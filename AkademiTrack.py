@@ -2,314 +2,548 @@ import requests
 import json
 import time
 import schedule
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import browser_cookie3
 import os
+import platform
+import sqlite3
+import shutil
+from pathlib import Path
+import pickle
+import subprocess
+import sys
+import tempfile
+import psutil
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, WebDriverException
+import uuid
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class SimpleISkoleAutomation:
+class ImprovedISkoleBot:
     def __init__(self):
         self.base_url = "https://iskole.net"
         self.session = requests.Session()
+        self.cookies_file = "iskole_cookies.pkl"
+        self.driver = None
+        self.temp_profile = None
         
-        # Headers based on your request
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'nb-NO,nb;q=0.9',
+        # Detect OS and set appropriate headers
+        self.headers = self.get_os_specific_headers()
+    
+    def get_os_specific_headers(self):
+        """Get OS-specific headers for better compatibility"""
+        return {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'nb-NO,nb;q=0.9,no;q=0.8,nn;q=0.7,en-US;q=0.6,en;q=0.5',
             'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Ch-Ua': '"Not.A/Brand";v="99", "Chromium";v="136"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-User': '?1',
+            'Sec-Fetch-Dest': 'document'
+        }
+    
+    def close_existing_chrome_processes(self):
+        """Close any existing Chrome processes that might interfere"""
+        try:
+            for proc in psutil.process_iter(['pid', 'name']):
+                if 'chrome' in proc.info['name'].lower():
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=3)
+                    except:
+                        try:
+                            proc.kill()
+                        except:
+                            pass
+            time.sleep(2)
+            logger.info("🔄 Closed existing Chrome processes")
+        except Exception as e:
+            logger.debug(f"Could not close Chrome processes: {e}")
+    
+    def create_temp_profile(self):
+        """Create a temporary Chrome profile"""
+        try:
+            self.temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
+            logger.info(f"📁 Created temp profile: {self.temp_profile}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create temp profile: {e}")
+            return False
+    
+    def cleanup_temp_profile(self):
+        """Clean up temporary profile"""
+        if self.temp_profile and os.path.exists(self.temp_profile):
+            try:
+                shutil.rmtree(self.temp_profile)
+                logger.info("🗑️  Cleaned up temp profile")
+            except:
+                pass
+    
+    def setup_selenium_driver(self):
+        """Setup Selenium Chrome driver with improved options"""
+        try:
+            # Close existing Chrome processes
+            self.close_existing_chrome_processes()
+            
+            # Create temp profile
+            if not self.create_temp_profile():
+                return False
+            
+            chrome_options = Options()
+            
+            # Use temporary profile to avoid conflicts
+            chrome_options.add_argument(f"--user-data-dir={self.temp_profile}")
+            chrome_options.add_argument("--profile-directory=Default")
+            
+            # Enhanced stealth options
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins-discovery")
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--allow-running-insecure-content")
+            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+            chrome_options.add_argument("--disable-ipc-flooding-protection")
+            chrome_options.add_argument("--disable-background-timer-throttling")
+            chrome_options.add_argument("--disable-renderer-backgrounding")
+            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+            
+            # Language settings for Norwegian
+            chrome_options.add_argument("--lang=nb-NO")
+            chrome_options.add_experimental_option("prefs", {
+                "intl.accept_languages": "nb-NO,nb,no,nn,en-US,en"
+            })
+            
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            # Try to create driver with webdriver-manager
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                from selenium.webdriver.chrome.service import Service
+                
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                
+                # Execute stealth script
+                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                    "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+                })
+                
+                logger.info("✅ Selenium Chrome driver initialized successfully")
+                return True
+                
+            except ImportError:
+                logger.info("📦 Installing webdriver-manager...")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "webdriver-manager"])
+                
+                from webdriver_manager.chrome import ChromeDriverManager
+                from selenium.webdriver.chrome.service import Service
+                
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                
+                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                logger.info("✅ ChromeDriver installed and initialized")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to setup Selenium driver: {e}")
+            self.cleanup_temp_profile()
+            return False
+    
+    def wait_for_login_completion(self, max_wait_minutes=20):
+        """Enhanced login detection with better monitoring"""
+        logger.info("👤 Please complete the login process in the browser...")
+        logger.info("⏳ The bot will detect when you reach the main page...")
+        
+        max_wait_time = max_wait_minutes * 60
+        start_time = time.time()
+        
+        success_indicators = [
+            'fravar', 'fravær', 'elev', 'student', 'timeplan', 'oppmøte', 'fremmøte'
+        ]
+        
+        while time.time() - start_time < max_wait_time:
+            try:
+                current_url = self.driver.current_url.lower()
+                page_title = self.driver.title.lower()
+                
+                # Get page source and check for success indicators
+                try:
+                    page_source = self.driver.page_source.lower()
+                except:
+                    page_source = ""
+                
+                # Check multiple success conditions
+                url_check = any(indicator in current_url for indicator in success_indicators)
+                title_check = any(indicator in page_title for indicator in success_indicators)
+                content_check = any(indicator in page_source for indicator in success_indicators)
+                
+                if url_check or title_check or content_check:
+                    logger.info("✅ Login detected! Proceeding with cookie extraction...")
+                    
+                    # Try to navigate to the fravær page specifically
+                    try:
+                        fravar_url = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar"
+                        if current_url != fravar_url:
+                            logger.info("🧭 Navigating to Fravær page...")
+                            self.driver.get(fravar_url)
+                            time.sleep(3)
+                    except Exception as e:
+                        logger.debug(f"Could not navigate to fravar page: {e}")
+                    
+                    return True
+                
+                # Check if we're on a login page or similar
+                if 'feide' in current_url or 'login' in current_url:
+                    time.sleep(3)  # Wait longer on login pages
+                else:
+                    time.sleep(2)
+                
+                # Progress indicator
+                elapsed_minutes = int((time.time() - start_time) / 60)
+                if elapsed_minutes > 0 and (time.time() - start_time) % 60 < 2:
+                    logger.info(f"⏱️  Waiting... ({elapsed_minutes}/{max_wait_minutes} minutes)")
+                    
+            except Exception as e:
+                logger.debug(f"Error during login monitoring: {e}")
+                time.sleep(2)
+        
+        logger.warning(f"⏰ Timeout after {max_wait_minutes} minutes. Make sure you complete the login process.")
+        return False
+    
+    def automated_login_and_cookie_extraction(self):
+        """Improved automated login with better error handling"""
+        if not self.setup_selenium_driver():
+            logger.error("❌ Could not setup Selenium driver")
+            return False
+        
+        try:
+            logger.info("🚀 Opening iSkole in browser...")
+            self.driver.get("https://iskole.net")
+            time.sleep(10)
+            
+            # Check if already logged in
+            current_url = self.driver.current_url.lower()
+            if any(indicator in current_url for indicator in ['fravar', 'fravær', 'elev']):
+                logger.info("✅ Already logged in!")
+                return self.extract_cookies_from_selenium()
+            
+            # Look for login elements and click if found
+            login_selectors = [
+                "//a[contains(text(), 'Logg inn')]",
+                "//button[contains(text(), 'Logg inn')]",
+                "//a[contains(text(), 'Login')]",
+                "//button[contains(text(), 'Login')]",
+                "//a[contains(@href, 'login')]",
+                "//a[contains(@href, 'feide')]",
+                "//a[contains(text(), 'Feide')]",
+                "//button[contains(text(), 'Feide')]",
+                "//input[@type='submit'][@value*='Logg']"
+            ]
+            
+            for selector in login_selectors:
+                try:
+                    login_element = WebDriverWait(self.driver, 3).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    logger.info(f"🔍 Found and clicking login element")
+                    self.driver.execute_script("arguments[0].click();", login_element)
+                    time.sleep(2)
+                    break
+                except TimeoutException:
+                    continue
+            
+            # Wait for user to complete login
+            if self.wait_for_login_completion():
+                return self.extract_cookies_from_selenium()
+            else:
+                return False
+            
+        except Exception as e:
+            logger.error(f"Error during automated login: {e}")
+            return False
+        finally:
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except:
+                    pass
+                self.cleanup_temp_profile()
+    
+    def extract_cookies_from_selenium(self):
+        """Enhanced cookie extraction with validation"""
+        try:
+            logger.info("🍪 Extracting cookies from browser session...")
+            
+            selenium_cookies = self.driver.get_cookies()
+            important_cookies = ['JSESSIONID', 'PHPSESSID', 'sessionid', 'auth']
+            
+            cookies_found = False
+            extracted_cookies = {}
+            
+            for cookie in selenium_cookies:
+                if cookie['domain'] in ['.iskole.net', 'iskole.net'] or \
+                   cookie['name'] in important_cookies:
+                    self.session.cookies.set(
+                        cookie['name'], 
+                        cookie['value'], 
+                        domain=cookie['domain'] if 'iskole.net' in cookie['domain'] else '.iskole.net'
+                    )
+                    extracted_cookies[cookie['name']] = cookie['value']
+                    logger.info(f"✅ Extracted cookie: {cookie['name']}")
+                    cookies_found = True
+            
+            if cookies_found:
+                # Test the extracted cookies
+                if self.test_cookies():
+                    self.save_cookies_to_file()
+                    logger.info("🎉 Cookies extracted and verified successfully!")
+                    logger.info(f"📝 Extracted {len(extracted_cookies)} cookies")
+                    return True
+                else:
+                    logger.warning("❌ Extracted cookies don't work properly")
+                    return False
+            else:
+                logger.warning("❌ No relevant cookies found in browser session")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error extracting cookies: {e}")
+            return False
+    
+    def save_cookies_to_file(self):
+        """Save current session cookies to file with metadata"""
+        try:
+            cookie_data = {
+                'cookies': dict(self.session.cookies),
+                'timestamp': datetime.now().isoformat(),
+                'user_agent': self.headers['User-Agent']
+            }
+            
+            with open(self.cookies_file, 'wb') as f:
+                pickle.dump(cookie_data, f)
+            logger.info(f"💾 Cookies saved to {self.cookies_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save cookies: {e}")
+            return False
+    
+    def load_cookies_from_file(self):
+        """Load cookies from file with expiration check"""
+        try:
+            if os.path.exists(self.cookies_file):
+                with open(self.cookies_file, 'rb') as f:
+                    cookie_data = pickle.load(f)
+                
+                # Handle old format (just cookies) or new format (with metadata)
+                if isinstance(cookie_data, dict) and 'cookies' in cookie_data:
+                    cookies = cookie_data['cookies']
+                    timestamp = datetime.fromisoformat(cookie_data.get('timestamp', '2025-01-01T00:00:00'))
+                    
+                    # Check if cookies are too old (more than 7 days)
+                    if datetime.now() - timestamp > timedelta(days=7):
+                        logger.info("⏰ Saved cookies are too old, will refresh")
+                        os.remove(self.cookies_file)
+                        return False
+                else:
+                    # Old format - just use the cookies directly
+                    cookies = cookie_data
+                
+                for name, value in cookies.items():
+                    self.session.cookies.set(name, value)
+                
+                logger.info(f"📂 Loaded {len(cookies)} cookies from file")
+                return True
+            else:
+                logger.info("No saved cookies file found")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to load cookies: {e}")
+            return False
+    
+    def test_cookies(self):
+        """Enhanced cookie validation"""
+        try:
+            test_urls = [
+                f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=fravar",
+                f"{self.base_url}/elev/",
+                f"{self.base_url}/"
+            ]
+            
+            for url in test_urls:
+                try:
+                    response = self.session.get(url, headers=self.headers, timeout=10)
+                    
+                    if response.status_code == 200:
+                        content = response.text.lower()
+                        success_indicators = [
+                            "fremmøte", "oppmøte", "fravær", "timeplan", 
+                            "elev", "student", "logg ut", "log out"
+                        ]
+                        
+                        if any(indicator in content for indicator in success_indicators):
+                            logger.info("✅ Cookie validation successful")
+                            return True
+                            
+                except Exception as e:
+                    logger.debug(f"Test failed for {url}: {e}")
+                    continue
+            
+            logger.info("❌ Cookie validation failed")
+            return False
+            
+        except Exception as e:
+            logger.debug(f"Cookie test error: {e}")
+            return False
+    
+    def get_browser_cookies_enhanced(self):
+        """Enhanced browser cookie extraction with multiple fallbacks"""
+        # Method 1: Try saved cookies first
+        if self.load_cookies_from_file():
+            if self.test_cookies():
+                logger.info("✅ Using saved cookies (still valid)")
+                return True
+            else:
+                logger.info("💾 Saved cookies invalid, refreshing...")
+        
+        # Method 2: Automated browser session (primary method)
+        logger.info("🤖 Starting automated browser session...")
+        if self.automated_login_and_cookie_extraction():
+            return True
+        
+        # Method 3: Enhanced browser_cookie3 with multiple attempts
+        logger.info("🔄 Trying browser_cookie3 with enhanced detection...")
+        
+        browsers_to_try = [
+            ('Chrome', browser_cookie3.chrome),
+            ('Edge', browser_cookie3.edge),
+            ('Firefox', browser_cookie3.firefox)
+        ]
+        
+        for browser_name, browser_func in browsers_to_try:
+            try:
+                logger.info(f"🔍 Trying {browser_name}...")
+                
+                # Try multiple domain variations
+                domains_to_try = ['iskole.net', '.iskole.net', 'www.iskole.net']
+                
+                for domain in domains_to_try:
+                    try:
+                        cookies = browser_func(domain_name=domain)
+                        if cookies:
+                            cookie_count = 0
+                            for cookie in cookies:
+                                if cookie.name and cookie.value:
+                                    self.session.cookies.set(cookie.name, cookie.value)
+                                    cookie_count += 1
+                            
+                            if cookie_count > 0:
+                                logger.info(f"🍪 Found {cookie_count} cookies from {browser_name}")
+                                if self.test_cookies():
+                                    self.save_cookies_to_file()
+                                    logger.info(f"✅ Successfully extracted cookies from {browser_name}")
+                                    return True
+                    except Exception as e:
+                        logger.debug(f"Failed to get cookies from {browser_name} for {domain}: {e}")
+                        continue
+                        
+            except Exception as e:
+                logger.debug(f"Browser {browser_name} failed: {e}")
+                continue
+        
+        logger.error("❌ All cookie extraction methods failed")
+        return False
+    
+    def get_api_headers(self):
+        """Get headers specifically for API requests"""
+        base_headers = self.headers.copy()
+        base_headers.update({
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/vnd.oracle.adf.action+json',
             'X-Requested-With': 'XMLHttpRequest',
             'Origin': 'https://iskole.net',
             'Referer': 'https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar',
-            'Sec-Fetch-Site': 'same-origin',
             'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Dest': 'empty',
-            'Connection': 'keep-alive'
-        }
-    
-    def get_browser_cookies(self):
-        """Get cookies from your browser automatically"""
-        try:
-            # Try different browsers
-            browsers = [
-                ('Chrome', browser_cookie3.chrome),
-                ('Firefox', browser_cookie3.firefox),
-                ('Safari', browser_cookie3.safari),
-                ('Edge', browser_cookie3.edge)
-            ]
-            
-            for browser_name, browser_func in browsers:
-                try:
-                    cookies = browser_func(domain_name='iskole.net')
-                    if cookies:
-                        logger.info(f"Found cookies from {browser_name}")
-                        # Add cookies to session
-                        for cookie in cookies:
-                            self.session.cookies.set(cookie.name, cookie.value)
-                        return True
-                except Exception as e:
-                    logger.debug(f"Could not get cookies from {browser_name}: {e}")
-                    continue
-            
-            logger.error("Could not find cookies from any browser")
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error getting browser cookies: {e}")
-            return False
+            'Sec-Fetch-Dest': 'empty'
+        })
+        return base_headers
     
     def get_current_ip(self):
-        """Get current public IP address"""
+        """Get current public IP address with fallback"""
         try:
-            response = requests.get('https://api.ipify.org/?format=json', timeout=10)
+            response = requests.get('https://api.ipify.org/?format=json', timeout=5)
             return response.json().get('ip', '109.247.238.162')
         except:
-            # Fallback to your IP from the request
-            return '109.247.238.162'
+            try:
+                response = requests.get('https://httpbin.org/ip', timeout=5)
+                return response.json().get('origin', '109.247.238.162')
+            except:
+                return '109.247.238.162'
     
     def check_login_status(self):
-        """Check if we can access the fravar page"""
+        """Enhanced login status check"""
         try:
-            response = self.session.get(
+            test_urls = [
                 f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=fravar",
-                headers=self.headers,
-                timeout=10
-            )
+                f"{self.base_url}/elev/"
+            ]
             
-            if response.status_code == 200 and "fremmøte" in response.text.lower():
-                logger.info("✅ Successfully connected to iSkole fravar page")
-                return True
-            else:
-                logger.warning("❌ Could not access fravar page - please make sure you're logged in to iSkole in your browser")
-                return False
+            for url in test_urls:
+                try:
+                    response = self.session.get(url, headers=self.headers, timeout=10)
+                    
+                    if response.status_code == 200:
+                        content = response.text.lower()
+                        if any(indicator in content for indicator in 
+                               ["fremmøte", "oppmøte", "fravær", "elev", "timeplan"]):
+                            logger.info("✅ Login status confirmed")
+                            return True
+                except:
+                    continue
+            
+            logger.warning("❌ Login status check failed")
+            return False
                 
         except Exception as e:
             logger.error(f"Error checking login status: {e}")
             return False
     
-    def get_current_lessons(self):
-        """Fetch current lesson data to get the correct timenr"""
-        try:
-            # Find the JSESSIONID from cookies
-            jsessionid = None
-            for cookie in self.session.cookies:
-                if cookie.name == 'JSESSIONID':
-                    jsessionid = cookie.value
-                    break
-            
-            if not jsessionid:
-                logger.error("No JSESSIONID found in cookies")
-                return None
-            
-            # Build URL to get lesson data
-            url = f"{self.base_url}/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionid}"
-            params = {
-                'finder': 'RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312',
-                'onlyData': 'true',
-                'limit': '99',
-                'offset': '0',
-                'totalResults': 'true'
-            }
-            
-            response = self.session.get(url, params=params, headers=self.headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                logger.info("📚 Successfully fetched lesson data")
-                return data
-            else:
-                logger.error(f"Failed to fetch lesson data: {response.status_code}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching lesson data: {e}")
-            return None
-
-    def calculate_timenr(self, base_timenr=21568187, reference_time=None):
-        """Calculate the correct timenr based on time passed"""
-        if reference_time is None:
-            # Use your first capture as reference: 2025-08-19 (assuming around 8:15 AM)
-            reference_time = datetime(2025, 8, 19, 8, 15)
-        
+    def calculate_timenr(self, base_timenr=21568187):
+        """Calculate timenr based on current time with improved logic"""
+        reference_time = datetime(2025, 8, 19, 8, 15)
         current_time = datetime.now()
         time_diff = current_time - reference_time
-        
-        # Calculate different possible increments
-        hours_passed = int(time_diff.total_seconds() / 3600)
-        days_passed = time_diff.days
-        
-        # Method 1: Hourly increment
-        timenr_hourly = base_timenr + hours_passed
-        
-        # Method 2: School period increment (assuming 8 periods per day, 5 days per week)
-        # School day schedule: 8:15, 9:00, 10:00, 10:45, 12:00, 12:45, 13:45, 14:30
-        school_periods = [
-            (8, 15), (9, 0), (10, 0), (10, 45),
-            (12, 0), (12, 45), (13, 45), (14, 30)
-        ]
-        
-        # Calculate which school period we're in
-        current_period = self.get_current_school_period(current_time, school_periods)
-        periods_since_reference = self.calculate_periods_since_reference(
-            reference_time, current_time, school_periods
-        )
-        timenr_period = base_timenr + periods_since_reference
-        
-        logger.info(f"📊 Timenr calculations:")
-        logger.info(f"   Hourly method: {timenr_hourly}")
-        logger.info(f"   Period method: {timenr_period}")
-        logger.info(f"   Hours passed: {hours_passed}")
-        logger.info(f"   Days passed: {days_passed}")
-        
-        return timenr_hourly, timenr_period
+        hours_passed = max(0, int(time_diff.total_seconds() / 3600))
+        calculated_timenr = base_timenr + hours_passed
+        logger.debug(f"Calculated timenr: {calculated_timenr} (base: {base_timenr}, hours: {hours_passed})")
+        return calculated_timenr
     
-    def get_current_school_period(self, current_time, school_periods):
-        """Determine which school period we're currently in"""
-        current_minutes = current_time.hour * 60 + current_time.minute
-        
-        for i, (hour, minute) in enumerate(school_periods):
-            period_start = hour * 60 + minute
-            period_end = period_start + 45  # 45 minute periods
-            
-            if period_start <= current_minutes < period_end:
-                return i
-        return -1  # Not in any school period
-    
-    def calculate_periods_since_reference(self, ref_time, current_time, school_periods):
-        """Calculate how many school periods have passed since reference"""
-        periods = 0
-        
-        # Simple calculation: assume 8 periods per school day
-        days_diff = (current_time.date() - ref_time.date()).days
-        weekdays_diff = self.count_weekdays(ref_time.date(), current_time.date())
-        
-        # Add periods for complete weekdays
-        periods += weekdays_diff * 8
-        
-        # Add periods for current day
-        ref_period = self.get_current_school_period(ref_time, school_periods)
-        current_period = self.get_current_school_period(current_time, school_periods)
-        
-        if current_time.date() == ref_time.date():
-            # Same day
-            periods += max(0, current_period - ref_period)
-        else:
-            # Different day
-            periods += current_period + 1 if current_period >= 0 else 0
-        
-        return periods
-    
-    def count_weekdays(self, start_date, end_date):
-        """Count weekdays between two dates"""
-        weekdays = 0
-        current_date = start_date
-        while current_date < end_date:
-            if current_date.weekday() < 5:  # Monday = 0, Friday = 4
-                weekdays += 1
-            current_date += timedelta(days=1)
-        return weekdays
-
-    def find_current_lesson_smart(self, lessons_data):
-        """Find the lesson using smart timenr calculation and API data"""
-        if not lessons_data or 'items' not in lessons_data:
-            logger.warning("No lesson data available")
-            return None
-        
-        # Calculate expected timenr values
-        timenr_hourly, timenr_period = self.calculate_timenr()
-        
-        # Try to find lesson in the API data first (most reliable)
-        current_time = datetime.now()
-        current_minutes = current_time.hour * 60 + current_time.minute
-        
-        # Registration windows
-        windows = [
-            (8*60 + 15, 8*60 + 30, "morning_1"),
-            (9*60, 9*60 + 15, "morning_2"),  
-            (14*60 + 15, 14*60 + 30, "afternoon_1"),
-            (15*60, 15*60 + 15, "afternoon_2")
-        ]
-        
-        current_window = None
-        for start, end, name in windows:
-            if start <= current_minutes <= end:
-                current_window = name
-                break
-        
-        if not current_window:
-            logger.warning("Not in any registration window")
-            return None
-        
-        # Look for lessons in the API data
-        logger.info(f"📚 Searching through {len(lessons_data['items'])} lessons...")
-        
-        best_match = None
-        for lesson in lessons_data['items']:
-            if 'timenr' in lesson:
-                lesson_timenr = lesson['timenr']
-                logger.debug(f"Found lesson with timenr: {lesson_timenr}")
-                
-                # Check if this timenr is close to our calculated values
-                if (abs(lesson_timenr - timenr_hourly) <= 2 or 
-                    abs(lesson_timenr - timenr_period) <= 2):
-                    logger.info(f"🎯 Found matching lesson: timenr={lesson_timenr}")
-                    best_match = lesson
-                    break
-        
-        if best_match:
-            return best_match
-        
-        # Fallback: create lesson data with calculated timenr
-        logger.info("🔄 Using calculated timenr (fallback method)")
-        fallback_lesson = {
-            'timenr': timenr_hourly  # Use hourly as primary guess
-        }
-        return fallback_lesson
-
-    def try_multiple_timenr_values(self, base_payload):
-        """Try registration with multiple timenr values"""
-        timenr_hourly, timenr_period = self.calculate_timenr()
-        
-        # Try different timenr values in order of likelihood
-        timenr_candidates = [
-            timenr_hourly,
-            timenr_period,
-            timenr_hourly + 1,
-            timenr_hourly - 1,
-            timenr_period + 1,
-            timenr_period - 1
-        ]
-        
-        for timenr in timenr_candidates:
-            logger.info(f"🎲 Trying timenr: {timenr}")
-            
-            # Update payload with this timenr
-            payload = base_payload.copy()
-            for param in payload['parameters']:
-                if 'timenr' in param:
-                    param['timenr'] = timenr
-                    break
-            
-            success = self.send_registration_request(payload)
-            if success:
-                logger.info(f"✅ Success with timenr: {timenr}")
-                return True
-            
-            # Small delay between attempts
-            time.sleep(1)
-        
-        logger.error("❌ Failed with all timenr values")
-        return False
-
-    def send_registration_request(self, payload):
-        """Send the actual registration request"""
+    def register_attendance_enhanced(self):
+        """Enhanced attendance registration with better error handling"""
         try:
-            # Find the JSESSIONID from cookies
+            current_ip = self.get_current_ip()
+            current_date = datetime.now().strftime("%Y%m%d")
+            timenr = self.calculate_timenr()
+            
+            # Get JSESSIONID
             jsessionid = None
             for cookie in self.session.cookies:
                 if cookie.name == 'JSESSIONID':
@@ -317,41 +551,12 @@ class SimpleISkoleAutomation:
                     break
             
             if not jsessionid:
-                logger.error("No JSESSIONID found in cookies")
+                logger.error("❌ No JSESSIONID found - login may have expired")
                 return False
             
-            # Build URL with session ID
             url = f"{self.base_url}/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionid}"
             
-            response = self.session.post(
-                url,
-                headers=self.headers,
-                data=json.dumps(payload),
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                return True
-            else:
-                logger.debug(f"Registration failed: {response.status_code} - {response.text}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Request failed: {e}")
-            return False
-
-    def register_attendance_now(self):
-        """Try to register attendance right now with smart timenr calculation"""
-        try:
-            # First, get current lesson data from API
-            lessons_data = self.get_current_lessons()
-            
-            # Get current IP and date
-            current_ip = self.get_current_ip()
-            current_date = datetime.now().strftime("%Y%m%d")
-            
-            # Build base payload
-            base_payload = {
+            payload = {
                 "name": "lagre_oppmote",
                 "parameters": [
                     {"fylkeid": "00"},
@@ -363,156 +568,226 @@ class SimpleISkoleAutomation:
                     {"kl_id": "A"},
                     {"k_navn": "STU"},
                     {"gruppe_nr": "$"},
-                    {"timenr": 0},  # Will be updated
+                    {"timenr": timenr},
                     {"fravaerstype": "M"},
                     {"ip": current_ip}
                 ]
             }
             
-            # Method 1: Try with API lesson data
-            if lessons_data:
-                current_lesson = self.find_current_lesson_smart(lessons_data)
-                if current_lesson and 'timenr' in current_lesson:
-                    # Update payload with correct timenr
-                    for param in base_payload['parameters']:
-                        if 'timenr' in param:
-                            param['timenr'] = current_lesson['timenr']
-                            break
-                    
-                    logger.info(f"🎯 Using API lesson data: timenr={current_lesson['timenr']}")
-                    success = self.send_registration_request(base_payload)
-                    if success:
-                        logger.info("🎉 Successfully registered attendance!")
-                        return True
+            logger.info(f"📡 Attempting registration with IP: {current_ip}, timenr: {timenr}")
             
-            # Method 2: Try with calculated timenr values
-            logger.info("🔄 Trying calculated timenr values...")
-            success = self.try_multiple_timenr_values(base_payload)
-            if success:
+            response = self.session.post(
+                url,
+                headers=self.get_api_headers(),
+                data=json.dumps(payload),
+                timeout=15
+            )
+            
+            logger.info(f"📊 Registration response: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    logger.info(f"📋 Response data: {response_data}")
+                except:
+                    logger.info("✅ Registration request sent successfully")
+                
+                logger.info("🎉 Attendance registration completed!")
                 return True
-            
-            logger.error("❌ All registration attempts failed")
-            return False
+            else:
+                logger.error(f"❌ Registration failed with status: {response.status_code}")
+                logger.debug(f"Response: {response.text[:200]}")
+                return False
                 
         except Exception as e:
-            logger.error(f"Error registering attendance: {e}")
+            logger.error(f"❌ Error during registration: {e}")
             return False
     
     def is_registration_time(self):
-        """Check if current time is within a registration window"""
+        """Check if current time is within registration windows"""
         now = datetime.now()
-        current_time = now.hour * 60 + now.minute  # Convert to minutes since midnight
+        current_time = now.hour * 60 + now.minute
         
-        # Registration windows based on your schedule
-        # Format: (start_minutes, end_minutes, description)
+        # Registration windows (in minutes from midnight)
         windows = [
-            (8*60 + 15, 8*60 + 30, "08:15-08:30 (første time)"),
-            (9*60, 9*60 + 15, "09:00-09:15 (andre time)"),  
-            (14*60 + 15, 14*60 + 30, "14:15-14:30 (sjette time)"),
-            (15*60, 15*60 + 15, "15:00-15:15 (syvende time)")
+            (8*60 + 15, 8*60 + 30),   # 08:15-08:30
+            (9*60, 9*60 + 15),        # 09:00-09:15
+            (14*60 + 15, 14*60 + 30), # 14:15-14:30
+            (15*60, 15*60 + 15)       # 15:00-15:15
         ]
         
-        for start, end, desc in windows:
+        for start, end in windows:
             if start <= current_time <= end:
-                logger.info(f"⏰ Within registration window: {desc}")
+                window_name = f"{start//60:02d}:{start%60:02d}-{end//60:02d}:{end%60:02d}"
+                logger.info(f"✅ Within registration window: {window_name}")
                 return True
         
         return False
     
     def check_and_register(self):
-        """Main function to check if we should register attendance"""
+        """Enhanced main check and register function"""
         current_time = datetime.now()
         logger.info(f"🕒 Checking at {current_time.strftime('%H:%M:%S')}")
         
         # Skip weekends
-        if current_time.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
-            logger.info("📅 Weekend - skipping check")
+        if current_time.weekday() >= 5:
+            logger.info("📅 Weekend - skipping")
             return
         
-        # Get browser cookies
-        if not self.get_browser_cookies():
-            logger.warning("⚠️  Could not get browser cookies - make sure iSkole is open in your browser")
+        # Try to get cookies
+        if not self.get_browser_cookies_enhanced():
+            logger.warning("⚠️  Could not obtain valid cookies")
             return
         
-        # Check if we can access the system
+        # Check login status
         if not self.check_login_status():
-            logger.warning("⚠️  Not logged in - please open iSkole in your browser and log in")
+            logger.warning("⚠️  Login verification failed")
+            # Remove expired cookies
+            if os.path.exists(self.cookies_file):
+                os.remove(self.cookies_file)
+                logger.info("🔄 Removed expired cookies")
             return
         
-        # Check if it's time to register
+        # Check if it's registration time
         if self.is_registration_time():
-            logger.info("✅ Time to register attendance!")
-            success = self.register_attendance_now()
+            logger.info("⏰ Registration time detected - attempting registration")
+            success = self.register_attendance_enhanced()
             if success:
                 logger.info("🎯 Attendance registered successfully!")
             else:
-                logger.warning("❌ Failed to register attendance")
+                logger.warning("❌ Registration attempt failed")
         else:
             next_window = self.get_next_registration_window()
             logger.info(f"⏳ Not registration time. Next window: {next_window}")
     
     def get_next_registration_window(self):
-        """Get description of next registration window"""
+        """Get the next registration window time"""
         now = datetime.now()
-        current_time = now.hour * 60 + now.minute
+        current_minutes = now.hour * 60 + now.minute
         
         windows = [
             (8*60 + 15, "08:15"),
-            (9*60, "09:00"),
-            (14*60 + 15, "14:15"), 
+            (9*60, "09:00"), 
+            (14*60 + 15, "14:15"),
             (15*60, "15:00")
         ]
         
-        for start, time_str in windows:
-            if current_time < start:
-                return f"{time_str} today"
+        for window_minutes, window_time in windows:
+            if current_minutes < window_minutes:
+                return window_time
         
-        return "08:15 tomorrow"
+        return "08:15 (tomorrow)"
     
     def run_scheduler(self):
-        """Set up and run the scheduler"""
-        # Check every 5 minutes during school hours
-        schedule.every(5).minutes.do(self.check_and_register)
+        """Run the enhanced automated scheduler"""
+        # Check every 3 minutes instead of 5 for better coverage
+        schedule.every(3).minutes.do(self.check_and_register)
         
-        logger.info("🚀 iSkole attendance automation started!")
-        logger.info("📋 Registration windows:")
-        logger.info("   • 08:15-08:30 (første time)")
-        logger.info("   • 09:00-09:15 (andre time)")  
-        logger.info("   • 14:15-14:30 (sjette time)")
-        logger.info("   • 15:00-15:15 (syvende time)")
-        logger.info("⏰ Checking every 5 minutes...")
-        logger.info("💡 Make sure iSkole is open and logged in in your browser!")
-        print("\n" + "="*50)
+        print("\n🤖 Enhanced iSkole Bot Started!")
+        print("📋 Registration windows:")
+        print("   • 08:15-08:30 (første time)")
+        print("   • 09:00-09:15 (andre time)")
+        print("   • 14:15-14:30 (sjette time)")
+        print("   • 15:00-15:15 (syvende time)")
+        print("⏰ Checking every 3 minutes...")
+        print("🔄 Enhanced cookie management")
+        print("✨ Improved login detection")
+        print("-" * 50)
         
-        # Do an initial check
+        # Initial check
         self.check_and_register()
         
-        # Run the scheduler
         while True:
             try:
                 schedule.run_pending()
-                time.sleep(30)  # Check every 30 seconds
+                time.sleep(30)
             except KeyboardInterrupt:
                 logger.info("👋 Stopping automation...")
                 break
             except Exception as e:
                 logger.error(f"Scheduler error: {e}")
-                time.sleep(60)  # Wait a bit before retrying
+                time.sleep(60)
+
+def install_requirements():
+    """Install required packages"""
+    required_packages = [
+        'selenium', 'webdriver-manager', 'psutil', 
+        'requests', 'schedule', 'browser-cookie3'
+    ]
+    
+    for package in required_packages:
+        try:
+            __import__(package.replace('-', '_'))
+        except ImportError:
+            logger.info(f"📦 Installing {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 def main():
-    print("🎓 iSkole Attendance Automation")
-    print("="*40)
-    print("Instructions:")
-    print("1. Open iSkole in your browser and log in")
-    print("2. Navigate to the 'Fravær' page") 
-    print("3. Keep the browser open (you can minimize it)")
-    print("4. This program will automatically register attendance during class times")
-    print("="*40)
+    print("🚀 ENHANCED iSkole Bot v4.0")
+    print("=" * 50)
+    print(f"💻 OS: {platform.system()} {platform.release()}")
+    print("\n✨ NEW FEATURES:")
+    print("✅ Enhanced cookie extraction")
+    print("✅ Better Chrome process management") 
+    print("✅ Improved login detection")
+    print("✅ Multiple fallback methods")
+    print("✅ Automatic Chrome process cleanup")
+    print("✅ Temporary profile management")
+    print("✅ Enhanced error handling")
+    print("\n📋 How it works:")
+    print("1. First run: Opens browser automatically")
+    print("2. You login once manually")
+    print("3. Bot extracts and saves cookies")
+    print("4. Future runs: Fully automatic")
+    print("5. Registers during school hours only")
+    print("=" * 50)
     
-    input("Press Enter when you're logged in to iSkole and on the Fravær page...")
+    # Install requirements
+    try:
+        install_requirements()
+        print("📦 All requirements installed")
+    except Exception as e:
+        print(f"⚠️  Could not install requirements: {e}")
+        print("Please run: pip install selenium webdriver-manager psutil requests schedule browser-cookie3")
+        input("Press Enter after installing requirements...")
     
-    automation = SimpleISkoleAutomation()
-    automation.run_scheduler()
+    automation = ImprovedISkoleBot()
+    
+    # Check for existing cookies
+    if os.path.exists(automation.cookies_file):
+        print("\n💾 Found saved cookies!")
+        print("Options:")
+        print("  [Enter] - Start with saved cookies")
+        print("  'reset' - Delete saved cookies and start fresh")
+        print("  'test' - Test current cookies")
+        
+        choice = input("\nChoice: ").strip().lower()
+        
+        if choice == 'reset':
+            os.remove(automation.cookies_file)
+            print("🗑️  Cookies deleted - will need fresh login")
+        elif choice == 'test':
+            print("🧪 Testing saved cookies...")
+            if automation.load_cookies_from_file() and automation.test_cookies():
+                print("✅ Saved cookies are working!")
+            else:
+                print("❌ Saved cookies are invalid")
+                os.remove(automation.cookies_file)
+                print("🗑️  Invalid cookies deleted")
+    else:
+        print("\n🆕 First run detected")
+        print("The bot will open a browser for you to login")
+    
+    print("\n🚀 Starting enhanced automation...")
+    print("💡 TIP: Keep this window open to see status updates")
+    
+    try:
+        automation.run_scheduler()
+    except KeyboardInterrupt:
+        print("\n👋 Bot stopped by user")
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")
+        print("💡 Try restarting the bot")
 
 if __name__ == "__main__":
     main()
