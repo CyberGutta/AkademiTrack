@@ -32,16 +32,27 @@ class ImprovedISkoleBot:
         self.base_url = "https://iskole.net"
         self.session = requests.Session()
         self.cookies_file = "iskole_cookies.pkl"
+        self.timenr_file = "timenr_counter.pkl"
         self.driver = None
         self.temp_profile = None
         
         # Detect OS and set appropriate headers
         self.headers = self.get_os_specific_headers()
+        
+        # Initialize timenr counter
+        self.load_timenr_counter()
     
     def get_os_specific_headers(self):
         """Get OS-specific headers for better compatibility"""
+        if platform.system() == "Darwin":  # macOS
+            user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            platform_header = '"macOS"'
+        else:  # Windows/Linux fallback
+            user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            platform_header = '"Windows"'
+            
         return {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'User-Agent': user_agent,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'nb-NO,nb;q=0.9,no;q=0.8,nn;q=0.7,en-US;q=0.6,en;q=0.5',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -49,7 +60,7 @@ class ImprovedISkoleBot:
             'Upgrade-Insecure-Requests': '1',
             'Sec-Ch-Ua': '"Not.A/Brand";v="99", "Chromium";v="136"',
             'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Ch-Ua-Platform': platform_header,
             'Sec-Fetch-Site': 'same-origin',
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-User': '?1',
@@ -57,18 +68,28 @@ class ImprovedISkoleBot:
         }
     
     def close_existing_chrome_processes(self):
-        """Close any existing Chrome processes that might interfere"""
+        """Close any existing Chrome processes that might interfere - Mac compatible"""
         try:
-            for proc in psutil.process_iter(['pid', 'name']):
-                if 'chrome' in proc.info['name'].lower():
-                    try:
-                        proc.terminate()
-                        proc.wait(timeout=3)
-                    except:
+            if platform.system() == "Darwin":  # macOS
+                # Use pkill on Mac for more reliable process termination
+                try:
+                    subprocess.run(['pkill', '-f', 'Chrome'], check=False, capture_output=True)
+                    subprocess.run(['pkill', '-f', 'chrome'], check=False, capture_output=True)
+                    subprocess.run(['pkill', '-f', 'Google Chrome'], check=False, capture_output=True)
+                except:
+                    pass
+            else:
+                # Original Windows/Linux method
+                for proc in psutil.process_iter(['pid', 'name']):
+                    if 'chrome' in proc.info['name'].lower():
                         try:
-                            proc.kill()
+                            proc.terminate()
+                            proc.wait(timeout=3)
                         except:
-                            pass
+                            try:
+                                proc.kill()
+                            except:
+                                pass
             time.sleep(2)
             logger.info("🔄 Closed existing Chrome processes")
         except Exception as e:
@@ -94,7 +115,7 @@ class ImprovedISkoleBot:
                 pass
     
     def setup_selenium_driver(self):
-        """Setup Selenium Chrome driver with improved options"""
+        """Setup Selenium Chrome driver with Mac-specific options"""
         try:
             # Close existing Chrome processes
             self.close_existing_chrome_processes()
@@ -109,9 +130,20 @@ class ImprovedISkoleBot:
             chrome_options.add_argument(f"--user-data-dir={self.temp_profile}")
             chrome_options.add_argument("--profile-directory=Default")
             
-            # Enhanced stealth options
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
+            # Mac-specific Chrome options
+            if platform.system() == "Darwin":
+                # macOS specific arguments
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                chrome_options.add_argument("--no-first-run")
+                chrome_options.add_argument("--no-default-browser-check")
+                chrome_options.add_argument("--disable-default-apps")
+                # Remove sandbox disable for Mac (can cause issues)
+                # chrome_options.add_argument("--no-sandbox")  # Comment out for Mac
+            else:
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+            
+            # Enhanced stealth options (cross-platform)
             chrome_options.add_argument("--disable-blink-features=AutomationControlled")
             chrome_options.add_argument("--disable-extensions")
             chrome_options.add_argument("--disable-plugins-discovery")
@@ -143,7 +175,7 @@ class ImprovedISkoleBot:
                 # Execute stealth script
                 self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                 self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-                    "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+                    "userAgent": self.headers['User-Agent']
                 })
                 
                 logger.info("✅ Selenium Chrome driver initialized successfully")
@@ -415,7 +447,7 @@ class ImprovedISkoleBot:
             return False
     
     def get_browser_cookies_enhanced(self):
-        """Enhanced browser cookie extraction with multiple fallbacks"""
+        """Enhanced browser cookie extraction with Mac compatibility"""
         # Method 1: Try saved cookies first
         if self.load_cookies_from_file():
             if self.test_cookies():
@@ -429,14 +461,22 @@ class ImprovedISkoleBot:
         if self.automated_login_and_cookie_extraction():
             return True
         
-        # Method 3: Enhanced browser_cookie3 with multiple attempts
+        # Method 3: Enhanced browser_cookie3 with Mac-specific handling
         logger.info("🔄 Trying browser_cookie3 with enhanced detection...")
         
-        browsers_to_try = [
-            ('Chrome', browser_cookie3.chrome),
-            ('Edge', browser_cookie3.edge),
-            ('Firefox', browser_cookie3.firefox)
-        ]
+        # Mac-specific browser detection
+        if platform.system() == "Darwin":
+            browsers_to_try = [
+                ('Chrome', browser_cookie3.chrome),
+                ('Safari', browser_cookie3.safari),
+                ('Firefox', browser_cookie3.firefox)
+            ]
+        else:
+            browsers_to_try = [
+                ('Chrome', browser_cookie3.chrome),
+                ('Edge', browser_cookie3.edge),
+                ('Firefox', browser_cookie3.firefox)
+            ]
         
         for browser_name, browser_func in browsers_to_try:
             try:
@@ -526,22 +566,89 @@ class ImprovedISkoleBot:
             logger.error(f"Error checking login status: {e}")
             return False
     
-    def calculate_timenr(self, base_timenr=21568187):
-        """Calculate timenr based on current time with improved logic"""
-        reference_time = datetime(2025, 8, 19, 8, 15)
-        current_time = datetime.now()
-        time_diff = current_time - reference_time
-        hours_passed = max(0, int(time_diff.total_seconds() / 3600))
-        calculated_timenr = base_timenr + hours_passed
-        logger.debug(f"Calculated timenr: {calculated_timenr} (base: {base_timenr}, hours: {hours_passed})")
-        return calculated_timenr
+    def load_timenr_counter(self):
+        """Load the timenr counter from file"""
+        try:
+            if os.path.exists(self.timenr_file):
+                with open(self.timenr_file, 'rb') as f:
+                    data = pickle.load(f)
+                    self.current_timenr = data.get('timenr', 21568187)
+                    self.last_increment_date = data.get('last_increment_date', '')
+                    self.daily_incremented_times = set(data.get('daily_incremented_times', []))
+                    logger.info(f"📊 Loaded timenr counter: {self.current_timenr}")
+            else:
+                self.current_timenr = 21568187
+                self.last_increment_date = ''
+                self.daily_incremented_times = set()
+                logger.info(f"🆕 Initialized timenr counter: {self.current_timenr}")
+                self.save_timenr_counter()
+        except Exception as e:
+            logger.error(f"Failed to load timenr counter: {e}")
+            self.current_timenr = 21568187
+            self.last_increment_date = ''
+            self.daily_incremented_times = set()
+    
+    def save_timenr_counter(self):
+        """Save the timenr counter to file"""
+        try:
+            data = {
+                'timenr': self.current_timenr,
+                'last_updated': datetime.now().isoformat(),
+                'last_increment_date': self.last_increment_date,
+                'daily_incremented_times': list(self.daily_incremented_times)
+            }
+            with open(self.timenr_file, 'wb') as f:
+                pickle.dump(data, f)
+            logger.debug(f"💾 Saved timenr counter: {self.current_timenr}")
+        except Exception as e:
+            logger.error(f"Failed to save timenr counter: {e}")
+    
+    def should_increment_timenr(self):
+        """Check if timenr should be incremented based on current time"""
+        now = datetime.now()
+        current_date = now.strftime("%Y-%m-%d")
+        current_time = now.strftime("%H:%M")
+        
+        # Reset daily tracking if it's a new day (but keep timenr growing)
+        if self.last_increment_date != current_date:
+            self.daily_incremented_times = set()
+            self.last_increment_date = current_date
+            logger.info("🗓️ New day - reset daily increment tracking (timenr continues growing)")
+            self.save_timenr_counter()
+        
+        # Define increment times
+        increment_times = ["08:10", "08:55", "09:50", "10:40", "11:55", "12:40", "13:40", "14:25"]
+        
+        # Check if current time matches any increment time and hasn't been done today
+        for increment_time in increment_times:
+            if current_time == increment_time and increment_time not in self.daily_incremented_times:
+                return increment_time
+        
+        return None
+    
+    def increment_timenr(self, increment_time=None):
+        """Increment timenr by 1 and save"""
+        self.current_timenr += 1
+        if increment_time:
+            self.daily_incremented_times.add(increment_time)
+            logger.info(f"🕒 Time-based increment at {increment_time}: timenr = {self.current_timenr}")
+        else:
+            logger.info(f"🔢 Manual increment: timenr = {self.current_timenr}")
+        self.save_timenr_counter()
+    
+    def check_timenr_increment(self):
+        """Check and perform timenr increment if needed"""
+        increment_time = self.should_increment_timenr()
+        if increment_time:
+            self.increment_timenr(increment_time)
+            return True
+        return False
     
     def register_attendance_enhanced(self):
-        """Enhanced attendance registration with better error handling"""
+        """Enhanced attendance registration without automatic timenr increment"""
         try:
             current_ip = self.get_current_ip()
             current_date = datetime.now().strftime("%Y%m%d")
-            timenr = self.calculate_timenr()
             
             # Get JSESSIONID
             jsessionid = None
@@ -568,13 +675,13 @@ class ImprovedISkoleBot:
                     {"kl_id": "A"},
                     {"k_navn": "STU"},
                     {"gruppe_nr": "$"},
-                    {"timenr": timenr},
+                    {"timenr": self.current_timenr},
                     {"fravaerstype": "M"},
                     {"ip": current_ip}
                 ]
             }
             
-            logger.info(f"📡 Attempting registration with IP: {current_ip}, timenr: {timenr}")
+            logger.info(f"📡 Attempting registration with IP: {current_ip}, timenr: {self.current_timenr}")
             
             response = self.session.post(
                 url,
@@ -625,7 +732,7 @@ class ImprovedISkoleBot:
         return False
     
     def check_and_register(self):
-        """Enhanced main check and register function"""
+        """Enhanced main check and register function with timenr increment checking"""
         current_time = datetime.now()
         logger.info(f"🕒 Checking at {current_time.strftime('%H:%M:%S')}")
         
@@ -633,6 +740,9 @@ class ImprovedISkoleBot:
         if current_time.weekday() >= 5:
             logger.info("📅 Weekend - skipping")
             return
+        
+        # Check if timenr should be incremented (independent of registration)
+        timenr_incremented = self.check_timenr_increment()
         
         # Try to get cookies
         if not self.get_browser_cookies_enhanced():
@@ -658,7 +768,37 @@ class ImprovedISkoleBot:
                 logger.warning("❌ Registration attempt failed")
         else:
             next_window = self.get_next_registration_window()
+            next_increment = self.get_next_increment_time()
             logger.info(f"⏳ Not registration time. Next window: {next_window}")
+            if next_increment:
+                logger.info(f"🔢 Next timenr increment: {next_increment}")
+    
+    def get_next_increment_time(self):
+        """Get the next timenr increment time"""
+        now = datetime.now()
+        current_time = now.hour * 60 + now.minute
+        current_date = now.strftime("%Y-%m-%d")
+        
+        # Reset daily tracking if it's a new day (but keep timenr growing)
+        if self.last_increment_date != current_date:
+            self.daily_incremented_times = set()
+        
+        increment_times = [
+            (8*60 + 10, "08:10"),   # 08:10
+            (8*60 + 55, "08:55"),   # 08:55
+            (9*60 + 50, "09:50"),   # 09:50
+            (10*60 + 40, "10:40"),  # 10:40
+            (11*60 + 55, "11:55"),  # 11:55
+            (12*60 + 40, "12:40"),  # 12:40
+            (13*60 + 40, "13:40"),  # 13:40
+            (14*60 + 25, "14:25")   # 14:25
+        ]
+        
+        for time_minutes, time_str in increment_times:
+            if current_time < time_minutes and time_str not in self.daily_incremented_times:
+                return time_str
+        
+        return "08:10 (tomorrow)"
     
     def get_next_registration_window(self):
         """Get the next registration window time"""
@@ -680,18 +820,24 @@ class ImprovedISkoleBot:
     
     def run_scheduler(self):
         """Run the enhanced automated scheduler"""
-        # Check every 3 minutes instead of 5 for better coverage
-        schedule.every(3).minutes.do(self.check_and_register)
+        # Check every minute for more precise timenr increment timing
+        schedule.every(1).minutes.do(self.check_and_register)
         
-        print("\n🤖 Enhanced iSkole Bot Started!")
+        print("\n🤖 Enhanced iSkole Bot Started (Mac Compatible)!")
         print("📋 Registration windows:")
         print("   • 08:15-08:30 (første time)")
         print("   • 09:00-09:15 (andre time)")
         print("   • 14:15-14:30 (sjette time)")
         print("   • 15:00-15:15 (syvende time)")
-        print("⏰ Checking every 3 minutes...")
+        print("🔢 Time-based timenr increments:")
+        print("   • 08:10, 08:55, 09:50, 10:40")
+        print("   • 11:55, 12:40, 13:40, 14:25")
+        print("   • timenr keeps growing continuously (no daily reset)")
+        print("⏰ Checking every minute...")
         print("🔄 Enhanced cookie management")
         print("✨ Improved login detection")
+        print("🔢 Continuous timenr growth")
+        print(f"📊 Current timenr: {self.current_timenr}")
         print("-" * 50)
         
         # Initial check
@@ -709,7 +855,7 @@ class ImprovedISkoleBot:
                 time.sleep(60)
 
 def install_requirements():
-    """Install required packages"""
+    """Install required packages with Mac compatibility"""
     required_packages = [
         'selenium', 'webdriver-manager', 'psutil', 
         'requests', 'schedule', 'browser-cookie3'
@@ -723,10 +869,16 @@ def install_requirements():
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 def main():
-    print("🚀 ENHANCED iSkole Bot v4.0")
-    print("=" * 50)
+    print("🚀 ENHANCED iSkole Bot v4.1 (Mac Compatible)")
+    print("=" * 55)
     print(f"💻 OS: {platform.system()} {platform.release()}")
+    
+    if platform.system() == "Darwin":
+        print("🍎 macOS optimizations enabled")
+    
     print("\n✨ NEW FEATURES:")
+    print("✅ macOS compatibility")
+    print("✅ Time-based timenr increments")
     print("✅ Enhanced cookie extraction")
     print("✅ Better Chrome process management") 
     print("✅ Improved login detection")
@@ -740,7 +892,17 @@ def main():
     print("3. Bot extracts and saves cookies")
     print("4. Future runs: Fully automatic")
     print("5. Registers during school hours only")
-    print("=" * 50)
+    print("6. timenr increments at specific times daily:")
+    print("   08:10, 08:55, 09:50, 10:40, 11:55, 12:40, 13:40, 14:25")
+    print("7. timenr keeps growing continuously (no daily reset)")
+    print("=" * 55)
+    
+    # Mac-specific installation notes
+    if platform.system() == "Darwin":
+        print("\n🍎 macOS Notes:")
+        print("• Chrome must be installed in Applications")
+        print("• Allow permissions if prompted")
+        print("• Close existing Chrome windows before starting")
     
     # Install requirements
     try:
@@ -753,15 +915,49 @@ def main():
     
     automation = ImprovedISkoleBot()
     
+    # Show current timenr
+    print(f"\n🔢 Current timenr: {automation.current_timenr}")
+    
+    # timenr management
+    print(f"\n🔢 Current timenr: {automation.current_timenr}")
+    print("\ntimenr Options:")
+    print("  [Enter] - Continue with current timenr")
+    print("  'set' - Set custom timenr value")
+    print("  'reset' - Reset timenr to default (21568187)")
+    
+    timenr_choice = input("\ntimenr choice: ").strip().lower()
+    
+    if timenr_choice == 'set':
+        while True:
+            try:
+                custom_timenr = input("\nEnter custom timenr value: ").strip()
+                new_timenr = int(custom_timenr)
+                if new_timenr > 0:
+                    automation.current_timenr = new_timenr
+                    automation.save_timenr_counter()
+                    print(f"✅ timenr set to: {automation.current_timenr}")
+                    break
+                else:
+                    print("❌ Please enter a positive number")
+            except ValueError:
+                print("❌ Please enter a valid number")
+            except KeyboardInterrupt:
+                print("\n🚫 Cancelled - keeping current timenr")
+                break
+    elif timenr_choice == 'reset':
+        automation.current_timenr = 21568187
+        automation.save_timenr_counter()
+        print(f"🔄 timenr reset to: {automation.current_timenr}")
+    
     # Check for existing cookies
     if os.path.exists(automation.cookies_file):
         print("\n💾 Found saved cookies!")
-        print("Options:")
+        print("Cookie Options:")
         print("  [Enter] - Start with saved cookies")
         print("  'reset' - Delete saved cookies and start fresh")
         print("  'test' - Test current cookies")
         
-        choice = input("\nChoice: ").strip().lower()
+        choice = input("\nCookie choice: ").strip().lower()
         
         if choice == 'reset':
             os.remove(automation.cookies_file)
