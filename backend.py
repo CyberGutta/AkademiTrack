@@ -35,12 +35,18 @@ class ImprovedISkoleBot:
     def __init__(self, gui_callback=None):
         self.base_url = "https://iskole.net"
         self.session = requests.Session()
-        self.cookies_file = "iskole_cookies.pkl"
-        self.timenr_file = "timenr_counter.pkl"
+        # Ensure files are saved alongside this script (avoid CWD issues)
+        self._base_dir = Path(__file__).resolve().parent
+        self.cookies_file = str(self._base_dir / "iskole_cookies.pkl")
+        self.timenr_file = str(self._base_dir / "timenr_counter.pkl")
         self.driver = None
         self.temp_profile = None
         self.gui_callback = gui_callback
         self.running = False
+        self.cookies_ready = False
+        self._should_stop = False
+        # Track if user cancelled setup by closing the login window
+        self.last_setup_cancelled = False
         
         # Detect OS and set appropriate headers
         self.headers = self.get_os_specific_headers()
@@ -51,6 +57,9 @@ class ImprovedISkoleBot:
         # Set up logging
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+        
+        # Target URL that guarantees user is fully authenticated (timeplan view)
+        self.timeplan_url = f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=timeplan"
     
     def log(self, message):
         """Log message and send to GUI if available"""
@@ -134,11 +143,34 @@ class ImprovedISkoleBot:
     def setup_selenium_driver(self):
         """Setup Selenium Chrome driver with platform-specific options"""
         try:
+            # If a driver already exists (window open), reuse it
+            if self.driver is not None:
+                try:
+                    _ = self.driver.current_url  # probe
+                    self.log("♻️ Reusing existing Selenium Chrome driver")
+                    return True
+                except Exception:
+                    # Driver is stale; continue to recreate
+                    try:
+                        self.driver.quit()
+                    except Exception:
+                        pass
+                    self.driver = None
+            
             self.close_existing_chrome_processes()
             
             if not self.create_temp_profile():
                 return False
             
+            # Suppress noisy logs from dependencies
+            try:
+                os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all, 3=error
+                os.environ.setdefault("ABSL_LOG_SEVERITY", "fatal")
+                os.environ.setdefault("GLOG_minloglevel", "3")
+                os.environ.setdefault("WDM_LOG", "0")  # webdriver_manager
+            except Exception:
+                pass
+
             chrome_options = Options()
             chrome_options.add_argument(f"--user-data-dir={self.temp_profile}")
             chrome_options.add_argument("--profile-directory=Default")
@@ -171,14 +203,25 @@ class ImprovedISkoleBot:
                 "intl.accept_languages": "nb-NO,nb,no,nn,en-US,en"
             })
             
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            # Logging/telemetry suppression
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])  # remove USB and GCM noise on Windows
+            chrome_options.add_argument("--log-level=3")  # INFO=0, WARNING=1, LOG_ERROR=2, LOG_FATAL=3
+            chrome_options.add_argument("--silent")
+            chrome_options.add_argument("--disable-logging")
+            chrome_options.add_argument("--v=0")
+            
+            # Keep automation extension disabled
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 
-                service = Service(ChromeDriverManager().install())
+                # Route ChromeDriver logs to DEVNULL where supported
+                try:
+                    service = Service(ChromeDriverManager().install(), log_output=subprocess.DEVNULL)
+                except TypeError:
+                    service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 
                 # Remove webdriver property
@@ -197,7 +240,10 @@ class ImprovedISkoleBot:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 
-                service = Service(ChromeDriverManager().install())
+                try:
+                    service = Service(ChromeDriverManager().install(), log_output=subprocess.DEVNULL)
+                except TypeError:
+                    service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 
                 self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -208,6 +254,18 @@ class ImprovedISkoleBot:
             self.log(f"Failed to setup Selenium driver: {e}")
             self.cleanup_temp_profile()
             return False
+
+    def _shutdown_browser(self):
+        """Safely close the Selenium browser and cleanup temp profile"""
+        try:
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except Exception:
+                    pass
+                self.driver = None
+        finally:
+            self.cleanup_temp_profile()
     
     def wait_for_login_completion(self, max_wait_minutes=20):
         """Enhanced login detection with better monitoring"""
@@ -218,7 +276,7 @@ class ImprovedISkoleBot:
         start_time = time.time()
         
         success_indicators = [
-            'fravar', 'fravær', 'elev', 'student', 'timeplan', 'oppmøte', 'fremmøte'
+            'isfeideinnlogget=true', 'timeplan'
         ]
         
         while time.time() - start_time < max_wait_time and not self._should_stop:
@@ -236,18 +294,20 @@ class ImprovedISkoleBot:
                 content_check = any(indicator in page_source for indicator in success_indicators)
                 
                 if url_check or title_check or content_check:
-                    self.log("✅ Login detected! Proceeding with cookie extraction...")
-                    
+                    # Ensure we are on the exact timeplan page with isFeideinnlogget=true
                     try:
-                        fravar_url = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar"
-                        if current_url != fravar_url:
-                            self.log("🧭 Navigating to Fravær page...")
-                            self.driver.get(fravar_url)
+                        if "isfeideinnlogget=true" not in current_url or "ojr=timeplan" not in current_url:
+                            self.log("🧭 Navigating to Timeplan page...")
+                            self.driver.get(self.timeplan_url)
+                            # wait a few seconds to let it load
                             time.sleep(3)
+                            current_url = self.driver.current_url.lower()
                     except Exception as e:
-                        self.log(f"Could not navigate to fravar page: {e}")
+                        self.log(f"Navigation to timeplan failed: {e}")
                     
-                    return True
+                    if "isfeideinnlogget=true" in current_url and "ojr=timeplan" in current_url:
+                        self.log("✅ On timeplan page with isFeideinnlogget=true. Ready for cookie extraction.")
+                        return True
                 
                 if 'feide' in current_url or 'login' in current_url:
                     time.sleep(3)
@@ -280,9 +340,33 @@ class ImprovedISkoleBot:
             time.sleep(3)
             
             current_url = self.driver.current_url.lower()
-            if any(indicator in current_url for indicator in ['fravar', 'fravær', 'elev']):
-                self.log("✅ Already logged in!")
-                return self.extract_cookies_from_selenium()
+            if "isfeideinnlogget=true" in current_url:
+                # Ensure we are at timeplan specifically
+                if "ojr=timeplan" not in current_url:
+                    self.log("🧭 Navigating to Timeplan page...")
+                    self.driver.get(self.timeplan_url)
+                    time.sleep(3)
+                self.log("✅ Already logged in (isFeideinnlogget=true)!")
+                if self.extract_cookies_from_selenium():
+                    # Close only after successful cookie capture
+                    self._shutdown_browser()
+                    return True
+                # If extraction failed despite being logged in, keep monitoring for a bit
+                self.log("⏳ Logged in but cookies not ready yet. Waiting...")
+                grace_deadline = time.time() + 5 * 60
+                while time.time() < grace_deadline:
+                    try:
+                        if self.driver is None or len(self.driver.window_handles) == 0:
+                            self.last_setup_cancelled = True
+                            return False
+                    except WebDriverException:
+                        self.last_setup_cancelled = True
+                        return False
+                    if self.extract_cookies_from_selenium():
+                        self._shutdown_browser()
+                        return True
+                    time.sleep(1.0)
+                return False
             
             # Try to find and click login button
             login_selectors = [
@@ -310,25 +394,93 @@ class ImprovedISkoleBot:
                     continue
             
             if self.wait_for_login_completion():
-                return self.extract_cookies_from_selenium()
+                if self.extract_cookies_from_selenium():
+                    # Close only after successful cookie capture
+                    self._shutdown_browser()
+                    return True
+                # If extraction failed post-login, keep monitoring similarly
+                self.log("⏳ Logged in but cookies not ready yet. Waiting...")
+                grace_deadline = time.time() + 5 * 60
+                while time.time() < grace_deadline:
+                    try:
+                        if self.driver is None or len(self.driver.window_handles) == 0:
+                            self.last_setup_cancelled = True
+                            return False
+                    except WebDriverException:
+                        self.last_setup_cancelled = True
+                        return False
+                    if self.extract_cookies_from_selenium():
+                        self._shutdown_browser()
+                        return True
+                    time.sleep(1.0)
+                return False
             else:
+                # Do NOT close the window on timeout; allow user to continue manually
+                self.log("⏳ Keeping the login window open for manual completion. It will close automatically when cookies are captured or if you close it.")
+                # Keep monitoring for a while longer without failing immediately
+                extended_deadline = time.time() + 10 * 60  # extra 10 minutes
+                last_log = 0
+                while time.time() < extended_deadline:
+                    # If user closed the window, treat as cancellation
+                    try:
+                        if self.driver is None or len(self.driver.window_handles) == 0:
+                            self.last_setup_cancelled = True
+                            return False
+                    except WebDriverException:
+                        self.last_setup_cancelled = True
+                        return False
+
+                    # Check URL for login completion
+                    try:
+                        current_url = self.driver.current_url.lower()
+                    except Exception:
+                        current_url = ""
+
+                    if "isfeideinnlogget=true" in current_url:
+                        # Ensure we are on timeplan specifically
+                        if "ojr=timeplan" not in current_url:
+                            try:
+                                self.driver.get(self.timeplan_url)
+                                time.sleep(2)
+                            except Exception:
+                                pass
+                        # Try extracting cookies now
+                        if self.extract_cookies_from_selenium():
+                            self._shutdown_browser()
+                            return True
+
+                    # Log a heartbeat every 30s to show we are waiting
+                    if time.time() - last_log > 30:
+                        self.log("⏳ Waiting for you to finish login...")
+                        last_log = time.time()
+                    time.sleep(1.0)
+                # If we reach here, extended wait elapsed
+                self.log("⌛ Extended wait elapsed without completing login. You can try Setup & Login again.")
                 return False
             
+        except WebDriverException:
+            # Treat browser window close or driver disconnect as user cancellation
+            self.last_setup_cancelled = True
+            # Do not log an error; user simply closed the window
+            return False
         except Exception as e:
+            # Unexpected errors still logged
             self.log(f"Error during automated login: {e}")
             return False
-        finally:
-            if self.driver:
-                try:
-                    self.driver.quit()
-                except:
-                    pass
-                self.cleanup_temp_profile()
     
     def extract_cookies_from_selenium(self):
         """Enhanced cookie extraction with validation"""
         try:
             self.log("🍪 Extracting cookies from browser session...")
+            
+            # Enforce that we are on timeplan URL with isFeideinnlogget=true before extracting
+            try:
+                current_url = self.driver.current_url.lower()
+            except Exception:
+                current_url = ""
+            if "isfeideinnlogget=true" not in current_url or "ojr=timeplan" not in current_url:
+                self.log("⛔ Not on the required timeplan page yet. Navigate to the timeplan page and try again.")
+                return False
             
             selenium_cookies = self.driver.get_cookies()
             important_cookies = ['JSESSIONID', 'PHPSESSID', 'sessionid', 'auth']
@@ -336,6 +488,7 @@ class ImprovedISkoleBot:
             cookies_found = False
             extracted_cookies = {}
             
+            iskole_cookie_count = 0
             for cookie in selenium_cookies:
                 if cookie['domain'] in ['.iskole.net', 'iskole.net'] or \
                    cookie['name'] in important_cookies:
@@ -347,18 +500,33 @@ class ImprovedISkoleBot:
                     extracted_cookies[cookie['name']] = cookie['value']
                     self.log(f"✅ Extracted cookie: {cookie['name']}")
                     cookies_found = True
+                    if 'iskole.net' in cookie.get('domain', ''):
+                        iskole_cookie_count += 1
             
+            # If we have some cookies and validation passes, save regardless of count
             if cookies_found:
+                if iskole_cookie_count < 3:
+                    self.log(f"ℹ️ Only {iskole_cookie_count} cookies from iskole.net so far; will still verify.")
                 if self.test_cookies():
-                    self.save_cookies_to_file()
-                    self.log("🎉 Cookies extracted and verified successfully!")
-                    self.log(f"📝 Extracted {len(extracted_cookies)} cookies")
-                    return True
+                    if self.save_cookies_to_file():
+                        # Verify file exists and report absolute path
+                        if os.path.exists(self.cookies_file):
+                            self.log(f"✅ Cookies file written at: {self.cookies_file}")
+                        self.cookies_ready = True
+                        self.log("🎉 Cookies extracted and verified successfully!")
+                        self.log(f"📝 Extracted {len(extracted_cookies)} cookies")
+                        return True
+                    else:
+                        self.log("❌ Failed to write cookies file to disk")
+                        return False
                 else:
                     self.log("❌ Extracted cookies don't work properly")
                     return False
             else:
-                self.log("❌ No relevant cookies found in browser session")
+                if not cookies_found:
+                    self.log("❌ No relevant cookies found in browser session")
+                else:
+                    self.log("❌ Not enough iSkole cookies yet. Please complete login. The window will remain open.")
                 return False
                 
         except Exception as e:

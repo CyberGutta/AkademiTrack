@@ -179,6 +179,8 @@ class SchedulerThread(QThread):
 
 class AkademiTrackWindow(QMainWindow):
     """Simple, clean main window"""
+    # Signal to append text to the console from any thread
+    console_signal = pyqtSignal(str)
     
     def __init__(self):
         super().__init__()
@@ -186,17 +188,28 @@ class AkademiTrackWindow(QMainWindow):
         self.setup_thread = None
         self.scheduler_thread = None
         self.is_running = False
+        # Console redirection holders
+        self._orig_stdout = None
+        self._orig_stderr = None
         
         self.init_ui()
         self.init_bot()
         self.log_message("Click 'Setup & Login' first, then 'Start Automation'")
         
+        # Connect console signal after UI is ready
+        self.console_signal.connect(self.append_console)
+        
+        # Redirect stdout/stderr to in-app console
+        self._redirect_std_streams()
+        
     def init_ui(self):
         """Initialize clean, simple UI"""
         self.setWindowTitle("AkademiTrack V1")
-        self.setGeometry(200, 200, 500, 280)
-        self.setMinimumSize(500, 280)
-        self.setMaximumSize(500, 280)
+        # Default window size as requested
+        self.setGeometry(200, 200, 850, 440)
+        self.setMinimumSize(850, 440)
+        # Allow resizing; do not cap the maximum size too low
+        self.setMaximumSize(16777215, 16777215)
         
         # Apply clean theme
         self.setStyleSheet("""
@@ -236,19 +249,56 @@ class AkademiTrackWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
-        layout = QVBoxLayout(central_widget)
-        layout.setSpacing(20)
-        layout.setContentsMargins(30, 30, 30, 30)
+        # Main horizontal layout: left (controls) | right (console)
+        main_hbox = QHBoxLayout(central_widget)
+        main_hbox.setSpacing(24)
+        main_hbox.setContentsMargins(20, 20, 20, 20)
+        
+        # Left vertical layout (existing UI)
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(20)
+        left_layout.setContentsMargins(10, 10, 10, 10)
         
         # Header
-        self.create_header(layout)
+        self.create_header(left_layout)
         
         # Controls
-        self.create_controls(layout)
+        self.create_controls(left_layout)
         
         # Status messages area
-        self.create_status_area(layout)
+        self.create_status_area(left_layout)
+        
+        # Right console panel
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(12)
+        right_layout.setContentsMargins(0, 6, 0, 6)
+        
+        console_label = QLabel("Console")
+        console_label.setFont(QFont("SF Pro Text", 12, QFont.Bold))
+        console_label.setStyleSheet("color: #212529;")
+        right_layout.addWidget(console_label)
+        
+        from PyQt5.QtWidgets import QPlainTextEdit
+        self.console = QPlainTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.console.setStyleSheet("""
+            QPlainTextEdit {
+                background-color: #0b0c10;
+                color: #e6edf3;
+                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
+                font-size: 12px;
+                border: 1px solid #1f2833;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        self.console.setMinimumWidth(360)
+        right_layout.addWidget(self.console, 1)
+        
+        # Assemble
+        main_hbox.addLayout(left_layout, 2)
+        main_hbox.addLayout(right_layout, 3)
     
     def create_header(self, parent_layout):
         """Create simple header"""
@@ -336,7 +386,7 @@ class AkademiTrackWindow(QMainWindow):
         """)
         self.status_message.setVisible(False)
         self.status_message.setWordWrap(True)
-        self.status_message.setMaximumHeight(40)
+        self.status_message.setMaximumHeight(80)
         
         status_layout.addWidget(self.status_message)
         parent_layout.addLayout(status_layout)
@@ -345,6 +395,30 @@ class AkademiTrackWindow(QMainWindow):
         """Initialize the bot"""
         self.install_requirements()
         self.bot = ImprovedISkoleBot(gui_callback=self.log_message)
+    
+    # ---------- Console plumbing ----------
+    def _redirect_std_streams(self):
+        class _StdRedirector:
+            def __init__(self, write_cb):
+                self._write_cb = write_cb
+            def write(self, text):
+                if text:
+                    self._write_cb(text)
+            def flush(self):
+                pass
+        
+        # Store originals so we can restore on exit
+        self._orig_stdout = sys.stdout
+        self._orig_stderr = sys.stderr
+        sys.stdout = _StdRedirector(lambda t: self.console_signal.emit(t))
+        sys.stderr = _StdRedirector(lambda t: self.console_signal.emit(t))
+    
+    def append_console(self, text: str):
+        """Append text to console safely (auto-scroll)."""
+        # Normalize newlines
+        self.console.moveCursor(self.console.textCursor().End)
+        self.console.insertPlainText(text)
+        self.console.moveCursor(self.console.textCursor().End)
     
     def install_requirements(self):
         """Install required packages quietly"""
@@ -369,7 +443,10 @@ class AkademiTrackWindow(QMainWindow):
                 self.show_error(f"Failed to install packages: {e}")
     
     def log_message(self, message):
-        """Show only critical messages, update status indicator for others"""
+        """Show only critical messages, update status indicator for others.
+        Do NOT print here to avoid duplicate lines because stdout is already
+        redirected to the in-app console and backend.log() prints.
+        """
         # Show cookie-related messages as warnings
         if any(keyword in message.lower() for keyword in ['cookie', 'expired', 'login', 'setup']):
             if 'expired' in message.lower() or 'invalid' in message.lower():
@@ -425,7 +502,8 @@ class AkademiTrackWindow(QMainWindow):
         self.setup_button.setText("Setting up...")
         self.status_indicator.set_status("Setting up...", "#0066cc")
         
-        # Start setup
+        # Clear prior cancellation flag and start setup
+        self.bot.last_setup_cancelled = False
         self.setup_thread = SetupThread(self.bot)
         self.setup_thread.message_signal.connect(self.log_message)
         self.setup_thread.finished_signal.connect(self.on_setup_finished)
@@ -443,6 +521,13 @@ class AkademiTrackWindow(QMainWindow):
             # Use a clean popup instead of ugly text box
             self.show_info("Setup completed successfully!")
         else:
+            # If user cancelled by closing the login window, do not show errors
+            if getattr(self.bot, 'last_setup_cancelled', False):
+                # Reset flag and keep UI in Ready state without alerts
+                self.bot.last_setup_cancelled = False
+                self.status_indicator.set_status("Ready", "#6c757d")
+                return
+            # Otherwise, show a normal failure message
             self.status_indicator.set_status("Setup failed", "#dc3545")
             self.show_error("Setup failed. Please try again.")
     
@@ -452,29 +537,36 @@ class AkademiTrackWindow(QMainWindow):
             self.start_automation()
         else:
             self.stop_automation()
-    
+
     def start_automation(self):
-        """Start automation with immediate execution"""
-        if not os.path.exists(self.bot.cookies_file):
-            reply = QMessageBox.question(
-                self, 
-                "Setup Required", 
-                "Setup hasn't been completed. Run setup first?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                self.setup_and_login()
-                return
-        
+        """Start automation with immediate execution after cookie validation"""
+        # Always validate cookies before starting
+        cookies_ok = False
+        if os.path.exists(self.bot.cookies_file):
+            try:
+                if self.bot.load_cookies_from_file() and self.bot.test_cookies():
+                    cookies_ok = True
+                else:
+                    self.log_message("🔑 Session expired or invalid - running Setup & Login")
+            except Exception as e:
+                self.log_message(f"Cookie validation error: {e}")
+        else:
+            self.log_message("🔑 No cookies found - running Setup & Login")
+
+        if not cookies_ok:
+            # Trigger setup flow automatically
+            self.setup_and_login()
+            return
+
         # Set the bot running flag FIRST
         self.bot.running = True
-        
+
         # Start scheduler thread
         self.scheduler_thread = SchedulerThread(self.bot)
         self.scheduler_thread.message_signal.connect(self.log_message)
         self.scheduler_thread.status_signal.connect(self.update_status)
         self.scheduler_thread.start()
-        
+
         # Update UI
         self.is_running = True
         self.start_button.setText("Stop Automation")
@@ -493,10 +585,9 @@ class AkademiTrackWindow(QMainWindow):
                 background-color: #c82333;
             }
         """)
-        
+
         self.setup_button.setEnabled(False)
         self.status_indicator.set_status("Running", "#28a745")
-        # Remove this ugly message
         # self.log_message("Automation started with immediate check")
     
     def stop_automation(self):
@@ -597,10 +688,26 @@ class AkademiTrackWindow(QMainWindow):
             if reply == QMessageBox.Yes:
                 self.stop_automation()
                 time.sleep(0.5)
+                # Restore stdout/stderr before exit
+                try:
+                    if self._orig_stdout:
+                        sys.stdout = self._orig_stdout
+                    if self._orig_stderr:
+                        sys.stderr = self._orig_stderr
+                except Exception:
+                    pass
                 event.accept()
             else:
                 event.ignore()
         else:
+            # Restore stdout/stderr before exit
+            try:
+                if self._orig_stdout:
+                    sys.stdout = self._orig_stdout
+                if self._orig_stderr:
+                    sys.stderr = self._orig_stderr
+            except Exception:
+                pass
             event.accept()
 
 
