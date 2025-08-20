@@ -645,7 +645,7 @@ class ImprovedISkoleBot:
         return False
     
     def register_attendance_enhanced(self):
-        """Enhanced attendance registration without automatic timenr increment"""
+        """Enhanced attendance registration - ALWAYS SENDS REQUEST"""
         try:
             current_ip = self.get_current_ip()
             current_date = datetime.now().strftime("%Y%m%d")
@@ -710,33 +710,12 @@ class ImprovedISkoleBot:
             logger.error(f"❌ Error during registration: {e}")
             return False
     
-    def is_registration_time(self):
-        """Check if current time is within registration windows"""
-        now = datetime.now()
-        current_time = now.hour * 60 + now.minute
-        
-        # Registration windows (in minutes from midnight)
-        windows = [
-            (8*60 + 15, 8*60 + 30),   # 08:15-08:30
-            (9*60, 9*60 + 15),        # 09:00-09:15
-            (14*60 + 15, 14*60 + 30), # 14:15-14:30
-            (15*60, 15*60 + 15)       # 15:00-15:15
-        ]
-        
-        for start, end in windows:
-            if start <= current_time <= end:
-                window_name = f"{start//60:02d}:{start%60:02d}-{end//60:02d}:{end%60:02d}"
-                logger.info(f"✅ Within registration window: {window_name}")
-                return True
-        
-        return False
-    
     def check_and_register(self):
-        """Enhanced main check and register function with timenr increment checking"""
+        """Modified main check and register function - ALWAYS ATTEMPTS REGISTRATION"""
         current_time = datetime.now()
         logger.info(f"🕒 Checking at {current_time.strftime('%H:%M:%S')}")
         
-        # Skip weekends
+        # Skip weekends (optional - remove this if you want to register on weekends too)
         if current_time.weekday() >= 5:
             logger.info("📅 Weekend - skipping")
             return
@@ -758,20 +737,13 @@ class ImprovedISkoleBot:
                 logger.info("🔄 Removed expired cookies")
             return
         
-        # Check if it's registration time
-        if self.is_registration_time():
-            logger.info("⏰ Registration time detected - attempting registration")
-            success = self.register_attendance_enhanced()
-            if success:
-                logger.info("🎯 Attendance registered successfully!")
-            else:
-                logger.warning("❌ Registration attempt failed")
+        # ALWAYS ATTEMPT REGISTRATION (removed time window check)
+        logger.info("🚀 Attempting attendance registration (no time restrictions)")
+        success = self.register_attendance_enhanced()
+        if success:
+            logger.info("🎯 Attendance registered successfully!")
         else:
-            next_window = self.get_next_registration_window()
-            next_increment = self.get_next_increment_time()
-            logger.info(f"⏳ Not registration time. Next window: {next_window}")
-            if next_increment:
-                logger.info(f"🔢 Next timenr increment: {next_increment}")
+            logger.warning("❌ Registration attempt failed")
     
     def get_next_increment_time(self):
         """Get the next timenr increment time"""
@@ -800,35 +772,14 @@ class ImprovedISkoleBot:
         
         return "08:10 (tomorrow)"
     
-    def get_next_registration_window(self):
-        """Get the next registration window time"""
-        now = datetime.now()
-        current_minutes = now.hour * 60 + now.minute
-        
-        windows = [
-            (8*60 + 15, "08:15"),
-            (9*60, "09:00"), 
-            (14*60 + 15, "14:15"),
-            (15*60, "15:00")
-        ]
-        
-        for window_minutes, window_time in windows:
-            if current_minutes < window_minutes:
-                return window_time
-        
-        return "08:15 (tomorrow)"
-    
     def run_scheduler(self):
-        """Run the enhanced automated scheduler"""
+        """Run the enhanced automated scheduler with always-register mode"""
         # Check every minute for more precise timenr increment timing
         schedule.every(1).minutes.do(self.check_and_register)
         
-        print("\n🤖 Enhanced iSkole Bot Started (Mac Compatible)!")
-        print("📋 Registration windows:")
-        print("   • 08:15-08:30 (første time)")
-        print("   • 09:00-09:15 (andre time)")
-        print("   • 14:15-14:30 (sjette time)")
-        print("   • 15:00-15:15 (syvende time)")
+        print("\n🤖 Enhanced iSkole Bot Started (ALWAYS REGISTER MODE)!")
+        print("⚠️  WARNING: This will attempt registration EVERY MINUTE!")
+        print("📋 No time restrictions - registers at ANY time")
         print("🔢 Time-based timenr increments:")
         print("   • 08:10, 08:55, 09:50, 10:40")
         print("   • 11:55, 12:40, 13:40, 14:25")
@@ -838,6 +789,7 @@ class ImprovedISkoleBot:
         print("✨ Improved login detection")
         print("🔢 Continuous timenr growth")
         print(f"📊 Current timenr: {self.current_timenr}")
+        print("🚨 CAUTION: This may cause many registration attempts!")
         print("-" * 50)
         
         # Initial check
@@ -869,14 +821,17 @@ def install_requirements():
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 def main():
-    print("🚀 ENHANCED iSkole Bot v4.1 (Mac Compatible)")
+    print("🚀 ENHANCED iSkole Bot v4.1 (ALWAYS REGISTER MODE)")
     print("=" * 55)
     print(f"💻 OS: {platform.system()} {platform.release()}")
     
     if platform.system() == "Darwin":
         print("🍎 macOS optimizations enabled")
     
-    print("\n✨ NEW FEATURES:")
+    print("\n⚠️  WARNING: ALWAYS REGISTER MODE ENABLED!")
+    print("This version will attempt registration EVERY MINUTE")
+    print("regardless of time windows!")
+    print("\n✨ FEATURES:")
     print("✅ macOS compatibility")
     print("✅ Time-based timenr increments")
     print("✅ Enhanced cookie extraction")
@@ -886,12 +841,13 @@ def main():
     print("✅ Automatic Chrome process cleanup")
     print("✅ Temporary profile management")
     print("✅ Enhanced error handling")
+    print("🚨 NO TIME RESTRICTIONS - ALWAYS REGISTERS!")
     print("\n📋 How it works:")
     print("1. First run: Opens browser automatically")
     print("2. You login once manually")
     print("3. Bot extracts and saves cookies")
     print("4. Future runs: Fully automatic")
-    print("5. Registers during school hours only")
+    print("5. Registers EVERY MINUTE (no time restrictions)")
     print("6. timenr increments at specific times daily:")
     print("   08:10, 08:55, 09:50, 10:40, 11:55, 12:40, 13:40, 14:25")
     print("7. timenr keeps growing continuously (no daily reset)")
@@ -903,6 +859,17 @@ def main():
         print("• Chrome must be installed in Applications")
         print("• Allow permissions if prompted")
         print("• Close existing Chrome windows before starting")
+    
+    # Warning about always register mode
+    print("\n🚨 IMPORTANT WARNING:")
+    print("This version will send registration requests EVERY MINUTE!")
+    print("This may result in many requests to the server.")
+    print("Use responsibly and consider the impact on the system.")
+    
+    confirm = input("\nType 'YES' to confirm you want to run in always-register mode: ").strip()
+    if confirm.upper() != 'YES':
+        print("❌ Operation cancelled. Exiting...")
+        return
     
     # Install requirements
     try:
@@ -974,8 +941,18 @@ def main():
         print("\n🆕 First run detected")
         print("The bot will open a browser for you to login")
     
-    print("\n🚀 Starting enhanced automation...")
+    print("\n🚨 FINAL WARNING:")
+    print("Starting ALWAYS REGISTER mode - will attempt registration every minute!")
+    print("This may generate many requests. Use responsibly!")
+    
+    final_confirm = input("Type 'START' to begin: ").strip()
+    if final_confirm.upper() != 'START':
+        print("❌ Operation cancelled. Exiting...")
+        return
+    
+    print("\n🚀 Starting enhanced automation in ALWAYS REGISTER mode...")
     print("💡 TIP: Keep this window open to see status updates")
+    print("🛑 Press Ctrl+C to stop the bot")
     
     try:
         automation.run_scheduler()
