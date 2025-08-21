@@ -82,7 +82,7 @@ class SimpleButton(QPushButton):
 class StatusIndicator(QLabel):
     """Simple status indicator with working stylesheet"""
     def __init__(self):
-        super().__init__("● Ready")
+        super().__init__("● Klar") 
         # Set initial style without dynamic color
         self.setStyleSheet("""
             QLabel {
@@ -160,7 +160,7 @@ class SettingsWindow(QWidget):
         
     def init_ui(self):
         """Initialize settings UI"""
-        self.setWindowTitle("Settings - AkademiTrack")
+        self.setWindowTitle("Innstillinger - AkademiTrack")
         self.setGeometry(300, 300, 800, 600)
         self.setMinimumSize(600, 400)
         
@@ -189,13 +189,13 @@ class SettingsWindow(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Header
-        header_label = QLabel("Settings")
+        header_label = QLabel("Innstillinger")
         header_label.setFont(QFont("SF Pro Display", 18, QFont.Bold))
         header_label.setStyleSheet("color: #212529; margin-bottom: 10px;")
         layout.addWidget(header_label)
         
         # Console section
-        console_label = QLabel("Console Output")
+        console_label = QLabel("Konsoll")
         console_label.setFont(QFont("SF Pro Text", 14, QFont.Bold))
         console_label.setStyleSheet("color: #212529; margin-bottom: 8px;")
         layout.addWidget(console_label)
@@ -222,7 +222,7 @@ class SettingsWindow(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        clear_button = SimpleButton("Clear Console")
+        clear_button = SimpleButton("Tøm konsoll")
         clear_button.clicked.connect(self.clear_console)
         button_layout.addWidget(clear_button)
         
@@ -338,7 +338,7 @@ class AkademiTrackWindow(QMainWindow):
         
         self.init_ui()
         self.init_bot()
-        self.log_message("Click 'Setup & Login' first, then 'Start Automation' or 'Manual'")
+        self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'Manuell registrering'")
         
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
@@ -347,7 +347,7 @@ class AkademiTrackWindow(QMainWindow):
         """Initialize clean, simple UI"""
         self.setWindowTitle("AkademiTrack V1")
         self.setGeometry(200, 200, 600, 440)
-        self.setMinimumSize(600, 440)
+        self.setMinimumSize(750, 440)
         self.setMaximumSize(16777215, 16777215)
         
         self.setStyleSheet("""
@@ -405,7 +405,7 @@ class AkademiTrackWindow(QMainWindow):
         title.setStyleSheet("color: #212529; margin-bottom: 4px;")
         title.setAlignment(Qt.AlignCenter)
         
-        subtitle = QLabel("Automatic attendance registration")
+        subtitle = QLabel("Automatisk frammøteregistrering")
         subtitle.setFont(QFont("SF Pro Text", 14))
         subtitle.setStyleSheet("color: #495057; font-weight: 500;")
         subtitle.setAlignment(Qt.AlignCenter)
@@ -424,7 +424,7 @@ class AkademiTrackWindow(QMainWindow):
         parent_layout.addLayout(header_layout)
     
     def create_controls(self, parent_layout):
-        """Create control buttons centered"""
+        """Create control buttons in two rows"""
         controls_layout = QVBoxLayout()
         
         progress_layout = QHBoxLayout()
@@ -455,33 +455,49 @@ class AkademiTrackWindow(QMainWindow):
         progress_layout.addStretch()
         controls_layout.addLayout(progress_layout)
         
-        button_container = QHBoxLayout()
-        button_container.addStretch()
+        # First row - Main buttons (Setup and Start)
+        main_button_container = QHBoxLayout()
+        main_button_container.addStretch()
         
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(12)
+        main_button_layout = QHBoxLayout()
+        main_button_layout.setSpacing(12)
         
-        self.setup_button = SimpleButton("Setup & Login")
+        self.setup_button = SimpleButton("Oppsett og innlogging")
         self.setup_button.clicked.connect(self.setup_and_login)
         
-        self.start_button = SimpleButton("Start Automation", primary=True)
+        self.start_button = SimpleButton("Start automatisering", primary=True)
         self.start_button.clicked.connect(self.toggle_automation)
         
-        self.manual_button = SimpleButton("Manual")
+        main_button_layout.addWidget(self.setup_button)
+        main_button_layout.addWidget(self.start_button)
+        
+        main_button_container.addLayout(main_button_layout)
+        main_button_container.addStretch()
+        
+        # Second row - Secondary buttons (Manual and Settings)
+        secondary_button_container = QHBoxLayout()
+        secondary_button_container.addStretch()
+        
+        secondary_button_layout = QHBoxLayout()
+        secondary_button_layout.setSpacing(12)
+        
+        self.manual_button = SimpleButton("Manuell Registrering")
         self.manual_button.clicked.connect(self.open_manual_registration)
         
-        self.settings_button = SimpleButton("Settings")
+        self.settings_button = SimpleButton("Innstillinger")
         self.settings_button.clicked.connect(self.open_settings)
         
-        button_layout.addWidget(self.setup_button)
-        button_layout.addWidget(self.start_button)
-        button_layout.addWidget(self.manual_button)
-        button_layout.addWidget(self.settings_button)
+        secondary_button_layout.addWidget(self.manual_button)
+        secondary_button_layout.addWidget(self.settings_button)
         
-        button_container.addLayout(button_layout)
-        button_container.addStretch()
+        secondary_button_container.addLayout(secondary_button_layout)
+        secondary_button_container.addStretch()
         
-        controls_layout.addLayout(button_container)
+        # Add both button rows to controls layout with spacing
+        controls_layout.addLayout(main_button_container)
+        controls_layout.addSpacing(12)  # Space between button rows
+        controls_layout.addLayout(secondary_button_container)
+        
         parent_layout.addLayout(controls_layout)
 
     def open_settings(self):
@@ -584,7 +600,7 @@ class AkademiTrackWindow(QMainWindow):
         """Show only critical messages, update status indicator for others."""
         if any(keyword in message.lower() for keyword in ['cookie', 'expired', 'login', 'setup']):
             if 'expired' in message.lower() or 'invalid' in message.lower():
-                self.status_message.setText("⚠️ Session expired - Please run 'Setup & Login'")
+                self.status_message.setText("⚠️ Økt utløpt - Kjør 'Oppsett og innlogging'")
                 self.status_message.setVisible(True)
                 self.status_message.setStyleSheet("""
                     color: #856404;
@@ -610,18 +626,18 @@ class AkademiTrackWindow(QMainWindow):
             QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
         
         elif 'scheduler stopped' in message.lower():
-            self.status_indicator.set_status("Ready", "#6c757d")
-        elif 'started' in message.lower() or 'automation started' in message.lower():
+            self.status_indicator.set_status("Klar", "#6c757d")
+        elif 'started' in message.lower() or 'automatisering starta' in message.lower():
             self.status_indicator.set_status("Running", "#28a745")
         elif 'setup completed' in message.lower():
-            self.status_indicator.set_status("Ready", "#28a745")
+            self.status_indicator.set_status("Klar", "#28a745")
         elif 'failed' in message.lower():
-            self.status_indicator.set_status("Error", "#dc3545")
+            self.status_indicator.set_status("Feil", "#dc3545")
     
     def setup_and_login(self):
         """Handle setup and login"""
         if self.is_running:
-            self.show_warning("Please stop automation first")
+            self.show_warning("Stopp automatisering først")
             return
             
         if self.setup_thread and self.setup_thread.isRunning():
@@ -630,8 +646,8 @@ class AkademiTrackWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.setup_button.setEnabled(False)
-        self.setup_button.setText("Setting up...")
-        self.status_indicator.set_status("Setting up...", "#0066cc")
+        self.setup_button.setText("Setter opp...")
+        self.status_indicator.set_status("Setter opp...", "#0066cc")
         
         self.bot.last_setup_cancelled = False
         self.setup_thread = SetupThread(self.bot)
@@ -644,18 +660,18 @@ class AkademiTrackWindow(QMainWindow):
         """Handle setup completion"""
         self.progress_bar.setVisible(False)
         self.setup_button.setEnabled(True)
-        self.setup_button.setText("Setup & Login")
+        self.setup_button.setText("Oppsett og innlogging")
         
         if success:
-            self.status_indicator.set_status("Ready", "#28a745")
-            self.show_info("Setup completed successfully!")
+            self.status_indicator.set_status("Klar", "#28a745")
+            self.show_info("Oppsett fullført!")
         else:
             if getattr(self.bot, 'last_setup_cancelled', False):
                 self.bot.last_setup_cancelled = False
                 self.status_indicator.set_status("Ready", "#6c757d")
                 return
-            self.status_indicator.set_status("Setup failed", "#dc3545")
-            self.show_error("Setup failed. Please try again.")
+            self.status_indicator.set_status("Oppsett mislyktes", "#dc3545")
+            self.show_error("Oppsett mislyktes. Prøv igjen.")
     
     def toggle_automation(self):
         """Toggle automation - COMPLETELY CRASH PROOF"""
@@ -673,11 +689,11 @@ class AkademiTrackWindow(QMainWindow):
             
             if not self.is_running:
                 print("Toggle: Starting automation...")
-                self.start_button.setText("Starting...")
+                self.start_button.setText("Starter...")
                 self._safe_start_automation()
             else:
                 print("Toggle: Stopping automation...")  
-                self.start_button.setText("Stopping...")
+                self.start_button.setText("Stopper...")
                 self._safe_stop_automation()
                 
         except Exception as e:
@@ -703,11 +719,11 @@ class AkademiTrackWindow(QMainWindow):
                     if self.bot.load_cookies_from_file() and self.bot.test_cookies():
                         cookies_ok = True
                     else:
-                        self.log_message("🔑 Session expired - running Setup & Login")
+                        self.log_message("🔑 Økten er utløpt - kjører oppsett og pålogging")
                 except Exception as e:
                     self.log_message(f"Cookie validation error: {e}")
             else:
-                self.log_message("🔑 No cookies found - running Setup & Login")
+                self.log_message("🔑 Ingen informasjonskapsel funnet - kjører oppsett og innlogging")
 
             if not cookies_ok:
                 self.setup_and_login()
@@ -731,37 +747,37 @@ class AkademiTrackWindow(QMainWindow):
             self._set_stop_button_style()
             self.setup_button.setEnabled(False)
             self.manual_button.setEnabled(False)
-            self.status_indicator.set_status("Running", "#28a745")
+            self.status_indicator.set_status("Kjører", "#28a745")
             
-            print("Safe start completed")
+            print("Sikker start fullført")
             
         except Exception as e:
-            print(f"Error in _safe_start_automation: {e}")
+            print(f"feil i _safe_start_automation: {e}")
             self._emergency_reset()
 
     
     def stop_automation(self):
         """Public stop method - delegates to safe internal method"""  
-        print("Public stop_automation called")
+        print("Kode: stopp_automatisering kalt")
         self._safe_stop_automation()
 
     def _safe_stop_automation(self):
         """Internal safe stop method - BULLETPROOF"""
         try:
-            print("Safe stop starting...")
+            print("Sikker start...")
             
             # Set stopping state immediately
             self.is_running = False
-            self.status_indicator.set_status("Stopping...", "#ffc107")
+            self.status_indicator.set_status("Stopper...", "#ffc107")
             
             # Stop bot
             if hasattr(self, 'bot') and self.bot:
                 try:
                     self.bot.running = False
                     self.bot.stop_scheduler()
-                    print("Bot stopped")
+                    print("bot stoppet")
                 except:
-                    print("Error stopping bot, continuing...")
+                    print("Feil ved å stoppe botten, fortsetter...")
             
             # Force kill thread
             self._force_kill_scheduler_thread()
@@ -770,19 +786,19 @@ class AkademiTrackWindow(QMainWindow):
             self._reset_start_button()
             self.setup_button.setEnabled(True)
             self.manual_button.setEnabled(True)
-            self.status_indicator.set_status("Stopped", "#6c757d")
+            self.status_indicator.set_status("Stoppet", "#6c757d")
             
-            print("Safe stop completed")
+            print("T-stopp fullført")
             
         except Exception as e:
-            print(f"Error in _safe_stop_automation: {e}")
+            print(f"Feil i _safe_stop_automation: {e}")
             self._emergency_reset()
 
     def _force_kill_scheduler_thread(self):
         """Force kill any existing scheduler thread"""
         try:
             if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                print("Killing existing scheduler thread...")
+                print("stopper eksisterende planleggertråd...")
                 
                 # Disconnect all signals first
                 try:
@@ -796,11 +812,11 @@ class AkademiTrackWindow(QMainWindow):
                     try:
                         self.scheduler_thread.stop()
                         if not self.scheduler_thread.wait(1000):  # Wait 1 second max
-                            print("Graceful stop failed, terminating...")
+                            print("Grasiøs stopp mislyktes, avsluttes...")
                             self.scheduler_thread.terminate()
                             self.scheduler_thread.wait(500)  # Wait 0.5 seconds for termination
                     except:
-                        print("Graceful stop failed, forcing termination...")
+                        print("Grasiøs stopp mislyktes, og fremtvinger avslutning...")
                         try:
                             self.scheduler_thread.terminate()
                             self.scheduler_thread.wait(500)
@@ -808,16 +824,16 @@ class AkademiTrackWindow(QMainWindow):
                             pass
                 
                 self.scheduler_thread = None
-                print("Scheduler thread killed")
+                print("Planleggertråden avsluttet")
                 
         except Exception as e:
-            print(f"Error killing thread: {e}")
+            print(f"Feil med avslutting av planleggertråd: {e}")
             # Set to None anyway
             self.scheduler_thread = None
     
     def _reset_start_button(self):
         """Reset start button to initial state"""
-        self.start_button.setText("Start Automation")
+        self.start_button.setText("Start automatisering")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
@@ -837,7 +853,7 @@ class AkademiTrackWindow(QMainWindow):
 
     def _set_stop_button_style(self):
         """Set button to stop style"""
-        self.start_button.setText("Stop Automation")
+        self.start_button.setText("Stopp automatisering")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
@@ -859,7 +875,7 @@ class AkademiTrackWindow(QMainWindow):
         """Release the action lock"""
         try:
             self._processing_any_action = False
-            print("Action lock released")
+            print("Handlingslåsen er løsnet, klar for nye handlinger. Knappen kan altså trykkes igjen.")
         except:
             pass
 
@@ -876,19 +892,19 @@ class AkademiTrackWindow(QMainWindow):
             
             # Clear all locks
             self._processing_any_action = False
-            if hasattr(self, '_starting'):
+            if hasattr(self, '_starter'):
                 self._starting = False
-            if hasattr(self, '_stopping'):
+            if hasattr(self, '_stopper'):
                 self._stopping = False
                 
         except Exception as e:
-            print(f"Error in emergency reset: {e}")
+            print(f"feil i emergency reset: {e}")
 
 
     def on_scheduler_stopped(self):
         """Handle when scheduler stops itself - SAFE VERSION"""
         try:
-            print("Scheduler stopped signal received")
+            print("Signal for stoppet planlegger mottatt")
             
             # Only update if we're actually running
             if hasattr(self, 'is_running') and self.is_running:
@@ -897,31 +913,31 @@ class AkademiTrackWindow(QMainWindow):
                 self._reset_start_button()
                 self.setup_button.setEnabled(True)
                 self.manual_button.setEnabled(True)
-                self.status_indicator.set_status("Completed", "#6c757d")
+                self.status_indicator.set_status("Fullført", "#6c757d")
                 
         except Exception as e:
-            print(f"Error in on_scheduler_stopped: {e}")
+            print(f"Feil i on_scheduler_stopped: {e}")
     
     def update_status(self, status):
         """Update status indicator"""
         if not self.is_running and status == "Running":
             return
             
-        if status == "Running":
+        if status == "Kjører":
             self.status_indicator.set_status("Running", "#28a745")
-        elif status == "Error":
+        elif status == "Feil":
             self.status_indicator.set_status("Error", "#dc3545")
             self.stop_automation()
-        elif status == "Stopped":
+        elif status == "Stoppet":
             self.stop_automation()
     
     def open_manual_registration(self):
         """Open the manual registration window"""
         if self.is_running:
-            self.show_warning("Please stop automation first")
+            self.show_warning("Stopp automatiseringen først")
             return
         if not self.bot.check_login_status():
-            self.show_warning("Please complete Setup & Login first")
+            self.show_warning("Vennligst fullfør oppsettet og logg inn først")
             return
         self.manual_window = ManualRegistrationWindow(self.bot, self)
         self.manual_window.show()
@@ -938,7 +954,7 @@ class AkademiTrackWindow(QMainWindow):
         """Show warning dialog"""
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Warning")
+        msg.setWindowTitle("Advarsel")
         msg.setText(message)
         msg.exec_()
     
@@ -946,7 +962,7 @@ class AkademiTrackWindow(QMainWindow):
         """Show error dialog"""
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Critical)
-        msg.setWindowTitle("Error")
+        msg.setWindowTitle("Feil")
         msg.setText(message)
         msg.exec_()
     
@@ -956,7 +972,7 @@ class AkademiTrackWindow(QMainWindow):
             reply = QMessageBox.question(
                 self, 
                 'Exit', 
-                'Automation is running. Stop and exit?',
+                'Automatisering kjører. Stopp og avslutt?',
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
@@ -1001,7 +1017,7 @@ def main():
         sys.exit(app.exec_())
         
     except Exception as e:
-        print(f"Failed to start: {e}")
+        print(f"Kunne ikke starte: {e}")
         sys.exit(1)
 
 
