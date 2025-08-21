@@ -80,14 +80,15 @@ class SimpleButton(QPushButton):
 
 
 class StatusIndicator(QLabel):
-    """Simple status indicator"""
+    """Simple status indicator with working stylesheet"""
     def __init__(self):
         super().__init__("● Ready")
+        # Set initial style without dynamic color
         self.setStyleSheet("""
             QLabel {
                 color: #6c757d;
                 font-size: 14px;
-                font-weight: 500;
+                font-weight: bold;
                 padding: 8px 12px;
                 background-color: #f8f9fa;
                 border-radius: 20px;
@@ -96,19 +97,158 @@ class StatusIndicator(QLabel):
         """)
         
     def set_status(self, status, color="#6c757d"):
+        """Set status text and color - FIXED METHOD"""
         self.setText(f"● {status}")
-        self.setStyleSheet(f"""
-            QLabel {{
-                color: {color};
-                font-size: 14px;
-                font-weight: 500;
-                padding: 8px 12px;
-                background-color: #f8f9fa;
-                border-radius: 20px;
-                border: 1px solid #dee2e6;
-            }}
-        """)
+        # Use hardcoded colors instead of dynamic CSS
+        if color == "#28a745":  # Green/Running
+            style = """
+                QLabel {
+                    color: #28a745;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 8px 12px;
+                    background-color: #d4edda;
+                    border-radius: 20px;
+                    border: 1px solid #c3e6cb;
+                }
+            """
+        elif color == "#dc3545":  # Red/Error
+            style = """
+                QLabel {
+                    color: #dc3545;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 8px 12px;
+                    background-color: #f8d7da;
+                    border-radius: 20px;
+                    border: 1px solid #f5c6cb;
+                }
+            """
+        elif color == "#ffc107":  # Yellow/Warning
+            style = """
+                QLabel {
+                    color: #856404;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 8px 12px;
+                    background-color: #fff3cd;
+                    border-radius: 20px;
+                    border: 1px solid #ffeaa7;
+                }
+            """
+        else:  # Default gray
+            style = """
+                QLabel {
+                    color: #6c757d;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 8px 12px;
+                    background-color: #f8f9fa;
+                    border-radius: 20px;
+                    border: 1px solid #dee2e6;
+                }
+            """
+        self.setStyleSheet(style)
 
+class SettingsWindow(QWidget):
+    """Settings window as a separate independent window"""
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.Window)  # Make it a proper window
+        self.parent_window = parent
+        self.console_widget = None
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize settings UI"""
+        self.setWindowTitle("Settings - AkademiTrack")
+        self.setGeometry(300, 300, 800, 600)
+        self.setMinimumSize(600, 400)
+        
+        # Set window flags for proper behavior
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinMaxButtonsHint)
+        
+        self.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                color: #212529;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            }
+            QPlainTextEdit {
+                background-color: #0b0c10;
+                color: #e6edf3;
+                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
+                font-size: 12px;
+                border: 1px solid #1f2833;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Header
+        header_label = QLabel("Settings")
+        header_label.setFont(QFont("SF Pro Display", 18, QFont.Bold))
+        header_label.setStyleSheet("color: #212529; margin-bottom: 10px;")
+        layout.addWidget(header_label)
+        
+        # Console section
+        console_label = QLabel("Console Output")
+        console_label.setFont(QFont("SF Pro Text", 14, QFont.Bold))
+        console_label.setStyleSheet("color: #212529; margin-bottom: 8px;")
+        layout.addWidget(console_label)
+        
+        # Create a new console widget for this window
+        self.console_widget = QPlainTextEdit()
+        self.console_widget.setReadOnly(True)
+        self.console_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.console_widget.setStyleSheet("""
+            QPlainTextEdit {
+                background-color: #0b0c10;
+                color: #e6edf3;
+                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
+                font-size: 12px;
+                border: 1px solid #1f2833;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        
+        layout.addWidget(self.console_widget, 1)
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        clear_button = SimpleButton("Clear Console")
+        clear_button.clicked.connect(self.clear_console)
+        button_layout.addWidget(clear_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Copy existing console content if parent has it
+        if self.parent_window and hasattr(self.parent_window, 'console'):
+            self.console_widget.setPlainText(self.parent_window.console.toPlainText())
+            
+    def append_text(self, text):
+        """Append text to console"""
+        if text.strip():
+            self.console_widget.appendPlainText(text.strip())
+            scrollbar = self.console_widget.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+        
+    def clear_console(self):
+        """Clear the console output"""
+        self.console_widget.clear()
+        # Also clear parent console if it exists
+        if self.parent_window and hasattr(self.parent_window, 'console'):
+            self.parent_window.console.clear()
+        
+    def closeEvent(self, event):
+        """Handle window close"""
+        event.accept()
 
 class SetupThread(QThread):
     """Thread for handling setup operations"""
@@ -179,14 +319,22 @@ class AkademiTrackWindow(QMainWindow):
     console_signal = pyqtSignal(str)
     
     def __init__(self):
+        """Initialize the main window"""
         super().__init__()
         self.bot = None
         self.setup_thread = None
         self.scheduler_thread = None
         self.manual_window = None
+        self.settings_window = None
         self.is_running = False
         self._orig_stdout = None
         self._orig_stderr = None
+        
+        # Create a hidden console for logging (not displayed in main UI)
+        self.console = QPlainTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.console.hide()  # Keep it hidden
         
         self.init_ui()
         self.init_bot()
@@ -198,8 +346,8 @@ class AkademiTrackWindow(QMainWindow):
     def init_ui(self):
         """Initialize clean, simple UI"""
         self.setWindowTitle("AkademiTrack V1")
-        self.setGeometry(200, 200, 850, 440)
-        self.setMinimumSize(1000, 440)
+        self.setGeometry(200, 200, 600, 440)
+        self.setMinimumSize(600, 440)
         self.setMaximumSize(16777215, 16777215)
         
         self.setStyleSheet("""
@@ -238,79 +386,55 @@ class AkademiTrackWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        main_hbox = QHBoxLayout(central_widget)
-        main_hbox.setSpacing(24)
-        main_hbox.setContentsMargins(20, 20, 20, 20)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(24)
+        main_layout.setContentsMargins(40, 40, 40, 40)
         
-        left_layout = QVBoxLayout()
-        left_layout.setSpacing(20)
-        left_layout.setContentsMargins(10, 10, 10, 10)
+        self.create_header(main_layout)
+        self.create_controls(main_layout)
+        self.create_status_area(main_layout)
         
-        self.create_header(left_layout)
-        self.create_controls(left_layout)
-        self.create_status_area(left_layout)
-        
-        right_layout = QVBoxLayout()
-        right_layout.setSpacing(12)
-        right_layout.setContentsMargins(0, 6, 0, 6)
-        
-        console_label = QLabel("Console")
-        console_label.setFont(QFont("SF Pro Text", 12, QFont.Bold))
-        console_label.setStyleSheet("color: #212529;")
-        right_layout.addWidget(console_label)
-        
-        self.console = QPlainTextEdit()
-        self.console.setReadOnly(True)
-        self.console.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.console.setStyleSheet("""
-            QPlainTextEdit {
-                background-color: #0b0c10;
-                color: #e6edf3;
-                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
-                font-size: 12px;
-                border: 1px solid #1f2833;
-                border-radius: 8px;
-                padding: 10px;
-            }
-        """)
-        self.console.setMinimumWidth(360)
-        right_layout.addWidget(self.console, 1)
-        
-        main_hbox.addLayout(left_layout, 2)
-        main_hbox.addLayout(right_layout, 3)
+        main_layout.addStretch()
     
     def create_header(self, parent_layout):
-        """Create simple header"""
+        """Create simple header with centered status"""
         header_layout = QVBoxLayout()
         
         title = QLabel("AkademiTrack")
         title.setFont(QFont("SF Pro Display", 24, QFont.Bold))
         title.setStyleSheet("color: #212529; margin-bottom: 4px;")
+        title.setAlignment(Qt.AlignCenter)
         
         subtitle = QLabel("Automatic attendance registration")
         subtitle.setFont(QFont("SF Pro Text", 14))
         subtitle.setStyleSheet("color: #495057; font-weight: 500;")
+        subtitle.setAlignment(Qt.AlignCenter)
         
         status_layout = QHBoxLayout()
-        self.status_indicator = StatusIndicator()
         status_layout.addStretch()
+        self.status_indicator = StatusIndicator()
         status_layout.addWidget(self.status_indicator)
+        status_layout.addStretch()
         
         header_layout.addWidget(title)
         header_layout.addWidget(subtitle)
-        header_layout.addSpacing(12)
+        header_layout.addSpacing(20)
         header_layout.addLayout(status_layout)
         
         parent_layout.addLayout(header_layout)
     
     def create_controls(self, parent_layout):
-        """Create control buttons"""
+        """Create control buttons centered"""
         controls_layout = QVBoxLayout()
+        
+        progress_layout = QHBoxLayout()
+        progress_layout.addStretch()
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFixedHeight(25)
+        self.progress_bar.setFixedWidth(400)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
                 border: 1px solid #dee2e6;
@@ -326,7 +450,13 @@ class AkademiTrackWindow(QMainWindow):
                 border-radius: 7px;
             }
         """)
-        controls_layout.addWidget(self.progress_bar)
+        
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addStretch()
+        controls_layout.addLayout(progress_layout)
+        
+        button_container = QHBoxLayout()
+        button_container.addStretch()
         
         button_layout = QHBoxLayout()
         button_layout.setSpacing(12)
@@ -341,15 +471,28 @@ class AkademiTrackWindow(QMainWindow):
         self.manual_button.clicked.connect(self.open_manual_registration)
         
         self.settings_button = SimpleButton("Settings")
-        self.settings_button.setEnabled(False)  # Disabled for now
+        self.settings_button.clicked.connect(self.open_settings)
         
         button_layout.addWidget(self.setup_button)
         button_layout.addWidget(self.start_button)
         button_layout.addWidget(self.manual_button)
         button_layout.addWidget(self.settings_button)
         
-        controls_layout.addLayout(button_layout)
+        button_container.addLayout(button_layout)
+        button_container.addStretch()
+        
+        controls_layout.addLayout(button_container)
         parent_layout.addLayout(controls_layout)
+
+    def open_settings(self):
+        """Open settings window as independent window"""
+        # Always create a new window (don't reuse)
+        self.settings_window = SettingsWindow(self)
+        self.settings_window.show()
+        
+        # Position it relative to main window
+        main_pos = self.pos()
+        self.settings_window.move(main_pos.x() + 50, main_pos.y() + 50)
     
     def create_status_area(self, parent_layout):
         """Create minimal status area - only for critical errors"""
@@ -376,7 +519,8 @@ class AkademiTrackWindow(QMainWindow):
         """Initialize the bot"""
         self.install_requirements()
         self.bot = ImprovedISkoleBot(gui_callback=self.log_message)
-        self.bot.scheduler_stopped_signal.connect(self.stop_automation)
+        # Connect the scheduler stopped signal to our handler
+        self.bot.scheduler_stopped_signal.connect(self.on_scheduler_stopped)
     
     def _redirect_std_streams(self):
         class _StdRedirector:
@@ -394,18 +538,25 @@ class AkademiTrackWindow(QMainWindow):
         sys.stderr = _StdRedirector(lambda t: self.console_signal.emit(t))
     
     def append_console(self, text):
-        """Append text to the console widget"""
-        if text.strip():  # Only append non-empty messages
+        """Append text to console and settings window if open"""
+        if text.strip():
+            # Update hidden main console
             self.console.appendPlainText(text.strip())
-            # Scroll to the bottom
             scrollbar = self.console.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
-            # Optional: Limit console to 1000 lines to prevent memory issues
+            
+            # Update settings window console if it's open
+            if hasattr(self, 'settings_window') and self.settings_window and hasattr(self.settings_window, 'console_widget'):
+                try:
+                    self.settings_window.append_text(text.strip())
+                except:
+                    pass  # Settings window might be closed
+            
+            # Limit console to 1000 lines
             lines = self.console.toPlainText().split('\n')
             if len(lines) > 1000:
                 new_text = '\n'.join(lines[-1000:])
                 self.console.setPlainText(new_text)
-                scrollbar.setValue(scrollbar.maximum())
     
     def install_requirements(self):
         """Install required packages quietly"""
@@ -507,86 +658,171 @@ class AkademiTrackWindow(QMainWindow):
             self.show_error("Setup failed. Please try again.")
     
     def toggle_automation(self):
-        """Toggle automation on/off"""
-        if not self.is_running:
-            self.start_automation()
-        else:
-            self.stop_automation()
+        """Toggle automation - COMPLETELY CRASH PROOF"""
+        try:
+            # Immediate return if already processing ANY action
+            if hasattr(self, '_processing_any_action') and self._processing_any_action:
+                print("Action already in progress, ignoring click...")
+                return
+                
+            # Set global action lock
+            self._processing_any_action = True
+            
+            # Disable button immediately to prevent further clicks
+            self.start_button.setEnabled(False)
+            
+            if not self.is_running:
+                print("Toggle: Starting automation...")
+                self.start_button.setText("Starting...")
+                self._safe_start_automation()
+            else:
+                print("Toggle: Stopping automation...")  
+                self.start_button.setText("Stopping...")
+                self._safe_stop_automation()
+                
+        except Exception as e:
+            print(f"CRITICAL ERROR in toggle_automation: {e}")
+            # Emergency reset
+            self._emergency_reset()
+        finally:
+            # Always release the lock after a delay
+            QTimer.singleShot(1000, self._release_action_lock)
 
     def start_automation(self):
-        """Start automation with immediate execution after cookie validation"""
-        cookies_ok = False
-        if os.path.exists(self.bot.cookies_file):
-            try:
-                if self.bot.load_cookies_from_file() and self.bot.test_cookies():
-                    cookies_ok = True
-                else:
-                    self.log_message("🔑 Session expired or invalid - running Setup & Login")
-            except Exception as e:
-                self.log_message(f"Cookie validation error: {e}")
-        else:
-            self.log_message("🔑 No cookies found - running Setup & Login")
+        """Public start method - delegates to safe internal method"""
+        print("Public start_automation called")
+        self._safe_start_automation()
 
-        if not cookies_ok:
-            self.setup_and_login()
-            return
+    def _safe_start_automation(self):
+        """Internal safe start method"""
+        try:
+            # Check cookies
+            cookies_ok = False
+            if os.path.exists(self.bot.cookies_file):
+                try:
+                    if self.bot.load_cookies_from_file() and self.bot.test_cookies():
+                        cookies_ok = True
+                    else:
+                        self.log_message("🔑 Session expired - running Setup & Login")
+                except Exception as e:
+                    self.log_message(f"Cookie validation error: {e}")
+            else:
+                self.log_message("🔑 No cookies found - running Setup & Login")
 
-        self.bot.running = True
-        self.scheduler_thread = SchedulerThread(self.bot)
-        self.scheduler_thread.message_signal.connect(self.log_message)
-        self.scheduler_thread.status_signal.connect(self.update_status)
-        self.scheduler_thread.start()
+            if not cookies_ok:
+                self.setup_and_login()
+                self._reset_start_button()
+                return
 
-        self.is_running = True
-        self.start_button.setText("Stop Automation")
-        self.start_button.setStyleSheet("""
-            QPushButton {
-                background-color: #dc3545;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: 600;
-                min-height: 20px;
-            }
-            QPushButton:hover {
-                background-color: #c82333;
-            }
-        """)
+            # Start the automation
+            self.bot.running = True
+            
+            # Kill any existing thread first
+            self._force_kill_scheduler_thread()
+            
+            # Create new thread
+            self.scheduler_thread = SchedulerThread(self.bot)
+            self.scheduler_thread.message_signal.connect(self.log_message)
+            self.scheduler_thread.status_signal.connect(self.update_status)
+            self.scheduler_thread.start()
 
-        self.setup_button.setEnabled(False)
-        self.manual_button.setEnabled(False)
-        self.status_indicator.set_status("Running", "#28a745")
+            # Update state
+            self.is_running = True
+            self._set_stop_button_style()
+            self.setup_button.setEnabled(False)
+            self.manual_button.setEnabled(False)
+            self.status_indicator.set_status("Running", "#28a745")
+            
+            print("Safe start completed")
+            
+        except Exception as e:
+            print(f"Error in _safe_start_automation: {e}")
+            self._emergency_reset()
+
     
     def stop_automation(self):
-        """Stop automation"""
-        if not self.is_running:
-            return
+        """Public stop method - delegates to safe internal method"""  
+        print("Public stop_automation called")
+        self._safe_stop_automation()
 
-        self.start_button.setText("Stopping...")
-        self.start_button.setEnabled(False)
-        self.status_indicator.set_status("Stopping...", "#ffc107")
-        
-        self.is_running = False
-        
+    def _safe_stop_automation(self):
+        """Internal safe stop method - BULLETPROOF"""
         try:
-            if self.bot:
-                self.bot.stop_scheduler()
+            print("Safe stop starting...")
             
-            if self.scheduler_thread and self.scheduler_thread.isRunning():
-                self.scheduler_thread.stop()
-                self.scheduler_thread.wait(2000)
-                self.scheduler_thread = None
+            # Set stopping state immediately
+            self.is_running = False
+            self.status_indicator.set_status("Stopping...", "#ffc107")
+            
+            # Stop bot
+            if hasattr(self, 'bot') and self.bot:
+                try:
+                    self.bot.running = False
+                    self.bot.stop_scheduler()
+                    print("Bot stopped")
+                except:
+                    print("Error stopping bot, continuing...")
+            
+            # Force kill thread
+            self._force_kill_scheduler_thread()
+            
+            # Reset UI
+            self._reset_start_button()
+            self.setup_button.setEnabled(True)
+            self.manual_button.setEnabled(True)
+            self.status_indicator.set_status("Stopped", "#6c757d")
+            
+            print("Safe stop completed")
+            
         except Exception as e:
-            self.log_message(f"Error stopping automation: {e}")
-        
+            print(f"Error in _safe_stop_automation: {e}")
+            self._emergency_reset()
+
+    def _force_kill_scheduler_thread(self):
+        """Force kill any existing scheduler thread"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                print("Killing existing scheduler thread...")
+                
+                # Disconnect all signals first
+                try:
+                    self.scheduler_thread.message_signal.disconnect()
+                    self.scheduler_thread.status_signal.disconnect()
+                except:
+                    pass
+                
+                # Try graceful stop first
+                if self.scheduler_thread.isRunning():
+                    try:
+                        self.scheduler_thread.stop()
+                        if not self.scheduler_thread.wait(1000):  # Wait 1 second max
+                            print("Graceful stop failed, terminating...")
+                            self.scheduler_thread.terminate()
+                            self.scheduler_thread.wait(500)  # Wait 0.5 seconds for termination
+                    except:
+                        print("Graceful stop failed, forcing termination...")
+                        try:
+                            self.scheduler_thread.terminate()
+                            self.scheduler_thread.wait(500)
+                        except:
+                            pass
+                
+                self.scheduler_thread = None
+                print("Scheduler thread killed")
+                
+        except Exception as e:
+            print(f"Error killing thread: {e}")
+            # Set to None anyway
+            self.scheduler_thread = None
+    
+    def _reset_start_button(self):
+        """Reset start button to initial state"""
         self.start_button.setText("Start Automation")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
-                background-color: #0066cc;
-                color: white;
+                background-color: #0066cc !important;
+                color: white !important;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -595,13 +831,76 @@ class AkademiTrackWindow(QMainWindow):
                 min-height: 20px;
             }
             QPushButton:hover {
-                background-color: #0052a3;
+                background-color: #0052a3 !important;
             }
         """)
-        
-        self.setup_button.setEnabled(True)
-        self.manual_button.setEnabled(True)
-        self.status_indicator.set_status("Ready", "#6c757d")
+
+    def _set_stop_button_style(self):
+        """Set button to stop style"""
+        self.start_button.setText("Stop Automation")
+        self.start_button.setEnabled(True)
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545 !important;
+                color: white !important;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                min-height: 20px;
+            }
+            QPushButton:hover {
+                background-color: #c82333 !important;
+            }
+        """)
+
+    def _release_action_lock(self):
+        """Release the action lock"""
+        try:
+            self._processing_any_action = False
+            print("Action lock released")
+        except:
+            pass
+
+    def _emergency_reset(self):
+        """Emergency reset all states"""
+        try:
+            print("EMERGENCY RESET!")
+            self.is_running = False
+            self._force_kill_scheduler_thread()
+            self._reset_start_button()
+            self.setup_button.setEnabled(True)
+            self.manual_button.setEnabled(True)
+            self.status_indicator.set_status("Reset", "#dc3545")
+            
+            # Clear all locks
+            self._processing_any_action = False
+            if hasattr(self, '_starting'):
+                self._starting = False
+            if hasattr(self, '_stopping'):
+                self._stopping = False
+                
+        except Exception as e:
+            print(f"Error in emergency reset: {e}")
+
+
+    def on_scheduler_stopped(self):
+        """Handle when scheduler stops itself - SAFE VERSION"""
+        try:
+            print("Scheduler stopped signal received")
+            
+            # Only update if we're actually running
+            if hasattr(self, 'is_running') and self.is_running:
+                # Don't call stop methods, just update UI
+                self.is_running = False
+                self._reset_start_button()
+                self.setup_button.setEnabled(True)
+                self.manual_button.setEnabled(True)
+                self.status_indicator.set_status("Completed", "#6c757d")
+                
+        except Exception as e:
+            print(f"Error in on_scheduler_stopped: {e}")
     
     def update_status(self, status):
         """Update status indicator"""
