@@ -51,7 +51,7 @@ class ImprovedISkoleBot:
         # Detect OS and set appropriate headers
         self.headers = self.get_os_specific_headers()
         
-        # Initialize timenr counter
+        # Initialize timenr counter with new logic
         self.load_timenr_counter()
         
         # Set up logging
@@ -60,6 +60,30 @@ class ImprovedISkoleBot:
         
         # Target URL that guarantees user is fully authenticated (timeplan view)
         self.timeplan_url = f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=timeplan"
+        
+        # Define study periods with their registration time windows
+        self.study_periods = [
+            {
+                "period_num": 1,
+                "class_time": {"start": "08:15", "end": "09:00"},
+                "registration_window": {"start": "08:15", "end": "08:30"}
+            },
+            {
+                "period_num": 2,
+                "class_time": {"start": "09:00", "end": "09:45"},
+                "registration_window": {"start": "09:00", "end": "09:15"}
+            },
+            {
+                "period_num": 3,
+                "class_time": {"start": "13:45", "end": "14:30"},
+                "registration_window": {"start": "14:15", "end": "14:30"}
+            },
+            {
+                "period_num": 4,
+                "class_time": {"start": "14:30", "end": "15:15"},
+                "registration_window": {"start": "15:00", "end": "15:15"}
+            }
+        ]
     
     def log(self, message):
         """Log message and send to GUI if available"""
@@ -685,82 +709,163 @@ class ImprovedISkoleBot:
             return False
     
     def load_timenr_counter(self):
-        """Load the timenr counter from file"""
+        """Load the timenr counter from file with new study period logic"""
         try:
             if os.path.exists(self.timenr_file):
                 with open(self.timenr_file, 'rb') as f:
                     data = pickle.load(f)
-                    self.current_timenr = data.get('timenr', 21568187)
-                    self.last_increment_date = data.get('last_increment_date', '')
-                    self.daily_incremented_times = set(data.get('daily_incremented_times', []))
+                    self.current_timenr = data.get('timenr', 83)
+                    self.daily_start_timenr = data.get('daily_start_timenr', 83)  # Track the starting timenr for the day
+                    self.last_school_date = data.get('last_school_date', '')
+                    self.completed_periods_today = set(data.get('completed_periods_today', []))
                     self.log(f"📊 Loaded timenr counter: {self.current_timenr}")
+                    self.log(f"📊 Daily start timenr: {self.daily_start_timenr}")
+                    self.log(f"📅 Last school date: {self.last_school_date}")
             else:
-                self.current_timenr = 21568187
-                self.last_increment_date = ''
-                self.daily_incremented_times = set()
+                self.current_timenr = 83
+                self.daily_start_timenr = 83
+                self.last_school_date = ''
+                self.completed_periods_today = set()
                 self.log(f"🆕 Initialized timenr counter: {self.current_timenr}")
                 self.save_timenr_counter()
         except Exception as e:
             self.log(f"Failed to load timenr counter: {e}")
-            self.current_timenr = 21568187
-            self.last_increment_date = ''
-            self.daily_incremented_times = set()
+            self.current_timenr = 83
+            self.daily_start_timenr = 83
+            self.last_school_date = ''
+            self.completed_periods_today = set()
     
     def save_timenr_counter(self):
         """Save the timenr counter to file"""
         try:
             data = {
                 'timenr': self.current_timenr,
+                'daily_start_timenr': self.daily_start_timenr,
                 'last_updated': datetime.now().isoformat(),
-                'last_increment_date': self.last_increment_date,
-                'daily_incremented_times': list(self.daily_incremented_times)
+                'last_school_date': self.last_school_date,
+                'completed_periods_today': list(self.completed_periods_today)
             }
             with open(self.timenr_file, 'wb') as f:
                 pickle.dump(data, f)
         except Exception as e:
             self.log(f"Failed to save timenr counter: {e}")
     
-    def should_increment_timenr(self):
-        """Check if timenr should be incremented based on current time"""
+    def time_to_minutes(self, time_str):
+        """Convert time string (HH:MM) to minutes since midnight"""
+        hours, minutes = map(int, time_str.split(':'))
+        return hours * 60 + minutes
+    
+    def get_current_study_period(self):
+        """Get the current study period number based on class time"""
         now = datetime.now()
-        current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
+        current_minutes = self.time_to_minutes(current_time)
         
-        if self.last_increment_date != current_date:
-            self.daily_incremented_times = set()
-            self.last_increment_date = current_date
-            self.log("🗓️ New day - reset daily increment tracking")
-            self.save_timenr_counter()
-        
-        increment_times = ["08:10", "08:55", "09:50", "10:40", "11:55", "12:40", "13:40", "14:25"]
-        
-        for increment_time in increment_times:
-            if current_time == increment_time and increment_time not in self.daily_incremented_times:
-                return increment_time
+        for period in self.study_periods:
+            start_minutes = self.time_to_minutes(period["class_time"]["start"])
+            end_minutes = self.time_to_minutes(period["class_time"]["end"])
+            
+            # Check if current time is within this class period
+            if start_minutes <= current_minutes <= end_minutes:
+                return period["period_num"]
         
         return None
     
-    def increment_timenr(self, increment_time=None):
-        """Increment timenr by 1 and save"""
-        self.current_timenr += 1
-        if increment_time:
-            self.daily_incremented_times.add(increment_time)
-            self.log(f"🕒 Time-based increment at {increment_time}: timenr = {self.current_timenr}")
-        else:
-            self.log(f"🔢 Manual increment: timenr = {self.current_timenr}")
-        self.save_timenr_counter()
+    def get_current_registration_period(self):
+        """Get the current registration period if we're in a registration window"""
+        now = datetime.now()
+        current_time = now.strftime("%H:%M")
+        current_minutes = self.time_to_minutes(current_time)
+        
+        for period in self.study_periods:
+            start_minutes = self.time_to_minutes(period["registration_window"]["start"])
+            end_minutes = self.time_to_minutes(period["registration_window"]["end"])
+            
+            # Check if current time is within this registration window
+            if start_minutes <= current_minutes <= end_minutes:
+                return period["period_num"]
+        
+        return None
     
-    def check_timenr_increment(self):
-        """Check and perform timenr increment if needed"""
-        increment_time = self.should_increment_timenr()
-        if increment_time:
-            self.increment_timenr(increment_time)
-            return True
-        return False
+    def is_study_period_time(self):
+        """Check if current time is during a study period (class time)"""
+        return self.get_current_study_period() is not None
+    
+    def is_registration_time(self):
+        """Check if current time is during a registration window"""
+        return self.get_current_registration_period() is not None
+    
+    def should_adjust_daily_counter(self):
+        """Check if we should adjust the daily counter for a new school day"""
+        now = datetime.now()
+        current_date = now.strftime("%Y-%m-%d")
+        
+        # If it's a new school day (weekday), subtract 4 from current timenr
+        if current_date != self.last_school_date and now.weekday() < 5:  # Monday = 0, Friday = 4
+            return True, current_date
+        
+        return False, current_date
+    
+    def update_timenr_for_period(self):
+        """Update timenr based on current registration period"""
+        should_adjust, current_date = self.should_adjust_daily_counter()
+        
+        if should_adjust:
+            # New school day - subtract 4 from the previous day's START timenr and clear completed periods
+            old_start_timenr = self.daily_start_timenr
+            self.daily_start_timenr = max(1, self.daily_start_timenr - 4)  # Subtract 4 from the START of previous day
+            self.current_timenr = self.daily_start_timenr  # Set current to new starting value
+            self.completed_periods_today = set()
+            self.last_school_date = current_date
+            self.log(f"🆕 New school day ({current_date})")
+            self.log(f"🔢 Previous day started at: {old_start_timenr}")
+            self.log(f"🔢 New day starts at: {self.daily_start_timenr} ({old_start_timenr} - 4)")
+            self.save_timenr_counter()
+        
+        current_period = self.get_current_registration_period()
+        if current_period is None:
+            # If not in registration window, just calculate what timenr should be for display
+            current_study_period = self.get_current_study_period()
+            if current_study_period:
+                expected_timenr = self.daily_start_timenr + (current_study_period - 1)
+                if self.current_timenr != expected_timenr:
+                    self.current_timenr = expected_timenr
+                    self.log(f"📚 Updated timenr for study period {current_study_period}: {self.current_timenr}")
+                    self.save_timenr_counter()
+            return False  # Not during a registration window
+        
+        # Check if we've already processed this period today
+        if current_period in self.completed_periods_today:
+            return False  # Already processed this period
+        
+        # Calculate what timenr should be for this period (daily_start + period_offset)
+        expected_timenr = self.daily_start_timenr + (current_period - 1)  # Period 1 = start, Period 2 = start+1, etc.
+        
+        if self.current_timenr != expected_timenr:
+            # Update to the correct timenr for this period
+            self.current_timenr = expected_timenr
+        
+        # Mark this period as completed
+        self.completed_periods_today.add(current_period)
+        self.log(f"📚 Registration window {current_period}: timenr = {self.current_timenr}")
+        self.save_timenr_counter()
+        return True
     
     def register_attendance_enhanced(self):
-        """Enhanced attendance registration"""
+        """Enhanced attendance registration with registration window logic"""
         try:
+            # Update timenr based on current registration window
+            if not self.update_timenr_for_period():
+                current_period = self.get_current_registration_period()
+                if current_period:
+                    if current_period in self.completed_periods_today:
+                        self.log(f"📚 Registration period {current_period} already processed (timenr: {self.current_timenr})")
+                    else:
+                        self.log(f"📚 Registration period {current_period}: timenr already correct ({self.current_timenr})")
+                else:
+                    self.log("⏰ Not currently in a registration window")
+                    return False
+            
             current_ip = self.get_current_ip()
             current_date = datetime.now().strftime("%Y%m%d")
             
@@ -794,7 +899,9 @@ class ImprovedISkoleBot:
                 ]
             }
             
-            self.log(f"📡 Attempting registration with IP: {current_ip}, timenr: {self.current_timenr}")
+            current_period = self.get_current_registration_period()
+            self.log(f"📡 Registering attendance for registration window {current_period}")
+            self.log(f"📡 Using IP: {current_ip}, timenr: {self.current_timenr}")
             
             response = self.session.post(
                 url,
@@ -823,7 +930,7 @@ class ImprovedISkoleBot:
             return False
     
     def check_and_register(self):
-        """Main check and register function with better cookie status feedback"""
+        """Main check and register function with registration window logic"""
         if self._should_stop:
             return
             
@@ -834,47 +941,78 @@ class ImprovedISkoleBot:
             self.log("📅 Weekend - skipping")
             return
         
-        # Define study hours (8:00-15:00 on weekdays)
-        study_start = 8
-        study_end = 15
-        is_study_time = study_start <= current_time.hour < study_end
+        # First, check if we need to adjust for a new school day
+        should_adjust, current_date = self.should_adjust_daily_counter()
+        if should_adjust:
+            old_start_timenr = self.daily_start_timenr
+            self.daily_start_timenr = max(1, self.daily_start_timenr - 4)  # Subtract 4 from previous day's START
+            self.current_timenr = self.daily_start_timenr
+            self.completed_periods_today = set()
+            self.last_school_date = current_date
+            self.log(f"🆕 New school day - start timenr: {old_start_timenr} - 4 = {self.daily_start_timenr}")
+            self.save_timenr_counter()
         
-        if is_study_time:
-            self.log("📚 During study hours - processing request")
-            
-            # Check for timenr increment
-            self.check_timenr_increment()
-            
-            if not self.get_browser_cookies_enhanced():
-                self.log("🔑 Cookie authentication failed - please run 'Setup & Login' again")
-                return
-            
-            if not self.check_login_status():
-                self.log("🔑 Session expired - cookies need refreshing. Please run 'Setup & Login'")
-                if os.path.exists(self.cookies_file):
-                    os.remove(self.cookies_file)
-                    self.log("🗑️ Removed expired cookies")
-                return
-            
-            self.log("🚀 Attempting attendance registration")
-            success = self.register_attendance_enhanced()
-            if success:
-                self.log("🎯 Attendance registered successfully!")
+        # Update current timenr based on what period we're in (even if not registering)
+        current_study_period = self.get_current_study_period()
+        if current_study_period:
+            expected_timenr = self.daily_start_timenr + (current_study_period - 1)
+            if self.current_timenr != expected_timenr:
+                self.current_timenr = expected_timenr
+                self.log(f"📚 Updated timenr for current study period {current_study_period}: {self.current_timenr}")
+                self.save_timenr_counter()
+        
+        # Check if we're during a registration window
+        if not self.is_registration_time():
+            if current_study_period:
+                # Find the registration window for this study period
+                for period in self.study_periods:
+                    if period["period_num"] == current_study_period:
+                        reg_start = period["registration_window"]["start"]
+                        reg_end = period["registration_window"]["end"]
+                        self.log(f"📚 In study period {current_study_period} (timenr: {self.current_timenr}), but registration window is {reg_start}-{reg_end}")
+                        break
+                else:
+                    self.log(f"📚 In study period {current_study_period} (timenr: {self.current_timenr}) - registration window not defined")
             else:
-                self.log("❌ Registration attempt failed")
+                self.log("⏰ Not during study time - skipping registration")
+            return
+        
+        current_reg_period = self.get_current_registration_period()
+        self.log(f"📚 During registration window {current_reg_period} (timenr: {self.current_timenr}) - processing request")
+        
+        if not self.get_browser_cookies_enhanced():
+            self.log("🔑 Cookie authentication failed - please run 'Setup & Login' again")
+            return
+        
+        if not self.check_login_status():
+            self.log("🔑 Session expired - cookies need refreshing. Please run 'Setup & Login'")
+            if os.path.exists(self.cookies_file):
+                os.remove(self.cookies_file)
+                self.log("🗑️ Removed expired cookies")
+            return
+        
+        self.log("🚀 Attempting attendance registration")
+        success = self.register_attendance_enhanced()
+        if success:
+            self.log("🎯 Attendance registered successfully!")
         else:
-            self.log("⏰ Outside study hours - skipping registration")
+            self.log("❌ Registration attempt failed")
     
     def run_scheduler(self):
-        """Run the automated scheduler with study-time aware intervals"""
+        """Run the automated scheduler with registration window awareness"""
         schedule.clear()  # Clear any existing jobs
         
-        # Schedule more frequent checks during study hours
-        schedule.every(2).minutes.do(self.check_and_register)  # Check every 2 minutes instead of 1
+        # Schedule checks every minute during potential study hours
+        schedule.every(1).minutes.do(self.check_and_register)
         
         self.running = True
         self._should_stop = False
-        self.log("🤖 Scheduler started - checking every 2 minutes")
+        self.log("🤖 Scheduler started - checking every minute")
+        self.log("📚 Study periods and registration windows:")
+        for period in self.study_periods:
+            class_time = f"{period['class_time']['start']} - {period['class_time']['end']}"
+            reg_time = f"{period['registration_window']['start']} - {period['registration_window']['end']}"
+            self.log(f"   Period {period['period_num']}: Class {class_time}, Registration {reg_time}")
         
         # IMMEDIATE CHECK when starting
         self.log("🚀 Running immediate check...")
@@ -883,17 +1021,17 @@ class ImprovedISkoleBot:
         while self.running and not self._should_stop:
             try:
                 current_time = datetime.now()
-                is_study_time = 8 <= current_time.hour < 15 and current_time.weekday() < 5
+                is_registration_time = self.is_registration_time() and current_time.weekday() < 5
                 
                 schedule.run_pending()
                 
-                # Adjust sleep based on study time
-                if is_study_time:
-                    # During study hours: check more frequently (every 60 seconds)
-                    sleep_interval = 60
+                # Adjust sleep based on registration time
+                if is_registration_time:
+                    # During registration windows: check more frequently (every 15 seconds)
+                    sleep_interval = 15
                 else:
-                    # Outside study hours: check less frequently (every 5 minutes)
-                    sleep_interval = 300
+                    # Outside registration windows: check less frequently (every 2 minutes)
+                    sleep_interval = 120
                 
                 # Sleep in small chunks for better responsiveness
                 for _ in range(sleep_interval):
@@ -914,3 +1052,45 @@ class ImprovedISkoleBot:
         self.running = False
         schedule.clear()
         self.log("🛑 Scheduler stopped")
+    
+    def get_status_info(self):
+        """Get current status information for display"""
+        now = datetime.now()
+        current_time = now.strftime("%H:%M")
+        current_date = now.strftime("%Y-%m-%d")
+        
+        current_study_period = self.get_current_study_period()
+        current_registration_period = self.get_current_registration_period()
+        is_study_time = self.is_study_period_time()
+        is_reg_time = self.is_registration_time()
+        
+        # Get next registration window info
+        next_reg_window = None
+        current_minutes = self.time_to_minutes(current_time)
+        for period in self.study_periods:
+            reg_start_minutes = self.time_to_minutes(period["registration_window"]["start"])
+            if reg_start_minutes > current_minutes:
+                next_reg_window = {
+                    'period': period["period_num"],
+                    'start': period["registration_window"]["start"],
+                    'end': period["registration_window"]["end"]
+                }
+                break
+        
+        status = {
+            'current_time': current_time,
+            'current_date': current_date,
+            'current_timenr': self.current_timenr,
+            'daily_start_timenr': self.daily_start_timenr,
+            'current_study_period': current_study_period,
+            'current_registration_period': current_registration_period,
+            'is_study_time': is_study_time,
+            'is_registration_time': is_reg_time,
+            'next_registration_window': next_reg_window,
+            'last_school_date': self.last_school_date,
+            'completed_periods_today': list(self.completed_periods_today),
+            'cookies_ready': self.cookies_ready,
+            'running': self.running
+        }
+        
+        return status
