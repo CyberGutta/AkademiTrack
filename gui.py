@@ -3,6 +3,7 @@ import os
 import time
 import platform
 import subprocess
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +11,7 @@ try:
     from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
         QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
-        QFrame, QProgressBar, QSizePolicy, QPlainTextEdit
+        QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
     )
     from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
     from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
@@ -20,11 +21,244 @@ except ImportError:
 
 try:
     from backend import ImprovedISkoleBot
-    from manual import ManualRegistrationWindow
 except ImportError:
     print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
 
+class PostRequestWindow(QDialog):
+    def __init__(self, bot, parent=None):
+        super().__init__(parent)
+        self.bot = bot
+        self.base_url = "https://iskole.net"
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the POST request window UI"""
+        self.setWindowTitle("Manual POST Request")
+        self.setGeometry(300, 300, 900, 700)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: white;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            }
+            QLabel {
+                color: #212529;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            QLineEdit, QTextEdit {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 12px;
+                color: #495057;
+            }
+            QPushButton {
+                background-color: #0066cc;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #0052a3;
+            }
+            QTextEdit#console {
+                background-color: #0b0c10;
+                color: #e6edf3;
+                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
+                font-size: 12px;
+                border: 1px solid #1f2833;
+            }
+        """)
+
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+
+        # Title
+        title = QLabel("Manual POST Request")
+        title.setFont(QFont("SF Pro Display", 18, QFont.Bold))
+        layout.addWidget(title)
+
+        # Form fields
+        form_layout = QVBoxLayout()
+        
+        # Fylkeid
+        form_layout.addWidget(QLabel("Fylke ID:"))
+        self.fylkeid_input = QLineEdit("00")
+        form_layout.addWidget(self.fylkeid_input)
+        
+        # Skoleid  
+        form_layout.addWidget(QLabel("Skole ID:"))
+        self.skoleid_input = QLineEdit("312")
+        form_layout.addWidget(self.skoleid_input)
+        
+        # Planperi
+        form_layout.addWidget(QLabel("Plan Periode:"))
+        self.planperi_input = QLineEdit("2025-26")
+        form_layout.addWidget(self.planperi_input)
+        
+        # Stkode
+        form_layout.addWidget(QLabel("ST Kode:"))
+        self.stkode_input = QLineEdit("PB")
+        form_layout.addWidget(self.stkode_input)
+        
+        # Kl_trinn
+        form_layout.addWidget(QLabel("Klasse Trinn:"))
+        self.kl_trinn_input = QLineEdit("3")
+        form_layout.addWidget(self.kl_trinn_input)
+        
+        # Kl_id
+        form_layout.addWidget(QLabel("Klasse ID:"))
+        self.kl_id_input = QLineEdit("A")
+        form_layout.addWidget(self.kl_id_input)
+        
+        # K_navn
+        form_layout.addWidget(QLabel("K Navn:"))
+        self.k_navn_input = QLineEdit("STU")
+        form_layout.addWidget(self.k_navn_input)
+        
+        # Gruppe_nr
+        form_layout.addWidget(QLabel("Gruppe Nr:"))
+        self.gruppe_nr_input = QLineEdit("$")
+        form_layout.addWidget(self.gruppe_nr_input)
+        
+        # Timenr
+        form_layout.addWidget(QLabel("Time Nr:"))
+        self.timenr_input = QLineEdit("1")
+        form_layout.addWidget(self.timenr_input)
+        
+        layout.addLayout(form_layout)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.send_button = QPushButton("Send POST Request")
+        self.send_button.clicked.connect(self.send_post_request)
+        button_layout.addWidget(self.send_button)
+
+        self.close_button = QPushButton("Close")
+        self.close_button.clicked.connect(self.close)
+        button_layout.addWidget(self.close_button)
+
+        layout.addLayout(button_layout)
+        
+        # Console output
+        layout.addWidget(QLabel("Response:"))
+        self.console = QTextEdit()
+        self.console.setObjectName("console")
+        self.console.setReadOnly(True)
+        self.console.setMinimumHeight(200)
+        layout.addWidget(self.console)
+
+        self.setLayout(layout)
+
+    def log(self, message):
+        """Log message to console"""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        formatted_message = f"[{timestamp}] {message}"
+        self.console.append(formatted_message)
+        if self.bot.gui_callback:
+            self.bot.gui_callback(formatted_message)
+
+    def send_post_request(self):
+        """Send the POST request with current form values - FIXED OUTPUT"""
+        try:
+            current_ip = self.bot.get_current_ip()
+            current_date = datetime.now().strftime("%Y%m%d")
+            
+            # Load cookies if they exist
+            if os.path.exists(self.bot.cookies_file):
+                self.bot.load_cookies_from_file()
+                self.log("📂 Loaded cookies from file")
+            else:
+                self.log("❌ No cookies file found - please run Setup & Login first")
+                return
+            
+            # Get JSESSIONID from the bot's session cookies
+            jsessionid = None
+            for cookie in self.bot.session.cookies:
+                if cookie.name == 'JSESSIONID':
+                    jsessionid = cookie.value
+                    break
+            
+            if not jsessionid:
+                self.log("❌ No JSESSIONID found in cookies")
+                self.log("Available cookies:")
+                for cookie in self.bot.session.cookies:
+                    self.log(f"  - {cookie.name}: {cookie.value[:20]}...")
+                return
+            
+            url = f"{self.base_url}/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionid}"
+            
+            payload = {
+                "name": "lagre_oppmote",
+                "parameters": [
+                    {"fylkeid": self.fylkeid_input.text()},
+                    {"skoleid": self.skoleid_input.text()},
+                    {"planperi": self.planperi_input.text()},
+                    {"ansidato": current_date},
+                    {"stkode": self.stkode_input.text()},
+                    {"kl_trinn": self.kl_trinn_input.text()},
+                    {"kl_id": self.kl_id_input.text()},
+                    {"k_navn": self.k_navn_input.text()},
+                    {"gruppe_nr": self.gruppe_nr_input.text()},
+                    {"timenr": self.timenr_input.text()},
+                    {"fravaerstype": "M"},
+                    {"ip": current_ip}
+                ]
+            }
+            
+            self.log(f"📤 Sending POST to: {url}")
+            self.log(f"📋 Payload: {json.dumps(payload, indent=2)}")
+            self.log(f"🌐 Using IP: {current_ip}")
+            self.log(f"📅 Date: {current_date}")
+            
+            # Use the bot's session and headers
+            response = self.bot.session.post(
+                url,
+                headers=self.bot.get_api_headers(),
+                data=json.dumps(payload),
+                timeout=15
+            )
+            
+            self.log(f"📡 Response Status: {response.status_code}")
+            self.log(f"📋 Response Headers: {dict(response.headers)}")
+            
+            try:
+                response_data = response.json()
+                self.log("📋 Complete Response JSON:")
+                self.log("=" * 80)
+                
+                # FIXED: Output complete JSON without any limits
+                complete_json = json.dumps(response_data, indent=2, ensure_ascii=False)
+                
+                # Split into smaller chunks to avoid GUI truncation
+                chunk_size = 1000
+                for i in range(0, len(complete_json), chunk_size):
+                    chunk = complete_json[i:i + chunk_size]
+                    self.console.append(chunk)
+                    # Force GUI update for each chunk
+                    self.console.repaint()
+                    
+                self.log("=" * 80)
+                
+            except Exception as e:
+                self.log(f"📋 Raw Response Text: {response.text}")
+                self.log(f"JSON Parse Error: {e}")
+
+            if response.status_code == 200:
+                self.log("✅ POST request completed successfully!")
+            else:
+                self.log(f"⚠️ POST request completed with status {response.status_code}")
+                
+        except Exception as e:
+            self.log(f"❌ Error sending POST request: {e}")
+            import traceback
+            self.log(f"📋 Full error: {traceback.format_exc()}")
 
 class SimpleButton(QPushButton):
     """Clean, simple button"""
@@ -159,7 +393,7 @@ class SettingsWindow(QWidget):
         self.init_ui()
         
     def init_ui(self):
-        """Initialize settings UI"""
+        """Initialize settings UI - FIXED CONSOLE VERSION"""
         self.setWindowTitle("Innstillinger - AkademiTrack")
         self.setGeometry(300, 300, 800, 600)
         self.setMinimumSize(600, 400)
@@ -200,42 +434,63 @@ class SettingsWindow(QWidget):
         console_label.setStyleSheet("color: #212529; margin-bottom: 8px;")
         layout.addWidget(console_label)
         
-        # Create a new console widget for this window
+        # FIXED: Create console widget without any limits
         self.console_widget = QPlainTextEdit()
         self.console_widget.setReadOnly(True)
-        self.console_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.console_widget.setStyleSheet("""
-            QPlainTextEdit {
-                background-color: #0b0c10;
-                color: #e6edf3;
-                font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
-                font-size: 12px;
-                border: 1px solid #1f2833;
-                border-radius: 8px;
-                padding: 10px;
-            }
-        """)
+        self.console_widget.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        # FIXED: Remove ALL block count limits
+        self.console_widget.setMaximumBlockCount(0)  
+        self.console_widget.document().setMaximumBlockCount(0) 
         
         layout.addWidget(self.console_widget, 1)
         
         # Button layout
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
+        self.post_button = SimpleButton("POST Request")
+        self.post_button.clicked.connect(self.open_post_request)
+        button_layout.addWidget(self.post_button)
+
         clear_button = SimpleButton("Tøm konsoll")
         clear_button.clicked.connect(self.clear_console)
         button_layout.addWidget(clear_button)
-        
+
         layout.addLayout(button_layout)
         
         # Copy existing console content if parent has it
         if self.parent_window and hasattr(self.parent_window, 'console'):
             self.console_widget.setPlainText(self.parent_window.console.toPlainText())
             
+    def open_post_request(self):
+        """Open the POST request window from settings"""
+        if not self.parent_window or not self.parent_window.bot:
+            self.append_text("❌ No bot instance available")
+            return
+            
+        if self.parent_window.is_running:
+            self.append_text("⚠️ Stop automation first before using POST Request")
+            return
+        
+        # Don't check login status - just check if cookies exist
+        if not os.path.exists(self.parent_window.bot.cookies_file):
+            self.append_text("❌ No cookies found - please run Setup & Login first")
+            return
+            
+        self.append_text("🚀 Opening POST Request window...")
+        self.post_window = PostRequestWindow(self.parent_window.bot, self)
+        self.post_window.show()
+    
     def append_text(self, text):
-        """Append text to console"""
+        """Append text to console without limits - FIXED VERSION"""
         if text.strip():
-            self.console_widget.appendPlainText(text.strip())
+            # FIXED: Remove all block limits and use insertPlainText for large content
+            cursor = self.console_widget.textCursor()
+            cursor.movePosition(cursor.End)
+            self.console_widget.setTextCursor(cursor)
+            self.console_widget.insertPlainText(text.strip() + "\n")
+            
+            # Scroll to bottom
             scrollbar = self.console_widget.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
         
@@ -324,7 +579,7 @@ class AkademiTrackWindow(QMainWindow):
         self.bot = None
         self.setup_thread = None
         self.scheduler_thread = None
-        self.manual_window = None
+        self.post_window = None  # CHANGED from manual_window
         self.settings_window = None
         self.is_running = False
         self._orig_stdout = None
@@ -334,11 +589,12 @@ class AkademiTrackWindow(QMainWindow):
         self.console = QPlainTextEdit()
         self.console.setReadOnly(True)
         self.console.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.console.hide()  # Keep it hidden
+        self.console.setMaximumBlockCount(0)  # Remove limits
+        self.console.hide()
         
         self.init_ui()
         self.init_bot()
-        self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'Manuell registrering'")
+        self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'POST Request'")
         
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
@@ -481,13 +737,9 @@ class AkademiTrackWindow(QMainWindow):
         secondary_button_layout = QHBoxLayout()
         secondary_button_layout.setSpacing(12)
         
-        self.manual_button = SimpleButton("Manuell Registrering")
-        self.manual_button.clicked.connect(self.open_manual_registration)
-        
         self.settings_button = SimpleButton("Innstillinger")
         self.settings_button.clicked.connect(self.open_settings)
         
-        secondary_button_layout.addWidget(self.manual_button)
         secondary_button_layout.addWidget(self.settings_button)
         
         secondary_button_container.addLayout(secondary_button_layout)
@@ -554,10 +806,14 @@ class AkademiTrackWindow(QMainWindow):
         sys.stderr = _StdRedirector(lambda t: self.console_signal.emit(t))
     
     def append_console(self, text):
-        """Append text to console and settings window if open"""
+        """Append text to console and settings window if open - FIXED VERSION"""
         if text.strip():
-            # Update hidden main console
-            self.console.appendPlainText(text.strip())
+            # Update hidden main console - FIXED: Remove limits
+            cursor = self.console.textCursor()
+            cursor.movePosition(cursor.End)
+            self.console.setTextCursor(cursor)
+            self.console.insertPlainText(text.strip() + "\n")
+            
             scrollbar = self.console.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
             
@@ -566,13 +822,8 @@ class AkademiTrackWindow(QMainWindow):
                 try:
                     self.settings_window.append_text(text.strip())
                 except:
-                    pass  # Settings window might be closed
+                    pass
             
-            # Limit console to 1000 lines
-            lines = self.console.toPlainText().split('\n')
-            if len(lines) > 1000:
-                new_text = '\n'.join(lines[-1000:])
-                self.console.setPlainText(new_text)
     
     def install_requirements(self):
         """Install required packages quietly"""
@@ -746,7 +997,6 @@ class AkademiTrackWindow(QMainWindow):
             self.is_running = True
             self._set_stop_button_style()
             self.setup_button.setEnabled(False)
-            self.manual_button.setEnabled(False)
             self.status_indicator.set_status("Kjører", "#28a745")
             
             print("Sikker start fullført")
@@ -785,7 +1035,6 @@ class AkademiTrackWindow(QMainWindow):
             # Reset UI
             self._reset_start_button()
             self.setup_button.setEnabled(True)
-            self.manual_button.setEnabled(True)
             self.status_indicator.set_status("Stoppet", "#6c757d")
             
             print("T-stopp fullført")
@@ -887,7 +1136,6 @@ class AkademiTrackWindow(QMainWindow):
             self._force_kill_scheduler_thread()
             self._reset_start_button()
             self.setup_button.setEnabled(True)
-            self.manual_button.setEnabled(True)
             self.status_indicator.set_status("Reset", "#dc3545")
             
             # Clear all locks
@@ -912,7 +1160,6 @@ class AkademiTrackWindow(QMainWindow):
                 self.is_running = False
                 self._reset_start_button()
                 self.setup_button.setEnabled(True)
-                self.manual_button.setEnabled(True)
                 self.status_indicator.set_status("Fullført", "#6c757d")
                 
         except Exception as e:
@@ -930,17 +1177,6 @@ class AkademiTrackWindow(QMainWindow):
             self.stop_automation()
         elif status == "Stoppet":
             self.stop_automation()
-    
-    def open_manual_registration(self):
-        """Open the manual registration window"""
-        if self.is_running:
-            self.show_warning("Stopp automatiseringen først")
-            return
-        if not self.bot.check_login_status():
-            self.show_warning("Vennligst fullfør oppsettet og logg inn først")
-            return
-        self.manual_window = ManualRegistrationWindow(self.bot, self)
-        self.manual_window.show()
     
     def show_info(self, message):
         """Show info dialog"""

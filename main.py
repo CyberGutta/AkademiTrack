@@ -96,7 +96,7 @@ def check_and_install_requirements():
 
 def check_files():
     """Check if required files exist"""
-    required_files = ['backend.py', 'gui.py']
+    required_files = ['backend.py', 'gui.py']  # Remove 'manual.py' from required files
     missing_files = []
     
     for file in required_files:
@@ -109,6 +109,7 @@ def check_files():
         print("- main.py")
         print("- backend.py")
         print("- gui.py")
+        # Remove manual.py reference
         return False
     
     return True

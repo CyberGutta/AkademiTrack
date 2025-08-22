@@ -443,7 +443,7 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def extract_cookies_from_selenium(self):
-        """Enhanced cookie extraction with validation"""
+        """Enhanced cookie extraction with validation and console output"""
         try:
             self.log("🍪 Extracting cookies from browser session...")
             
@@ -460,6 +460,10 @@ class ImprovedISkoleBot(QObject):
             extracted_cookies = {}
             cookies_found = False
             
+            # Log all extracted cookies with details
+            self.log("📋 Extracted Cookies Details:")
+            self.log("=" * 50)
+            
             for cookie in selenium_cookies:
                 domain = cookie['domain']
                 path = cookie.get('path', '/')
@@ -470,8 +474,22 @@ class ImprovedISkoleBot(QObject):
                     path=path
                 )
                 extracted_cookies[cookie['name']] = cookie['value']
-                self.log(f"✅ Extracted cookie: {cookie['name']} for domain {domain}")
+                
+                # Detailed cookie logging
+                self.log(f"Cookie: {cookie['name']}")
+                self.log(f"  Value: {cookie['value'][:50]}{'...' if len(cookie['value']) > 50 else ''}")
+                self.log(f"  Domain: {domain}")
+                self.log(f"  Path: {path}")
+                self.log(f"  Secure: {cookie.get('secure', False)}")
+                if cookie.get('expires'):
+                    expire_time = datetime.fromtimestamp(cookie['expires']).strftime('%Y-%m-%d %H:%M:%S')
+                    self.log(f"  Expires: {expire_time}")
+                self.log("-" * 30)
+                
                 cookies_found = True
+            
+            self.log(f"📊 Total cookies extracted: {len(extracted_cookies)}")
+            self.log("=" * 50)
             
             if cookies_found:
                 if self.test_cookies():
@@ -567,17 +585,23 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def test_cookies(self):
-        """Enhanced cookie validation"""
+        """Enhanced cookie validation with detailed output"""
         try:
+            self.log("🔍 Testing cookie validity...")
+            
             test_urls = [
                 f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=fravar",
                 f"{self.base_url}/elev/",
                 f"{self.base_url}/"
             ]
             
-            for url in test_urls:
+            for i, url in enumerate(test_urls, 1):
                 try:
+                    self.log(f"📡 Test {i}/3: Testing {url}")
                     response = self.session.get(url, headers=self.headers, timeout=10)
+                    
+                    self.log(f"  Status: {response.status_code}")
+                    self.log(f"  Content-Length: {len(response.text)} chars")
                     
                     if response.status_code == 200:
                         content = response.text.lower()
@@ -586,15 +610,20 @@ class ImprovedISkoleBot(QObject):
                             "elev", "student", "logg ut", "log out"
                         ]
                         
-                        if any(indicator in content for indicator in success_indicators):
+                        found_indicators = [indicator for indicator in success_indicators if indicator in content]
+                        
+                        if found_indicators:
+                            self.log(f"  ✅ Found success indicators: {', '.join(found_indicators)}")
                             self.log("✅ Cookie validation successful")
                             return True
+                        else:
+                            self.log(f"  ⚠️ No success indicators found")
                             
                 except Exception as e:
-                    self.log(f"Test failed for {url}: {e}")
+                    self.log(f"  ❌ Test failed for {url}: {e}")
                     continue
             
-            self.log("❌ Cookie validation failed")
+            self.log("❌ Cookie validation failed - all tests unsuccessful")
             return False
             
         except Exception as e:
@@ -640,30 +669,60 @@ class ImprovedISkoleBot(QObject):
                 return '109.247.238.162'
     
     def check_login_status(self):
-        """Enhanced login status check with clear cookie status reporting"""
+        """Enhanced login status check with better logic"""
         try:
+            self.log("🔍 Checking login status...")
+            
             test_urls = [
                 f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=fravar",
                 f"{self.base_url}/elev/"
             ]
             
-            for url in test_urls:
+            for i, url in enumerate(test_urls, 1):
                 try:
+                    self.log(f"📡 Login check {i}/2: {url}")
                     response = self.session.get(url, headers=self.headers, timeout=10)
+                    
+                    self.log(f"  Status: {response.status_code}")
+                    self.log(f"  Content-Type: {response.headers.get('Content-Type', 'N/A')}")
+                    self.log(f"  Content-Length: {len(response.text)} chars")
                     
                     if response.status_code == 200:
                         content = response.text.lower()
-                        if any(indicator in content for indicator in 
-                            ["fremmøte", "oppmøte", "fravær", "elev", "timeplan"]):
-                            self.log("✅ Cookies are valid and working")
+                        
+                        # More specific success indicators
+                        success_indicators = ["fremmøte", "oppmøte", "fravær", "timeplan"]
+                        found_success = [ind for ind in success_indicators if ind in content]
+                        
+                        # More specific failure indicators - avoid generic "login"
+                        failure_indicators = ["logg inn", "feide innlogging", "ikke logget inn", "you are not logged in"]
+                        found_failure = [ind for ind in failure_indicators if ind in content]
+                        
+                        self.log(f"  Success indicators found: {found_success}")
+                        self.log(f"  Failure indicators found: {found_failure}")
+                        
+                        # If we find specific success indicators and NO failure indicators, we're good
+                        if found_success and not found_failure:
+                            self.log("✅ Login status: VALID - Cookies are working")
                             return True
-                        elif "login" in content or "logg inn" in content:
-                            self.log("🔑 Cookies expired - need fresh login")
+                        # If we only find "elev" but no specific attendance features, might be logged in but wrong page
+                        elif "elev" in content and not found_failure and not found_success:
+                            self.log("✅ Login status: VALID - On student page")
+                            return True
+                        elif found_failure:
+                            self.log("🔑 Login status: EXPIRED - Need fresh login")
                             return False
-                except:
+                        else:
+                            self.log("⚠️ Login status: UNCLEAR - Continuing checks...")
+                            
+                    else:
+                        self.log(f"  ❌ HTTP {response.status_code} - Server error")
+                        
+                except Exception as e:
+                    self.log(f"  ❌ Network error: {e}")
                     continue
             
-            self.log("❌ Cookies invalid or connection failed - please run setup again")
+            self.log("❌ Login status: FAILED - All checks unsuccessful")
             return False
                 
         except Exception as e:
@@ -671,10 +730,12 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def fetch_schedule(self):
-        """Fetch the current day's schedule using GET request (STU periods only)"""
+        """Fetch the current day's schedule with detailed console output - FIXED VERSION"""
         if not self.check_login_status():
             return False
 
+        self.log("📅 Fetching today's schedule...")
+        
         url = f"{self.base_url}/iskole_elev/rest/v0/VoTimeplan_elev_oppmote"
         params = {
             "finder": "RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312",
@@ -690,21 +751,51 @@ class ImprovedISkoleBot(QObject):
             self.last_fetch_date = current_date
 
         try:
+            self.log(f"📡 GET {url}")
+            self.log(f"📋 Params: {params}")
+            
             response = self.session.get(url, params=params, headers=self.get_api_headers(), timeout=10)
+            
+            self.log(f"📊 Response Status: {response.status_code}")
+            self.log(f"📊 Response Headers: {dict(response.headers)}")
+            
             if response.status_code != 200:
                 self.log(f"❌ Schedule fetch failed: {response.status_code}")
+                self.log(f"Response content: {response.text[:500]}...")
                 return False
 
             data = response.json()
+            
+            # FIXED: Remove the [:1000] truncation and output complete JSON
+            complete_json = json.dumps(data, indent=2, ensure_ascii=False)
+            
+            # Output in chunks to avoid GUI issues
+            self.log("📋 Complete JSON response:")
+            self.log("=" * 80)
+            
+            # Split into manageable chunks
+            chunk_size = 2000
+            for i in range(0, len(complete_json), chunk_size):
+                chunk = complete_json[i:i + chunk_size]
+                self.log(chunk)
+            
+            self.log("=" * 80)
+            
             items = data.get('items', [])
+            self.log(f"📊 Total items in response: {len(items)}")
+            
             self.fetched_periods = []
 
-            for item in items:
+            for i, item in enumerate(items, 1):
+                self.log(f"📋 Processing item {i}: {item.get('Fag', 'Unknown')}")
+                
                 if not item['Fag'].endswith('STU'):
+                    self.log(f"  ⏭️ Skipping non-STU subject: {item['Fag']}")
                     continue
 
                 tidsrom = item.get('TidsromTilstedevaerelse')
                 if not tidsrom:
+                    self.log(f"  ⏭️ No registration window found for {item['Fag']}")
                     continue
 
                 reg_start, reg_end = [t.strip() for t in tidsrom.split('-')]
@@ -726,11 +817,24 @@ class ImprovedISkoleBot(QObject):
                     'gruppe_nr': item['GruppeNr']
                 }
                 period['registered'] = typefravaer is not None
+                
+                self.log(f"  ✅ Added STU period:")
+                self.log(f"    Timenr: {period['timenr']}")
+                self.log(f"    Class: {class_start}-{class_end}")
+                self.log(f"    Registration: {reg_start}-{reg_end}")
+                self.log(f"    Already registered: {period['registered']}")
+                
                 if period['registered']:
                     self.registered_timenrs.add(period['timenr'])
                 self.fetched_periods.append(period)
 
-            self.log(f"📅 Fetched {len(self.fetched_periods)} STU periods for today")
+            self.log("=" * 50)
+            self.log(f"📅 Schedule fetch complete: {len(self.fetched_periods)} STU periods found")
+            for period in self.fetched_periods:
+                status = "✅ Registered" if period['registered'] else "⏳ Pending"
+                self.log(f"  {period['timenr']}: {period['class_time']['start']}-{period['class_time']['end']} - {status}")
+            self.log("=" * 50)
+            
             return True
 
         except Exception as e:
