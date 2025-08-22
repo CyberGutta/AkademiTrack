@@ -456,29 +456,24 @@ class ImprovedISkoleBot(QObject):
                 return False
             
             selenium_cookies = self.driver.get_cookies()
-            important_cookies = ['JSESSIONID', 'PHPSESSID', 'sessionid', 'auth']
             
-            cookies_found = False
             extracted_cookies = {}
+            cookies_found = False
             
-            iskole_cookie_count = 0
             for cookie in selenium_cookies:
-                if cookie['domain'] in ['.iskole.net', 'iskole.net'] or \
-                   cookie['name'] in important_cookies:
-                    self.session.cookies.set(
-                        cookie['name'], 
-                        cookie['value'], 
-                        domain=cookie['domain'] if 'iskole.net' in cookie['domain'] else '.iskole.net'
-                    )
-                    extracted_cookies[cookie['name']] = cookie['value']
-                    self.log(f"✅ Extracted cookie: {cookie['name']}")
-                    cookies_found = True
-                    if 'iskole.net' in cookie.get('domain', ''):
-                        iskole_cookie_count += 1
+                domain = cookie['domain']
+                path = cookie.get('path', '/')
+                self.session.cookies.set(
+                    cookie['name'], 
+                    cookie['value'], 
+                    domain=domain,
+                    path=path
+                )
+                extracted_cookies[cookie['name']] = cookie['value']
+                self.log(f"✅ Extracted cookie: {cookie['name']} for domain {domain}")
+                cookies_found = True
             
             if cookies_found:
-                if iskole_cookie_count < 3:
-                    self.log(f"ℹ️ Only {iskole_cookie_count} cookies from iskole.net so far; will still verify.")
                 if self.test_cookies():
                     if self.save_cookies_to_file():
                         if os.path.exists(self.cookies_file):
@@ -494,10 +489,7 @@ class ImprovedISkoleBot(QObject):
                     self.log("❌ Extracted cookies don't work properly")
                     return False
             else:
-                if not cookies_found:
-                    self.log("❌ No relevant cookies found in browser session")
-                else:
-                    self.log("❌ Not enough iSkole cookies yet. Please complete login. The window will remain open.")
+                self.log("❌ No cookies found in browser session")
                 return False
                 
         except Exception as e:
@@ -505,10 +497,21 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def save_cookies_to_file(self):
-        """Save current session cookies to file with metadata"""
+        """Save current session cookies to file with metadata, including domain and path"""
         try:
+            cookies_list = []
+            for cookie in self.session.cookies:
+                cookies_list.append({
+                    'name': cookie.name,
+                    'value': cookie.value,
+                    'domain': cookie.domain,
+                    'path': cookie.path,
+                    'secure': cookie.secure,
+                    'expires': cookie.expires
+                })
+            
             cookie_data = {
-                'cookies': dict(self.session.cookies),
+                'cookies': cookies_list,
                 'timestamp': datetime.now().isoformat(),
                 'user_agent': self.headers['User-Agent']
             }
@@ -522,7 +525,7 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def load_cookies_from_file(self):
-        """Load cookies from file with expiration check"""
+        """Load cookies from file with expiration check, including domain and path"""
         try:
             if os.path.exists(self.cookies_file):
                 with open(self.cookies_file, 'rb') as f:
@@ -537,13 +540,25 @@ class ImprovedISkoleBot(QObject):
                         os.remove(self.cookies_file)
                         return False
                 else:
-                    cookies = cookie_data
+                    # Backward compatibility for old format
+                    cookies = [{'name': name, 'value': value, 'domain': '.iskole.net', 'path': '/'} for name, value in cookie_data.items()]
                 
-                for name, value in cookies.items():
-                    self.session.cookies.set(name, value)
+                now = time.time()
+                loaded_count = 0
+                for c in cookies:
+                    if c.get('expires') and c['expires'] < now:
+                        self.log(f"Skipping expired cookie: {c['name']}")
+                        continue
+                    self.session.cookies.set(
+                        c['name'], 
+                        c['value'], 
+                        domain=c.get('domain', '.iskole.net'),
+                        path=c.get('path', '/')
+                    )
+                    loaded_count += 1
                 
-                self.log(f"📂 Loaded {len(cookies)} cookies from file")
-                return True
+                self.log(f"📂 Loaded {loaded_count} cookies from file")
+                return loaded_count > 0
             else:
                 self.log("No saved cookies file found")
                 return False
@@ -696,19 +711,23 @@ class ImprovedISkoleBot(QObject):
                 class_start = item['StartKl'][:2] + ':' + item['StartKl'][2:]
                 class_end = item['SluttKl'][:2] + ':' + item['SluttKl'][2:]
 
+                typefravaer = item.get('Typefravaer')
+
                 period = {
                     'timenr': item['Timenr'],
                     'fag': item['Fag'],
                     'class_time': {'start': class_start, 'end': class_end},
                     'registration_window': {'start': reg_start, 'end': reg_end},
-                    'typefravaer': item['Typefravaer'] or "M",
+                    'typefravaer': "M",
                     'stkode': item['Stkode'],
                     'kl_trinn': item['KlTrinn'],
                     'kl_id': item['KlId'],
                     'k_navn': item['KNavn'],
                     'gruppe_nr': item['GruppeNr']
                 }
-                period['registered'] = period['timenr'] in self.registered_timenrs
+                period['registered'] = typefravaer is not None
+                if period['registered']:
+                    self.registered_timenrs.add(period['timenr'])
                 self.fetched_periods.append(period)
 
             self.log(f"📅 Fetched {len(self.fetched_periods)} STU periods for today")
@@ -781,6 +800,30 @@ class ImprovedISkoleBot(QObject):
                 return False
 
         return True
+    
+    def log_registered_status(self):
+        """Log the status of registered periods and the next one to register"""
+        if not self.fetched_periods:
+            self.log("No periods fetched yet")
+            return
+
+        registered = [p for p in self.fetched_periods if p['registered']]
+        unregistered = [p for p in self.fetched_periods if not p['registered']]
+
+        self.log(f"📋 Registered periods: {len(registered)} / {len(self.fetched_periods)}")
+        for p in registered:
+            self.log(f"✅ {p['timenr']}: {p['class_time']['start']}-{p['class_time']['end']}")
+
+        if unregistered:
+            now_minutes = self.time_to_minutes(datetime.now().strftime("%H:%M"))
+            upcoming = [p for p in unregistered if self.time_to_minutes(p['registration_window']['start']) >= now_minutes]
+            if upcoming:
+                next_p = min(upcoming, key=lambda p: self.time_to_minutes(p['registration_window']['start']))
+                self.log(f"⏭️ Next to register: {next_p['timenr']} at {next_p['registration_window']['start']}-{next_p['registration_window']['end']}")
+            else:
+                self.log("No upcoming registration windows; some past windows may be unregistered")
+        else:
+            self.log("🏁 All periods registered")
     
     def register_attendance_enhanced(self, period):
         """Enhanced attendance registration using fetched period data"""
@@ -865,6 +908,8 @@ class ImprovedISkoleBot(QObject):
                 self.log("❌ Failed to fetch schedule - skipping")
                 return
         
+        self.log_registered_status()
+        
         if self.are_all_periods_completed():
             self.log("🏁 All STU classes for the day are completed or their registration windows have passed")
             self.stop_scheduler()
@@ -873,7 +918,8 @@ class ImprovedISkoleBot(QObject):
         if not self.is_registration_time():
             period = self.get_current_study_period()
             if period:
-                self.log(f"📚 In STU class {period['class_time']['start']}-{period['class_time']['end']}, registration window {period['registration_window']['start']}-{period['registration_window']['end']}")
+                if not period['registered']:
+                    self.log(f"📚 In STU class {period['class_time']['start']}-{period['class_time']['end']}, registration window {period['registration_window']['start']}-{period['registration_window']['end']}")
             else:
                 self.log("⏰ Not during STU class time - skipping registration")
             return
@@ -898,6 +944,7 @@ class ImprovedISkoleBot(QObject):
         success = self.register_attendance_enhanced(period)
         if success:
             self.log("🎯 Attendance registered successfully!")
+            self.log_registered_status()
             
             if self.are_all_periods_completed():
                 self.log("🏁 All STU classes for the day are completed")
