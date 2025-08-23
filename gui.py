@@ -347,222 +347,137 @@ class SettingsManager:
             print(f"Error restoring window geometry: {e}")
 
 class NotificationWidget(QWidget):
-    """Professional notification widget with modern design and smooth animations - FIXED TOP-ONLY STACKING"""
+    """Complete notification widget with proper implementation"""
     
     def __init__(self, message, notification_type="info", duration=5000, parent=None):
         super().__init__(parent)
-        self.parent_widget = parent
-        self.duration = duration
+        self.message = message
         self.notification_type = notification_type
+        self.duration = duration
         
-        # Modern window flags for professional appearance
+        # Set window flags for overlay behavior
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
         
-        self.init_ui(message)
-        self.setup_animations()
+        self.init_ui()
+        self.setup_animation()
         
-    def init_ui(self, message):
-        """Initialize professional notification UI with modern design"""
-        self.setFixedSize(380, 90)
+    def init_ui(self):
+        """Initialize notification UI"""
+        # Set fixed size
+        self.setFixedSize(350, 80)
         
-        # Professional color schemes and icons
-        notification_configs = {
-            "success": {
-                "bg_color": "#10B981",  # Modern green
-                "text_color": "white",
-                "icon": "✓",
-                "border": "#059669",
-                "shadow": "rgba(16, 185, 129, 0.4)"
-            },
-            "error": {
-                "bg_color": "#EF4444",  # Modern red
-                "text_color": "white", 
-                "icon": "✕",
-                "border": "#DC2626",
-                "shadow": "rgba(239, 68, 68, 0.4)"
-            },
-            "warning": {
-                "bg_color": "#F59E0B",  # Modern amber
-                "text_color": "white",
-                "icon": "⚠",
-                "border": "#D97706", 
-                "shadow": "rgba(245, 158, 11, 0.4)"
-            },
-            "completed": {
-                "bg_color": "#8B5CF6",  # Modern purple
-                "text_color": "white",
-                "icon": "🎉",
-                "border": "#7C3AED",
-                "shadow": "rgba(139, 92, 246, 0.4)"
-            },
-            "info": {
-                "bg_color": "#3B82F6",  # Modern blue
-                "text_color": "white",
-                "icon": "ℹ",
-                "border": "#2563EB",
-                "shadow": "rgba(59, 130, 246, 0.4)"
-            }
-        }
-        
-        config = notification_configs.get(self.notification_type, notification_configs["info"])
-        
-        # Modern stylesheet with gradient and shadow effects
-        self.setStyleSheet(f"""
-            NotificationWidget {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {config["bg_color"]}, 
-                    stop:1 {self.darken_color(config["bg_color"], 0.1)});
-                border: 1px solid {config["border"]};
-                border-radius: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', system-ui, sans-serif;
-            }}
-        """)
-        
+        # Create main layout
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # Modern icon with better styling
-        icon_label = QLabel(config["icon"])
-        icon_label.setFont(QFont("SF Pro Display", 20, QFont.Bold))
-        icon_label.setFixedSize(32, 32)
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet(f"""
-            QLabel {{
-                color: {config["text_color"]};
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 16px;
-                border: none;
+        # Create main container
+        container = QFrame()
+        container.setObjectName("notificationContainer")
+        
+        # Set styles based on type
+        if self.notification_type == "success":
+            bg_color = "#d4edda"
+            border_color = "#c3e6cb"
+            text_color = "#155724"
+            icon = "✅"
+        elif self.notification_type == "error":
+            bg_color = "#f8d7da"
+            border_color = "#f5c6cb"
+            text_color = "#721c24"
+            icon = "❌"
+        elif self.notification_type == "warning":
+            bg_color = "#fff3cd"
+            border_color = "#ffeaa7"
+            text_color = "#856404"
+            icon = "⚠️"
+        elif self.notification_type == "completed":
+            bg_color = "#d1ecf1"
+            border_color = "#bee5eb"
+            text_color = "#0c5460"
+            icon = "🎊"
+        else:  # info
+            bg_color = "#d1ecf1"
+            border_color = "#bee5eb"
+            text_color = "#0c5460"
+            icon = "ℹ️"
+        
+        container.setStyleSheet(f"""
+            QFrame#notificationContainer {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+                padding: 12px;
             }}
-        """)
-        
-        # Content container for better text layout
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(2)
-        
-        # Main message with better typography
-        message_label = QLabel(message)
-        message_label.setStyleSheet(f"""
             QLabel {{
-                color: {config["text_color"]};
+                color: {text_color};
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
                 font-size: 14px;
-                font-weight: 600;
-                background: transparent;
-                border: none;
-                letter-spacing: 0.3px;
+                font-weight: 500;
             }}
         """)
+        
+        # Container layout
+        container_layout = QHBoxLayout(container)
+        container_layout.setContentsMargins(8, 8, 8, 8)
+        container_layout.setSpacing(8)
+        
+        # Icon label
+        icon_label = QLabel(icon)
+        icon_label.setFont(QFont("SF Pro Text", 16))
+        container_layout.addWidget(icon_label)
+        
+        # Message label
+        message_label = QLabel(self.message)
         message_label.setWordWrap(True)
+        container_layout.addWidget(message_label, 1)
         
-        # Subtle timestamp
-        timestamp_label = QLabel(datetime.now().strftime("%H:%M"))
-        timestamp_label.setStyleSheet(f"""
-            QLabel {{
-                color: rgba(255, 255, 255, 0.8);
-                font-size: 11px;
-                font-weight: 400;
-                background: transparent;
-                border: none;
-            }}
-        """)
+        # Add container to main layout
+        layout.addWidget(container)
         
-        content_layout.addWidget(message_label)
-        content_layout.addWidget(timestamp_label)
-        
-        # Close button (optional, appears on hover)
-        close_button = QPushButton("×")
-        close_button.setFixedSize(24, 24)
-        close_button.setStyleSheet(f"""
-            QPushButton {{
-                color: rgba(255, 255, 255, 0.7);
-                background: transparent;
-                border: none;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background: rgba(255, 255, 255, 0.2);
-                color: white;
-            }}
-        """)
-        close_button.clicked.connect(self.hide_notification)
-        
-        layout.addWidget(icon_label)
-        layout.addWidget(content_widget, 1)
-        layout.addWidget(close_button)
-        
-    def darken_color(self, hex_color, factor):
-        """Darken a hex color by a factor (0-1)"""
-        try:
-            # Remove # if present
-            hex_color = hex_color.lstrip('#')
-            # Convert to RGB
-            rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-            # Darken each component
-            darkened = tuple(int(c * (1 - factor)) for c in rgb)
-            # Convert back to hex
-            return f"#{darkened[0]:02x}{darkened[1]:02x}{darkened[2]:02x}"
-        except:
-            return hex_color
-        
-    def setup_animations(self):
-        """Setup smooth professional animations"""
-        # Slide-in animation with easing
+    def setup_animation(self):
+        """Setup slide-in animation"""
         self.slide_in_animation = QPropertyAnimation(self, b"geometry")
-        self.slide_in_animation.setDuration(400)  # Slightly longer for smoothness
+        self.slide_in_animation.setDuration(300)
         self.slide_in_animation.setEasingCurve(QEasingCurve.OutCubic)
         
-        # Slide-out animation
-        self.slide_out_animation = QPropertyAnimation(self, b"geometry")
-        self.slide_out_animation.setDuration(300)
-        self.slide_out_animation.setEasingCurve(QEasingCurve.InCubic)
-        self.slide_out_animation.finished.connect(self.close)
-        
-        # Fade-out animation for smooth disappearing
-        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
-        self.fade_animation.setDuration(250)
-        self.fade_animation.setStartValue(1.0)
-        self.fade_animation.setEndValue(0.0)
-        self.fade_animation.finished.connect(self.close)
-        
     def show_notification(self):
-        """FIXED: Show notification at top position only - hide existing notifications first"""
+        """Show notification with slide-in animation"""
         try:
             app = QApplication.instance()
+            if not app:
+                return
+                
             screen = app.primaryScreen().availableGeometry()
             
-            # FIXED: Hide all existing notifications to make room at the top
-            if hasattr(app, '_active_notifications'):
-                for notification in app._active_notifications[:]:  # Copy list to avoid modification during iteration
-                    if notification != self and notification.isVisible():
-                        try:
-                            notification.hide_notification()
-                        except:
-                            pass
-                app._active_notifications = []
-            else:
+            # Manage existing notifications
+            if not hasattr(app, '_active_notifications'):
                 app._active_notifications = []
             
-            # FIXED: Always position at the same top location
+            # Hide older notifications
+            for notification in app._active_notifications[:]:
+                if notification != self and notification.isVisible():
+                    try:
+                        notification.hide_notification()
+                    except:
+                        pass
+            
+            app._active_notifications = [self]  # Keep only this notification
+            
+            # Position calculation
             margin = 20
             start_x = screen.right()
             end_x = screen.right() - self.width() - margin
-            y = screen.top() + margin  # FIXED: Always at the top
+            y = screen.top() + margin
             
             # Set initial position and show
             self.setGeometry(start_x, y, self.width(), self.height())
             self.show()
             self.raise_()
-            self.activateWindow()
             
-            # Add to active notifications list
-            app._active_notifications.append(self)
-            
-            # Animate slide-in
+            # Start slide animation
             self.slide_in_animation.setStartValue(QRect(start_x, y, self.width(), self.height()))
             self.slide_in_animation.setEndValue(QRect(end_x, y, self.width(), self.height()))
             self.slide_in_animation.start()
@@ -573,66 +488,25 @@ class NotificationWidget(QWidget):
         except Exception as e:
             print(f"Error showing notification: {e}")
     
-    def hide_notification(self):
-        """Hide notification with smooth fade animation"""
-        if not self.isVisible():
-            return
+    def show_notification_original(self):
+        """Alias for show_notification for compatibility"""
+        self.show_notification()
         
-        # Use fade animation instead of slide for smoother exit
-        self.fade_animation.start()
-    
-    def closeEvent(self, event):
-        """Handle window close - now saves settings"""
-        if self.is_running:
-            reply = QMessageBox.question(
-                self, 
-                'Exit', 
-                'Automatisering kjører. Stopp og avslutt?',
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                self.stop_automation()
-                time.sleep(0.5)
-                
-                # Save window geometry before closing
-                if hasattr(self, 'settings_manager'):
-                    self.settings_manager.save_window_geometry(self)
-                
-                try:
-                    if self._orig_stdout:
-                        sys.stdout = self._orig_stdout
-                    if self._orig_stderr:
-                        sys.stderr = self._orig_stderr
-                except Exception:
-                    pass
-                event.accept()
-            else:
-                event.ignore()
-        else:
-            # Save window geometry before closing
-            if hasattr(self, 'settings_manager'):
-                self.settings_manager.save_window_geometry(self)
-                
-            try:
-                if self._orig_stdout:
-                    sys.stdout = self._orig_stdout
-                if self._orig_stderr:
-                    sys.stderr = self._orig_stderr
-            except Exception:
-                pass
-            event.accept()
-    
-    def mousePressEvent(self, event):
-        """Close notification when clicked"""
+    def hide_notification(self):
+        """Hide notification with fade out"""
         try:
-            self.hide_notification()
-            event.accept()
+            self.hide()
+            
+            # Remove from active notifications
+            app = QApplication.instance()
+            if app and hasattr(app, '_active_notifications'):
+                try:
+                    app._active_notifications.remove(self)
+                except ValueError:
+                    pass
+                    
         except Exception as e:
-            print(f"Error in notification click: {e}")
-            try:
-                self.close()
-            except:
-                pass
+            print(f"Error hiding notification: {e}")
 
 class PostRequestWindow(QDialog):
     def __init__(self, bot, parent=None):
@@ -953,9 +827,14 @@ class PostRequestWindow(QDialog):
             self.console.setMaximumHeight(220)
 
 class SimpleButton(QPushButton):
-    """Clean, simple button"""
+    """FIXED: Simple button with minimum size constraints"""
     def __init__(self, text, primary=False):
         super().__init__(text)
+        
+        # FIXED: Set minimum size to prevent shrinking
+        self.setMinimumSize(140, 44)
+        self.setMaximumHeight(60)
+        
         if primary:
             self.setStyleSheet("""
                 QPushButton {
@@ -967,6 +846,7 @@ class SimpleButton(QPushButton):
                     font-size: 14px;
                     font-weight: 600;
                     min-height: 20px;
+                    min-width: 140px;
                 }
                 QPushButton:hover {
                     background-color: #0052a3;
@@ -989,6 +869,7 @@ class SimpleButton(QPushButton):
                     padding: 12px 24px;
                     font-size: 14px;
                     min-height: 20px;
+                    min-width: 140px;
                 }
                 QPushButton:hover {
                     background-color: #e9ecef;
@@ -1235,30 +1116,61 @@ class SetupThread(QThread):
 
 
 class SchedulerThread(QThread):
-    """Thread for running the bot scheduler"""
+    """FIXED: More robust thread that handles termination better"""
     message_signal = pyqtSignal(str)
-    status_signal = pyqtSignal(str)
     
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.should_stop = False
+        self.setTerminationEnabled(True)
+        self._should_stop = False
     
     def run(self):
+        """Enhanced run method with better error handling"""
         try:
-            self.status_signal.emit("Kjører")
-            if self.bot.running:
-                self.bot.run_scheduler()
-            self.status_signal.emit("Stoppet")
+            print("Scheduler thread starting...")
+            
+            # Quick start notification
+            try:
+                self.message_signal.emit("🚀 Automatisering startet")
+            except:
+                pass
+            
+            # Main loop with frequent stop checks
+            while not self._should_stop and self.bot and self.bot.running:
+                try:
+                    # Check if we should stop every iteration
+                    if self._should_stop:
+                        break
+                        
+                    # Run bot scheduler
+                    if hasattr(self.bot, 'run_scheduler'):
+                        self.bot.run_scheduler()
+                    
+                    # Small sleep to prevent CPU spinning
+                    self.msleep(100)
+                    
+                except Exception as e:
+                    print(f"Scheduler error: {e}")
+                    try:
+                        self.message_signal.emit(f"Scheduler error: {e}")
+                    except:
+                        pass
+                    break
+            
+            print("Scheduler thread ending...")
+            
         except Exception as e:
-            self.message_signal.emit(f"Scheduler feil: {e}")
-            self.status_signal.emit("Feil")
+            print(f"Thread run error: {e}")
+        finally:
+            try:
+                self.message_signal.emit("🛑 Scheduler stopped")
+            except:
+                pass
     
     def stop(self):
-        """Stop the thread gracefully"""
-        self.should_stop = True
-        if self.bot:
-            self.bot.stop_scheduler()
+        """Graceful stop method"""
+        self._should_stop = True
 
 
 class AkademiTrackWindow(QMainWindow):
@@ -1274,6 +1186,9 @@ class AkademiTrackWindow(QMainWindow):
         self.post_window = None  # CHANGED from manual_window
         self.settings_window = None
         self.is_running = False
+        self._toggle_lock = False  # Prevent spam clicking
+        self._last_notifications = {}
+
         self._orig_stdout = None
         self._orig_stderr = None
         self.active_notifications = []  # Track active notifications
@@ -1289,67 +1204,51 @@ class AkademiTrackWindow(QMainWindow):
         self.init_bot()
         self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'POST Request'")
         
+        if hasattr(self, 'bot') and self.bot:
+            try:
+            # Use queued connection for thread safety
+                self.bot.scheduler_stopped_signal.connect(
+                    self.on_scheduler_stopped, 
+                    Qt.QueuedConnection
+                )
+            except:
+                print("Could not connect scheduler signal - continuing anyway")
+
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
+
+        
     
     def show_notification(self, message, notification_type="info", duration=5000):
-        """FIXED: Show enhanced professional notification with top-only positioning and better duplicate prevention"""
+        """FIXED: Create and show notification properly"""
         try:
-            # FIXED: Enhanced spam prevention with special handling for automation messages
+            # Simple spam prevention
             current_time = time.time()
             
-            if not hasattr(self, '_last_notifications'):
-                self._last_notifications = {}
+            if not hasattr(self, '_last_notification_time'):
+                self._last_notification_time = 0
             
-            # FIXED: Better deduplication logic for stop messages
-            message_lower = message.lower().strip()
-            
-            # Special handling for automation start/stop messages
-            automation_keywords = {
-                'start': ['automatisering startet', 'automation started', 'startet'],
-                'stop': ['automatisering stoppet', 'automation stopped', 'stoppet', 'scheduler stopped']
-            }
-            
-            # Determine if this is an automation message
-            is_start_message = any(keyword in message_lower for keyword in automation_keywords['start'])
-            is_stop_message = any(keyword in message_lower for keyword in automation_keywords['stop'])
-            
-            if is_start_message or is_stop_message:
-                # For automation messages, use type-specific keys with shorter cooldown
-                action_type = 'start' if is_start_message else 'stop'
-                message_key = f"automation_{action_type}_{notification_type}"
-                cooldown = 2.0  # 2 seconds cooldown for automation messages
-            else:
-                # For other messages, use content-based deduplication
-                message_key = f"{message_lower}_{notification_type}"
-                cooldown = 3.0
-            
-            # Check for duplicate within cooldown period
-            if message_key in self._last_notifications:
-                time_since_last = current_time - self._last_notifications[message_key]
-                if time_since_last < cooldown:
-                    print(f"Notification blocked (duplicate): {message} (last shown {time_since_last:.1f}s ago)")
+            # Only block if same message within 1 second
+            if (current_time - self._last_notification_time) < 1.0:
+                last_message = getattr(self, '_last_notification_message', '')
+                if last_message == message:
                     return
             
-            # Update timestamp
-            self._last_notifications[message_key] = current_time
+            self._last_notification_time = current_time
+            self._last_notification_message = message
             
-            # Create and show notification
+            # Create notification widget with proper parameters
             notification = NotificationWidget(message, notification_type, duration, None)
-            notification.show_notification()
             
-            # Clean up old notification references periodically
-            if len(self._last_notifications) > 50:
-                cutoff_time = current_time - 300  # 5 minutes
-                self._last_notifications = {
-                    k: v for k, v in self._last_notifications.items() 
-                    if v > cutoff_time
-                }
+            # Show the notification
+            notification.show_notification()
             
             print(f"Notification shown: {message} ({notification_type})")
             
         except Exception as e:
             print(f"Error showing notification: {e}")
+            import traceback
+            traceback.print_exc()
         
     def init_ui(self):
         """Initialize clean, simple UI"""
@@ -1606,7 +1505,7 @@ class AkademiTrackWindow(QMainWindow):
                 self.show_error(f"Failed to install packages: {e}")
     
     def log_message(self, message):
-        """FIXED: Enhanced log message handler with better duplicate prevention for stop notifications"""
+        """FIXED: Enhanced log message handler with working notifications"""
         try:
             should_notify = False
             notification_type = "info"
@@ -1616,7 +1515,8 @@ class AkademiTrackWindow(QMainWindow):
             
             # SUCCESS NOTIFICATIONS
             if ('🎯 registrert studietid' in message_lower or 
-                'attendance registered successfully' in message_lower):
+                'attendance registered successfully' in message_lower or
+                'studietid registrert' in message_lower):
                 should_notify = True
                 notification_type = "success"
                 
@@ -1633,14 +1533,16 @@ class AkademiTrackWindow(QMainWindow):
             
             # COMPLETION NOTIFICATIONS
             elif ('🏁 all stu classes for the day are completed' in message_lower or
-                '🎊 all stu classes for the day are completed' in message_lower):
+                '🎊 all stu classes for the day are completed' in message_lower or
+                'alle studietimer fullført' in message_lower):
                 should_notify = True
                 notification_type = "completed"
                 notification_message = "Alle studietimer fullført i dag!"
             
             # SETUP SUCCESS
             elif ('🎉 setup completed successfully' in message_lower or
-                'setup completed successfully' in message_lower):
+                'setup completed successfully' in message_lower or
+                'oppsett fullført' in message_lower):
                 should_notify = True
                 notification_type = "success"
                 notification_message = "Oppsett fullført!"
@@ -1658,12 +1560,13 @@ class AkademiTrackWindow(QMainWindow):
             
             # WARNING NOTIFICATIONS
             elif ('cookie authentication failed' in message_lower or 
-                'session expired' in message_lower):
+                'session expired' in message_lower or
+                'økt utløpt' in message_lower):
                 should_notify = True
                 notification_type = "warning"
                 notification_message = "Økt utløpt - Kjør oppsett på nytt"
             
-            # AUTOMATION STATUS - FIXED: Better detection for start messages
+            # AUTOMATION STATUS
             elif ('🚀 automatisering startet' in message_lower or 
                 ('automation' in message_lower and 'started' in message_lower) or
                 ('scheduler started' in message_lower)):
@@ -1671,18 +1574,18 @@ class AkademiTrackWindow(QMainWindow):
                 notification_type = "info"
                 notification_message = "Automatisering startet"
             
-            # FIXED: Consolidated stop detection to prevent duplicates
+            # STOP MESSAGES (with duplicate prevention)
             elif (any(stop_phrase in message_lower for stop_phrase in [
                 'scheduler stopped',
                 '🛑 scheduler stopped', 
                 '🛑 stopping scheduler',
                 'automatisering stoppet'
             ])):
-                # FIXED: Only show stop notification once per stop event
+                # Only show stop notification once per stop event
                 if not hasattr(self, '_current_stop_event_time'):
                     self._current_stop_event_time = time.time()
                     should_notify = True
-                    notification_type = "error"  # Red color for stopped
+                    notification_type = "error"
                     notification_message = "Automatisering stoppet"
                 elif time.time() - self._current_stop_event_time > 5.0:
                     # Reset after 5 seconds to allow new stop events
@@ -1690,17 +1593,11 @@ class AkademiTrackWindow(QMainWindow):
                     should_notify = True
                     notification_type = "error"
                     notification_message = "Automatisering stoppet"
-                else:
-                    # Block duplicate stop notifications within 5 seconds
-                    print(f"Blocked duplicate stop notification: {message}")
             
-            # Show professional notification
+            # SHOW NOTIFICATION if conditions met
             if should_notify and notification_message:
-                try:
-                    print(f"Triggering notification: {notification_message} ({notification_type})")
-                    self.show_notification(notification_message, notification_type)
-                except Exception as e:
-                    print(f"Notification error: {e}")
+                print(f"Triggering notification: {notification_message} ({notification_type})")
+                self.show_notification(notification_message, notification_type)
             
             # Handle status messages and UI updates
             if any(keyword in message_lower for keyword in ['cookie', 'expired', 'login', 'setup']):
@@ -1744,6 +1641,8 @@ class AkademiTrackWindow(QMainWindow):
             
         except Exception as e:
             print(f"Error in log_message: {e}")
+            import traceback
+            traceback.print_exc()
     
     def setup_and_login(self):
         """Handle setup and login"""
@@ -1784,90 +1683,695 @@ class AkademiTrackWindow(QMainWindow):
             self.show_error("Oppsett mislyktes. Prøv igjen.")
     
     def toggle_automation(self):
-        """Toggle automation - FIXED for better notification consistency"""
+        """FIXED: Spam-proof automation toggle with proper locking"""
         try:
-            # FIXED: Allow quick actions but ensure notifications show
-            if hasattr(self, '_processing_any_action') and self._processing_any_action:
-                if self.is_running:
-                    # Allow stop even if action is in progress
-                    self._processing_any_action = False
-                    print("Forcing stop action...")
-                else:
-                    print("Start action already in progress, ignoring...")
-                    return
-                    
-            self._processing_any_action = True
+            # Prevent multiple simultaneous toggles
+            if self._toggle_lock:
+                print("Toggle already in progress, ignoring...")
+                return
+                
+            self._toggle_lock = True
+            
+            # Disable button immediately to prevent spam
+            if hasattr(self, 'start_button'):
+                self.start_button.setEnabled(False)
             
             if not self.is_running:
-                print("Toggle: Starting automation...")
-                self.start_button.setEnabled(False)
-                self.start_button.setText("Starter...")
-                
-                # Clear any previous stop event timing
-                if hasattr(self, '_current_stop_event_time'):
-                    delattr(self, '_current_stop_event_time')
-                
-                # FIXED: Add small delay to ensure UI updates and clear previous state
-                QTimer.singleShot(100, self._safe_start_automation)
+                # Start automation
+                QTimer.singleShot(50, self._safe_start_automation)
             else:
-                print("Toggle: Stopping automation...")  
-                self.start_button.setEnabled(False)
-                self._stopping_in_progress = True
+                # Stop automation
+                QTimer.singleShot(50, self._safe_stop_automation)
                 
-                # FIXED: Add small delay to ensure UI updates and clear previous state
-                QTimer.singleShot(100, self._safe_stop_automation)
-                    
         except Exception as e:
-            print(f"CRITICAL ERROR in toggle_automation: {e}")
-            self._emergency_reset()
-        finally:
-            # FIXED: Shorter delay for responsiveness
-            QTimer.singleShot(500, self._release_action_lock)
+            print(f"Toggle error: {e}")
+            self._release_toggle_lock()
 
-
-    def start_automation(self):
-        """Public start method - delegates to safe internal method"""
-        print("Public start_automation called")
-        self._safe_start_automation()
-
-    def _safe_start_automation(self):
-        """Internal safe start method with guaranteed notifications"""
+    def _async_start_automation(self):
+        """Async start - runs in next event loop cycle"""
         try:
-            # FIXED: Clear any previous notification state
-            if hasattr(self, '_last_notifications'):
-                # Remove old automation notifications to allow new ones
-                keys_to_remove = [k for k in self._last_notifications.keys() 
-                                if 'automatisering' in k.lower() or 'automation' in k.lower()]
-                for key in keys_to_remove:
-                    del self._last_notifications[key]
+            print("🚀 Async start...")
             
-            # Check cookies with better error handling
-            cookies_ok = False
-            cookies_exist = os.path.exists(self.bot.cookies_file)
-            
-            if cookies_exist:
-                try:
-                    if self.bot.load_cookies_from_file() and self.bot.test_cookies():
-                        cookies_ok = True
-                        self.log_message("✅ Using existing valid cookies")
-                    else:
-                        self.log_message("🔑 Existing cookies are invalid")
-                except Exception as e:
-                    self.log_message(f"Cookie validation error: {e}")
-            else:
-                self.log_message("🔑 No cookies file found")
-
-            if not cookies_ok:
-                self.show_notification("Trenger oppsett først", "warning", 3000)
-                self.log_message("❌ Please run 'Oppsett og innlogging' first before starting automation")
-                self._reset_start_button()
+            # Quick checks only
+            if not self.bot or not os.path.exists(self.bot.cookies_file):
+                self.show_notification("Trenger oppsett først", "warning")
+                self._reset_button_to_start()
                 return
-
-            # Start the automation
+            
+            # Set states immediately
+            self.is_running = True
             self.bot.running = True
             
-            # Kill any existing thread first
-            self._force_kill_scheduler_thread()
+            # Kill old thread WITHOUT waiting (async)
+            self._async_cleanup_thread()
+            
+            # Create new thread - NO signal connections yet
+            self.scheduler_thread = SchedulerThread(self.bot)
+            
+            # Start thread immediately - connect signals AFTER starting
+            self.scheduler_thread.start()
+            
+            # Connect signals AFTER thread is running
+            QTimer.singleShot(50, self._connect_thread_signals)
+            
+            # Update UI immediately
+            self._set_button_to_stop()
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+            
+            print("✅ Start completed")
+            
+        except Exception as e:
+            print(f"Async start error: {e}")
+            QTimer.singleShot(50, self._force_reset_everything)
+
+    def _async_stop_automation(self):
+        """Async stop - runs in next event loop cycle"""
+        try:
+            print("🛑 Async stop...")
+            
+            # Set states immediately - no blocking operations
+            self.is_running = False
+            
+            if hasattr(self, 'bot') and self.bot:
+                self.bot.running = False
+            
+            # Update UI immediately - don't wait for thread
+            self._reset_button_to_start()
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+            
+            # Kill thread asynchronously - don't block GUI
+            QTimer.singleShot(10, self._async_cleanup_thread)
+            
+            print("✅ Stop completed")
+            
+        except Exception as e:
+            print(f"Async stop error: {e}")
+            QTimer.singleShot(50, self._force_reset_everything)
+
+    def _async_cleanup_thread(self):
+        """Cleanup thread asynchronously to prevent UI blocking"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                # Terminate without waiting
+                try:
+                    self.scheduler_thread.terminate()
+                except:
+                    pass
+                self.scheduler_thread = None
+                print("Async thread cleanup completed")
+        except:
+            if hasattr(self, 'scheduler_thread'):
+                self.scheduler_thread = None
+
+    def _connect_thread_signals(self):
+        """Connect thread signals after thread is running"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                # Use Qt.QueuedConnection for thread safety
+                self.scheduler_thread.message_signal.connect(
+                    self._ultra_safe_message_handler,
+                    Qt.QueuedConnection
+                )
+                print("Signals connected")
+        except Exception as e:
+            print(f"Signal connection error: {e}")
+
+    def _ultra_safe_message_handler(self, message):
+        """Ultra-safe message handler - cannot block or crash"""
+        try:
+            # Process message in next event loop to prevent blocking
+            QTimer.singleShot(0, lambda: self._process_message_safe(message))
+        except:
+            pass
+
+    def _process_message_safe(self, message):
+        """Process message safely without blocking"""
+        try:
+            if message and hasattr(self, 'log_message'):
+                self.log_message(message)
+        except:
+            try:
+                print(f"Log: {message}")
+            except:
+                pass
+
+    def _stop_automation_bulletproof(self):
+        """BULLETPROOF stop that CANNOT crash"""
+        try:
+            print("🛑 Stopping automation...")
+            
+            # Set flags IMMEDIATELY - no delays
+            self.is_running = False
+            
+            # Stop bot immediately
+            if hasattr(self, 'bot') and self.bot:
+                self.bot.running = False
+            
+            # NUCLEAR thread cleanup - no mercy
+            self._nuclear_thread_cleanup()
+            
+            # Reset UI immediately
+            self._reset_button_to_start()
+            
+            # Update status
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+            
+            # Log stop - but don't let this crash anything
+            try:
+                print("🛑 Automation stopped successfully")
+            except:
+                pass
+            
+        except Exception as e:
+            print(f"Stop error: {e}")
+            # Even if stop fails, force reset
+            self._force_reset_everything()
+
+    def _reset_button_to_start(self):
+        """Reset button - ultra fast"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+                
+        except:
+            pass
+
+    def _nuclear_thread_cleanup(self):
+        """Nuclear option - destroy all threads"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                print("💥 Nuclear thread cleanup...")
+                
+                # Don't even try to disconnect signals - just kill
+                try:
+                    self.scheduler_thread.terminate()
+                    # Give it 500ms max, then move on
+                    self.scheduler_thread.wait(500)
+                except:
+                    pass
+                
+                # Clear reference no matter what
+                self.scheduler_thread = None
+                print("Thread destroyed")
+        except:
+            # Always clear reference
+            if hasattr(self, 'scheduler_thread'):
+                self.scheduler_thread = None
+
+    def _start_automation_bulletproof(self):
+        """Start automation with zero crash possibility"""
+        try:
+            print("Starting automation...")
+            
+            # Check cookies
+            if not self.bot or not os.path.exists(self.bot.cookies_file):
+                self.show_notification("Trenger oppsett først", "warning")
+                self._reset_button_to_start()
+                return
+            
+            # Kill any existing threads FIRST
+            self._nuclear_thread_cleanup()
+            
+            # Set bot running
+            self.bot.running = True
+            self.is_running = True
+            
+            # Create new thread WITHOUT signal connections initially
+            self.scheduler_thread = SchedulerThread(self.bot)
+            
+            # Connect signals using QueuedConnection for thread safety
+            self.scheduler_thread.message_signal.connect(
+                self._safe_message_handler, 
+                Qt.QueuedConnection
+            )
+            
+            # Start thread
+            self.scheduler_thread.start()
+            
+            # Update UI immediately
+            self._set_button_to_stop()
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+            
+            # Log success
+            print("🚀 Automation started successfully")
+            
+        except Exception as e:
+            print(f"Start error: {e}")
+            self._force_reset_everything()
+
+    def _set_button_to_stop(self):
+        """Set button to stop - ultra fast"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Stopp automatisering")  
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+                
+        except:
+            pass
+
+    def _force_reset_everything(self):
+        """Force reset - async version"""
+        try:
+            print("🚨 ASYNC FORCE RESET")
+            
+            # Set states immediately
+            self.is_running = False
+            
+            # Stop bot
+            if hasattr(self, 'bot'):
+                try:
+                    self.bot.running = False
+                except:
+                    pass
+            
+            # Reset UI immediately
+            self._reset_button_to_start()
+            
+            # Cleanup thread asynchronously
+            QTimer.singleShot(10, self._async_cleanup_thread)
+            
+            print("Async reset completed")
+            
+        except:
+            pass
+
+    def _safe_message_handler(self, message):
+        """Thread-safe message handler that cannot crash"""
+        try:
+            if message and hasattr(self, 'log_message'):
+                self.log_message(message)
+        except:
+            # Silent fail - never crash on logging
+            print(f"Log: {message}")
+
+    def _emergency_recovery(self):
+        """Ultimate crash recovery"""
+        try:
+            print("🚨 EMERGENCY RECOVERY")
+            
+            # Force all states
+            self.is_running = False
+            
+            if hasattr(self, 'bot') and self.bot:
+                self.bot.running = False
+            
+            # Kill threads
+            self._force_cleanup_threads()
+            
+            # Reset UI
+            try:
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)
+                if hasattr(self, 'setup_button'):
+                    self.setup_button.setEnabled(True)
+            except:
+                pass
+                
+            print("Emergency recovery completed")
+            
+        except Exception as e:
+            print(f"Emergency recovery failed: {e}")
+
+    def _update_status_safe(self, status):
+        """Safe status update that won't crash"""
+        try:
+            if status == "Stoppet" and self.is_running:
+                # Auto-stop if scheduler reports stopped
+                self.is_running = False
+                self._update_ui_stopped()
+                
+        except Exception as e:
+            print(f"Status update error: {e}")
+
+    def _update_ui_running(self):
+        """Update UI to running state"""
+        try:
+            self.start_button.setText("Stopp automatisering")
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    font-size: 14px;
+                    font-weight: 600;
+                }
+                QPushButton:hover { background-color: #c82333; }
+            """)
+            self.start_button.setEnabled(True)
+            
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+                
+        except Exception as e:
+            print(f"UI update error: {e}")
+
+    def _update_ui_stopped(self):
+        """Update UI to stopped state"""
+        try:
+            self.start_button.setText("Start automatisering")
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #0066cc;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    font-size: 14px;
+                    font-weight: 600;
+                }
+                QPushButton:hover { background-color: #0052a3; }
+            """)
+            self.start_button.setEnabled(True)
+            
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+                
+        except Exception as e:
+            print(f"UI update error: {e}")
+
+    def _safe_signal_handler(self, func):
+        """Wrapper to prevent signal crashes"""
+        try:
+            func()
+        except Exception as e:
+            print(f"Signal handler error: {e}")
+
+    def _force_cleanup_threads(self):
+        """Brutally clean up any existing threads"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                print("🔪 Killing existing thread...")
+                
+                # Don't bother with graceful disconnect - just terminate
+                try:
+                    if self.scheduler_thread.isRunning():
+                        self.scheduler_thread.terminate()
+                        # Short wait only
+                        self.scheduler_thread.wait(1000)
+                except:
+                    pass
+                
+                self.scheduler_thread = None
+                print("Thread killed")
+        except:
+            self.scheduler_thread = None
+
+
+    def crash_safe_reset(self):
+        """Ultimate crash-safe reset"""
+        try:
+            print("CRASH SAFE RESET")
+            
+            # Force all states
+            self.is_running = False
+            
+            # Kill thread without any ceremony
+            if hasattr(self, 'scheduler_thread'):
+                try:
+                    if self.scheduler_thread:
+                        self.scheduler_thread.terminate()
+                except:
+                    pass
+                self.scheduler_thread = None
+            
+            # Reset bot
+            if hasattr(self, 'bot') and self.bot:
+                try:
+                    self.bot.running = False
+                except:
+                    pass
+            
+            # Reset UI - each element separately with try/catch
+            try:
+                if hasattr(self, 'start_button'):
+                    self.start_button.setText("Start automatisering") 
+                    self.start_button.setEnabled(True)
+            except:
+                pass
+                
+            try:
+                if hasattr(self, 'setup_button'):
+                    self.setup_button.setEnabled(True)
+            except:
+                pass
+                
+            try:
+                if hasattr(self, 'status_indicator'):
+                    self.status_indicator.set_status("Reset", "#dc3545")
+            except:
+                pass
+            
+            print("Crash safe reset completed")
+            
+        except Exception as e:
+            print(f"CRITICAL ERROR in crash safe reset: {e}")
+            # Ultimate fallback
+            try:
+                self.is_running = False
+            except:
+                pass
+
+    def stop_automation_safe(self):
+        """Crash-safe stop method"""
+        try:
+            print("Safe stop initiated...")
+            
+            # Set states immediately
+            self.is_running = False
+            
+            # Stop bot immediately
+            if hasattr(self, 'bot') and self.bot:
+                try:
+                    self.bot.running = False
+                except:
+                    pass
+            
+            # Kill thread brutally - no waiting
+            self.kill_thread_brutally()
+            
+            # Update UI
+            self.update_ui_to_stopped()
+            
+            # Log stop
+            try:
+                self.log_message("🛑 Scheduler stopped")
+            except:
+                print("🛑 Scheduler stopped")
+            
+            print("Safe stop completed")
+            
+        except Exception as e:
+            print(f"Error in stop_automation_safe: {e}")
+            import traceback
+            traceback.print_exc()
+            self.crash_safe_reset()
+
+    def kill_thread_brutally(self):
+        """Brutally kill any existing thread - no mercy"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                print("Killing existing thread...")
+                
+                # Don't try to disconnect signals - just kill
+                try:
+                    if self.scheduler_thread.isRunning():
+                        self.scheduler_thread.terminate()
+                        # Don't wait - just move on
+                except:
+                    pass
+                
+                # Clear reference
+                self.scheduler_thread = None
+                print("Thread killed")
+                
+        except Exception as e:
+            print(f"Error killing thread: {e}")
+            # Always clear reference
+            self.scheduler_thread = None
+
+    def start_automation_safe(self):
+        """Crash-safe start method"""
+        try:
+            # Check cookies first
+            if not hasattr(self, 'bot') or not self.bot:
+                print("No bot instance")
+                self.crash_safe_reset()
+                return
+                
+            if not os.path.exists(self.bot.cookies_file):
+                self.show_notification("Trenger oppsett først", "warning", 3000)
+                self.crash_safe_reset()
+                return
+
+            # Kill any existing thread BEFORE creating new one
+            self.kill_thread_brutally()
+            
+            # Start bot
+            self.bot.running = True
+            
+            # Create new thread with error handling
+            try:
+                self.scheduler_thread = SchedulerThread(self.bot)
+                
+                # Connect signals with error handling
+                if hasattr(self.scheduler_thread, 'message_signal'):
+                    self.scheduler_thread.message_signal.connect(self.safe_log_message)
+                if hasattr(self.scheduler_thread, 'status_signal'):
+                    self.scheduler_thread.status_signal.connect(self.safe_update_status)
+                    
+                self.scheduler_thread.start()
+                print("Thread started successfully")
+                
+            except Exception as e:
+                print(f"Error creating/starting thread: {e}")
+                self.crash_safe_reset()
+                return
+
+            # Update state
+            self.is_running = True
+            self.update_ui_to_running()
+            
+            # Log success
+            try:
+                self.log_message("🚀 Automatisering startet")
+            except:
+                print("🚀 Automatisering startet")
+            
+        except Exception as e:
+            print(f"Error in start_automation_safe: {e}")
+            import traceback
+            traceback.print_exc()
+            self.crash_safe_reset()
+
+    def safe_log_message(self, message):
+        """Safe wrapper for log_message to prevent signal crashes"""
+        try:
+            self.log_message(message)
+        except Exception as e:
+            print(f"Error in safe_log_message: {e}")
+            print(f"Original message: {message}")
+
+    def safe_update_status(self, status):
+        """Safe wrapper for update_status to prevent signal crashes"""
+        try:
+            self.update_status(status)
+        except Exception as e:
+            print(f"Error in safe_update_status: {e}")
+            print(f"Original status: {status}")
+
+    def update_ui_to_running(self):
+        """Update UI to running state - crash safe"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Stopp automatisering")
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+                
+        except Exception as e:
+            print(f"Error updating UI to running: {e}")
+
+    def update_ui_to_stopped(self):
+        """Update UI to stopped state - crash safe"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+                
+        except Exception as e:
+            print(f"Error updating UI to stopped: {e}")
+
+    def stop_automation_simple(self):
+        """Simplified stop method that avoids complex threading issues"""
+        try:
+            print("Simple stop initiated...")
+            
+            # Immediately set states
+            self.is_running = False
+            
+            # Update button immediately and safely
+            if hasattr(self, 'start_button'):
+                try:
+                    self.start_button.setEnabled(False)
+                    self.start_button.setText("Stopper...")
+                except:
+                    pass
+            
+            # Stop bot immediately
+            if hasattr(self, 'bot') and self.bot:
+                try:
+                    self.bot.running = False
+                    print("Bot stopped")
+                except:
+                    pass
+            
+            # Simple thread cleanup - no timeouts or complex logic
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                try:
+                    # Just terminate - don't wait for graceful shutdown
+                    self.scheduler_thread.terminate()
+                    self.scheduler_thread = None
+                    print("Thread terminated")
+                except:
+                    self.scheduler_thread = None
+                    pass
+            
+            # Reset UI immediately - no timers
+            self.reset_ui_simple()
+            
+            print("Simple stop completed")
+            
+        except Exception as e:
+            print(f"Error in simple stop: {e}")
+            self.simple_reset()
+
+    def start_automation_simple(self):
+        """Simplified start method"""
+        try:
+            # Check cookies exist
+            if not os.path.exists(self.bot.cookies_file):
+                self.show_notification("Trenger oppsett først", "warning", 3000)
+                return
+
+            # Start bot
+            self.bot.running = True
+            
+            # Kill any existing thread simply
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                try:
+                    self.scheduler_thread.terminate()
+                except:
+                    pass
+                self.scheduler_thread = None
             
             # Create new thread
             self.scheduler_thread = SchedulerThread(self.bot)
@@ -1877,80 +2381,447 @@ class AkademiTrackWindow(QMainWindow):
 
             # Update state
             self.is_running = True
-            self._set_stop_button_style()
-            self.setup_button.setEnabled(False)
-            self.status_indicator.set_status("Kjører", "#28a745")
+            self.update_button_to_stop()
             
-            # FIXED: Ensure start notification always shows with unique timing
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+            
             self.log_message("🚀 Automatisering startet")
             
-            print("Safe start completed")
-            
         except Exception as e:
-            print(f"Error in _safe_start_automation: {e}")
-            self.show_notification("Feil ved oppstart", "error", 3000)
-            self._emergency_reset()
+            print(f"Error in simple start: {e}")
+            self.simple_reset()
 
-    
-    def stop_automation(self):
-        """Public stop method - delegates to safe internal method"""  
-        print("Kode: stopp_automatisering kalt")
-        self._safe_stop_automation()
-
-    def _safe_stop_automation(self):
-        """Internal safe stop method with guaranteed notifications"""
+    def update_button_to_stop(self):
+        """Update button to stop state - simplified"""
         try:
-            print("Safe stop starting...")
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Stopp automatisering")
+                self.start_button.setEnabled(True)
+        except Exception as e:
+            print(f"Error updating button: {e}")
+
+    def simple_reset(self):
+        """Simplest possible reset - no complex operations"""
+        try:
+            print("SIMPLE RESET")
             
-            # FIXED: Clear any previous notification state for stop messages
-            if hasattr(self, '_last_notifications'):
-                keys_to_remove = [k for k in self._last_notifications.keys() 
-                                if 'stoppet' in k.lower() or 'stopped' in k.lower()]
-                for key in keys_to_remove:
-                    del self._last_notifications[key]
-            
-            # Set stopping state immediately
+            # Force all states
             self.is_running = False
             
-            # Update button immediately
-            self.start_button.setEnabled(False)
+            # Kill thread brutally
+            if hasattr(self, 'scheduler_thread'):
+                try:
+                    if self.scheduler_thread:
+                        self.scheduler_thread.terminate()
+                except:
+                    pass
+                self.scheduler_thread = None
             
-            # Stop bot immediately
+            # Reset bot
             if hasattr(self, 'bot') and self.bot:
                 try:
                     self.bot.running = False
-                    self.bot.stop_scheduler()
-                    print("Bot stopped")
-                except Exception as e:
-                    print(f"Error stopping bot: {e}")
+                except:
+                    pass
             
-            # Force kill thread immediately
-            self._force_kill_scheduler_thread()
+            # Reset button
+            if hasattr(self, 'start_button'):
+                try:
+                    self.start_button.setText("Start automatisering") 
+                    self.start_button.setEnabled(True)
+                except:
+                    pass
+                    
+            if hasattr(self, 'setup_button'):
+                try:
+                    self.setup_button.setEnabled(True)
+                except:
+                    pass
             
-            # FIXED: Complete stop process after very short delay
-            QTimer.singleShot(200, self._complete_stop_process)
-            
-            print("Safe stop initiated")
+            print("Simple reset completed")
             
         except Exception as e:
-            print(f"Error in _safe_stop_automation: {e}")
+            print(f"Error in simple reset: {e}")
+
+    def reset_ui_simple(self):
+        """Simple UI reset without complex styling"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+                
+            print("UI reset completed")
+            
+        except Exception as e:
+            print(f"Error in UI reset: {e}")
+
+
+
+    def _release_toggle_lock(self):
+        """Release toggle lock to allow next action"""
+        try:
+            QTimer.singleShot(500, self._do_release_lock)  # Small delay to prevent immediate spam
+        except:
+            self._toggle_lock = False
+
+    def _do_release_lock(self):
+        """Actually release the lock"""
+        self._toggle_lock = False
+        print("Toggle lock released")
+
+    def start_automation(self):
+        """Public method redirect"""
+        self.start_automation_safe()
+
+    def _safe_start_automation(self):
+        """FIXED: Bulletproof start method"""
+        try:
+            print("🚀 Starting automation...")
+            
+            # Check prerequisites
+            if not self.bot or not os.path.exists(self.bot.cookies_file):
+                self.show_notification("Trenger oppsett først", "warning")
+                self._release_toggle_lock()
+                return
+            
+            # Kill any existing threads FIRST
+            self._force_cleanup_existing_threads()
+            
+            # Set states
+            self.is_running = True
+            self.bot.running = True
+            
+            # Create new thread
+            self.scheduler_thread = SchedulerThread(self.bot)
+            
+            # Connect signals with proper error handling
+            try:
+                self.scheduler_thread.message_signal.connect(
+                    self._thread_safe_log_message, 
+                    Qt.QueuedConnection
+                )
+            except Exception as e:
+                print(f"Signal connection error: {e}")
+            
+            # Start thread
+            self.scheduler_thread.start()
+            
+            # Update UI
+            self._update_ui_to_running()
+            
+            # Show notification
+            self.show_notification("Automatisering startet", "info")
+            
+            print("✅ Start completed successfully")
+            
+        except Exception as e:
+            print(f"Start error: {e}")
             self._emergency_reset()
+        finally:
+            self._release_toggle_lock()
+
+    def _thread_safe_log_message(self, message):
+        """Thread-safe message handler"""
+        try:
+            # Use QTimer to process in main thread
+            QTimer.singleShot(0, lambda: self.log_message(message))
+        except Exception as e:
+            print(f"Thread message error: {e}")
+
+
+    def _update_ui_to_running(self):
+        """FIXED: Update UI to running state with proper button sizing"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Stopp automatisering")
+                # FIXED: Added min-width and height constraints
+                self.start_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #dc3545;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 12px 24px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        min-height: 20px;
+                        min-width: 160px;
+                    }
+                    QPushButton:hover { 
+                        background-color: #c82333; 
+                    }
+                    QPushButton:disabled {
+                        background-color: #6c757d;
+                        color: #dee2e6;
+                    }
+                """)
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Kjører", "#28a745")
+                
+        except Exception as e:
+            print(f"UI update error: {e}")
+
+    def _force_cleanup_existing_threads(self):
+        """FIXED: Aggressive thread cleanup that won't hang"""
+        try:
+            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
+                print("💀 Killing existing thread...")
+                
+                # Don't try to disconnect signals - just terminate
+                try:
+                    if self.scheduler_thread.isRunning():
+                        self.scheduler_thread.terminate()
+                        # Very short wait - don't block UI
+                        self.scheduler_thread.wait(200)  # Max 200ms
+                except:
+                    pass
+                
+                # Clear reference
+                self.scheduler_thread = None
+                print("Thread killed")
+                
+        except Exception as e:
+            print(f"Thread cleanup error: {e}")
+            # Always clear reference
+            if hasattr(self, 'scheduler_thread'):
+                self.scheduler_thread = None
+
+    def setup_and_login_safe(self):
+        """Replace the original setup_and_login method"""
+        try:
+            if self.is_running:
+                self.show_warning("Stopp automatisering først")
+                return
+                
+            if hasattr(self, 'setup_thread') and self.setup_thread and self.setup_thread.isRunning():
+                print("Setup already running")
+                return
+            
+            # Kill any automation first
+            self.kill_thread_brutally()
+            
+            # Disable buttons
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(False)
+                self.setup_button.setText("Setter opp...")
+                
+            if hasattr(self, 'start_button'):
+                self.start_button.setEnabled(False)
+            
+            # Start setup
+            if hasattr(self, 'bot') and self.bot:
+                self.bot.last_setup_cancelled = False
+                self.setup_thread = SetupThread(self.bot)
+                self.setup_thread.message_signal.connect(self.safe_log_message)
+                self.setup_thread.finished_signal.connect(self.on_setup_finished_safe)
+                if hasattr(self, 'progress_bar'):
+                    self.progress_bar.setVisible(True)
+                    self.setup_thread.progress_signal.connect(self.progress_bar.setValue)
+                self.setup_thread.start()
+            
+        except Exception as e:
+            print(f"Error in setup_and_login_safe: {e}")
+            self.reset_setup_ui()
+    
+    def on_setup_finished_safe(self, success):
+        """Safe setup finish handler"""
+        try:
+            if hasattr(self, 'progress_bar'):
+                self.progress_bar.setVisible(False)
+            self.reset_setup_ui()
+            
+            if success:
+                if hasattr(self, 'status_indicator'):
+                    self.status_indicator.set_status("Klar", "#28a745")
+                print("Setup completed successfully")
+            else:
+                if hasattr(self, 'status_indicator'):
+                    self.status_indicator.set_status("Oppsett mislyktes", "#dc3545")
+                print("Setup failed")
+        except Exception as e:
+            print(f"Error in setup finish: {e}")
+            self.reset_setup_ui()
+
+    def reset_setup_ui(self):
+        """Reset setup UI elements"""
+        try:
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setText("Oppsett og innlogging")
+                self.setup_button.setEnabled(True)
+            if hasattr(self, 'start_button'):
+                self.start_button.setEnabled(True)
+        except Exception as e:
+            print(f"Error resetting setup UI: {e}")
+
+    def stop_automation(self):
+        """Public method redirect"""
+        self.stop_automation_safe()
+
+    def _safe_stop_automation(self):
+        """FIXED: Bulletproof stop method"""
+        try:
+            print("🛑 Stopping automation...")
+            
+            # Set states immediately
+            self.is_running = False
+            
+            if hasattr(self, 'bot') and self.bot:
+                self.bot.running = False
+            
+            # Update UI immediately
+            self._update_ui_to_stopped()
+            
+            # Kill thread asynchronously to prevent blocking
+            QTimer.singleShot(10, self._async_cleanup_thread)
+            
+            # Show notification
+            self.show_notification("Automatisering stoppet", "error")
+            
+            print("✅ Stop completed successfully")
+            
+        except Exception as e:
+            print(f"Stop error: {e}")
+            self._emergency_reset()
+        finally:
+            self._release_toggle_lock()
+
+    def _update_ui_to_stopped(self):
+        """FIXED: Update UI to stopped state with proper button sizing"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                # FIXED: Added min-width and height constraints
+                self.start_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #0066cc;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 12px 24px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        min-height: 20px;
+                        min-width: 160px;
+                    }
+                    QPushButton:hover { 
+                        background-color: #0052a3; 
+                    }
+                    QPushButton:disabled {
+                        background-color: #cccccc;
+                        color: #666666;
+                    }
+                """)
+                self.start_button.setEnabled(True)
+                
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+                
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+                
+        except Exception as e:
+            print(f"UI update error: {e}")
+
+    def _cleanup_scheduler_thread(self):
+        """Safely cleanup scheduler thread - FIXED to prevent exceptions"""
+        try:
+            if not hasattr(self, 'scheduler_thread') or not self.scheduler_thread:
+                print("No scheduler thread to cleanup")
+                return
+                
+            print("Cleaning up scheduler thread...")
+            
+            # Disconnect signals safely
+            try:
+                if self.scheduler_thread.message_signal:
+                    self.scheduler_thread.message_signal.disconnect()
+            except:
+                pass
+                
+            try:
+                if self.scheduler_thread.status_signal:
+                    self.scheduler_thread.status_signal.disconnect()
+            except:
+                pass
+            
+            # Stop the thread gracefully
+            if self.scheduler_thread.isRunning():
+                try:
+                    # Try to stop gracefully first
+                    self.scheduler_thread.stop()
+                    
+                    # Wait for graceful stop (max 2 seconds)
+                    if self.scheduler_thread.wait(2000):
+                        print("Thread stopped gracefully")
+                    else:
+                        print("Graceful stop timeout, terminating thread...")
+                        self.scheduler_thread.terminate()
+                        # Wait for termination (max 1 second)
+                        if self.scheduler_thread.wait(1000):
+                            print("Thread terminated successfully")
+                        else:
+                            print("Thread termination timeout")
+                            
+                except Exception as e:
+                    print(f"Error during thread cleanup: {e}")
+                    # Force terminate as last resort
+                    try:
+                        self.scheduler_thread.terminate()
+                        self.scheduler_thread.wait(500)
+                    except:
+                        print("Force termination failed")
+            
+            # Clear the thread reference
+            self.scheduler_thread = None
+            print("Scheduler thread cleanup completed")
+            
+        except Exception as e:
+            print(f"Error in _cleanup_scheduler_thread: {e}")
+            # Always clear the reference even if cleanup fails
+            self.scheduler_thread = None
 
     def _complete_stop_process(self):
-        """Complete the stop process with guaranteed notification"""
+        """Complete the stop process - FIXED to prevent exceptions"""
         try:
-            # Reset UI
-            self._reset_start_button()
-            self.setup_button.setEnabled(True)
-            self.status_indicator.set_status("Stoppet", "#8a010f")
+            print("Completing stop process...")
             
-            # FIXED: Ensure stop notification always shows
+            # Reset UI elements safely
+            self._reset_start_button()
+            
+            # Re-enable setup button
+            if hasattr(self, 'setup_button'):
+                self.setup_button.setEnabled(True)
+            
+            # Update status indicator
+            if hasattr(self, 'status_indicator'):
+                self.status_indicator.set_status("Stoppet", "#dc3545")
+            
+            # Clear any stopping flags
+            if hasattr(self, '_stopping_in_progress'):
+                self._stopping_in_progress = False
+            
+            # Log the stop message
             self.log_message("🛑 Scheduler stopped")
             
-            print("Stop process completed")
+            print("Stop process completed successfully")
             
         except Exception as e:
             print(f"Error completing stop process: {e}")
+            # Force emergency reset if completion fails
             self._emergency_reset()
 
     def _force_kill_scheduler_thread(self):
@@ -1991,27 +2862,32 @@ class AkademiTrackWindow(QMainWindow):
             self.scheduler_thread = None
     
     def _reset_start_button(self):
-        """Reset start button to initial state"""
-        self.start_button.setText("Start automatisering")
-        self.start_button.setEnabled(True)
-        self.start_button.setStyleSheet("""
-            QPushButton {
-                background-color: #0066cc;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: 600;
-                min-height: 20px;
-            }
-            QPushButton:hover {
-                background-color: #0052a3;
-            }
-            QPushButton:pressed {
-                background-color: #003d7a;
-            }
-        """)
+        """Reset start button to initial state - FIXED to prevent exceptions"""
+        try:
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)
+                self.start_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #0066cc;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 12px 24px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        min-height: 20px;
+                    }
+                    QPushButton:hover {
+                        background-color: #0052a3;
+                    }
+                    QPushButton:pressed {
+                        background-color: #003d7a;
+                    }
+                """)
+                print("Start button reset successfully")
+        except Exception as e:
+            print(f"Error resetting start button: {e}")
 
     def _set_stop_button_style(self):
         """Set button to stop style - FIXED WITH PROPER HOVER EFFECTS"""
@@ -2053,43 +2929,68 @@ class AkademiTrackWindow(QMainWindow):
             self._processing_any_action = False
 
     def _emergency_reset(self):
-        """Emergency reset all states"""
+        """Emergency reset for crashes"""
         try:
-            print("EMERGENCY RESET!")
-            self.is_running = False
-            self._force_kill_scheduler_thread()
-            self._reset_start_button()
-            self.setup_button.setEnabled(True)
-            self.status_indicator.set_status("Reset", "#dc3545")
+            print("🚨 EMERGENCY RESET")
             
-            # Clear all locks
-            self._processing_any_action = False
-            if hasattr(self, '_starting'):
-                self._starting = False
-            if hasattr(self, '_stopping'):
-                self._stopping = False
-                
+            # Force all states
+            self.is_running = False
+            self._toggle_lock = False
+            
+            # Kill thread
+            if hasattr(self, 'scheduler_thread'):
+                try:
+                    if self.scheduler_thread:
+                        self.scheduler_thread.terminate()
+                except:
+                    pass
+                self.scheduler_thread = None
+            
+            # Stop bot
+            if hasattr(self, 'bot') and self.bot:
+                try:
+                    self.bot.running = False
+                except:
+                    pass
+            
+            # Reset UI
+            self._update_ui_to_stopped()
+            
+            print("Emergency reset completed")
+            
         except Exception as e:
-            print(f"Error in emergency reset: {e}")
-
+            print(f"Emergency reset failed: {e}")
+            # Ultimate fallback
+            self._toggle_lock = False
+            self.is_running = False
 
     def on_scheduler_stopped(self):
-        """Handle when scheduler stops itself - prevent duplicate notifications"""
+        """Handle stop signal - async version"""
         try:
-            print("Scheduler stopped signal received")
-            
-            # FIXED: Only update if we're actually running and not already stopping
-            if (hasattr(self, 'is_running') and self.is_running and 
-                not getattr(self, '_stopping_in_progress', False)):
-                
-                self.is_running = False
-                self._reset_start_button()
-                self.setup_button.setEnabled(True)
-                self.status_indicator.set_status("Fullført", "#6c757d")
-                
-        except Exception as e:
-            print(f"Error in on_scheduler_stopped: {e}")
+            # Just set flag - use timer for UI updates
+            self.is_running = False
+            QTimer.singleShot(100, self._handle_stop_ui_update)
+        except:
+            pass
     
+    def _handle_stop_ui_update(self):
+        """Update UI after stop - runs async"""
+        try:
+            if not self.is_running:
+                self._reset_button_to_start()
+                if hasattr(self, 'status_indicator'):
+                    self.status_indicator.set_status("Stoppet", "#dc3545")
+        except:
+            pass
+
+    def _handle_scheduler_stopped_ui(self):
+        """Handle UI updates for scheduler stopped - runs in main thread"""
+        try:
+            if not self.is_running:  # Double check
+                self._update_ui_stopped()
+        except Exception as e:
+            print(f"Error updating UI after scheduler stop: {e}")      
+
     def update_status(self, status):
         """Update status indicator"""
         if not self.is_running and status == "Running":
