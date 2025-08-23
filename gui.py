@@ -9,11 +9,11 @@ from pathlib import Path
 
 try:
     from PyQt5.QtWidgets import (
-        QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-        QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
-        QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+    QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
+    QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
     )
-    from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
+    from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
     from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
 except ImportError:
     print("PyQt5 is required. Please install it with: pip install PyQt5")
@@ -24,6 +24,266 @@ try:
 except ImportError:
     print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
+
+class NotificationWidget(QWidget):
+    """Professional notification widget with modern design and smooth animations"""
+    
+    def __init__(self, message, notification_type="info", duration=5000, parent=None):
+        super().__init__(parent)
+        self.parent_widget = parent
+        self.duration = duration
+        self.notification_type = notification_type
+        
+        # Modern window flags for professional appearance
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        
+        self.init_ui(message)
+        self.setup_animations()
+        
+    def init_ui(self, message):
+        """Initialize professional notification UI with modern design"""
+        self.setFixedSize(380, 90)
+        
+        # Professional color schemes and icons
+        notification_configs = {
+            "success": {
+                "bg_color": "#10B981",  # Modern green
+                "text_color": "white",
+                "icon": "✓",
+                "border": "#059669",
+                "shadow": "rgba(16, 185, 129, 0.4)"
+            },
+            "error": {
+                "bg_color": "#EF4444",  # Modern red
+                "text_color": "white", 
+                "icon": "✕",
+                "border": "#DC2626",
+                "shadow": "rgba(239, 68, 68, 0.4)"
+            },
+            "warning": {
+                "bg_color": "#F59E0B",  # Modern amber
+                "text_color": "white",
+                "icon": "⚠",
+                "border": "#D97706", 
+                "shadow": "rgba(245, 158, 11, 0.4)"
+            },
+            "completed": {
+                "bg_color": "#8B5CF6",  # Modern purple
+                "text_color": "white",
+                "icon": "🎉",
+                "border": "#7C3AED",
+                "shadow": "rgba(139, 92, 246, 0.4)"
+            },
+            "info": {
+                "bg_color": "#3B82F6",  # Modern blue
+                "text_color": "white",
+                "icon": "ℹ",
+                "border": "#2563EB",
+                "shadow": "rgba(59, 130, 246, 0.4)"
+            }
+        }
+        
+        config = notification_configs.get(self.notification_type, notification_configs["info"])
+        
+        # Modern stylesheet with gradient and shadow effects
+        self.setStyleSheet(f"""
+            NotificationWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {config["bg_color"]}, 
+                    stop:1 {self.darken_color(config["bg_color"], 0.1)});
+                border: 1px solid {config["border"]};
+                border-radius: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', system-ui, sans-serif;
+            }}
+        """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(16)
+        
+        # Modern icon with better styling
+        icon_label = QLabel(config["icon"])
+        icon_label.setFont(QFont("SF Pro Display", 20, QFont.Bold))
+        icon_label.setFixedSize(32, 32)
+        icon_label.setAlignment(Qt.AlignCenter)
+        icon_label.setStyleSheet(f"""
+            QLabel {{
+                color: {config["text_color"]};
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 16px;
+                border: none;
+            }}
+        """)
+        
+        # Content container for better text layout
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(2)
+        
+        # Main message with better typography
+        message_label = QLabel(message)
+        message_label.setStyleSheet(f"""
+            QLabel {{
+                color: {config["text_color"]};
+                font-size: 14px;
+                font-weight: 600;
+                background: transparent;
+                border: none;
+                letter-spacing: 0.3px;
+            }}
+        """)
+        message_label.setWordWrap(True)
+        
+        # Subtle timestamp
+        timestamp_label = QLabel(datetime.now().strftime("%H:%M"))
+        timestamp_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 11px;
+                font-weight: 400;
+                background: transparent;
+                border: none;
+            }}
+        """)
+        
+        content_layout.addWidget(message_label)
+        content_layout.addWidget(timestamp_label)
+        
+        # Close button (optional, appears on hover)
+        close_button = QPushButton("×")
+        close_button.setFixedSize(24, 24)
+        close_button.setStyleSheet(f"""
+            QPushButton {{
+                color: rgba(255, 255, 255, 0.7);
+                background: transparent;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+            }}
+        """)
+        close_button.clicked.connect(self.hide_notification)
+        
+        layout.addWidget(icon_label)
+        layout.addWidget(content_widget, 1)
+        layout.addWidget(close_button)
+        
+    def darken_color(self, hex_color, factor):
+        """Darken a hex color by a factor (0-1)"""
+        try:
+            # Remove # if present
+            hex_color = hex_color.lstrip('#')
+            # Convert to RGB
+            rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            # Darken each component
+            darkened = tuple(int(c * (1 - factor)) for c in rgb)
+            # Convert back to hex
+            return f"#{darkened[0]:02x}{darkened[1]:02x}{darkened[2]:02x}"
+        except:
+            return hex_color
+        
+    def setup_animations(self):
+        """Setup smooth professional animations"""
+        # Slide-in animation with easing
+        self.slide_in_animation = QPropertyAnimation(self, b"geometry")
+        self.slide_in_animation.setDuration(400)  # Slightly longer for smoothness
+        self.slide_in_animation.setEasingCurve(QEasingCurve.OutCubic)
+        
+        # Slide-out animation
+        self.slide_out_animation = QPropertyAnimation(self, b"geometry")
+        self.slide_out_animation.setDuration(300)
+        self.slide_out_animation.setEasingCurve(QEasingCurve.InCubic)
+        self.slide_out_animation.finished.connect(self.close)
+        
+        # Fade-out animation for smooth disappearing
+        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation.setDuration(250)
+        self.fade_animation.setStartValue(1.0)
+        self.fade_animation.setEndValue(0.0)
+        self.fade_animation.finished.connect(self.close)
+        
+    def show_notification(self):
+        """Show notification with enhanced positioning and stacking"""
+        try:
+            app = QApplication.instance()
+            screen = app.primaryScreen().availableGeometry()
+            
+            # Better positioning - account for taskbar and multiple notifications
+            margin = 20
+            notification_spacing = 100  # Space between stacked notifications
+            
+            # Calculate position considering existing notifications
+            if hasattr(app, '_active_notifications'):
+                existing_count = len([n for n in app._active_notifications if n.isVisible()])
+            else:
+                app._active_notifications = []
+                existing_count = 0
+            
+            start_x = screen.right()
+            end_x = screen.right() - self.width() - margin
+            y = screen.top() + margin + (existing_count * notification_spacing)
+            
+            # Ensure notification doesn't go off-screen
+            max_y = screen.bottom() - self.height() - margin
+            if y > max_y:
+                y = screen.top() + margin  # Reset to top if too many notifications
+            
+            # Set initial position and show
+            self.setGeometry(start_x, y, self.width(), self.height())
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            
+            # Add to active notifications list
+            app._active_notifications.append(self)
+            
+            # Animate slide-in
+            self.slide_in_animation.setStartValue(QRect(start_x, y, self.width(), self.height()))
+            self.slide_in_animation.setEndValue(QRect(end_x, y, self.width(), self.height()))
+            self.slide_in_animation.start()
+            
+            # Auto-hide after duration
+            QTimer.singleShot(self.duration, self.hide_notification)
+            
+        except Exception as e:
+            print(f"Error showing notification: {e}")
+    
+    def hide_notification(self):
+        """Hide notification with smooth fade animation"""
+        if not self.isVisible():
+            return
+        
+        # Use fade animation instead of slide for smoother exit
+        self.fade_animation.start()
+    
+    def closeEvent(self, event):
+        """Clean up when notification closes"""
+        try:
+            # Remove from active notifications list
+            app = QApplication.instance()
+            if hasattr(app, '_active_notifications') and self in app._active_notifications:
+                app._active_notifications.remove(self)
+        except:
+            pass
+        event.accept()
+    
+    def mousePressEvent(self, event):
+        """Close notification when clicked"""
+        try:
+            self.hide_notification()
+            event.accept()
+        except Exception as e:
+            print(f"Error in notification click: {e}")
+            try:
+                self.close()
+            except:
+                pass
 
 class PostRequestWindow(QDialog):
     def __init__(self, bot, parent=None):
@@ -570,7 +830,7 @@ class SchedulerThread(QThread):
 
 
 class AkademiTrackWindow(QMainWindow):
-    """Simple, clean main window"""
+    """Simple, clean main window with notification system"""
     console_signal = pyqtSignal(str)
     
     def __init__(self):
@@ -584,6 +844,7 @@ class AkademiTrackWindow(QMainWindow):
         self.is_running = False
         self._orig_stdout = None
         self._orig_stderr = None
+        self.active_notifications = []  # Track active notifications
         
         # Create a hidden console for logging (not displayed in main UI)
         self.console = QPlainTextEdit()
@@ -598,6 +859,40 @@ class AkademiTrackWindow(QMainWindow):
         
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
+    
+    
+
+    def show_notification(self, message, notification_type="info", duration=5000):
+        """Show enhanced professional notification with better stacking"""
+        try:
+            # Prevent spam notifications
+            current_time = time.time()
+            message_key = f"{message}_{notification_type}"
+            
+            if not hasattr(self, '_last_notifications'):
+                self._last_notifications = {}
+            
+            # Check for duplicate within 3 seconds
+            if message_key in self._last_notifications:
+                if current_time - self._last_notifications[message_key] < 3.0:
+                    return
+            
+            self._last_notifications[message_key] = current_time
+            
+            # Create and show notification
+            notification = NotificationWidget(message, notification_type, duration, None)
+            notification.show_notification()
+            
+            # Clean up old notification references periodically
+            if len(self._last_notifications) > 50:  # Keep only recent ones
+                cutoff_time = current_time - 300  # 5 minutes
+                self._last_notifications = {
+                    k: v for k, v in self._last_notifications.items() 
+                    if v > cutoff_time
+                }
+            
+        except Exception as e:
+            print(f"Error showing notification: {e}")
         
     def init_ui(self):
         """Initialize clean, simple UI"""
@@ -806,9 +1101,9 @@ class AkademiTrackWindow(QMainWindow):
         sys.stderr = _StdRedirector(lambda t: self.console_signal.emit(t))
     
     def append_console(self, text):
-        """Append text to console and settings window if open - FIXED VERSION"""
+        """Append text to console and settings window - handles large JSON properly"""
         if text.strip():
-            # Update hidden main console - FIXED: Remove limits
+            # Update hidden main console - NO LIMITS for full JSON
             cursor = self.console.textCursor()
             cursor.movePosition(cursor.End)
             self.console.setTextCursor(cursor)
@@ -817,13 +1112,19 @@ class AkademiTrackWindow(QMainWindow):
             scrollbar = self.console.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
             
-            # Update settings window console if it's open
+            # Update settings window console if it's open - NO LIMITS
             if hasattr(self, 'settings_window') and self.settings_window and hasattr(self.settings_window, 'console_widget'):
                 try:
-                    self.settings_window.append_text(text.strip())
-                except:
-                    pass
-            
+                    # Use insertPlainText for large content instead of append
+                    cursor = self.settings_window.console_widget.textCursor()
+                    cursor.movePosition(cursor.End)
+                    self.settings_window.console_widget.setTextCursor(cursor)
+                    self.settings_window.console_widget.insertPlainText(text.strip() + "\n")
+                    
+                    scrollbar = self.settings_window.console_widget.verticalScrollBar()
+                    scrollbar.setValue(scrollbar.maximum())
+                except Exception as e:
+                    print(f"Error updating settings console: {e}")
     
     def install_requirements(self):
         """Install required packages quietly"""
@@ -848,42 +1149,120 @@ class AkademiTrackWindow(QMainWindow):
                 self.show_error(f"Failed to install packages: {e}")
     
     def log_message(self, message):
-        """Show only critical messages, update status indicator for others."""
-        if any(keyword in message.lower() for keyword in ['cookie', 'expired', 'login', 'setup']):
-            if 'expired' in message.lower() or 'invalid' in message.lower():
-                self.status_message.setText("⚠️ Økt utløpt - Kjør 'Oppsett og innlogging'")
+        """Enhanced log message handler with professional notifications"""
+        try:
+            should_notify = False
+            notification_type = "info"
+            notification_message = ""
+            
+            message_lower = message.lower()
+            
+            # SUCCESS NOTIFICATIONS
+            if ('🎯 registrert studietid' in message_lower or 
+                'attendance registered successfully' in message_lower):
+                should_notify = True
+                notification_type = "success"
+                
+                # Extract time number for more specific message
+                if 'timenr' in message_lower:
+                    import re
+                    timenr_match = re.search(r'timenr (\w+)', message_lower)
+                    if timenr_match:
+                        notification_message = f"Studietid registrert - Time {timenr_match.group(1)}"
+                    else:
+                        notification_message = "Studietid registrert"
+                else:
+                    notification_message = "Studietid registrert"
+            
+            # COMPLETION NOTIFICATIONS
+            elif ('🏁 all stu classes for the day are completed' in message_lower or
+                '🎊 all stu classes for the day are completed' in message_lower):
+                should_notify = True
+                notification_type = "completed"
+                notification_message = "Alle studietimer fullført i dag!"
+            
+            # SETUP SUCCESS
+            elif ('🎉 setup completed successfully' in message_lower or
+                'setup completed successfully' in message_lower):
+                should_notify = True
+                notification_type = "success"
+                notification_message = "Oppsett fullført!"
+            
+            # ERROR NOTIFICATIONS  
+            elif ('registration failed' in message_lower and 'status' in message_lower):
+                should_notify = True
+                notification_type = "error"
+                notification_message = "Registrering mislyktes"
+            
+            elif 'setup failed' in message_lower:
+                should_notify = True
+                notification_type = "error"
+                notification_message = "Oppsett mislyktes"
+            
+            # WARNING NOTIFICATIONS
+            elif ('cookie authentication failed' in message_lower or 
+                'session expired' in message_lower):
+                should_notify = True
+                notification_type = "warning"
+                notification_message = "Økt utløpt - Kjør oppsett på nytt"
+            
+            # AUTOMATION STATUS
+            elif '🚀 automatisering startet' in message_lower:
+                should_notify = True
+                notification_type = "info"
+                notification_message = "Automatisering startet"
+            
+            elif 'scheduler stopped' in message_lower:
+                should_notify = True
+                notification_type = "info"
+                notification_message = "Automatisering stoppet"
+            
+            # Show professional notification
+            if should_notify and notification_message:
+                try:
+                    self.show_notification(notification_message, notification_type)
+                except Exception as e:
+                    print(f"Notification error: {e}")
+            
+            # Handle status messages and UI updates
+            if any(keyword in message_lower for keyword in ['cookie', 'expired', 'login', 'setup']):
+                if 'expired' in message_lower or 'invalid' in message_lower:
+                    self.status_message.setText("⚠️ Økt utløpt - Kjør 'Oppsett og innlogging'")
+                    self.status_message.setVisible(True)
+                    self.status_message.setStyleSheet("""
+                        color: #856404;
+                        background-color: #fff3cd;
+                        border: 1px solid #ffeaa7;
+                        border-radius: 8px;
+                        padding: 12px 16px;
+                        margin: 8px 0;
+                    """)
+                    QTimer.singleShot(5000, lambda: self.status_message.setVisible(False))
+            
+            elif 'error' in message_lower and 'critical' in message_lower:
+                self.status_message.setText(message)
                 self.status_message.setVisible(True)
                 self.status_message.setStyleSheet("""
-                    color: #856404;
-                    background-color: #fff3cd;
-                    border: 1px solid #ffeaa7;
+                    color: #721c24;
+                    background-color: #f8d7da;
+                    border: 1px solid #f5c6cb;
                     border-radius: 8px;
                     padding: 12px 16px;
                     margin: 8px 0;
                 """)
-                QTimer.singleShot(5000, lambda: self.status_message.setVisible(False))
-        
-        elif 'error' in message.lower() and 'critical' in message.lower():
-            self.status_message.setText(message)
-            self.status_message.setVisible(True)
-            self.status_message.setStyleSheet("""
-                color: #721c24;
-                background-color: #f8d7da;
-                border: 1px solid #f5c6cb;
-                border-radius: 8px;
-                padding: 12px 16px;
-                margin: 8px 0;
-            """)
-            QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
-        
-        elif 'scheduler stopped' in message.lower():
-            self.status_indicator.set_status("Klar", "#6c757d")
-        elif 'started' in message.lower() or 'automatisering starta' in message.lower():
-            self.status_indicator.set_status("Running", "#28a745")
-        elif 'setup completed' in message.lower():
-            self.status_indicator.set_status("Klar", "#28a745")
-        elif 'failed' in message.lower():
-            self.status_indicator.set_status("Feil", "#dc3545")
+                QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
+            
+            elif 'scheduler stopped' in message_lower:
+                self.status_indicator.set_status("Klar", "#6c757d")
+            elif 'started' in message_lower or 'automatisering starta' in message_lower:
+                self.status_indicator.set_status("Running", "#28a745")
+            elif 'setup completed' in message_lower:
+                self.status_indicator.set_status("Klar", "#28a745")
+            elif 'failed' in message_lower:
+                self.status_indicator.set_status("Feil", "#dc3545")
+            
+        except Exception as e:
+            print(f"Error in log_message: {e}")
     
     def setup_and_login(self):
         """Handle setup and login"""
@@ -915,7 +1294,6 @@ class AkademiTrackWindow(QMainWindow):
         
         if success:
             self.status_indicator.set_status("Klar", "#28a745")
-            self.show_info("Oppsett fullført!")
         else:
             if getattr(self.bot, 'last_setup_cancelled', False):
                 self.bot.last_setup_cancelled = False
@@ -927,15 +1305,12 @@ class AkademiTrackWindow(QMainWindow):
     def toggle_automation(self):
         """Toggle automation - COMPLETELY CRASH PROOF"""
         try:
-            # Immediate return if already processing ANY action
+            # Prevent multiple rapid clicks
             if hasattr(self, '_processing_any_action') and self._processing_any_action:
                 print("Action already in progress, ignoring click...")
                 return
-                
-            # Set global action lock
+                    
             self._processing_any_action = True
-            
-            # Disable button immediately to prevent further clicks
             self.start_button.setEnabled(False)
             
             if not self.is_running:
@@ -945,14 +1320,13 @@ class AkademiTrackWindow(QMainWindow):
             else:
                 print("Toggle: Stopping automation...")  
                 self.start_button.setText("Stopper...")
+                self._stopping_in_progress = True
                 self._safe_stop_automation()
-                
+                    
         except Exception as e:
             print(f"CRITICAL ERROR in toggle_automation: {e}")
-            # Emergency reset
             self._emergency_reset()
         finally:
-            # Always release the lock after a delay
             QTimer.singleShot(1000, self._release_action_lock)
 
     def start_automation(self):
@@ -961,23 +1335,28 @@ class AkademiTrackWindow(QMainWindow):
         self._safe_start_automation()
 
     def _safe_start_automation(self):
-        """Internal safe start method"""
+        """Internal safe start method with better cookie handling"""
         try:
-            # Check cookies
+            # Check cookies with better error handling
             cookies_ok = False
-            if os.path.exists(self.bot.cookies_file):
+            cookies_exist = os.path.exists(self.bot.cookies_file)
+            
+            if cookies_exist:
                 try:
                     if self.bot.load_cookies_from_file() and self.bot.test_cookies():
                         cookies_ok = True
+                        self.log_message("✅ Using existing valid cookies")  # FIXED: log -> log_message
                     else:
-                        self.log_message("🔑 Økten er utløpt - kjører oppsett og pålogging")
+                        self.log_message("🔑 Existing cookies are invalid")  # FIXED: log -> log_message
                 except Exception as e:
-                    self.log_message(f"Cookie validation error: {e}")
+                    self.log_message(f"Cookie validation error: {e}")  # FIXED: log -> log_message
             else:
-                self.log_message("🔑 Ingen informasjonskapsel funnet - kjører oppsett og innlogging")
+                self.log_message("🔑 No cookies file found")  # FIXED: log -> log_message
 
             if not cookies_ok:
-                self.setup_and_login()
+                # Show specific notification for first-time setup needed
+                self.show_notification("Trenger oppsett først", "warning", 3000)
+                self.log_message("❌ Please run 'Oppsett og innlogging' first before starting automation")  # FIXED: log -> log_message
                 self._reset_start_button()
                 return
 
@@ -989,7 +1368,7 @@ class AkademiTrackWindow(QMainWindow):
             
             # Create new thread
             self.scheduler_thread = SchedulerThread(self.bot)
-            self.scheduler_thread.message_signal.connect(self.log_message)
+            self.scheduler_thread.message_signal.connect(self.log_message)  # This is correct
             self.scheduler_thread.status_signal.connect(self.update_status)
             self.scheduler_thread.start()
 
@@ -999,10 +1378,14 @@ class AkademiTrackWindow(QMainWindow):
             self.setup_button.setEnabled(False)
             self.status_indicator.set_status("Kjører", "#28a745")
             
-            print("Sikker start fullført")
+            # Show start notification only once
+            self.show_notification("Automatisering startet", "info", 2000)
+            
+            print("Safe start completed")  # Use print for debug, not self.log
             
         except Exception as e:
-            print(f"feil i _safe_start_automation: {e}")
+            print(f"Error in _safe_start_automation: {e}")  # Use print for debug
+            self.show_notification("Feil ved oppstart", "error", 3000)
             self._emergency_reset()
 
     
@@ -1014,7 +1397,7 @@ class AkademiTrackWindow(QMainWindow):
     def _safe_stop_automation(self):
         """Internal safe stop method - BULLETPROOF"""
         try:
-            print("Sikker start...")
+            print("Safe stop starting...")  # Use print for debug
             
             # Set stopping state immediately
             self.is_running = False
@@ -1025,9 +1408,9 @@ class AkademiTrackWindow(QMainWindow):
                 try:
                     self.bot.running = False
                     self.bot.stop_scheduler()
-                    print("bot stoppet")
+                    print("Bot stopped")  # Use print for debug
                 except:
-                    print("Feil ved å stoppe botten, fortsetter...")
+                    print("Error stopping bot, continuing...")  # Use print for debug
             
             # Force kill thread
             self._force_kill_scheduler_thread()
@@ -1037,10 +1420,13 @@ class AkademiTrackWindow(QMainWindow):
             self.setup_button.setEnabled(True)
             self.status_indicator.set_status("Stoppet", "#6c757d")
             
-            print("T-stopp fullført")
+            # Show stop notification
+            self.show_notification("Automatisering stoppet", "info", 2000)
+            
+            print("Safe stop completed")  # Use print for debug
             
         except Exception as e:
-            print(f"Feil i _safe_stop_automation: {e}")
+            print(f"Error in _safe_stop_automation: {e}")  # Use print for debug
             self._emergency_reset()
 
     def _force_kill_scheduler_thread(self):
@@ -1121,10 +1507,12 @@ class AkademiTrackWindow(QMainWindow):
         """)
 
     def _release_action_lock(self):
-        """Release the action lock"""
+        """Release the action lock and stop flag"""
         try:
             self._processing_any_action = False
-            print("Handlingslåsen er løsnet, klar for nye handlinger. Knappen kan altså trykkes igjen.")
+            if hasattr(self, '_stopping_in_progress'):
+                self._stopping_in_progress = False
+            print("Action lock released")
         except:
             pass
 
@@ -1140,30 +1528,31 @@ class AkademiTrackWindow(QMainWindow):
             
             # Clear all locks
             self._processing_any_action = False
-            if hasattr(self, '_starter'):
+            if hasattr(self, '_starting'):
                 self._starting = False
-            if hasattr(self, '_stopper'):
+            if hasattr(self, '_stopping'):
                 self._stopping = False
                 
         except Exception as e:
-            print(f"feil i emergency reset: {e}")
+            print(f"Error in emergency reset: {e}")
 
 
     def on_scheduler_stopped(self):
-        """Handle when scheduler stops itself - SAFE VERSION"""
+        """Handle when scheduler stops itself - prevent duplicate notifications"""
         try:
-            print("Signal for stoppet planlegger mottatt")
+            print("Scheduler stopped signal received")
             
-            # Only update if we're actually running
-            if hasattr(self, 'is_running') and self.is_running:
-                # Don't call stop methods, just update UI
+            # FIXED: Only update if we're actually running and not already stopping
+            if (hasattr(self, 'is_running') and self.is_running and 
+                not getattr(self, '_stopping_in_progress', False)):
+                
                 self.is_running = False
                 self._reset_start_button()
                 self.setup_button.setEnabled(True)
                 self.status_indicator.set_status("Fullført", "#6c757d")
                 
         except Exception as e:
-            print(f"Feil i on_scheduler_stopped: {e}")
+            print(f"Error in on_scheduler_stopped: {e}")
     
     def update_status(self, status):
         """Update status indicator"""

@@ -497,7 +497,7 @@ class ImprovedISkoleBot(QObject):
                         if os.path.exists(self.cookies_file):
                             self.log(f"✅ Cookies file written at: {self.cookies_file}")
                         self.cookies_ready = True
-                        self.log("🎉 Cookies extracted and verified successfully!")
+                        self.log("🎉 Setup completed successfully!")
                         self.log(f"📝 Extracted {len(extracted_cookies)} cookies")
                         return True
                     else:
@@ -710,7 +710,7 @@ class ImprovedISkoleBot(QObject):
                             self.log("✅ Login status: VALID - On student page")
                             return True
                         elif found_failure:
-                            self.log("🔑 Login status: EXPIRED - Need fresh login")
+                            self.log("🔑 Session expired - Need fresh login")
                             return False
                         else:
                             self.log("⚠️ Login status: UNCLEAR - Continuing checks...")
@@ -730,7 +730,7 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def fetch_schedule(self):
-        """Fetch the current day's schedule with detailed console output - FIXED VERSION"""
+        """Fetch the current day's schedule with detailed console output - RESTORED FULL JSON"""
         if not self.check_login_status():
             return False
 
@@ -766,14 +766,14 @@ class ImprovedISkoleBot(QObject):
 
             data = response.json()
             
-            # FIXED: Remove the [:1000] truncation and output complete JSON
+            # RESTORED: Full JSON output without truncation
             complete_json = json.dumps(data, indent=2, ensure_ascii=False)
             
-            # Output in chunks to avoid GUI issues
+            # Output complete JSON in chunks to avoid GUI issues
             self.log("📋 Complete JSON response:")
             self.log("=" * 80)
             
-            # Split into manageable chunks
+            # Split into manageable chunks for GUI display
             chunk_size = 2000
             for i in range(0, len(complete_json), chunk_size):
                 chunk = complete_json[i:i + chunk_size]
@@ -781,6 +781,7 @@ class ImprovedISkoleBot(QObject):
             
             self.log("=" * 80)
             
+            # Continue with rest of the method...
             items = data.get('items', [])
             self.log(f"📊 Total items in response: {len(items)}")
             
@@ -930,7 +931,7 @@ class ImprovedISkoleBot(QObject):
             self.log("🏁 All periods registered")
     
     def register_attendance_enhanced(self, period):
-        """Enhanced attendance registration using fetched period data"""
+        """Enhanced attendance registration using fetched period data with notification triggers"""
         try:
             current_ip = self.get_current_ip()
             current_date = datetime.now().strftime("%Y%m%d")
@@ -982,12 +983,15 @@ class ImprovedISkoleBot(QObject):
                 except:
                     self.log("✅ Registration request sent successfully")
                 
-                self.log("🎉 Attendance registration completed!")
+                # ENHANCED: Trigger notification with specific message
+                self.log(f"🎯 Registrert studietid for timenr {period['timenr']}")
+                self.log("🎉 Attendance registered successfully!")
                 self.registered_timenrs.add(period['timenr'])
                 period['registered'] = True
                 return True
             else:
                 self.log(f"❌ Registration failed with status: {response.status_code}")
+                self.log("❌ Error during registration - please check logs")
                 return False
                 
         except Exception as e:
@@ -1016,6 +1020,7 @@ class ImprovedISkoleBot(QObject):
         
         if self.are_all_periods_completed():
             self.log("🏁 All STU classes for the day are completed or their registration windows have passed")
+            self.log("🎊 All STU classes for the day are completed")
             self.stop_scheduler()
             return
         
@@ -1047,11 +1052,11 @@ class ImprovedISkoleBot(QObject):
         self.log(f"🚀 Attempting attendance registration for timenr {period['timenr']}")
         success = self.register_attendance_enhanced(period)
         if success:
-            self.log("🎯 Attendance registered successfully!")
             self.log_registered_status()
             
             if self.are_all_periods_completed():
                 self.log("🏁 All STU classes for the day are completed")
+                self.log("🎊 All STU classes for the day are completed")
                 self.stop_scheduler()
         else:
             self.log("❌ Registration attempt failed")
@@ -1065,6 +1070,7 @@ class ImprovedISkoleBot(QObject):
             self.running = True
             self._should_stop = False
             self.log("🤖 Scheduler started - checking every minute")
+            self.log("🚀 Automatisering startet")
             self.log("📚 Will fetch STU periods from schedule and register during their windows")
             
             self.log("🚀 Running immediate check...")
