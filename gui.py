@@ -509,6 +509,7 @@ class NotificationWidget(QWidget):
             print(f"Error hiding notification: {e}")
 
 class PostRequestWindow(QDialog):
+    finished = pyqtSignal()
     def __init__(self, bot, parent=None):
         super().__init__(parent)
         self.bot = bot
@@ -972,10 +973,14 @@ class StatusIndicator(QLabel):
 
 class SettingsWindow(QWidget):
     """Settings window as a separate independent window"""
+    finished = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window)  # Make it a proper window
         self.parent_window = parent
         self.console_widget = None
+        self.post_window = None  # Track POST window instance
+        self.post_window_open = False  # Track POST window state
         self.init_ui()
         
     def init_ui(self):
@@ -1049,7 +1054,7 @@ class SettingsWindow(QWidget):
             self.console_widget.setPlainText(self.parent_window.console.toPlainText())
             
     def open_post_request(self):
-        """Open the POST request window from settings"""
+        """Open the POST request window from settings - SINGLE INSTANCE"""
         if not self.parent_window or not self.parent_window.bot:
             self.append_text("❌ No bot instance available")
             return
@@ -1058,14 +1063,37 @@ class SettingsWindow(QWidget):
             self.append_text("⚠️ Stop automation first before using POST Request")
             return
         
+        # Check if POST window is already open
+        if self.post_window_open:
+            # If window exists and is visible, just bring it to front
+            if self.post_window and self.post_window.isVisible():
+                self.post_window.raise_()
+                self.post_window.activateWindow()
+                return
+            else:
+                # Window was closed but flag wasn't reset
+                self.post_window_open = False
+        
         # Don't check login status - just check if cookies exist
         if not os.path.exists(self.parent_window.bot.cookies_file):
             self.append_text("❌ No cookies found - please run Setup & Login first")
             return
-            
+        
         self.append_text("🚀 Opening POST Request window...")
+        
+        # Create new window only if none exists
         self.post_window = PostRequestWindow(self.parent_window.bot, self)
+        self.post_window_open = True
+        
+        # Connect close event to reset flag
+        self.post_window.finished.connect(self._on_post_window_closed)
+        
         self.post_window.show()
+
+    def _on_post_window_closed(self):
+        """Reset POST window flag when closed"""
+        self.post_window_open = False
+        self.post_window = None
     
     def append_text(self, text):
         """Append text to console without limits - FIXED VERSION"""
@@ -1089,7 +1117,13 @@ class SettingsWindow(QWidget):
         
     def closeEvent(self, event):
         """Handle window close"""
+        self.finished.emit()  # Emit finished signal
         event.accept()
+
+    def close(self):
+        """Override close method to emit signal"""
+        self.finished.emit()
+        super().close()
 
 class SetupThread(QThread):
     """Thread for handling setup operations"""
@@ -1205,6 +1239,11 @@ class AkademiTrackWindow(QMainWindow):
         self._orig_stdout = None
         self._orig_stderr = None
         self.active_notifications = []  # Track active notifications
+
+        self.post_window = None
+        self.settings_window = None
+        self.post_window_open = False
+        self.settings_window_open = False
         
         # Create a hidden console for logging (not displayed in main UI)
         self.console = QPlainTextEdit()
@@ -1417,14 +1456,35 @@ class AkademiTrackWindow(QMainWindow):
         parent_layout.addLayout(controls_layout)
 
     def open_settings(self):
-        """Open settings window as independent window"""
-        # Always create a new window (don't reuse)
+        """Open settings window as independent window - SINGLE INSTANCE"""
+        # Check if settings window is already open
+        if self.settings_window_open:
+            # If window exists and is visible, just bring it to front
+            if self.settings_window and self.settings_window.isVisible():
+                self.settings_window.raise_()
+                self.settings_window.activateWindow()
+                return
+            else:
+                # Window was closed but flag wasn't reset
+                self.settings_window_open = False
+        
+        # Create new window only if none exists
         self.settings_window = SettingsWindow(self)
+        self.settings_window_open = True
+        
+        # Connect close event to reset flag
+        self.settings_window.finished.connect(self._on_settings_window_closed)
+        
         self.settings_window.show()
         
         # Position it relative to main window
         main_pos = self.pos()
         self.settings_window.move(main_pos.x() + 50, main_pos.y() + 50)
+
+    def _on_settings_window_closed(self):
+        """Reset settings window flag when closed"""
+        self.settings_window_open = False
+        self.settings_window = None
     
     def create_status_area(self, parent_layout):
         """Create minimal status area - only for critical errors"""
