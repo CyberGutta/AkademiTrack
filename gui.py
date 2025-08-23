@@ -956,7 +956,7 @@ class AkademiTrackWindow(QMainWindow):
         title.setStyleSheet("color: #212529; margin-bottom: 4px;")
         title.setAlignment(Qt.AlignCenter)
         
-        subtitle = QLabel("Automatisk frammøteregistrering")
+        subtitle = QLabel("Automatisk oppmøteregistrering")
         subtitle.setFont(QFont("SF Pro Text", 14))
         subtitle.setStyleSheet("color: #495057; font-weight: 500;")
         subtitle.setAlignment(Qt.AlignCenter)
@@ -1472,8 +1472,8 @@ class AkademiTrackWindow(QMainWindow):
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
-                background-color: #0066cc !important;
-                color: white !important;
+                background-color: #0066cc;
+                color: white;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -1482,18 +1482,21 @@ class AkademiTrackWindow(QMainWindow):
                 min-height: 20px;
             }
             QPushButton:hover {
-                background-color: #0052a3 !important;
+                background-color: #0052a3;
+            }
+            QPushButton:pressed {
+                background-color: #003d7a;
             }
         """)
 
     def _set_stop_button_style(self):
-        """Set button to stop style"""
+        """Set button to stop style - FIXED WITH PROPER HOVER EFFECTS"""
         self.start_button.setText("Stopp automatisering")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545 !important;
-                color: white !important;
+                background-color: #dc3545;
+                color: white;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -1502,7 +1505,14 @@ class AkademiTrackWindow(QMainWindow):
                 min-height: 20px;
             }
             QPushButton:hover {
-                background-color: #c82333 !important;
+                background-color: #8a010f;
+            }
+            QPushButton:pressed {
+                background-color: #66000a;
+            }
+            QPushButton:disabled {
+                background-color: #6c757d;
+                color: #dee2e6;
             }
         """)
 
