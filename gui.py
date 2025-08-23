@@ -293,9 +293,34 @@ class PostRequestWindow(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the POST request window UI"""
+        """Initialize the POST request window UI with responsive design and larger inputs"""
         self.setWindowTitle("Manual POST Request")
-        self.setGeometry(300, 300, 900, 700)
+        
+        # Get screen dimensions for responsive sizing
+        try:
+            app = QApplication.instance()
+            screen = app.primaryScreen().availableGeometry()
+            screen_width = screen.width()
+            screen_height = screen.height()
+            
+            # Calculate responsive size (40% of screen width, 65% of screen height)
+            window_width = max(700, min(900, int(screen_width * 0.45)))
+            window_height = max(600, min(750, int(screen_height * 0.70)))
+            
+            # Center the window
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+            
+            self.setGeometry(x, y, window_width, window_height)
+            
+        except Exception as e:
+            # Fallback to larger fixed size if screen detection fails
+            self.setGeometry(300, 300, 750, 650)
+        
+        # Set minimum and maximum sizes for better UX
+        self.setMinimumSize(650, 550)
+        self.setMaximumSize(1100, 900)
+        
         self.setStyleSheet("""
             QDialog {
                 background-color: white;
@@ -305,114 +330,163 @@ class PostRequestWindow(QDialog):
                 color: #212529;
                 font-size: 14px;
                 font-weight: 500;
+                margin-bottom: 4px;
             }
-            QLineEdit, QTextEdit {
+            QLineEdit {
                 background-color: #f8f9fa;
                 border: 1px solid #dee2e6;
-                border-radius: 8px;
-                padding: 8px;
-                font-size: 12px;
+                border-radius: 6px;
+                padding: 12px 16px;
+                font-size: 15px;
                 color: #495057;
+                margin-bottom: 8px;
+                min-height: 24px;
+            }
+            QLineEdit:focus {
+                border-color: #0066cc;
+                background-color: white;
             }
             QPushButton {
                 background-color: #0066cc;
                 color: white;
                 border: none;
                 border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 12px;
+                padding: 12px 18px;
+                font-size: 14px;
                 font-weight: 600;
+                min-height: 20px;
             }
             QPushButton:hover {
                 background-color: #0052a3;
+            }
+            QPushButton#closeButton {
+                background-color: #6c757d;
+            }
+            QPushButton#closeButton:hover {
+                background-color: #545b62;
             }
             QTextEdit#console {
                 background-color: #0b0c10;
                 color: #e6edf3;
                 font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
-                font-size: 12px;
+                font-size: 13px;
                 border: 1px solid #1f2833;
+                border-radius: 6px;
+                padding: 10px;
             }
         """)
 
         layout = QVBoxLayout()
-        layout.setSpacing(12)
+        layout.setSpacing(10)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Title
+        # Title with better spacing
         title = QLabel("Manual POST Request")
-        title.setFont(QFont("SF Pro Display", 18, QFont.Bold))
+        title.setFont(QFont("SF Pro Display", 16, QFont.Bold))
+        title.setStyleSheet("color: #212529; margin-bottom: 8px;")
         layout.addWidget(title)
 
-        # Form fields
-        form_layout = QVBoxLayout()
+        # Scrollable form area for better space usage
+        scroll_area = QWidget()
+        form_layout = QVBoxLayout(scroll_area)
+        form_layout.setSpacing(8)
         
-        # Fylkeid
-        form_layout.addWidget(QLabel("Fylke ID:"))
-        self.fylkeid_input = QLineEdit("00")
-        form_layout.addWidget(self.fylkeid_input)
+        # Create form fields in a more compact layout
+        fields = [
+            ("Fylke ID:", "fylkeid_input", "00"),
+            ("Skole ID:", "skoleid_input", "312"),
+            ("Plan Periode:", "planperi_input", "2025-26"),
+            ("ST Kode:", "stkode_input", "PB"),
+            ("Klasse Trinn:", "kl_trinn_input", "3"),
+            ("Klasse ID:", "kl_id_input", "A"),
+            ("K Navn:", "k_navn_input", "STU"),
+            ("Gruppe Nr:", "gruppe_nr_input", "$"),
+            ("Time Nr:", "timenr_input", "1")
+        ]
         
-        # Skoleid  
-        form_layout.addWidget(QLabel("Skole ID:"))
-        self.skoleid_input = QLineEdit("312")
-        form_layout.addWidget(self.skoleid_input)
+        # Create form in a grid-like layout for better space usage
+        form_grid = QVBoxLayout()
         
-        # Planperi
-        form_layout.addWidget(QLabel("Plan Periode:"))
-        self.planperi_input = QLineEdit("2025-26")
-        form_layout.addWidget(self.planperi_input)
+        for i in range(0, len(fields), 2):  # Process 2 fields per row
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(16)
+            
+            # First field in row
+            field_label, field_attr, field_default = fields[i]
+            left_widget = QWidget()
+            left_layout = QVBoxLayout(left_widget)
+            left_layout.setContentsMargins(0, 0, 0, 0)
+            left_layout.setSpacing(4)
+            
+            left_layout.addWidget(QLabel(field_label))
+            field_input = QLineEdit(field_default)
+            # FIXED: Increased height significantly for better readability
+            field_input.setFixedHeight(48)
+            field_input.setFont(QFont("SF Pro Text", 15))  # Explicit font size
+            setattr(self, field_attr, field_input)
+            left_layout.addWidget(field_input)
+            
+            row_layout.addWidget(left_widget)
+            
+            # Second field in row (if exists)
+            if i + 1 < len(fields):
+                field_label, field_attr, field_default = fields[i + 1]
+                right_widget = QWidget()
+                right_layout = QVBoxLayout(right_widget)
+                right_layout.setContentsMargins(0, 0, 0, 0)
+                right_layout.setSpacing(4)
+                
+                right_layout.addWidget(QLabel(field_label))
+                field_input = QLineEdit(field_default)
+                # FIXED: Increased height significantly for better readability
+                field_input.setFixedHeight(48)
+                field_input.setFont(QFont("SF Pro Text", 15))  # Explicit font size
+                setattr(self, field_attr, field_input)
+                right_layout.addWidget(field_input)
+                
+                row_layout.addWidget(right_widget)
+            else:
+                row_layout.addStretch()  # Fill remaining space if odd number of fields
+            
+            form_grid.addLayout(row_layout)
         
-        # Stkode
-        form_layout.addWidget(QLabel("ST Kode:"))
-        self.stkode_input = QLineEdit("PB")
-        form_layout.addWidget(self.stkode_input)
-        
-        # Kl_trinn
-        form_layout.addWidget(QLabel("Klasse Trinn:"))
-        self.kl_trinn_input = QLineEdit("3")
-        form_layout.addWidget(self.kl_trinn_input)
-        
-        # Kl_id
-        form_layout.addWidget(QLabel("Klasse ID:"))
-        self.kl_id_input = QLineEdit("A")
-        form_layout.addWidget(self.kl_id_input)
-        
-        # K_navn
-        form_layout.addWidget(QLabel("K Navn:"))
-        self.k_navn_input = QLineEdit("STU")
-        form_layout.addWidget(self.k_navn_input)
-        
-        # Gruppe_nr
-        form_layout.addWidget(QLabel("Gruppe Nr:"))
-        self.gruppe_nr_input = QLineEdit("$")
-        form_layout.addWidget(self.gruppe_nr_input)
-        
-        # Timenr
-        form_layout.addWidget(QLabel("Time Nr:"))
-        self.timenr_input = QLineEdit("1")
-        form_layout.addWidget(self.timenr_input)
-        
-        layout.addLayout(form_layout)
+        form_layout.addLayout(form_grid)
+        layout.addWidget(scroll_area)
 
-        # Buttons
+        # Buttons with better layout
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        button_layout.addStretch()
+        
         self.send_button = QPushButton("Send POST Request")
         self.send_button.clicked.connect(self.send_post_request)
+        self.send_button.setFixedHeight(44)  # Slightly larger button
         button_layout.addWidget(self.send_button)
 
         self.close_button = QPushButton("Close")
+        self.close_button.setObjectName("closeButton")
         self.close_button.clicked.connect(self.close)
+        self.close_button.setFixedHeight(44)  # Slightly larger button
         button_layout.addWidget(self.close_button)
 
         layout.addLayout(button_layout)
         
-        # Console output
-        layout.addWidget(QLabel("Response:"))
+        # Console output - takes remaining space
+        console_label = QLabel("Response:")
+        console_label.setFont(QFont("SF Pro Text", 13, QFont.Bold))
+        console_label.setStyleSheet("margin-top: 8px; margin-bottom: 4px;")
+        layout.addWidget(console_label)
+        
         self.console = QTextEdit()
         self.console.setObjectName("console")
         self.console.setReadOnly(True)
-        self.console.setMinimumHeight(200)
-        layout.addWidget(self.console)
+        
+        # Make console responsive to window size but don't let it dominate
+        self.console.setMinimumHeight(150)
+        self.console.setMaximumHeight(200)
+        
+        layout.addWidget(self.console, 1)  # Give console the remaining space
 
         self.setLayout(layout)
 
@@ -491,7 +565,7 @@ class PostRequestWindow(QDialog):
             try:
                 response_data = response.json()
                 self.log("📋 Complete Response JSON:")
-                self.log("=" * 80)
+                self.log("=" * 40)
                 
                 # FIXED: Output complete JSON without any limits
                 complete_json = json.dumps(response_data, indent=2, ensure_ascii=False)
@@ -504,7 +578,7 @@ class PostRequestWindow(QDialog):
                     # Force GUI update for each chunk
                     self.console.repaint()
                     
-                self.log("=" * 80)
+                self.log("=" * 40)
                 
             except Exception as e:
                 self.log(f"📋 Raw Response Text: {response.text}")
@@ -519,6 +593,15 @@ class PostRequestWindow(QDialog):
             self.log(f"❌ Error sending POST request: {e}")
             import traceback
             self.log(f"📋 Full error: {traceback.format_exc()}")
+
+    def resizeEvent(self, event):
+        """Handle window resize to adjust console size"""
+        super().resizeEvent(event)
+        # Keep console at a reasonable fixed size instead of percentage
+        if hasattr(self, 'console'):
+            # Fixed console height that doesn't change much with window size
+            self.console.setMinimumHeight(150)
+            self.console.setMaximumHeight(220)
 
 class SimpleButton(QPushButton):
     """Clean, simple button"""
