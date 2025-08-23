@@ -14,7 +14,9 @@ try:
     QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
     )
     from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
-    from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
+    from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QCheckBox
+
 except ImportError:
     print("PyQt5 is required. Please install it with: pip install PyQt5")
     sys.exit(1)
@@ -25,8 +27,327 @@ except ImportError:
     print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
 
+class WelcomeDialog(QDialog):
+    """Welcome dialog for first-time users - IMPROVED: Responsive sizing and proper centering"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Velkommen til AkademiTrack")
+        self.setModal(True)
+        
+        # FIXED: Responsive sizing based on screen dimensions
+        self.setup_responsive_size()
+        self.init_ui()
+        
+    def setup_responsive_size(self):
+        """Setup responsive dialog size based on screen dimensions"""
+        try:
+            # Get screen geometry
+            from PyQt5.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is None:
+                # Fallback if no app instance
+                self.setFixedSize(900, 700)
+                return
+                
+            screen = app.primaryScreen().availableGeometry()
+            screen_width = screen.width()
+            screen_height = screen.height()
+            
+            # Calculate responsive size (60-80% of screen, with reasonable limits)
+            min_width, max_width = 800, 1200
+            min_height, max_height = 600, 900
+            
+            # Use 65% of screen width and 75% of screen height
+            target_width = int(screen_width * 0.65)
+            target_height = int(screen_height * 0.75)
+            
+            # Clamp to reasonable limits
+            final_width = max(min_width, min(max_width, target_width))
+            final_height = max(min_height, min(max_height, target_height))
+            
+            self.setFixedSize(final_width, final_height)
+            
+            # Center on screen immediately without blinking
+            x = (screen_width - final_width) // 2
+            y = (screen_height - final_height) // 2
+            self.move(x, y)
+            
+        except Exception as e:
+            # Fallback to reasonable default size
+            self.setFixedSize(900, 700)
+            # Try to center with fallback positioning
+            try:
+                from PyQt5.QtWidgets import QDesktopWidget
+                desktop = QDesktopWidget()
+                screen_rect = desktop.screenGeometry()
+                x = (screen_rect.width() - 900) // 2
+                y = (screen_rect.height() - 700) // 2
+                self.move(max(0, x), max(0, y))
+            except:
+                pass
+        
+    def init_ui(self):
+        """Initialize the welcome dialog UI with responsive text sizing"""
+        # Get current dialog size for responsive text scaling
+        dialog_width = self.width()
+        dialog_height = self.height()
+        
+        # Calculate scaling factors
+        width_scale = dialog_width / 1000.0  # Base width of 1000px
+        height_scale = dialog_height / 800.0  # Base height of 800px
+        scale_factor = min(width_scale, height_scale)  # Use smaller factor to prevent overflow
+        
+        # Responsive font sizes
+        title_size = max(18, int(28 * scale_factor))
+        subtitle_size = max(14, int(18 * scale_factor))
+        content_size = max(12, int(16 * scale_factor))
+        button_size = max(12, int(16 * scale_factor))
+        
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: white;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            }}
+            QLabel {{
+                color: #212529;
+            }}
+            QTextEdit {{
+                background-color: #f8f9fa;
+                color: #495057;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: {max(12, int(20 * scale_factor))}px;
+                font-size: {content_size}px;
+                line-height: 1.6;
+            }}
+            QPushButton {{
+                background-color: #0066cc;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: {max(10, int(14 * scale_factor))}px {max(18, int(28 * scale_factor))}px;
+                font-size: {button_size}px;
+                font-weight: 600;
+                min-height: {max(16, int(24 * scale_factor))}px;
+            }}
+            QPushButton:hover {{
+                background-color: #0052a3;
+            }}
+            QPushButton#secondaryButton {{
+                background-color: #6c757d;
+            }}
+            QPushButton#secondaryButton:hover {{
+                background-color: #545b62;
+            }}
+            QCheckBox {{
+                font-size: {max(11, int(14 * scale_factor))}px;
+                color: #495057;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        # Responsive spacing and margins
+        spacing = max(20, int(30 * scale_factor))
+        margin = max(30, int(50 * scale_factor))
+        layout.setSpacing(spacing)
+        layout.setContentsMargins(margin, margin, margin, margin)
+        
+        # Header with responsive fonts
+        title = QLabel("🎓 Velkommen til AkademiTrack")
+        title.setFont(QFont("SF Pro Display", title_size, QFont.Bold))
+        title.setStyleSheet("color: #0066cc; margin-bottom: 20px;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        subtitle = QLabel("Automatisk oppmøteregistrering for iSkole")
+        subtitle.setFont(QFont("SF Pro Text", subtitle_size))
+        subtitle.setStyleSheet("color: #6c757d; margin-bottom: 30px;")
+        subtitle.setAlignment(Qt.AlignCenter)
+        layout.addWidget(subtitle)
+        
+        # Instructions text with responsive content
+        instructions_text = QTextEdit()
+        instructions_text.setReadOnly(True)
+        # Responsive height (40-60% of dialog height)
+        text_height = max(300, int(dialog_height * 0.5))
+        instructions_text.setMaximumHeight(text_height)
+        
+        # Responsive font sizes in HTML content
+        html_title_size = max(16, int(22 * scale_factor))
+        html_content_size = max(12, int(16 * scale_factor))
+        html_list_size = max(12, int(16 * scale_factor))
+        
+        instructions_content = f"""
+<div style="font-size: {html_content_size}px; line-height: 1.7;">
+<h3 style="color: #0066cc; font-size: {html_title_size}px; margin-bottom: 15px;">Hva gjør AkademiTrack?</h3>
+<p style="margin-bottom: 18px; font-size: {html_content_size}px;">AkademiTrack automatiserer oppmøteregistrering for STU-timer i iSkole systemet. Programmet:</p>
+<ul style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
+<li style="margin-bottom: 12px;"><b>🔍 Overvåker timeplan</b> - Henter automatisk dagens STU-timer</li>
+<li style="margin-bottom: 12px;"><b>⏰ Registrerer oppmøte</b> - Registrerer deg automatisk i registreringsvinduet</li>
+<li style="margin-bottom: 12px;"><b>🎯 Intelligent timing</b> - Bare aktiv under STU-timer og registreringsperioder</li>
+<li style="margin-bottom: 12px;"><b>📱 Notifikasjoner</b> - Gir beskjed når registrering er fullført</li>
+</ul>
+
+<h3 style="color: #0066cc; font-size: {html_title_size}px; margin-top: 30px; margin-bottom: 15px;">Slik bruker du programmet:</h3>
+<ol style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
+<li style="margin-bottom: 15px;"><b>Oppsett og innlogging:</b> Klikk først på "Oppsett og innlogging" for å logge inn i iSkole. Etter du har logget inn på iSkole så kommer nettleseren til å lukke seg automatisk. Hvis du allerede har nettleseren åpen så lukkes den automatisk.</li>
+<li style="margin-bottom: 15px;"><b>Start automatisering:</b> Klikk på "Start automatisering" når du er klar</li>
+<li style="margin-bottom: 15px;"><b>La det kjøre:</b> Programmet kjører i bakgrunnen og registrerer automatisk</li>
+<li style="margin-bottom: 15px;"><b>Stopp når ferdig:</b> Stopper automatisk når alle timer er fullført</li>
+</ol>
+
+<h3 style="color: #dc3545; font-size: {html_title_size}px; margin-top: 30px; margin-bottom: 15px;">⚠️ Viktig informasjon:</h3>
+<ul style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
+<li style="margin-bottom: 12px;">Programmet fungerer kun for <b>STU-timer</b> (studietimer)</li>
+<li style="margin-bottom: 12px;">Du må ha tilgang til iSkole med Feide-innlogging</li>
+<li style="margin-bottom: 12px;">Programmet kan kjøre i bakgrunnen når det er minimert</li>
+<li style="margin-bottom: 12px;">Bruk "Innstillinger" for å se detaljerte logger og teste manuell registrering</li>
+</ul>
+
+<p style="color: #28a745; font-weight: bold; font-size: {int(html_content_size * 1.1)}px; margin-top: 30px; text-align: center; padding: 20px; background-color: #d4edda; border-radius: 10px; border: 1px solid #c3e6cb;">
+✅ Klar til å starte? Klikk "Forstått, start programmet" nedenfor!
+</p>
+</div>
+        """
+        
+        instructions_text.setHtml(instructions_content)
+        layout.addWidget(instructions_text)
+        
+        # Don't show again checkbox
+        self.dont_show_checkbox = QCheckBox("Ikke vis denne meldingen igjen")
+        self.dont_show_checkbox.setStyleSheet("margin-top: 15px;")
+        layout.addWidget(self.dont_show_checkbox)
+        
+        # Buttons with responsive sizing
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        self.close_button = QPushButton("Lukk")
+        self.close_button.setObjectName("secondaryButton")
+        self.close_button.clicked.connect(self.close_app)
+        button_layout.addWidget(self.close_button)
+        
+        self.continue_button = QPushButton("Forstått, start programmet")
+        self.continue_button.clicked.connect(self.continue_to_app)
+        button_layout.addWidget(self.continue_button)
+        
+        layout.addLayout(button_layout)
+        
+    def close_app(self):
+        """Close the entire application"""
+        self.reject()
+        
+    def continue_to_app(self):
+        """Continue to main application"""
+        self.accept()
+
+class SettingsManager:
+    """Manages application settings including first-time user experience"""
+    
+    def __init__(self):
+        self.base_dir = Path(__file__).resolve().parent
+        self.settings_file = self.base_dir / "settings.json"
+        self.default_settings = {
+            "first_time_user": True,
+            "show_welcome_dialog": True,
+            "window_position": {"x": 200, "y": 200},
+            "window_size": {"width": 600, "height": 440},
+            "auto_start_on_login_success": False,
+            "notification_duration": 5000,
+            "log_level": "INFO",
+            "theme": "light",
+            "check_interval_seconds": 60,
+            "max_registration_attempts": 3
+        }
+        self.settings = self.load_settings()
+    
+    def load_settings(self):
+        """Load settings from file or create with defaults"""
+        try:
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    loaded_settings = json.load(f)
+                
+                # Merge with defaults to handle new settings in updates
+                settings = self.default_settings.copy()
+                settings.update(loaded_settings)
+                
+                # Save back to include any new defaults
+                self.save_settings(settings)
+                return settings
+            else:
+                # First time - create with defaults
+                self.save_settings(self.default_settings)
+                return self.default_settings.copy()
+                
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+            return self.default_settings.copy()
+    
+    def save_settings(self, settings=None):
+        """Save settings to file"""
+        try:
+            if settings is None:
+                settings = self.settings
+                
+            self.settings_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+            return False
+    
+    def get(self, key, default=None):
+        """Get a setting value"""
+        return self.settings.get(key, default)
+    
+    def set(self, key, value):
+        """Set a setting value and save"""
+        self.settings[key] = value
+        self.save_settings()
+    
+    def is_first_time_user(self):
+        """Check if this is a first-time user"""
+        return self.get("first_time_user", True)
+    
+    def should_show_welcome(self):
+        """Check if welcome dialog should be shown"""
+        return self.get("show_welcome_dialog", True)
+    
+    def mark_welcome_shown(self, dont_show_again=False):
+        """Mark welcome dialog as shown"""
+        self.set("first_time_user", False)
+        if dont_show_again:
+            self.set("show_welcome_dialog", False)
+    
+    def save_window_geometry(self, window):
+        """Save window position and size"""
+        try:
+            pos = window.pos()
+            size = window.size()
+            self.settings["window_position"] = {"x": pos.x(), "y": pos.y()}
+            self.settings["window_size"] = {"width": size.width(), "height": size.height()}
+            self.save_settings()
+        except Exception as e:
+            print(f"Error saving window geometry: {e}")
+    
+    def restore_window_geometry(self, window):
+        """Restore window position and size"""
+        try:
+            pos = self.settings.get("window_position", {"x": 200, "y": 200})
+            size = self.settings.get("window_size", {"width": 600, "height": 440})
+            
+            window.resize(size["width"], size["height"])
+            window.move(pos["x"], pos["y"])
+        except Exception as e:
+            print(f"Error restoring window geometry: {e}")
+
 class NotificationWidget(QWidget):
-    """Professional notification widget with modern design and smooth animations"""
+    """Professional notification widget with modern design and smooth animations - FIXED TOP-ONLY STACKING"""
     
     def __init__(self, message, notification_type="info", duration=5000, parent=None):
         super().__init__(parent)
@@ -209,30 +530,28 @@ class NotificationWidget(QWidget):
         self.fade_animation.finished.connect(self.close)
         
     def show_notification(self):
-        """Show notification with enhanced positioning and stacking"""
+        """FIXED: Show notification at top position only - hide existing notifications first"""
         try:
             app = QApplication.instance()
             screen = app.primaryScreen().availableGeometry()
             
-            # Better positioning - account for taskbar and multiple notifications
-            margin = 20
-            notification_spacing = 100  # Space between stacked notifications
-            
-            # Calculate position considering existing notifications
+            # FIXED: Hide all existing notifications to make room at the top
             if hasattr(app, '_active_notifications'):
-                existing_count = len([n for n in app._active_notifications if n.isVisible()])
+                for notification in app._active_notifications[:]:  # Copy list to avoid modification during iteration
+                    if notification != self and notification.isVisible():
+                        try:
+                            notification.hide_notification()
+                        except:
+                            pass
+                app._active_notifications = []
             else:
                 app._active_notifications = []
-                existing_count = 0
             
+            # FIXED: Always position at the same top location
+            margin = 20
             start_x = screen.right()
             end_x = screen.right() - self.width() - margin
-            y = screen.top() + margin + (existing_count * notification_spacing)
-            
-            # Ensure notification doesn't go off-screen
-            max_y = screen.bottom() - self.height() - margin
-            if y > max_y:
-                y = screen.top() + margin  # Reset to top if too many notifications
+            y = screen.top() + margin  # FIXED: Always at the top
             
             # Set initial position and show
             self.setGeometry(start_x, y, self.width(), self.height())
@@ -263,15 +582,45 @@ class NotificationWidget(QWidget):
         self.fade_animation.start()
     
     def closeEvent(self, event):
-        """Clean up when notification closes"""
-        try:
-            # Remove from active notifications list
-            app = QApplication.instance()
-            if hasattr(app, '_active_notifications') and self in app._active_notifications:
-                app._active_notifications.remove(self)
-        except:
-            pass
-        event.accept()
+        """Handle window close - now saves settings"""
+        if self.is_running:
+            reply = QMessageBox.question(
+                self, 
+                'Exit', 
+                'Automatisering kjører. Stopp og avslutt?',
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self.stop_automation()
+                time.sleep(0.5)
+                
+                # Save window geometry before closing
+                if hasattr(self, 'settings_manager'):
+                    self.settings_manager.save_window_geometry(self)
+                
+                try:
+                    if self._orig_stdout:
+                        sys.stdout = self._orig_stdout
+                    if self._orig_stderr:
+                        sys.stderr = self._orig_stderr
+                except Exception:
+                    pass
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            # Save window geometry before closing
+            if hasattr(self, 'settings_manager'):
+                self.settings_manager.save_window_geometry(self)
+                
+            try:
+                if self._orig_stdout:
+                    sys.stdout = self._orig_stdout
+                if self._orig_stderr:
+                    sys.stderr = self._orig_stderr
+            except Exception:
+                pass
+            event.accept()
     
     def mousePressEvent(self, event):
         """Close notification when clicked"""
@@ -897,13 +1246,13 @@ class SchedulerThread(QThread):
     
     def run(self):
         try:
-            self.status_signal.emit("Running")
+            self.status_signal.emit("Kjører")
             if self.bot.running:
                 self.bot.run_scheduler()
-            self.status_signal.emit("Stopped")
+            self.status_signal.emit("Stoppet")
         except Exception as e:
-            self.message_signal.emit(f"Scheduler error: {e}")
-            self.status_signal.emit("Error")
+            self.message_signal.emit(f"Scheduler feil: {e}")
+            self.status_signal.emit("Feil")
     
     def stop(self):
         """Stop the thread gracefully"""
@@ -913,7 +1262,7 @@ class SchedulerThread(QThread):
 
 
 class AkademiTrackWindow(QMainWindow):
-    """Simple, clean main window with notification system"""
+    """Simple, clean main window with notification system - FIXED FOR TOP-ONLY NOTIFICATIONS"""
     console_signal = pyqtSignal(str)
     
     def __init__(self):
@@ -943,23 +1292,46 @@ class AkademiTrackWindow(QMainWindow):
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
     
-    
-
     def show_notification(self, message, notification_type="info", duration=5000):
-        """Show enhanced professional notification with better stacking"""
+        """FIXED: Show enhanced professional notification with top-only positioning and better duplicate prevention"""
         try:
-            # Prevent spam notifications
+            # FIXED: Enhanced spam prevention with special handling for automation messages
             current_time = time.time()
-            message_key = f"{message}_{notification_type}"
             
             if not hasattr(self, '_last_notifications'):
                 self._last_notifications = {}
             
-            # Check for duplicate within 3 seconds
+            # FIXED: Better deduplication logic for stop messages
+            message_lower = message.lower().strip()
+            
+            # Special handling for automation start/stop messages
+            automation_keywords = {
+                'start': ['automatisering startet', 'automation started', 'startet'],
+                'stop': ['automatisering stoppet', 'automation stopped', 'stoppet', 'scheduler stopped']
+            }
+            
+            # Determine if this is an automation message
+            is_start_message = any(keyword in message_lower for keyword in automation_keywords['start'])
+            is_stop_message = any(keyword in message_lower for keyword in automation_keywords['stop'])
+            
+            if is_start_message or is_stop_message:
+                # For automation messages, use type-specific keys with shorter cooldown
+                action_type = 'start' if is_start_message else 'stop'
+                message_key = f"automation_{action_type}_{notification_type}"
+                cooldown = 2.0  # 2 seconds cooldown for automation messages
+            else:
+                # For other messages, use content-based deduplication
+                message_key = f"{message_lower}_{notification_type}"
+                cooldown = 3.0
+            
+            # Check for duplicate within cooldown period
             if message_key in self._last_notifications:
-                if current_time - self._last_notifications[message_key] < 3.0:
+                time_since_last = current_time - self._last_notifications[message_key]
+                if time_since_last < cooldown:
+                    print(f"Notification blocked (duplicate): {message} (last shown {time_since_last:.1f}s ago)")
                     return
             
+            # Update timestamp
             self._last_notifications[message_key] = current_time
             
             # Create and show notification
@@ -967,12 +1339,14 @@ class AkademiTrackWindow(QMainWindow):
             notification.show_notification()
             
             # Clean up old notification references periodically
-            if len(self._last_notifications) > 50:  # Keep only recent ones
+            if len(self._last_notifications) > 50:
                 cutoff_time = current_time - 300  # 5 minutes
                 self._last_notifications = {
                     k: v for k, v in self._last_notifications.items() 
                     if v > cutoff_time
                 }
+            
+            print(f"Notification shown: {message} ({notification_type})")
             
         except Exception as e:
             print(f"Error showing notification: {e}")
@@ -1232,7 +1606,7 @@ class AkademiTrackWindow(QMainWindow):
                 self.show_error(f"Failed to install packages: {e}")
     
     def log_message(self, message):
-        """Enhanced log message handler with professional notifications"""
+        """FIXED: Enhanced log message handler with better duplicate prevention for stop notifications"""
         try:
             should_notify = False
             notification_type = "info"
@@ -1289,20 +1663,41 @@ class AkademiTrackWindow(QMainWindow):
                 notification_type = "warning"
                 notification_message = "Økt utløpt - Kjør oppsett på nytt"
             
-            # AUTOMATION STATUS
-            elif '🚀 automatisering startet' in message_lower:
+            # AUTOMATION STATUS - FIXED: Better detection for start messages
+            elif ('🚀 automatisering startet' in message_lower or 
+                ('automation' in message_lower and 'started' in message_lower) or
+                ('scheduler started' in message_lower)):
                 should_notify = True
                 notification_type = "info"
                 notification_message = "Automatisering startet"
             
-            elif 'scheduler stopped' in message_lower:
-                should_notify = True
-                notification_type = "info"
-                notification_message = "Automatisering stoppet"
+            # FIXED: Consolidated stop detection to prevent duplicates
+            elif (any(stop_phrase in message_lower for stop_phrase in [
+                'scheduler stopped',
+                '🛑 scheduler stopped', 
+                '🛑 stopping scheduler',
+                'automatisering stoppet'
+            ])):
+                # FIXED: Only show stop notification once per stop event
+                if not hasattr(self, '_current_stop_event_time'):
+                    self._current_stop_event_time = time.time()
+                    should_notify = True
+                    notification_type = "error"  # Red color for stopped
+                    notification_message = "Automatisering stoppet"
+                elif time.time() - self._current_stop_event_time > 5.0:
+                    # Reset after 5 seconds to allow new stop events
+                    self._current_stop_event_time = time.time()
+                    should_notify = True
+                    notification_type = "error"
+                    notification_message = "Automatisering stoppet"
+                else:
+                    # Block duplicate stop notifications within 5 seconds
+                    print(f"Blocked duplicate stop notification: {message}")
             
             # Show professional notification
             if should_notify and notification_message:
                 try:
+                    print(f"Triggering notification: {notification_message} ({notification_type})")
                     self.show_notification(notification_message, notification_type)
                 except Exception as e:
                     print(f"Notification error: {e}")
@@ -1335,10 +1730,13 @@ class AkademiTrackWindow(QMainWindow):
                 """)
                 QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
             
-            elif 'scheduler stopped' in message_lower:
+            # FIXED: Better status indicator updates with specific conditions
+            elif ('scheduler stopped' in message_lower and 
+                  not hasattr(self, '_stopping_in_progress')):
                 self.status_indicator.set_status("Klar", "#6c757d")
-            elif 'started' in message_lower or 'automatisering starta' in message_lower:
-                self.status_indicator.set_status("Running", "#28a745")
+            elif (('started' in message_lower and 'automatisering' in message_lower) or 
+                  'scheduler started' in message_lower):
+                self.status_indicator.set_status("Kjører", "#28a745")
             elif 'setup completed' in message_lower:
                 self.status_indicator.set_status("Klar", "#28a745")
             elif 'failed' in message_lower:
@@ -1386,31 +1784,46 @@ class AkademiTrackWindow(QMainWindow):
             self.show_error("Oppsett mislyktes. Prøv igjen.")
     
     def toggle_automation(self):
-        """Toggle automation - COMPLETELY CRASH PROOF"""
+        """Toggle automation - FIXED for better notification consistency"""
         try:
-            # Prevent multiple rapid clicks
+            # FIXED: Allow quick actions but ensure notifications show
             if hasattr(self, '_processing_any_action') and self._processing_any_action:
-                print("Action already in progress, ignoring click...")
-                return
+                if self.is_running:
+                    # Allow stop even if action is in progress
+                    self._processing_any_action = False
+                    print("Forcing stop action...")
+                else:
+                    print("Start action already in progress, ignoring...")
+                    return
                     
             self._processing_any_action = True
-            self.start_button.setEnabled(False)
             
             if not self.is_running:
                 print("Toggle: Starting automation...")
+                self.start_button.setEnabled(False)
                 self.start_button.setText("Starter...")
-                self._safe_start_automation()
+                
+                # Clear any previous stop event timing
+                if hasattr(self, '_current_stop_event_time'):
+                    delattr(self, '_current_stop_event_time')
+                
+                # FIXED: Add small delay to ensure UI updates and clear previous state
+                QTimer.singleShot(100, self._safe_start_automation)
             else:
                 print("Toggle: Stopping automation...")  
-                self.start_button.setText("Stopper...")
+                self.start_button.setEnabled(False)
                 self._stopping_in_progress = True
-                self._safe_stop_automation()
+                
+                # FIXED: Add small delay to ensure UI updates and clear previous state
+                QTimer.singleShot(100, self._safe_stop_automation)
                     
         except Exception as e:
             print(f"CRITICAL ERROR in toggle_automation: {e}")
             self._emergency_reset()
         finally:
-            QTimer.singleShot(1000, self._release_action_lock)
+            # FIXED: Shorter delay for responsiveness
+            QTimer.singleShot(500, self._release_action_lock)
+
 
     def start_automation(self):
         """Public start method - delegates to safe internal method"""
@@ -1418,8 +1831,16 @@ class AkademiTrackWindow(QMainWindow):
         self._safe_start_automation()
 
     def _safe_start_automation(self):
-        """Internal safe start method with better cookie handling"""
+        """Internal safe start method with guaranteed notifications"""
         try:
+            # FIXED: Clear any previous notification state
+            if hasattr(self, '_last_notifications'):
+                # Remove old automation notifications to allow new ones
+                keys_to_remove = [k for k in self._last_notifications.keys() 
+                                if 'automatisering' in k.lower() or 'automation' in k.lower()]
+                for key in keys_to_remove:
+                    del self._last_notifications[key]
+            
             # Check cookies with better error handling
             cookies_ok = False
             cookies_exist = os.path.exists(self.bot.cookies_file)
@@ -1428,18 +1849,17 @@ class AkademiTrackWindow(QMainWindow):
                 try:
                     if self.bot.load_cookies_from_file() and self.bot.test_cookies():
                         cookies_ok = True
-                        self.log_message("✅ Using existing valid cookies")  # FIXED: log -> log_message
+                        self.log_message("✅ Using existing valid cookies")
                     else:
-                        self.log_message("🔑 Existing cookies are invalid")  # FIXED: log -> log_message
+                        self.log_message("🔑 Existing cookies are invalid")
                 except Exception as e:
-                    self.log_message(f"Cookie validation error: {e}")  # FIXED: log -> log_message
+                    self.log_message(f"Cookie validation error: {e}")
             else:
-                self.log_message("🔑 No cookies file found")  # FIXED: log -> log_message
+                self.log_message("🔑 No cookies file found")
 
             if not cookies_ok:
-                # Show specific notification for first-time setup needed
                 self.show_notification("Trenger oppsett først", "warning", 3000)
-                self.log_message("❌ Please run 'Oppsett og innlogging' first before starting automation")  # FIXED: log -> log_message
+                self.log_message("❌ Please run 'Oppsett og innlogging' first before starting automation")
                 self._reset_start_button()
                 return
 
@@ -1451,7 +1871,7 @@ class AkademiTrackWindow(QMainWindow):
             
             # Create new thread
             self.scheduler_thread = SchedulerThread(self.bot)
-            self.scheduler_thread.message_signal.connect(self.log_message)  # This is correct
+            self.scheduler_thread.message_signal.connect(self.log_message)
             self.scheduler_thread.status_signal.connect(self.update_status)
             self.scheduler_thread.start()
 
@@ -1461,13 +1881,13 @@ class AkademiTrackWindow(QMainWindow):
             self.setup_button.setEnabled(False)
             self.status_indicator.set_status("Kjører", "#28a745")
             
-            # Show start notification only once
-            self.show_notification("Automatisering startet", "info", 2000)
+            # FIXED: Ensure start notification always shows with unique timing
+            self.log_message("🚀 Automatisering startet")
             
-            print("Safe start completed")  # Use print for debug, not self.log
+            print("Safe start completed")
             
         except Exception as e:
-            print(f"Error in _safe_start_automation: {e}")  # Use print for debug
+            print(f"Error in _safe_start_automation: {e}")
             self.show_notification("Feil ved oppstart", "error", 3000)
             self._emergency_reset()
 
@@ -1478,38 +1898,59 @@ class AkademiTrackWindow(QMainWindow):
         self._safe_stop_automation()
 
     def _safe_stop_automation(self):
-        """Internal safe stop method - BULLETPROOF"""
+        """Internal safe stop method with guaranteed notifications"""
         try:
-            print("Safe stop starting...")  # Use print for debug
+            print("Safe stop starting...")
+            
+            # FIXED: Clear any previous notification state for stop messages
+            if hasattr(self, '_last_notifications'):
+                keys_to_remove = [k for k in self._last_notifications.keys() 
+                                if 'stoppet' in k.lower() or 'stopped' in k.lower()]
+                for key in keys_to_remove:
+                    del self._last_notifications[key]
             
             # Set stopping state immediately
             self.is_running = False
-            self.status_indicator.set_status("Stopper...", "#ffc107")
             
-            # Stop bot
+            # Update button immediately
+            self.start_button.setEnabled(False)
+            
+            # Stop bot immediately
             if hasattr(self, 'bot') and self.bot:
                 try:
                     self.bot.running = False
                     self.bot.stop_scheduler()
-                    print("Bot stopped")  # Use print for debug
-                except:
-                    print("Error stopping bot, continuing...")  # Use print for debug
+                    print("Bot stopped")
+                except Exception as e:
+                    print(f"Error stopping bot: {e}")
             
-            # Force kill thread
+            # Force kill thread immediately
             self._force_kill_scheduler_thread()
             
+            # FIXED: Complete stop process after very short delay
+            QTimer.singleShot(200, self._complete_stop_process)
+            
+            print("Safe stop initiated")
+            
+        except Exception as e:
+            print(f"Error in _safe_stop_automation: {e}")
+            self._emergency_reset()
+
+    def _complete_stop_process(self):
+        """Complete the stop process with guaranteed notification"""
+        try:
             # Reset UI
             self._reset_start_button()
             self.setup_button.setEnabled(True)
-            self.status_indicator.set_status("Stoppet", "#6c757d")
+            self.status_indicator.set_status("Stoppet", "#8a010f")
             
-            # Show stop notification
-            self.show_notification("Automatisering stoppet", "info", 2000)
+            # FIXED: Ensure stop notification always shows
+            self.log_message("🛑 Scheduler stopped")
             
-            print("Safe stop completed")  # Use print for debug
+            print("Stop process completed")
             
         except Exception as e:
-            print(f"Error in _safe_stop_automation: {e}")  # Use print for debug
+            print(f"Error completing stop process: {e}")
             self._emergency_reset()
 
     def _force_kill_scheduler_thread(self):
@@ -1600,14 +2041,16 @@ class AkademiTrackWindow(QMainWindow):
         """)
 
     def _release_action_lock(self):
-        """Release the action lock and stop flag"""
+        """Release the action lock and stop flag - FASTER"""
         try:
             self._processing_any_action = False
             if hasattr(self, '_stopping_in_progress'):
                 self._stopping_in_progress = False
             print("Action lock released")
-        except:
-            pass
+        except Exception as e:
+            print(f"Error releasing lock: {e}")
+            # Force clear anyway
+            self._processing_any_action = False
 
     def _emergency_reset(self):
         """Emergency reset all states"""
@@ -1653,9 +2096,9 @@ class AkademiTrackWindow(QMainWindow):
             return
             
         if status == "Kjører":
-            self.status_indicator.set_status("Running", "#28a745")
+            self.status_indicator.set_status("Kjører", "#28a745")
         elif status == "Feil":
-            self.status_indicator.set_status("Error", "#dc3545")
+            self.status_indicator.set_status("Feil", "#dc3545")
             self.stop_automation()
         elif status == "Stoppet":
             self.stop_automation()
@@ -1718,26 +2161,63 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Main function"""
+    """Main function with welcome dialog - FIXED: Always center window properly"""
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     
     try:
-        window = AkademiTrackWindow()
-        window.show()
+        # Initialize settings manager
+        settings_manager = SettingsManager()
         
-        screen = app.primaryScreen().geometry()
-        window.move(
-            (screen.width() - window.width()) // 2,
-            (screen.height() - window.height()) // 2
-        )
+        # Show welcome dialog for first-time users
+        if settings_manager.should_show_welcome():
+            welcome_dialog = WelcomeDialog()
+            
+            if welcome_dialog.exec_() == QDialog.Accepted:
+                # User clicked "Forstått, start programmet"
+                dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
+                settings_manager.mark_welcome_shown(dont_show_again)
+            else:
+                # User clicked "Lukk" or closed dialog
+                print("User cancelled setup")
+                sys.exit(0)
+        
+        # Create main window (don't show yet)
+        window = AkademiTrackWindow()
+        window.settings_manager = settings_manager
+        
+        # FIXED: Always center the window regardless of saved geometry
+        try:
+            screen = app.primaryScreen().availableGeometry()
+            window_width = window.width()
+            window_height = window.height()
+            
+            # Calculate center position
+            x = (screen.width() - window_width) // 2
+            y = (screen.height() - window_height) // 2
+            
+            # Ensure window doesn't go off-screen
+            x = max(0, min(x, screen.width() - window_width))
+            y = max(0, min(y, screen.height() - window_height))
+            
+            # Set position before showing
+            window.move(x, y)
+            
+            print(f"Window centered at position: {x}, {y}")
+            
+        except Exception as e:
+            print(f"Could not center window: {e}")
+            # Fallback to default position
+            window.move(200, 200)
+        
+        # Show window after positioning is complete
+        window.show()
         
         sys.exit(app.exec_())
         
     except Exception as e:
-        print(f"Kunne ikke starte: {e}")
+        print(f"Could not start application: {e}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
