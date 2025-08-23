@@ -891,10 +891,9 @@ class StatusIndicator(QLabel):
     def __init__(self):
         super().__init__("● Klar") 
         
-        # FIXED: Set consistent minimum and maximum sizes
-        self.setMinimumSize(140, 32)  # Minimum width and height
-        self.setMaximumHeight(40)     # Prevent vertical growth
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)  # Fixed size policy
+        # FIXED: Force exact size - never changes
+        self.setFixedSize(140, 36)  # Exact fixed size
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         # Set initial style
         self.setStyleSheet("""
@@ -904,10 +903,8 @@ class StatusIndicator(QLabel):
                 font-weight: bold;
                 padding: 8px 12px;
                 background-color: #f8f9fa;
-                border-radius: 20px;
+                border-radius: 18px;
                 border: 1px solid #dee2e6;
-                min-width: 120px;
-                max-height: 32px;
             }
         """)
         
@@ -915,10 +912,10 @@ class StatusIndicator(QLabel):
         self.setAlignment(Qt.AlignCenter)
         
     def set_status(self, status, color="#6c757d"):
-        """Set status text and color - FIXED METHOD with consistent sizing"""
+        """Set status text and color - FIXED METHOD with exact sizing"""
         self.setText(f"● {status}")
         
-        # FIXED: All styles include size constraints to prevent shrinking
+        # FIXED: Remove all size properties from CSS - rely on setFixedSize only
         if color == "#28a745":  # Green/Running
             style = """
                 QLabel {
@@ -927,10 +924,8 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #d4edda;
-                    border-radius: 20px;
+                    border-radius: 18px;
                     border: 1px solid #c3e6cb;
-                    min-width: 120px;
-                    max-height: 32px;
                 }
             """
         elif color == "#dc3545":  # Red/Error
@@ -941,10 +936,8 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #f8d7da;
-                    border-radius: 20px;
+                    border-radius: 18px;
                     border: 1px solid #f5c6cb;
-                    min-width: 120px;
-                    max-height: 32px;
                 }
             """
         elif color == "#ffc107":  # Yellow/Warning
@@ -955,10 +948,8 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #fff3cd;
-                    border-radius: 20px;
+                    border-radius: 18px;
                     border: 1px solid #ffeaa7;
-                    min-width: 120px;
-                    max-height: 32px;
                 }
             """
         else:  # Default gray
@@ -969,18 +960,15 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #f8f9fa;
-                    border-radius: 20px;
+                    border-radius: 18px;
                     border: 1px solid #dee2e6;
-                    min-width: 120px;
-                    max-height: 32px;
                 }
             """
         
         self.setStyleSheet(style)
         
-        # FIXED: Force size update after style change
-        self.updateGeometry()
-        self.repaint()
+        # FIXED: Ensure size never changes
+        self.setFixedSize(140, 36)  # Force same size after every update
 
 class SettingsWindow(QWidget):
     """Settings window as a separate independent window"""
