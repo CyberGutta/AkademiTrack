@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -55,27 +55,71 @@ jobs:
           echo 'Python files:'
           ls -la *.py
 
+      - name: Test Python imports
+        run: |
+          echo "Testing Python imports..."
+          python -c "import PyQt5; print('PyQt5 OK')"
+          python -c "import sys; print('Python version:', sys.version)"
+          python -c "exec(open('main.py').read().split('if __name__')[0]); print('main.py imports OK')" || echo "main.py import test failed"
+
       - name: Build application
         run: |
           echo "Building with command: ${{ matrix.build-cmd }}"
           ${{ matrix.build-cmd }}
+
+      - name: Check build output size and contents
+        run: |
+          echo "=== Build Output Analysis ==="
+          if [ -d "main.dist" ]; then
+            echo "main.dist directory size:"
+            du -sh main.dist/
+            echo "main.dist contents:"
+            ls -la main.dist/
+            echo "Total files in main.dist:"
+            find main.dist -type f | wc -l
+          fi
+          if [ -f "AkademiTrack.app" ] || [ -d "AkademiTrack.app" ]; then
+            echo "AkademiTrack.app size:"
+            du -sh AkademiTrack.app/
+          fi
+          if [ -f "AkademiTrack.exe" ]; then
+            echo "AkademiTrack.exe size:"
+            du -sh AkademiTrack.exe
+          fi
+          if [ -f "AkademiTrack" ]; then
+            echo "AkademiTrack size:"
+            du -sh AkademiTrack
+          fi
+        shell: bash
 
       - name: Move files from main.dist (Windows/Linux)
         if: matrix.os != 'macos-latest'
         run: |
           if [ -d "main.dist" ]; then
             echo "Moving files from main.dist to current directory"
+            echo "Before move - current directory:"
+            ls -la
             mv main.dist/* . || true
             rmdir main.dist || true
+            echo "After move - current directory:"
+            ls -la
+          else
+            echo "No main.dist directory found"
           fi
         shell: bash
 
       - name: List final build output
         run: |
-          echo "Final directory contents:"
+          echo "=== Final Build Analysis ==="
+          echo "Current directory total size:"
+          du -sh .
+          echo "All files:"
           ls -la
           echo "Looking for AkademiTrack files:"
           ls -la AkademiTrack* || echo "No AkademiTrack files found"
+          echo "Executable files:"
+          find . -type f -executable -name "*" | head -10
+        shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -83,5 +127,8 @@ jobs:
           name: AkademiTrack-${{ matrix.os }}
           path: |
             AkademiTrack*
-            *.app
+            *.app/
+            *.exe
+            !*.xml
+            !*.pyc
           if-no-files-found: error
