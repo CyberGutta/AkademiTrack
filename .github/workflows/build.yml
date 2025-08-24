@@ -44,7 +44,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nuitka pyqt5
-          pip install -r requirements.txt || echo "No requirements.txt found - continuing without it"
+        continue-on-error: false
 
       - name: List files for debugging
         run: |
@@ -112,13 +112,19 @@ jobs:
         run: |
           echo "=== Final Build Analysis ==="
           echo "Current directory total size:"
-          du -sh .
+          du -sh . 2>/dev/null || dir
           echo "All files:"
-          ls -la
-          echo "Looking for AkademiTrack files:"
-          ls -la AkademiTrack* || echo "No AkademiTrack files found"
-          echo "Executable files:"
-          find . -type f -executable -name "*" | head -10
+          ls -la 2>/dev/null || dir
+          echo "Looking for any app/executable files:"
+          ls -la *.app 2>/dev/null || echo "No .app files"
+          ls -la *.exe 2>/dev/null || echo "No .exe files"  
+          ls -la AkademiTrack* 2>/dev/null || echo "No AkademiTrack files"
+          ls -la main.* 2>/dev/null || echo "No main.* files"
+          if [ -d "main.dist" ]; then
+            echo "main.dist contents and size:"
+            ls -la main.dist/
+            du -sh main.dist/ 2>/dev/null || echo "Could not get main.dist size"
+          fi
         shell: bash
 
       - name: Upload artifacts
@@ -127,8 +133,10 @@ jobs:
           name: AkademiTrack-${{ matrix.os }}
           path: |
             AkademiTrack*
-            *.app/
+            main.app/
+            main.dist/
             *.exe
             !*.xml
             !*.pyc
-          if-no-files-found: error
+            !main.build/
+          if-no-files-found: warn
