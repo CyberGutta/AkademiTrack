@@ -28,35 +28,229 @@ except ImportError:
     sys.exit(1)
 
 def set_application_icon(self):
-    """Set application icon from logo file"""
+    """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories"""
     try:
-        # Try different logo file formats
-        logo_paths = [
-            "logo.ico",
-            "logo.png", 
-            "pictures/logo.png",
-            "pictures/logo.ico"
+        import platform
+        import os
+        from pathlib import Path
+        
+        # Detect platform for format preferences
+        current_platform = platform.system().lower()
+        
+        # Define search directories (relative to script location)
+        base_dir = Path(__file__).resolve().parent
+        search_dirs = [
+            base_dir,                           # Root directory
+            base_dir / "assets",               # Assets folder
+            base_dir / "icons",                # Icons folder  
+            base_dir / "images",               # Images folder
+            base_dir / "pictures",             # Pictures folder (your existing)
+            base_dir / "resources",            # Resources folder
+            base_dir / "res",                  # Res folder
         ]
         
+        # Platform-specific format preferences
+        if current_platform == "darwin":  # macOS
+            preferred_formats = ["icns", "png", "ico"]
+            format_priority = {
+                "icns": 1,  # Best for macOS
+                "png": 2,   # Good fallback
+                "ico": 3    # Windows format but works
+            }
+        elif current_platform == "windows":  # Windows
+            preferred_formats = ["ico", "png", "icns"] 
+            format_priority = {
+                "ico": 1,   # Best for Windows
+                "png": 2,   # Good fallback
+                "icns": 3   # Mac format but might work
+            }
+        else:  # Linux and others
+            preferred_formats = ["png", "ico", "icns"]
+            format_priority = {
+                "png": 1,   # Best for Linux
+                "ico": 2,   # Windows format but works
+                "icns": 3   # Mac format but might work
+            }
+        
+        # Common icon filenames to search for
+        icon_names = [
+            "logo",
+            "icon", 
+            "app_icon",
+            "application_icon",
+            "main_icon",
+            "window_icon",
+            f"{self.windowTitle().lower().replace(' ', '_')}_icon",  # Based on window title
+            "akademitrack_icon",  # Your app specific
+            "akademitrack"
+        ]
+        
+        # Build comprehensive list of possible icon paths
+        possible_icons = []
+        
+        for search_dir in search_dirs:
+            if not search_dir.exists():
+                continue
+                
+            for icon_name in icon_names:
+                for format_ext in preferred_formats:
+                    icon_path = search_dir / f"{icon_name}.{format_ext}"
+                    if icon_path.exists():
+                        priority = format_priority.get(format_ext, 99)
+                        possible_icons.append((str(icon_path), priority, format_ext))
+        
+        # Sort by priority (lower number = higher priority)
+        possible_icons.sort(key=lambda x: x[1])
+        
+        # Try to set icon with the best available option
         icon_set = False
-        for logo_path in logo_paths:
-            if os.path.exists(logo_path):
+        for icon_path, priority, format_ext in possible_icons:
+            try:
+                print(f"Attempting to set icon: {icon_path} (format: {format_ext}, priority: {priority})")
+                
+                # Create QIcon from file
+                icon = QIcon(icon_path)
+                
+                # Verify the icon loaded properly
+                if icon.isNull():
+                    print(f"Warning: Icon appears to be null/invalid: {icon_path}")
+                    continue
+                
+                # Test if icon has available sizes (additional validation)
+                available_sizes = icon.availableSizes()
+                if not available_sizes:
+                    print(f"Warning: No available sizes for icon: {icon_path}")
+                    # Continue anyway as some icons might still work
+                
                 # Set window icon
-                icon = QIcon(logo_path)
                 self.setWindowIcon(icon)
                 
                 # Set application icon (shows in taskbar)
-                QApplication.instance().setWindowIcon(icon)
+                app_instance = QApplication.instance()
+                if app_instance:
+                    app_instance.setWindowIcon(icon)
                 
-                print(f"Logo set successfully from: {logo_path}")
+                print(f"✅ Icon set successfully from: {icon_path}")
+                print(f"   Platform: {current_platform}")
+                print(f"   Format: {format_ext}")
+                print(f"   Available sizes: {[f'{s.width()}x{s.height()}' for s in available_sizes]}")
+                
                 icon_set = True
                 break
+                
+            except Exception as icon_error:
+                print(f"Failed to set icon from {icon_path}: {icon_error}")
+                continue
         
         if not icon_set:
-            print("No logo file found. Checked paths:", logo_paths)
+            print("❌ No suitable icon found. Searched in:")
+            for search_dir in search_dirs:
+                print(f"   - {search_dir}")
+            print("Supported formats:", ", ".join(preferred_formats))
+            print("Expected names:", ", ".join([f"{name}.{ext}" for name in icon_names[:3] for ext in preferred_formats[:2]]))
             
+            # Fallback: Try to create a simple default icon
+            try:
+                self._create_fallback_icon()
+            except Exception as fallback_error:
+                print(f"Fallback icon creation failed: {fallback_error}")
+                
     except Exception as e:
-        print(f"Error setting logo: {e}")
+        print(f"Critical error in set_application_icon: {e}")
+        import traceback
+        traceback.print_exc()
+
+def _create_fallback_icon(self):
+    """Create a simple fallback icon programmatically"""
+    try:
+        from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor
+        from PyQt5.QtCore import Qt
+        
+        # Create a 64x64 pixmap
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(QColor(0, 102, 204))  # Blue background (#0066cc)
+        
+        # Draw something simple
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Draw a simple "A" for AkademiTrack
+        painter.setPen(QColor(255, 255, 255))  # White text
+        painter.setFont(painter.font())
+        font = painter.font()
+        font.setPointSize(32)
+        font.setBold(True)
+        painter.setFont(font)
+        
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "A")
+        painter.end()
+        
+        # Set as icon
+        fallback_icon = QIcon(pixmap)
+        self.setWindowIcon(fallback_icon)
+        
+        app_instance = QApplication.instance()
+        if app_instance:
+            app_instance.setWindowIcon(fallback_icon)
+            
+        print("✅ Fallback icon created and set")
+        
+    except Exception as e:
+        print(f"Fallback icon creation failed: {e}")
+
+def set_application_icon_in_main(app_instance):
+    """Enhanced version for the main() function - pass QApplication instance"""
+    try:
+        import platform
+        from pathlib import Path
+        
+        current_platform = platform.system().lower()
+        base_dir = Path(__file__).resolve().parent
+        
+        search_dirs = [
+            base_dir,
+            base_dir / "assets", 
+            base_dir / "icons",
+            base_dir / "images", 
+            base_dir / "pictures",
+            base_dir / "resources"
+        ]
+        
+        # Platform-specific preferences
+        if current_platform == "darwin":
+            formats = ["icns", "png", "ico"]
+        elif current_platform == "windows":
+            formats = ["ico", "png", "icns"]
+        else:
+            formats = ["png", "ico", "icns"]
+        
+        icon_names = ["logo", "icon", "app_icon", "akademitrack"]
+        
+        # Find best icon
+        for search_dir in search_dirs:
+            if not search_dir.exists():
+                continue
+                
+            for icon_name in icon_names:
+                for format_ext in formats:
+                    icon_path = search_dir / f"{icon_name}.{format_ext}"
+                    if icon_path.exists():
+                        try:
+                            icon = QIcon(str(icon_path))
+                            if not icon.isNull():
+                                app_instance.setWindowIcon(icon)  # Now properly passed
+                                print(f"✅ Application icon set from: {icon_path}")
+                                return True
+                        except Exception as e:
+                            print(f"Failed to load {icon_path}: {e}")
+                            continue
+        
+        print("❌ No suitable application icon found")
+        return False
+        
+    except Exception as e:
+        print(f"Error setting application icon in main: {e}")
+        return False
 
 class WelcomeDialog(QDialog):
     """Welcome dialog for first-time users - IMPROVED: Responsive sizing and proper centering"""
@@ -1295,36 +1489,176 @@ class AkademiTrackWindow(QMainWindow):
         self._redirect_std_streams()
 
     def set_application_icon(self):
-        """Set application icon from logo file"""
+        """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories"""
         try:
-            # Try different logo file formats
-            logo_paths = [
-                "logo.ico",
-                "logo.png", 
-                "pictures/logo.png",
-                "pictures/logo.ico"
+            import platform
+            import os
+            from pathlib import Path
+            
+            # Detect platform for format preferences
+            current_platform = platform.system().lower()
+            
+            # Define search directories (relative to script location)
+            base_dir = Path(__file__).resolve().parent
+            search_dirs = [
+                base_dir,                           # Root directory
+                base_dir / "assets",               # Assets folder
+                base_dir / "icons",                # Icons folder  
+                base_dir / "images",               # Images folder
+                base_dir / "pictures",             # Pictures folder (your existing)
+                base_dir / "resources",            # Resources folder
+                base_dir / "res",                  # Res folder
             ]
             
+            # Platform-specific format preferences
+            if current_platform == "darwin":  # macOS
+                preferred_formats = ["icns", "png", "ico"]
+                format_priority = {
+                    "icns": 1,  # Best for macOS
+                    "png": 2,   # Good fallback
+                    "ico": 3    # Windows format but works
+                }
+            elif current_platform == "windows":  # Windows
+                preferred_formats = ["ico", "png", "icns"] 
+                format_priority = {
+                    "ico": 1,   # Best for Windows
+                    "png": 2,   # Good fallback
+                    "icns": 3   # Mac format but might work
+                }
+            else:  # Linux and others
+                preferred_formats = ["png", "ico", "icns"]
+                format_priority = {
+                    "png": 1,   # Best for Linux
+                    "ico": 2,   # Windows format but works
+                    "icns": 3   # Mac format but might work
+                }
+            
+            # Common icon filenames to search for
+            icon_names = [
+                "logo",
+                "icon", 
+                "app_icon",
+                "application_icon",
+                "main_icon",
+                "window_icon",
+                f"{self.windowTitle().lower().replace(' ', '_')}_icon",  # Based on window title
+                "akademitrack_icon",  # Your app specific
+                "akademitrack"
+            ]
+            
+            # Build comprehensive list of possible icon paths
+            possible_icons = []
+            
+            for search_dir in search_dirs:
+                if not search_dir.exists():
+                    continue
+                    
+                for icon_name in icon_names:
+                    for format_ext in preferred_formats:
+                        icon_path = search_dir / f"{icon_name}.{format_ext}"
+                        if icon_path.exists():
+                            priority = format_priority.get(format_ext, 99)
+                            possible_icons.append((str(icon_path), priority, format_ext))
+            
+            # Sort by priority (lower number = higher priority)
+            possible_icons.sort(key=lambda x: x[1])
+            
+            # Try to set icon with the best available option
             icon_set = False
-            for logo_path in logo_paths:
-                if os.path.exists(logo_path):
+            for icon_path, priority, format_ext in possible_icons:
+                try:
+                    print(f"Attempting to set icon: {icon_path} (format: {format_ext}, priority: {priority})")
+                    
+                    # Create QIcon from file
+                    icon = QIcon(icon_path)
+                    
+                    # Verify the icon loaded properly
+                    if icon.isNull():
+                        print(f"Warning: Icon appears to be null/invalid: {icon_path}")
+                        continue
+                    
+                    # Test if icon has available sizes (additional validation)
+                    available_sizes = icon.availableSizes()
+                    if not available_sizes:
+                        print(f"Warning: No available sizes for icon: {icon_path}")
+                        # Continue anyway as some icons might still work
+                    
                     # Set window icon
-                    icon = QIcon(logo_path)
                     self.setWindowIcon(icon)
                     
                     # Set application icon (shows in taskbar)
-                    QApplication.instance().setWindowIcon(icon)
+                    app_instance = QApplication.instance()
+                    if app_instance:
+                        app_instance.setWindowIcon(icon)
                     
-                    print(f"Logo set successfully from: {logo_path}")
+                    print(f"✅ Icon set successfully from: {icon_path}")
+                    print(f"   Platform: {current_platform}")
+                    print(f"   Format: {format_ext}")
+                    print(f"   Available sizes: {[f'{s.width()}x{s.height()}' for s in available_sizes]}")
+                    
                     icon_set = True
                     break
+                    
+                except Exception as icon_error:
+                    print(f"Failed to set icon from {icon_path}: {icon_error}")
+                    continue
             
             if not icon_set:
-                print("No logo file found. Checked paths:", logo_paths)
+                print("❌ No suitable icon found. Searched in:")
+                for search_dir in search_dirs:
+                    print(f"   - {search_dir}")
+                print("Supported formats:", ", ".join(preferred_formats))
+                print("Expected names:", ", ".join([f"{name}.{ext}" for name in icon_names[:3] for ext in preferred_formats[:2]]))
                 
+                # Fallback: Try to create a simple default icon
+                try:
+                    self._create_fallback_icon()
+                except Exception as fallback_error:
+                    print(f"Fallback icon creation failed: {fallback_error}")
+                    
         except Exception as e:
-            print(f"Error setting logo: {e}")
+            print(f"Critical error in set_application_icon: {e}")
+            import traceback
+            traceback.print_exc()
     
+    def _create_fallback_icon(self):
+        """Create a simple fallback icon programmatically"""
+        try:
+            from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor
+            from PyQt5.QtCore import Qt
+            
+            # Create a 64x64 pixmap
+            pixmap = QPixmap(64, 64)
+            pixmap.fill(QColor(0, 102, 204))  # Blue background (#0066cc)
+            
+            # Draw something simple
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+            
+            # Draw a simple "A" for AkademiTrack
+            painter.setPen(QColor(255, 255, 255))  # White text
+            painter.setFont(painter.font())
+            font = painter.font()
+            font.setPointSize(32)
+            font.setBold(True)
+            painter.setFont(font)
+            
+            painter.drawText(pixmap.rect(), Qt.AlignCenter, "A")
+            painter.end()
+            
+            # Set as icon
+            fallback_icon = QIcon(pixmap)
+            self.setWindowIcon(fallback_icon)
+            
+            app_instance = QApplication.instance()
+            if app_instance:
+                app_instance.setWindowIcon(fallback_icon)
+                
+            print("✅ Fallback icon created and set")
+            
+        except Exception as e:
+            print(f"Fallback icon creation failed: {e}")
+
     def show_notification(self, message, notification_type="info", duration=5000):
         """FIXED: Create and show notification properly"""
         try:
@@ -3190,16 +3524,7 @@ def main():
     app.setStyle('Fusion')
     
     # Set application icon globally for taskbar
-    try:
-        logo_paths = ["logo.ico", "logo.png", "pictures/logo.png", "pictures/logo.ico"]
-        for logo_path in logo_paths:
-            if os.path.exists(logo_path):
-                icon = QIcon(logo_path)
-                app.setWindowIcon(icon)
-                print(f"Application logo set from: {logo_path}")
-                break
-    except Exception as e:
-        print(f"Error setting application logo: {e}")
+    set_application_icon_in_main(app)
     
     # Initialize settings manager
     settings_manager = SettingsManager()
