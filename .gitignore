@@ -3,3 +3,6 @@ iskole_cookies.pkl
 *.pyc
 *.py
 settings.json
+/build/main
+/dist
+main.spec
