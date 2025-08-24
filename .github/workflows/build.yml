@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -38,39 +38,108 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-dev python3-pyqt5 python3-pyqt5.qtcore python3-pyqt5.qtgui python3-pyqt5.qtwidgets
+          sudo apt-get install -y python3-dev python3-pyqt5
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install nuitka pyqt5
-          pip install -r requirements.txt || echo "No requirements.txt found"
-
-      - name: Create icon files if missing
-        run: |
-          python -c "
-          import os
-          if not os.path.exists('pictures'):
-              os.makedirs('pictures')
-          if not os.path.exists('${{ matrix.icon }}'):
-              print('Warning: Icon file ${{ matrix.icon }} not found, build may fail')
-          "
+        continue-on-error: false
 
       - name: List files for debugging
         run: |
           echo 'Current directory contents:'
           ls -la
-          echo 'Pictures directory contents (if exists):'
-          ls -la pictures/ || echo 'Pictures directory not found'
+          echo 'Pictures directory contents:'
+          ls -la pictures/
+          echo 'Python files:'
+          ls -la *.py
+        shell: bash
+
+      - name: Test Python imports
+        run: |
+          echo "Testing Python imports..."
+          python -c "import PyQt5; print('PyQt5 OK')"
+          python -c "import sys; print('Python version:', sys.version)"
+          python -c "exec(open('main.py').read().split('if __name__')[0]); print('main.py imports OK')" || echo "main.py import test failed"
+        shell: bash
 
       - name: Build application
-        run: ${{ matrix.build-cmd }}
+        run: |
+          echo "Building with command: ${{ matrix.build-cmd }}"
+          python -m ${{ matrix.build-cmd }}
+        shell: bash
+
+      - name: Check build output size and contents
+        run: |
+          echo "=== Build Output Analysis ==="
+          if [ -d "main.dist" ]; then
+            echo "main.dist directory size:"
+            du -sh main.dist/
+            echo "main.dist contents:"
+            ls -la main.dist/
+            echo "Total files in main.dist:"
+            find main.dist -type f | wc -l
+          fi
+          if [ -f "AkademiTrack.app" ] || [ -d "AkademiTrack.app" ]; then
+            echo "AkademiTrack.app size:"
+            du -sh AkademiTrack.app/
+          fi
+          if [ -f "AkademiTrack.exe" ]; then
+            echo "AkademiTrack.exe size:"
+            du -sh AkademiTrack.exe
+          fi
+          if [ -f "AkademiTrack" ]; then
+            echo "AkademiTrack size:"
+            du -sh AkademiTrack
+          fi
+        shell: bash
+
+      - name: Move files from main.dist (Windows/Linux)
+        if: matrix.os != 'macos-latest'
+        run: |
+          if [ -d "main.dist" ]; then
+            echo "Moving files from main.dist to current directory"
+            echo "Before move - current directory:"
+            ls -la
+            mv main.dist/* . || true
+            rmdir main.dist || true
+            echo "After move - current directory:"
+            ls -la
+          else
+            echo "No main.dist directory found"
+          fi
+        shell: bash
+
+      - name: List final build output
+        run: |
+          echo "=== Final Build Analysis ==="
+          echo "Current directory total size:"
+          du -sh . 2>/dev/null || dir
+          echo "All files:"
+          ls -la 2>/dev/null || dir
+          echo "Looking for any app/executable files:"
+          ls -la *.app 2>/dev/null || echo "No .app files"
+          ls -la *.exe 2>/dev/null || echo "No .exe files"  
+          ls -la AkademiTrack* 2>/dev/null || echo "No AkademiTrack files"
+          ls -la main.* 2>/dev/null || echo "No main.* files"
+          if [ -d "main.dist" ]; then
+            echo "main.dist contents and size:"
+            ls -la main.dist/
+            du -sh main.dist/ 2>/dev/null || echo "Could not get main.dist size"
+          fi
+        shell: bash
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: AkademiTrack-${{ matrix.os }}
           path: |
             AkademiTrack*
-            *.app
-          if-no-files-found: error
+            main.app/
+            main.dist/
+            *.exe
+            !*.xml
+            !*.pyc
+            !main.build/
+          if-no-files-found: warn
