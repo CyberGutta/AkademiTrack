@@ -27,6 +27,37 @@ except ImportError:
     print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
 
+def set_application_icon(self):
+    """Set application icon from logo file"""
+    try:
+        # Try different logo file formats
+        logo_paths = [
+            "logo.ico",
+            "logo.png", 
+            "pictures/logo.png",
+            "pictures/logo.ico"
+        ]
+        
+        icon_set = False
+        for logo_path in logo_paths:
+            if os.path.exists(logo_path):
+                # Set window icon
+                icon = QIcon(logo_path)
+                self.setWindowIcon(icon)
+                
+                # Set application icon (shows in taskbar)
+                QApplication.instance().setWindowIcon(icon)
+                
+                print(f"Logo set successfully from: {logo_path}")
+                icon_set = True
+                break
+        
+        if not icon_set:
+            print("No logo file found. Checked paths:", logo_paths)
+            
+    except Exception as e:
+        print(f"Error setting logo: {e}")
+
 class WelcomeDialog(QDialog):
     """Welcome dialog for first-time users - IMPROVED: Responsive sizing and proper centering"""
     
@@ -828,11 +859,10 @@ class PostRequestWindow(QDialog):
             self.console.setMaximumHeight(220)
 
 class SimpleButton(QPushButton):
-    """FIXED: Simple button with minimum size constraints"""
+    """FIXED: Simple button that never gets visually disabled"""
     def __init__(self, text, primary=False):
         super().__init__(text)
         
-        # FIXED: Set minimum size to prevent shrinking
         self.setMinimumSize(140, 44)
         self.setMaximumHeight(60)
         
@@ -855,10 +885,7 @@ class SimpleButton(QPushButton):
                 QPushButton:pressed {
                     background-color: #003d7a;
                 }
-                QPushButton:disabled {
-                    background-color: #cccccc;
-                    color: #666666;
-                }
+                /* REMOVED DISABLED STATE - button never looks disabled */
             """)
         else:
             self.setStyleSheet("""
@@ -879,11 +906,7 @@ class SimpleButton(QPushButton):
                 QPushButton:pressed {
                     background-color: #dee2e6;
                 }
-                QPushButton:disabled {
-                    background-color: #f8f9fa;
-                    color: #6c757d;
-                    border-color: #dee2e6;
-                }
+                /* REMOVED DISABLED STATE - button never looks disabled */
             """)
 
 
@@ -1254,6 +1277,8 @@ class AkademiTrackWindow(QMainWindow):
         
         self.init_ui()
         self.init_bot()
+        self.set_application_icon()
+
         self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'POST Request'")
         
         if hasattr(self, 'bot') and self.bot:
@@ -1269,7 +1294,36 @@ class AkademiTrackWindow(QMainWindow):
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
 
-        
+    def set_application_icon(self):
+        """Set application icon from logo file"""
+        try:
+            # Try different logo file formats
+            logo_paths = [
+                "logo.ico",
+                "logo.png", 
+                "pictures/logo.png",
+                "pictures/logo.ico"
+            ]
+            
+            icon_set = False
+            for logo_path in logo_paths:
+                if os.path.exists(logo_path):
+                    # Set window icon
+                    icon = QIcon(logo_path)
+                    self.setWindowIcon(icon)
+                    
+                    # Set application icon (shows in taskbar)
+                    QApplication.instance().setWindowIcon(icon)
+                    
+                    print(f"Logo set successfully from: {logo_path}")
+                    icon_set = True
+                    break
+            
+            if not icon_set:
+                print("No logo file found. Checked paths:", logo_paths)
+                
+        except Exception as e:
+            print(f"Error setting logo: {e}")
     
     def show_notification(self, message, notification_type="info", duration=5000):
         """FIXED: Create and show notification properly"""
@@ -1426,6 +1480,13 @@ class AkademiTrackWindow(QMainWindow):
         
         self.start_button = SimpleButton("Start automatisering", primary=True)
         self.start_button.clicked.connect(self.toggle_automation)
+        
+        # FIXED: Override setEnabled to prevent disabling
+        original_setEnabled = self.start_button.setEnabled
+        def force_enabled_start_button(enabled):
+            # Always call with True - never actually disable the start button
+            original_setEnabled(True)
+        self.start_button.setEnabled = force_enabled_start_button
         
         main_button_layout.addWidget(self.setup_button)
         main_button_layout.addWidget(self.start_button)
@@ -1756,26 +1817,23 @@ class AkademiTrackWindow(QMainWindow):
             self.show_error("Oppsett mislyktes. Prøv igjen.")
     
     def toggle_automation(self):
-        """FIXED: Spam-proof automation toggle with proper locking"""
+        """FIXED: Never disable start button during toggle"""
         try:
-            # Prevent multiple simultaneous toggles
             if self._toggle_lock:
                 print("Toggle already in progress, ignoring...")
                 return
                 
             self._toggle_lock = True
             
-            # Disable button immediately to prevent spam
-            if hasattr(self, 'start_button'):
-                self.start_button.setEnabled(False)
+            # REMOVED: Don't disable button here anymore
+            # if hasattr(self, 'start_button'):
+            #     self.start_button.setEnabled(False)
             
             if not self.is_running:
-                # Start automation
                 QTimer.singleShot(50, self._safe_start_automation)
             else:
-                # Stop automation
                 QTimer.singleShot(50, self._safe_stop_automation)
-                
+                    
         except Exception as e:
             print(f"Toggle error: {e}")
             self._release_toggle_lock()
@@ -2170,7 +2228,7 @@ class AkademiTrackWindow(QMainWindow):
 
 
     def crash_safe_reset(self):
-        """Ultimate crash-safe reset"""
+        """Ultimate crash-safe reset - FIXED: Always keep start button enabled"""
         try:
             print("CRASH SAFE RESET")
             
@@ -2197,6 +2255,7 @@ class AkademiTrackWindow(QMainWindow):
             try:
                 if hasattr(self, 'start_button'):
                     self.start_button.setText("Start automatisering") 
+                    # FIXED: Always keep start button enabled
                     self.start_button.setEnabled(True)
             except:
                 pass
@@ -2220,6 +2279,9 @@ class AkademiTrackWindow(QMainWindow):
             # Ultimate fallback
             try:
                 self.is_running = False
+                # FIXED: Always ensure start button stays enabled
+                if hasattr(self, 'start_button'):
+                    self.start_button.setEnabled(True)
             except:
                 pass
 
@@ -2282,9 +2344,9 @@ class AkademiTrackWindow(QMainWindow):
             self.scheduler_thread = None
 
     def start_automation_safe(self):
-        """Crash-safe start method"""
+        """Crash-safe start method - FIXED: Keep button active even without cookies"""
         try:
-            # Check cookies first
+            # Check cookies first - but don't disable button
             if not hasattr(self, 'bot') or not self.bot:
                 print("No bot instance")
                 self.crash_safe_reset()
@@ -2292,7 +2354,7 @@ class AkademiTrackWindow(QMainWindow):
                 
             if not os.path.exists(self.bot.cookies_file):
                 self.show_notification("Trenger oppsett først", "warning", 3000)
-                self.crash_safe_reset()
+                # FIXED: Don't call crash_safe_reset() - just return and keep button active
                 return
 
             # Kill any existing thread BEFORE creating new one
@@ -2428,11 +2490,12 @@ class AkademiTrackWindow(QMainWindow):
             self.simple_reset()
 
     def start_automation_simple(self):
-        """Simplified start method"""
+        """Simplified start method - FIXED: Keep button active even without cookies"""
         try:
-            # Check cookies exist
+            # Check cookies exist - but don't disable button
             if not os.path.exists(self.bot.cookies_file):
                 self.show_notification("Trenger oppsett først", "warning", 3000)
+                # FIXED: Just return - don't disable button or reset
                 return
 
             # Start bot
@@ -2477,7 +2540,7 @@ class AkademiTrackWindow(QMainWindow):
             print(f"Error updating button: {e}")
 
     def simple_reset(self):
-        """Simplest possible reset - no complex operations"""
+        """Simplest possible reset - FIXED: Always keep start button enabled"""
         try:
             print("SIMPLE RESET")
             
@@ -2500,11 +2563,11 @@ class AkademiTrackWindow(QMainWindow):
                 except:
                     pass
             
-            # Reset button
+            # Reset button - FIXED: Always keep enabled
             if hasattr(self, 'start_button'):
                 try:
                     self.start_button.setText("Start automatisering") 
-                    self.start_button.setEnabled(True)
+                    self.start_button.setEnabled(True)  # FIXED: Always enabled
                 except:
                     pass
                     
@@ -2518,6 +2581,12 @@ class AkademiTrackWindow(QMainWindow):
             
         except Exception as e:
             print(f"Error in simple reset: {e}")
+            # FIXED: Always ensure start button is enabled
+            try:
+                if hasattr(self, 'start_button'):
+                    self.start_button.setEnabled(True)
+            except:
+                pass
 
     def reset_ui_simple(self):
         """Simple UI reset without complex styling"""
@@ -2556,27 +2625,23 @@ class AkademiTrackWindow(QMainWindow):
         self.start_automation_safe()
 
     def _safe_start_automation(self):
-        """FIXED: Bulletproof start method"""
+        """FIXED: Keep start button always enabled"""
         try:
             print("🚀 Starting automation...")
             
-            # Check prerequisites
+            # Check prerequisites - show notification but keep button enabled
             if not self.bot or not os.path.exists(self.bot.cookies_file):
                 self.show_notification("Trenger oppsett først", "warning")
                 self._release_toggle_lock()
+                # BUTTON STAYS ENABLED - just return
                 return
             
-            # Kill any existing threads FIRST
+            # Rest of the method unchanged...
             self._force_cleanup_existing_threads()
-            
-            # Set states
             self.is_running = True
             self.bot.running = True
             
-            # Create new thread
             self.scheduler_thread = SchedulerThread(self.bot)
-            
-            # Connect signals with proper error handling
             try:
                 self.scheduler_thread.message_signal.connect(
                     self._thread_safe_log_message, 
@@ -2585,15 +2650,9 @@ class AkademiTrackWindow(QMainWindow):
             except Exception as e:
                 print(f"Signal connection error: {e}")
             
-            # Start thread
             self.scheduler_thread.start()
-            
-            # Update UI
             self._update_ui_to_running()
-            
-            # Show notification
             self.show_notification("Automatisering startet", "info")
-            
             print("✅ Start completed successfully")
             
         except Exception as e:
@@ -2612,11 +2671,10 @@ class AkademiTrackWindow(QMainWindow):
 
 
     def _update_ui_to_running(self):
-        """FIXED: Update UI to running state with proper button sizing"""
+        """FIXED: Update UI to running state - button always enabled"""
         try:
             if hasattr(self, 'start_button'):
                 self.start_button.setText("Stopp automatisering")
-                # FIXED: Added min-width and height constraints
                 self.start_button.setStyleSheet("""
                     QPushButton {
                         background-color: #dc3545;
@@ -2632,11 +2690,11 @@ class AkademiTrackWindow(QMainWindow):
                     QPushButton:hover { 
                         background-color: #a60212; 
                     }
-                    QPushButton:disabled {
-                        background-color: #6c757d;
-                        color: #dee2e6;
+                    QPushButton:pressed {
+                        background-color: #66000a;
                     }
                 """)
+                # FIXED: Always keep enabled
                 self.start_button.setEnabled(True)
                 
             if hasattr(self, 'setup_button'):
@@ -2673,61 +2731,51 @@ class AkademiTrackWindow(QMainWindow):
             if hasattr(self, 'scheduler_thread'):
                 self.scheduler_thread = None
 
-    def setup_and_login_safe(self):
-        """Replace the original setup_and_login method"""
-        try:
-            if self.is_running:
-                self.show_warning("Stopp automatisering først")
-                return
-                
-            if hasattr(self, 'setup_thread') and self.setup_thread and self.setup_thread.isRunning():
-                print("Setup already running")
-                return
+    def setup_and_login(self):
+        """Handle setup and login - FIXED: Keep start button enabled"""
+        if self.is_running:
+            self.show_warning("Stopp automatisering først")
+            return
             
-            # Kill any automation first
-            self.kill_thread_brutally()
-            
-            # Disable buttons
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-                self.setup_button.setText("Setter opp...")
-                
-            if hasattr(self, 'start_button'):
-                self.start_button.setEnabled(False)
-            
-            # Start setup
-            if hasattr(self, 'bot') and self.bot:
-                self.bot.last_setup_cancelled = False
-                self.setup_thread = SetupThread(self.bot)
-                self.setup_thread.message_signal.connect(self.safe_log_message)
-                self.setup_thread.finished_signal.connect(self.on_setup_finished_safe)
-                if hasattr(self, 'progress_bar'):
-                    self.progress_bar.setVisible(True)
-                    self.setup_thread.progress_signal.connect(self.progress_bar.setValue)
-                self.setup_thread.start()
-            
-        except Exception as e:
-            print(f"Error in setup_and_login_safe: {e}")
-            self.reset_setup_ui()
+        if self.setup_thread and self.setup_thread.isRunning():
+            return
+        
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.setup_button.setEnabled(False)
+        self.setup_button.setText("Setter opp...")
+        self.status_indicator.set_status("Setter opp...", "#0066cc")
+        
+        # FIXED: Don't disable start button during setup
+        # Keep it enabled so user can try to start if they want
+        
+        self.bot.last_setup_cancelled = False
+        self.setup_thread = SetupThread(self.bot)
+        self.setup_thread.message_signal.connect(self.log_message)
+        self.setup_thread.finished_signal.connect(self.on_setup_finished)
+        self.setup_thread.progress_signal.connect(self.progress_bar.setValue)
+        self.setup_thread.start()
     
-    def on_setup_finished_safe(self, success):
-        """Safe setup finish handler"""
-        try:
-            if hasattr(self, 'progress_bar'):
-                self.progress_bar.setVisible(False)
-            self.reset_setup_ui()
-            
-            if success:
-                if hasattr(self, 'status_indicator'):
-                    self.status_indicator.set_status("Klar", "#28a745")
-                print("Setup completed successfully")
-            else:
-                if hasattr(self, 'status_indicator'):
-                    self.status_indicator.set_status("Oppsett mislyktes", "#dc3545")
-                print("Setup failed")
-        except Exception as e:
-            print(f"Error in setup finish: {e}")
-            self.reset_setup_ui()
+    def on_setup_finished(self, success):
+        """Handle setup completion - FIXED: Keep start button enabled"""
+        self.progress_bar.setVisible(False)
+        self.setup_button.setEnabled(True)
+        self.setup_button.setText("Oppsett og innlogging")
+        
+        # FIXED: Never disable start button - always keep it enabled
+        # if hasattr(self, 'start_button'):
+        #     self.start_button.setEnabled(True)  # Always enabled anyway
+        
+        if success:
+            self.status_indicator.set_status("Klar", "#28a745")
+        else:
+            if getattr(self.bot, 'last_setup_cancelled', False):
+                self.bot.last_setup_cancelled = False
+                self.status_indicator.set_status("Ready", "#6c757d")
+                return
+            self.status_indicator.set_status("Oppsett mislyktes", "#dc3545")
+            self.show_error("Oppsett mislyktes. Prøv igjen.")
+
 
     def reset_setup_ui(self):
         """Reset setup UI elements"""
@@ -2773,11 +2821,10 @@ class AkademiTrackWindow(QMainWindow):
             self._release_toggle_lock()
 
     def _update_ui_to_stopped(self):
-        """FIXED: Update UI to stopped state with proper button sizing"""
+        """FIXED: Update UI to stopped state - button always enabled"""
         try:
             if hasattr(self, 'start_button'):
                 self.start_button.setText("Start automatisering")
-                # FIXED: Added min-width and height constraints
                 self.start_button.setStyleSheet("""
                     QPushButton {
                         background-color: #0066cc;
@@ -2793,11 +2840,11 @@ class AkademiTrackWindow(QMainWindow):
                     QPushButton:hover { 
                         background-color: #0052a3; 
                     }
-                    QPushButton:disabled {
-                        background-color: #cccccc;
-                        color: #666666;
+                    QPushButton:pressed {
+                        background-color: #003d7a;
                     }
                 """)
+                # FIXED: Always keep enabled - NEVER disable
                 self.start_button.setEnabled(True)
                 
             if hasattr(self, 'setup_button'):
@@ -3002,15 +3049,13 @@ class AkademiTrackWindow(QMainWindow):
             self._processing_any_action = False
 
     def _emergency_reset(self):
-        """Emergency reset for crashes"""
+        """Emergency reset - FIXED: Always keep start button enabled"""
         try:
             print("🚨 EMERGENCY RESET")
             
-            # Force all states
             self.is_running = False
             self._toggle_lock = False
             
-            # Kill thread
             if hasattr(self, 'scheduler_thread'):
                 try:
                     if self.scheduler_thread:
@@ -3019,23 +3064,28 @@ class AkademiTrackWindow(QMainWindow):
                     pass
                 self.scheduler_thread = None
             
-            # Stop bot
             if hasattr(self, 'bot') and self.bot:
                 try:
                     self.bot.running = False
                 except:
                     pass
             
-            # Reset UI
+            # FIXED: Always keep start button enabled
+            if hasattr(self, 'start_button'):
+                self.start_button.setText("Start automatisering")
+                self.start_button.setEnabled(True)  # NEVER DISABLE
+                
             self._update_ui_to_stopped()
-            
             print("Emergency reset completed")
             
         except Exception as e:
             print(f"Emergency reset failed: {e}")
-            # Ultimate fallback
-            self._toggle_lock = False
-            self.is_running = False
+            # ULTIMATE FALLBACK: Always ensure button is enabled
+            if hasattr(self, 'start_button'):
+                try:
+                    self.start_button.setEnabled(True)
+                except:
+                    pass
 
     def on_scheduler_stopped(self):
         """Handle stop signal - async version"""
@@ -3135,63 +3185,65 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Main function with welcome dialog - FIXED: Always center window properly"""
+    """Main function with welcome dialog"""
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     
+    # Set application icon globally for taskbar
     try:
-        # Initialize settings manager
-        settings_manager = SettingsManager()
+        logo_paths = ["logo.ico", "logo.png", "pictures/logo.png", "pictures/logo.ico"]
+        for logo_path in logo_paths:
+            if os.path.exists(logo_path):
+                icon = QIcon(logo_path)
+                app.setWindowIcon(icon)
+                print(f"Application logo set from: {logo_path}")
+                break
+    except Exception as e:
+        print(f"Error setting application logo: {e}")
+    
+    # Initialize settings manager
+    settings_manager = SettingsManager()
+    
+    # Show welcome dialog for first-time users
+    if settings_manager.should_show_welcome():
+        welcome_dialog = WelcomeDialog()
         
-        # Show welcome dialog for first-time users
-        if settings_manager.should_show_welcome():
-            welcome_dialog = WelcomeDialog()
-            
-            if welcome_dialog.exec_() == QDialog.Accepted:
-                # User clicked "Forstått, start programmet"
-                dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
-                settings_manager.mark_welcome_shown(dont_show_again)
-            else:
-                # User clicked "Lukk" or closed dialog
-                print("User cancelled setup")
-                sys.exit(0)
+        if welcome_dialog.exec_() == QDialog.Accepted:
+            # User clicked "Forstått, start programmet"
+            dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
+            settings_manager.mark_welcome_shown(dont_show_again)
+        else:
+            # User clicked "Lukk" or closed dialog
+            print("User cancelled setup")
+            sys.exit(0)
+    
+    # Create main window
+    window = AkademiTrackWindow()
+    window.settings_manager = settings_manager
+    
+    # Center the window
+    try:
+        screen = app.primaryScreen().availableGeometry()
+        window_width = window.width()
+        window_height = window.height()
         
-        # Create main window (don't show yet)
-        window = AkademiTrackWindow()
-        window.settings_manager = settings_manager
+        x = (screen.width() - window_width) // 2
+        y = (screen.height() - window_height) // 2
         
-        # FIXED: Always center the window regardless of saved geometry
-        try:
-            screen = app.primaryScreen().availableGeometry()
-            window_width = window.width()
-            window_height = window.height()
-            
-            # Calculate center position
-            x = (screen.width() - window_width) // 2
-            y = (screen.height() - window_height) // 2
-            
-            # Ensure window doesn't go off-screen
-            x = max(0, min(x, screen.width() - window_width))
-            y = max(0, min(y, screen.height() - window_height))
-            
-            # Set position before showing
-            window.move(x, y)
-            
-            print(f"Window centered at position: {x}, {y}")
-            
-        except Exception as e:
-            print(f"Could not center window: {e}")
-            # Fallback to default position
-            window.move(200, 200)
+        x = max(0, min(x, screen.width() - window_width))
+        y = max(0, min(y, screen.height() - window_height))
         
-        # Show window after positioning is complete
-        window.show()
-        
-        sys.exit(app.exec_())
+        window.move(x, y)
+        print(f"Window centered at position: {x}, {y}")
         
     except Exception as e:
-        print(f"Could not start application: {e}")
-        sys.exit(1)
+        print(f"Could not center window: {e}")
+        window.move(200, 200)
+    
+    # Show window
+    window.show()
+    
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
     main()

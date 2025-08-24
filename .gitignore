@@ -7,3 +7,5 @@ settings.json
 /dist
 main.spec
 iskole_bot.log
+/main.dist
+AkademiTrack.exe
