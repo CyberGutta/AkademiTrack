@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=universal main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=arm64 main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -122,8 +122,18 @@ jobs:
             
             cat > install_akademitrack.sh << 'INSTALLER_EOF'
           #!/bin/bash
-          echo "Installing AkademiTrack..."
-          echo "This app supports both Intel and Apple Silicon Macs"
+          echo "Installing AkademiTrack for Apple Silicon Macs..."
+          echo "This app is built specifically for M1, M2, M3, M4 Macs (Apple Silicon)"
+          echo ""
+          
+          # Check if running on Apple Silicon
+          if [[ $(uname -m) != "arm64" ]]; then
+              echo "WARNING: This version is built for Apple Silicon (M1/M2/M3/M4) Macs only."
+              echo "If you're on an Intel Mac, this may not work properly."
+              echo "Press Ctrl+C to cancel or any key to continue..."
+              read -n 1 -s
+          fi
+          
           if [ -d "/Applications/AkademiTrack.app" ]; then
               echo "Removing existing installation..."
               rm -rf "/Applications/AkademiTrack.app"
@@ -138,7 +148,7 @@ jobs:
           echo "3. Click 'Open' when macOS asks for confirmation"
           echo "4. After first run, you can open normally from Launchpad"
           echo ""
-          echo "Note: This is a universal binary that works on both Intel and Apple Silicon Macs"
+          echo "Note: This is an Apple Silicon (ARM64) build for M1/M2/M3/M4 Macs"
           INSTALLER_EOF
             chmod +x install_akademitrack.sh
             echo "Created installer script"
