@@ -38,8 +38,11 @@ class ImprovedISkoleBot(QObject):
         super().__init__(parent)
         self.base_url = "https://iskole.net"
         self.session = requests.Session()
-        self._base_dir = Path(__file__).resolve().parent
+        
+        # FIXED: Use portable path detection
+        self._base_dir = self.get_portable_base_dir()
         self.cookies_file = str(self._base_dir / "iskole_cookies.pkl")
+        
         self.driver = None
         self.temp_profile = None
         self.gui_callback = gui_callback
@@ -48,12 +51,65 @@ class ImprovedISkoleBot(QObject):
         self._should_stop = False
         self.last_setup_cancelled = False
         self.headers = self.get_os_specific_headers()
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        
+        # FIXED: Setup logging with portable file path
+        self.setup_portable_logging()
         self.logger = logging.getLogger(__name__)
+        
         self.timeplan_url = f"{self.base_url}/elev/?isFeideinnlogget=true&ojr=timeplan"
         self.fetched_periods = []
         self.last_fetch_date = None
         self.registered_timenrs = set()
+
+    def get_portable_base_dir(self):
+        """Get portable base directory that works across different environments"""
+        try:
+            # Try to get the script's directory
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                base_dir = Path(sys.executable).parent
+            elif __file__:
+                # Running as script
+                base_dir = Path(__file__).resolve().parent
+            else:
+                # Fallback to current working directory
+                base_dir = Path.cwd()
+        except (NameError, AttributeError):
+            # Ultimate fallback
+            base_dir = Path.cwd()
+        
+        # Ensure the directory exists and is writable
+        try:
+            base_dir.mkdir(exist_ok=True)
+            # Test write permissions
+            test_file = base_dir / f".test_write_{uuid.uuid4()}.tmp"
+            test_file.write_text("test")
+            test_file.unlink()
+        except (PermissionError, OSError):
+            # Fall back to user's home directory if we can't write to script directory
+            base_dir = Path.home() / ".iskole_bot"
+            base_dir.mkdir(exist_ok=True)
+        
+        return base_dir
+
+    def setup_portable_logging(self):
+        """Setup logging with portable file paths"""
+        try:
+            log_file = self._base_dir / "iskole_bot.log"
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(levelname)s - %(message)s',
+                handlers=[
+                    logging.FileHandler(str(log_file), encoding='utf-8'),
+                    logging.StreamHandler(sys.stdout)
+                ]
+            )
+        except Exception:
+            # Fallback to console only if file logging fails
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(levelname)s - %(message)s'
+            )
 
     def log(self, message):
         """Log message and send to GUI if available"""
@@ -65,10 +121,15 @@ class ImprovedISkoleBot(QObject):
     
     def get_os_specific_headers(self):
         """Get OS-specific headers for better compatibility"""
-        if platform.system() == "Darwin":  # macOS
+        system = platform.system().lower()
+        
+        if system == "darwin":  # macOS
             user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             platform_header = '"macOS"'
-        else:  # Windows/Linux fallback
+        elif system == "linux":
+            user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            platform_header = '"Linux"'
+        else:  # Windows or unknown
             user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             platform_header = '"Windows"'
             
@@ -89,36 +150,71 @@ class ImprovedISkoleBot(QObject):
         }
     
     def close_existing_chrome_processes(self):
-        """Close any existing Chrome processes that might interfere"""
+        """Close any existing Chrome processes that might interfere - cross-platform"""
         try:
-            if platform.system() == "Darwin":  # macOS
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                chrome_processes = ['Google Chrome', 'Chromium', 'chrome']
+                for proc_name in chrome_processes:
+                    try:
+                        subprocess.run(['pkill', '-f', proc_name], 
+                                     check=False, capture_output=True, timeout=5)
+                    except (subprocess.TimeoutExpired, FileNotFoundError):
+                        pass
+            elif system == "linux":
+                chrome_processes = ['google-chrome', 'chromium', 'chrome']
+                for proc_name in chrome_processes:
+                    try:
+                        subprocess.run(['pkill', '-f', proc_name], 
+                                     check=False, capture_output=True, timeout=5)
+                    except (subprocess.TimeoutExpired, FileNotFoundError):
+                        pass
+            else:  # Windows
                 try:
-                    subprocess.run(['pkill', '-f', 'Chrome'], check=False, capture_output=True)
-                    subprocess.run(['pkill', '-f', 'chrome'], check=False, capture_output=True)
-                    subprocess.run(['pkill', '-f', 'Google Chrome'], check=False, capture_output=True)
-                except:
+                    subprocess.run(['taskkill', '/f', '/im', 'chrome.exe'], 
+                                 check=False, capture_output=True, timeout=5)
+                    subprocess.run(['taskkill', '/f', '/im', 'chromium.exe'], 
+                                 check=False, capture_output=True, timeout=5)
+                except (subprocess.TimeoutExpired, FileNotFoundError):
                     pass
-            else:
+            
+            # Fallback using psutil for any remaining processes
+            try:
                 for proc in psutil.process_iter(['pid', 'name']):
                     try:
-                        if 'chrome' in proc.info['name'].lower():
+                        if proc.info and 'chrome' in proc.info['name'].lower():
                             proc.terminate()
-                            proc.wait(timeout=3)
-                    except:
-                        try:
-                            if proc.is_running():
+                            try:
+                                proc.wait(timeout=3)
+                            except psutil.TimeoutExpired:
                                 proc.kill()
-                        except:
-                            pass
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+            except Exception:
+                pass
+                
             time.sleep(2)
             self.log("🔄 Closed existing Chrome processes")
         except Exception as e:
             self.log(f"Could not close Chrome processes: {e}")
     
     def create_temp_profile(self):
-        """Create a temporary Chrome profile"""
+        """Create a temporary Chrome profile with better error handling"""
         try:
-            self.temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
+            # Use a more specific temp directory name
+            temp_base = tempfile.gettempdir()
+            profile_name = f"iskole_chrome_{uuid.uuid4().hex[:8]}"
+            self.temp_profile = os.path.join(temp_base, profile_name)
+            
+            os.makedirs(self.temp_profile, exist_ok=True)
+            
+            # Test write permissions
+            test_file = os.path.join(self.temp_profile, "test.txt")
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            
             self.log(f"📁 Created temp profile: {self.temp_profile}")
             return True
         except Exception as e:
@@ -126,20 +222,83 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def cleanup_temp_profile(self):
-        """Clean up temporary profile"""
+        """Clean up temporary profile with better error handling"""
         if self.temp_profile and os.path.exists(self.temp_profile):
             try:
-                shutil.rmtree(self.temp_profile)
+                # Force close any handles on Windows
+                if platform.system().lower() == "windows":
+                    time.sleep(1)
+                
+                shutil.rmtree(self.temp_profile, ignore_errors=True)
                 self.log("🗑️ Cleaned up temp profile")
             except Exception as e:
                 self.log(f"Failed to cleanup temp profile: {e}")
+                # Try alternative cleanup method
+                try:
+                    if platform.system().lower() == "windows":
+                        subprocess.run(['rmdir', '/s', '/q', self.temp_profile], 
+                                     check=False, shell=True)
+                    else:
+                        subprocess.run(['rm', '-rf', self.temp_profile], 
+                                     check=False)
+                except Exception:
+                    self.log(f"Temp profile cleanup failed, may need manual removal: {self.temp_profile}")
     
+    def find_chrome_executable(self):
+        """Find Chrome executable across different platforms"""
+        system = platform.system().lower()
+        
+        chrome_paths = []
+        
+        if system == "windows":
+            chrome_paths = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                r"C:\Users\{}\AppData\Local\Google\Chrome\Application\chrome.exe".format(os.getenv('USERNAME', '')),
+                r"C:\Program Files\Chromium\Application\chrome.exe",
+            ]
+        elif system == "darwin":  # macOS
+            chrome_paths = [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                "/usr/bin/google-chrome",
+                "/usr/bin/chromium",
+            ]
+        else:  # Linux
+            chrome_paths = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/snap/bin/chromium",
+                "/usr/local/bin/chrome",
+            ]
+        
+        # Check if any of the paths exist
+        for path in chrome_paths:
+            if os.path.isfile(path):
+                return path
+        
+        # Try to find using which/where command
+        try:
+            if system == "windows":
+                result = subprocess.run(['where', 'chrome'], capture_output=True, text=True, timeout=5)
+            else:
+                result = subprocess.run(['which', 'google-chrome'], capture_output=True, text=True, timeout=5)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip().split('\n')[0]
+        except Exception:
+            pass
+        
+        return None
+
     def setup_selenium_driver(self):
-        """Setup Selenium Chrome driver with platform-specific options"""
+        """Setup Selenium Chrome driver with better cross-platform support"""
         try:
             if self.driver is not None:
                 try:
-                    _ = self.driver.current_url  # probe
+                    _ = self.driver.current_url  # Test if driver is still alive
                     self.log("♻️ Reusing existing Selenium Chrome driver")
                     return True
                 except Exception:
@@ -155,28 +314,24 @@ class ImprovedISkoleBot(QObject):
             if not self.create_temp_profile():
                 return False
             
-            # Suppress noisy logs from dependencies
-            try:
-                os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # 0=all, 3=error
-                os.environ.setdefault("ABSL_LOG_SEVERITY", "fatal")
-                os.environ.setdefault("GLOG_minloglevel", "3")
-                os.environ.setdefault("WDM_LOG", "0")  # webdriver_manager
-            except Exception:
-                pass
+            # Suppress noisy logs
+            os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+            os.environ.setdefault("WDM_LOG", "0")
 
             chrome_options = Options()
             chrome_options.add_argument(f"--user-data-dir={self.temp_profile}")
             chrome_options.add_argument("--profile-directory=Default")
             
-            # Platform-specific options
-            if platform.system() == "Darwin":
+            # Cross-platform options
+            system = platform.system().lower()
+            if system == "linux":
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                chrome_options.add_argument("--disable-gpu")
+            elif system == "darwin":
                 chrome_options.add_argument("--disable-dev-shm-usage")
                 chrome_options.add_argument("--no-first-run")
                 chrome_options.add_argument("--no-default-browser-check")
-                chrome_options.add_argument("--disable-default-apps")
-            else:
-                chrome_options.add_argument("--no-sandbox")
-                chrome_options.add_argument("--disable-dev-shm-usage")
             
             # General options
             chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -189,60 +344,81 @@ class ImprovedISkoleBot(QObject):
             chrome_options.add_argument("--disable-background-timer-throttling")
             chrome_options.add_argument("--disable-renderer-backgrounding")
             chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-            
-            # Language settings
             chrome_options.add_argument("--lang=nb-NO")
+            
+            # Logging suppression
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+            chrome_options.add_argument("--log-level=3")
+            chrome_options.add_argument("--silent")
+            chrome_options.add_argument("--disable-logging")
+            chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_experimental_option("prefs", {
                 "intl.accept_languages": "nb-NO,nb,no,nn,en-US,en"
             })
             
-            # Logging/telemetry suppression
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])  # remove USB and GCM noise on Windows
-            chrome_options.add_argument("--log-level=3")  # INFO=0, WARNING=1, LOG_ERROR=2, LOG_FATAL=3
-            chrome_options.add_argument("--silent")
-            chrome_options.add_argument("--disable-logging")
-            chrome_options.add_argument("--v=0")
-            
-            # Keep automation extension disabled
-            chrome_options.add_experimental_option('useAutomationExtension', False)
+            # Try to find Chrome executable
+            chrome_binary = self.find_chrome_executable()
+            if chrome_binary:
+                chrome_options.binary_location = chrome_binary
+                self.log(f"🔍 Using Chrome binary: {chrome_binary}")
             
             try:
+                # Try with webdriver-manager first
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 
-                # Route ChromeDriver logs to DEVNULL where supported
+                driver_path = ChromeDriverManager().install()
+                
+                # Create service with proper log suppression
                 try:
-                    service = Service(ChromeDriverManager().install(), log_output=subprocess.DEVNULL)
+                    service = Service(driver_path, log_output=subprocess.DEVNULL)
                 except TypeError:
-                    service = Service(ChromeDriverManager().install())
+                    # Older selenium versions
+                    service = Service(driver_path)
+                
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 
-                # Remove webdriver property
-                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-                self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-                    "userAgent": self.headers['User-Agent']
-                })
-                
-                self.log("✅ Selenium Chrome driver initialized successfully")
-                return True
-                
             except ImportError:
+                # Install webdriver-manager if not available
                 self.log("📦 Installing webdriver-manager...")
                 subprocess.check_call([sys.executable, "-m", "pip", "install", "webdriver-manager"])
                 
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 
+                driver_path = ChromeDriverManager().install()
                 try:
-                    service = Service(ChromeDriverManager().install(), log_output=subprocess.DEVNULL)
+                    service = Service(driver_path, log_output=subprocess.DEVNULL)
                 except TypeError:
-                    service = Service(ChromeDriverManager().install())
+                    service = Service(driver_path)
+                
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            except Exception as fallback_error:
+                # Fallback to system ChromeDriver
+                self.log(f"WebDriver manager failed: {fallback_error}")
+                self.log("🔄 Trying system ChromeDriver...")
                 
-                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-                self.log("✅ ChromeDriver installed and initialized")
-                return True
-                
+                try:
+                    service = Service()  # Use system ChromeDriver
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                except Exception as system_error:
+                    self.log(f"System ChromeDriver failed: {system_error}")
+                    raise system_error
+            
+            # Remove webdriver property and set user agent
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            try:
+                self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                    "userAgent": self.headers['User-Agent']
+                })
+            except Exception:
+                # CDP commands might not be available in all environments
+                pass
+            
+            self.log("✅ Selenium Chrome driver initialized successfully")
+            return True
+            
         except Exception as e:
             self.log(f"Failed to setup Selenium driver: {e}")
             self.cleanup_temp_profile()
@@ -515,7 +691,7 @@ class ImprovedISkoleBot(QObject):
             return False
     
     def save_cookies_to_file(self):
-        """Save current session cookies to file with metadata, including domain and path"""
+        """Save current session cookies to file with better error handling"""
         try:
             cookies_list = []
             for cookie in self.session.cookies:
@@ -534,54 +710,96 @@ class ImprovedISkoleBot(QObject):
                 'user_agent': self.headers['User-Agent']
             }
             
-            with open(self.cookies_file, 'wb') as f:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.cookies_file), exist_ok=True)
+            
+            # Write to temporary file first, then rename (atomic operation)
+            temp_file = self.cookies_file + '.tmp'
+            with open(temp_file, 'wb') as f:
                 pickle.dump(cookie_data, f)
+            
+            # Atomic rename
+            if platform.system().lower() == "windows":
+                # Windows doesn't allow rename over existing file
+                if os.path.exists(self.cookies_file):
+                    os.remove(self.cookies_file)
+            os.rename(temp_file, self.cookies_file)
+            
             self.log(f"💾 Cookies saved to {self.cookies_file}")
             return True
         except Exception as e:
             self.log(f"Failed to save cookies: {e}")
+            # Clean up temp file if it exists
+            temp_file = self.cookies_file + '.tmp'
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
             return False
     
     def load_cookies_from_file(self):
-        """Load cookies from file with expiration check, including domain and path"""
+        """Load cookies from file with better error handling"""
         try:
-            if os.path.exists(self.cookies_file):
-                with open(self.cookies_file, 'rb') as f:
-                    cookie_data = pickle.load(f)
-                
-                if isinstance(cookie_data, dict) and 'cookies' in cookie_data:
-                    cookies = cookie_data['cookies']
-                    timestamp = datetime.fromisoformat(cookie_data.get('timestamp', '2025-01-01T00:00:00'))
-                    
-                    if datetime.now() - timestamp > timedelta(days=7):
-                        self.log("⏰ Saved cookies are too old, will refresh")
-                        os.remove(self.cookies_file)
-                        return False
-                else:
-                    # Backward compatibility for old format
-                    cookies = [{'name': name, 'value': value, 'domain': '.iskole.net', 'path': '/'} for name, value in cookie_data.items()]
-                
-                now = time.time()
-                loaded_count = 0
-                for c in cookies:
-                    if c.get('expires') and c['expires'] < now:
-                        self.log(f"Skipping expired cookie: {c['name']}")
-                        continue
-                    self.session.cookies.set(
-                        c['name'], 
-                        c['value'], 
-                        domain=c.get('domain', '.iskole.net'),
-                        path=c.get('path', '/')
-                    )
-                    loaded_count += 1
-                
-                self.log(f"📂 Loaded {loaded_count} cookies from file")
-                return loaded_count > 0
-            else:
+            if not os.path.exists(self.cookies_file):
                 self.log("No saved cookies file found")
                 return False
+            
+            # Check if file is readable and not corrupted
+            try:
+                file_size = os.path.getsize(self.cookies_file)
+                if file_size == 0:
+                    self.log("Cookies file is empty, removing...")
+                    os.remove(self.cookies_file)
+                    return False
+            except Exception:
+                return False
+            
+            with open(self.cookies_file, 'rb') as f:
+                cookie_data = pickle.load(f)
+            
+            if isinstance(cookie_data, dict) and 'cookies' in cookie_data:
+                cookies = cookie_data['cookies']
+                timestamp_str = cookie_data.get('timestamp', '2025-01-01T00:00:00')
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str)
+                except ValueError:
+                    timestamp = datetime(2025, 1, 1)
+                
+                if datetime.now() - timestamp > timedelta(days=7):
+                    self.log("⏰ Saved cookies are too old, will refresh")
+                    os.remove(self.cookies_file)
+                    return False
+            else:
+                # Backward compatibility for old format
+                cookies = [{'name': name, 'value': value, 'domain': '.iskole.net', 'path': '/'} 
+                          for name, value in cookie_data.items()]
+            
+            now = time.time()
+            loaded_count = 0
+            for c in cookies:
+                if c.get('expires') and c['expires'] < now:
+                    continue
+                self.session.cookies.set(
+                    c['name'], 
+                    c['value'], 
+                    domain=c.get('domain', '.iskole.net'),
+                    path=c.get('path', '/')
+                )
+                loaded_count += 1
+            
+            self.log(f"📂 Loaded {loaded_count} cookies from file")
+            return loaded_count > 0
+            
         except Exception as e:
             self.log(f"Failed to load cookies: {e}")
+            # Remove corrupted cookies file
+            if os.path.exists(self.cookies_file):
+                try:
+                    os.remove(self.cookies_file)
+                    self.log("🗑️ Removed corrupted cookies file")
+                except Exception:
+                    pass
             return False
     
     def test_cookies(self):
