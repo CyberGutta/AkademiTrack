@@ -106,53 +106,27 @@ def log_bundle_info():
     print(f"========================")
 
 def get_base_directory():
-    """Get the base directory for the application - ENHANCED FOR ALL BUNDLE TYPES"""
+    """FIXED: Get base directory for macOS .app bundles"""
     try:
         if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            if sys.platform == 'darwin':  # macOS
-                # Check if we're in an .app bundle
-                if '.app/Contents/MacOS' in sys.executable:
-                    # In .app bundle, resources are in Contents/Resources
-                    bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-                    resources_dir = Path(bundle_dir) / 'Resources'
-                    if resources_dir.exists():
-                        return resources_dir
-                    else:
-                        # Fallback to bundle root
-                        return Path(bundle_dir)
+            if sys.platform == 'darwin' and '.app/' in sys.executable:
+                # macOS .app bundle - Resources directory
+                bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+                resources_dir = Path(bundle_dir) / 'Resources'
+                if resources_dir.exists():
+                    return resources_dir
                 else:
-                    # Standalone macOS executable
-                    return Path(sys.executable).parent
+                    return Path(bundle_dir)
             else:
-                # Windows/Linux - same directory as executable
-                exe_path = Path(sys.executable)
-                # For nuitka, check if there's a distribution directory
-                possible_dirs = [
-                    exe_path.parent,  # Same directory as exe
-                    exe_path.parent.parent,  # Parent directory (if in subdirectory)
-                ]
-                
-                # Return the first directory that contains our files
-                for dir_path in possible_dirs:
-                    if (dir_path / 'backend.py').exists() or (dir_path / 'pictures').exists():
-                        return dir_path
-                
-                return exe_path.parent
+                # Other platforms or standalone executable
+                return Path(sys.executable).parent
         else:
             # Running as script
             return Path(__file__).resolve().parent
             
     except Exception as e:
-        print(f"Error determining base directory: {e}")
-        # Ultimate fallback
-        try:
-            if getattr(sys, 'frozen', False):
-                return Path(sys.executable).parent
-            else:
-                return Path(__file__).resolve().parent
-        except:
-            return Path.cwd()
+        print(f"Error in get_base_directory: {e}")
+        return Path.cwd()
 
 def set_application_icon(self):
     """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories - BUNDLE COMPATIBLE"""
@@ -3657,99 +3631,149 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Main function with bundle support and better error handling"""
+    """Main function with macOS bundle fix"""
     
-    # Log bundle info for debugging
-    log_bundle_info()
-    
-    # Ensure we can import Qt
-    try:
-        from PyQt5.QtWidgets import QApplication
-    except ImportError as e:
-        print(f"Critical error: Cannot import PyQt5: {e}")
-        input("Press Enter to exit...")
-        sys.exit(1)
+    # === CRITICAL macOS BUNDLE FIX ===
+    print("🍎 macOS Bundle Fix Starting...")
     
     try:
+        # Fix Python path for bundled app
+        if getattr(sys, 'frozen', False):
+            print(f"Running as bundled app: {sys.executable}")
+            
+            if sys.platform == 'darwin' and '.app/' in sys.executable:
+                # macOS .app bundle
+                bundle_dir = os.path.dirname(os.path.dirname(sys.executable))  # Go up from MacOS to Contents
+                resources_dir = os.path.join(bundle_dir, 'Resources')
+                
+                print(f"Bundle dir: {bundle_dir}")
+                print(f"Resources dir: {resources_dir}")
+                
+                # Add both directories to Python path
+                if os.path.exists(resources_dir):
+                    sys.path.insert(0, resources_dir)
+                    print(f"✅ Added to path: {resources_dir}")
+                
+                # Also add the MacOS directory itself
+                macos_dir = os.path.dirname(sys.executable)
+                sys.path.insert(0, macos_dir)
+                print(f"✅ Added to path: {macos_dir}")
+                
+                # Set working directory to Resources if it exists
+                if os.path.exists(resources_dir):
+                    os.chdir(resources_dir)
+                    print(f"✅ Changed working directory to: {resources_dir}")
+            
+            # List available files for debugging
+            current_dir = os.getcwd()
+            print(f"Current directory: {current_dir}")
+            try:
+                files = os.listdir(current_dir)
+                print(f"Available files: {files[:10]}")  # First 10 files
+                
+                # Check specifically for backend.py
+                if 'backend.py' in files:
+                    print("✅ backend.py found!")
+                else:
+                    print("❌ backend.py NOT found in current directory")
+                    # Try to find it
+                    for root, dirs, files in os.walk(current_dir):
+                        if 'backend.py' in files:
+                            print(f"📍 Found backend.py at: {root}")
+                            sys.path.insert(0, root)
+                            break
+                            
+            except Exception as e:
+                print(f"Error listing files: {e}")
+        
+        print("🍎 macOS Bundle Fix Complete")
+        
+    except Exception as e:
+        print(f"❌ Bundle fix error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # === CRASH PROTECTION WRAPPER ===
+    try:
+        # Your existing main() code starts here...
         app = QApplication(sys.argv)
         app.setStyle('Fusion')
         
-        # Set application properties
+        # Test backend import immediately
+        try:
+            print("Testing backend import...")
+            from backend import ImprovedISkoleBot
+            print("✅ Backend import successful!")
+        except ImportError as e:
+            print(f"❌ CRITICAL: Cannot import backend: {e}")
+            print(f"Python path: {sys.path[:3]}...")
+            
+            # Show error dialog instead of crashing
+            from PyQt5.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setWindowTitle("Import Error")
+            msg.setText(f"Cannot find backend.py:\n{e}\n\nCheck if backend.py is included in the bundle.")
+            msg.exec_()
+            sys.exit(1)
+        
+        # Continue with rest of your main() function...
         app.setApplicationName("AkademiTrack")
         app.setApplicationVersion("1.0")
         app.setOrganizationName("AkademiTrack")
         
-        # Set application icon globally for taskbar
-        set_application_icon_in_main(app)
-        
-        # Initialize settings manager with error handling
-        try:
-            settings_manager = SettingsManager()
-        except Exception as e:
-            print(f"Error initializing settings: {e}")
-            # Continue without settings
-            settings_manager = None
-        
-        # Show welcome dialog for first-time users
-        if settings_manager and settings_manager.should_show_welcome():
-            try:
-                from PyQt5.QtWidgets import QDialog
-                welcome_dialog = WelcomeDialog()
-                
-                if welcome_dialog.exec_() == QDialog.Accepted:
-                    # User clicked "Forstått, start programmet"
-                    dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
-                    settings_manager.mark_welcome_shown(dont_show_again)
-                else:
-                    # User clicked "Lukk" or closed dialog
-                    print("User cancelled setup")
-                    sys.exit(0)
-            except Exception as e:
-                print(f"Error with welcome dialog: {e}")
-                # Continue without welcome dialog
-        
-        # Create main window with error handling
+        # Create window with error handling
         try:
             window = AkademiTrackWindow()
-            if settings_manager:
-                window.settings_manager = settings_manager
         except Exception as e:
-            print(f"Critical error creating main window: {e}")
-            import traceback
+            print(f"❌ Window creation error: {e}")
             traceback.print_exc()
-            input("Press Enter to exit...")
+            
+            # Show error instead of silent crash
+            from PyQt5.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setWindowTitle("Startup Error")
+            msg.setText(f"Failed to create main window:\n{e}")
+            msg.exec_()
             sys.exit(1)
         
-        # Center the window
+        # Center and show window
         try:
             screen = app.primaryScreen().availableGeometry()
-            window_width = window.width()
-            window_height = window.height()
-            
-            x = (screen.width() - window_width) // 2
-            y = (screen.height() - window_height) // 2
-            
-            x = max(0, min(x, screen.width() - window_width))
-            y = max(0, min(y, screen.height() - window_height))
-            
-            window.move(x, y)
-            print(f"Window centered at position: {x}, {y}")
-            
+            x = (screen.width() - window.width()) // 2
+            y = (screen.height() - window.height()) // 2
+            window.move(max(0, x), max(0, y))
+            window.show()
+            print("✅ Window shown successfully")
         except Exception as e:
-            print(f"Could not center window: {e}")
-            window.move(200, 200)
+            print(f"❌ Window display error: {e}")
+            window.show()  # Try to show anyway
         
-        # Show window
-        window.show()
-        
-        # Run application
-        sys.exit(app.exec_())
+        # Run app with crash protection
+        print("🚀 Starting Qt event loop...")
+        exit_code = app.exec_()
+        print(f"App exited with code: {exit_code}")
+        sys.exit(exit_code)
         
     except Exception as e:
-        print(f"Critical application error: {e}")
-        import traceback
+        print(f"❌ CRITICAL ERROR in main(): {e}")
         traceback.print_exc()
-        input("Press Enter to exit...")
+        
+        # Try to show error dialog before crashing
+        try:
+            from PyQt5.QtWidgets import QApplication, QMessageBox
+            if not QApplication.instance():
+                app = QApplication(sys.argv)
+            
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setWindowTitle("Critical Error")
+            msg.setText(f"Application crashed:\n{e}\n\nCheck Console.app for details.")
+            msg.exec_()
+        except:
+            pass
+        
         sys.exit(1)
 
 if __name__ == "__main__":
