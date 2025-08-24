@@ -7,19 +7,53 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+# ===== CRITICAL macOS BUNDLE FIX =====
+def setup_bundle_environment():
+    """Setup environment for bundled application - FIXED FOR macOS"""
+    if getattr(sys, 'frozen', False):
+        print(f"🍎 Detected bundled app: {sys.executable}")
+        
+        if sys.platform == 'darwin':  # macOS
+            # In macOS .app bundle, files are embedded in the executable
+            # No need to add paths - Python can find embedded modules
+            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+            resources_dir = os.path.join(bundle_dir, 'Resources')
+            
+            print(f"Bundle structure:")
+            print(f"  Bundle dir: {bundle_dir}")
+            print(f"  Resources dir: {resources_dir}")
+            print(f"  Executable: {sys.executable}")
+            
+            # Set working directory to Resources if it exists (for data files)
+            if os.path.exists(resources_dir):
+                os.chdir(resources_dir)
+                print(f"✅ Changed working directory to: {resources_dir}")
+            
+            return True
+        else:
+            # Windows/Linux - add executable directory to path
+            exe_dir = os.path.dirname(sys.executable)
+            sys.path.insert(0, exe_dir)
+            return True
+    
+    return False
+
+# Call this BEFORE any other imports
+setup_bundle_environment()
 
 try:
     from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-    QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
-    QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
+        QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+        QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
+        QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
     )
     from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
     from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
     from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QCheckBox
+    print("✅ PyQt5 imported successfully")
 
 except ImportError:
-    print("PyQt5 is required. Please install it with: pip install PyQt5")
+    print("❌ PyQt5 is required. Please install it with: pip install PyQt5")
     sys.exit(1)
 
 try:
@@ -49,83 +83,148 @@ except ImportError as e:
             print(f"Failed all backend import attempts: {e2}")
             sys.exit(1)
 
-def setup_bundle_environment():
-    """Setup environment for bundled application"""
-    if getattr(sys, 'frozen', False):
-        # Running as bundled executable
-        if sys.platform == 'darwin':  # macOS
-            # In .app bundle, add Resources to Python path
-            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-            resources_dir = os.path.join(bundle_dir, 'Resources')
-            if os.path.exists(resources_dir):
-                sys.path.insert(0, resources_dir)
-        else:
-            # Windows/Linux - add executable directory to path
-            exe_dir = os.path.dirname(sys.executable)
-            sys.path.insert(0, exe_dir)
+def import_backend_with_fallbacks():
+    """Import backend with multiple fallback strategies for bundled apps"""
+    
+    strategies = [
+        "direct_import",
+        "importlib_import", 
+        "exec_import",
+        "file_search_import"
+    ]
+    
+    for strategy in strategies:
+        try:
+            print(f"🔄 Trying strategy: {strategy}")
             
-            setup_bundle_environment()
+            if strategy == "direct_import":
+                # Strategy 1: Direct import (works for embedded modules)
+                from backend import ImprovedISkoleBot
+                print("✅ Direct import successful!")
+                return ImprovedISkoleBot
+                
+            elif strategy == "importlib_import":
+                # Strategy 2: Importlib (for embedded modules)
+                import importlib
+                backend = importlib.import_module('backend')
+                ImprovedISkoleBot = backend.ImprovedISkoleBot
+                print("✅ Importlib import successful!")
+                return ImprovedISkoleBot
+                
+            elif strategy == "exec_import":
+                # Strategy 3: Try to find and exec backend code
+                try:
+                    import backend
+                    ImprovedISkoleBot = backend.ImprovedISkoleBot
+                    print("✅ Exec import successful!")
+                    return ImprovedISkoleBot
+                except:
+                    continue
+                    
+            elif strategy == "file_search_import":
+                # Strategy 4: Search for backend.py file (last resort)
+                search_dirs = [
+                    os.getcwd(),
+                    os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd(),
+                    os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd(),
+                ]
+                
+                for search_dir in search_dirs:
+                    backend_path = os.path.join(search_dir, 'backend.py')
+                    if os.path.exists(backend_path):
+                        print(f"Found backend.py at: {backend_path}")
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location("backend", backend_path)
+                        backend = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(backend)
+                        ImprovedISkoleBot = backend.ImprovedISkoleBot
+                        print("✅ File search import successful!")
+                        return ImprovedISkoleBot
+                        
+        except Exception as e:
+            print(f"❌ Strategy {strategy} failed: {e}")
+            continue
+    
+    # If all strategies fail
+    print("❌ ALL IMPORT STRATEGIES FAILED")
+    
+    # Show user-friendly error
+    if getattr(sys, 'frozen', False):
+        print("This appears to be a bundled app with missing components.")
+        print("The backend.py module could not be found or loaded.")
+    
+    return None
 
+# Try to import backend
+ImprovedISkoleBot = import_backend_with_fallbacks()
+if ImprovedISkoleBot is None:
+    print("🚨 CRITICAL: Cannot import backend - app will exit")
+    
+    # Try to show error dialog before exiting
+    try:
+        app = QApplication(sys.argv) if not QApplication.instance() else QApplication.instance()
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setWindowTitle("Import Error")
+        msg.setText("Critical Error: Cannot load backend module.\n\nThe application cannot start.")
+        msg.setDetailedText("This may be due to:\n1. Missing backend.py in bundle\n2. Incorrect bundle packaging\n3. Import path issues")
+        msg.exec_()
+    except:
+        pass
+    
+    sys.exit(1)
 
 def get_resource_path(filename):
-    """Get the path to a resource file - WORKS IN ALL BUNDLE TYPES"""
+    """Get path to resource file - works in all bundle types including macOS"""
     base_dir = get_base_directory()
     
-    # Try multiple locations
+    # Search in multiple possible locations
     possible_paths = [
         base_dir / filename,
         base_dir / 'pictures' / filename,
         base_dir / 'assets' / filename,
         base_dir / 'resources' / filename,
+        base_dir / 'icons' / filename,
+        base_dir / 'images' / filename,
     ]
     
     for path in possible_paths:
         if path.exists():
+            print(f"✅ Found resource: {path}")
             return str(path)
     
     # If not found, return the most likely path
-    return str(base_dir / filename)
+    fallback_path = base_dir / filename
+    print(f"⚠️ Resource not found, using fallback: {fallback_path}")
+    return str(fallback_path)
     
-def log_bundle_info():
-    """Log information about bundle environment for debugging"""
-    print(f"=== BUNDLE INFORMATION ===")
-    print(f"sys.frozen: {getattr(sys, 'frozen', False)}")
-    print(f"sys.executable: {sys.executable}")
-    print(f"__file__: {__file__ if '__file__' in globals() else 'Not available'}")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Base directory: {get_base_directory()}")
-    print(f"Python path: {sys.path[:3]}...")  # First 3 entries
-    
-    base_dir = get_base_directory()
-    print(f"Files in base directory:")
-    try:
-        for item in os.listdir(base_dir):
-            print(f"  - {item}")
-    except Exception as e:
-        print(f"  Error listing directory: {e}")
-    print(f"========================")
 
 def get_base_directory():
-    """FIXED: Get base directory for macOS .app bundles"""
+    """FIXED: Get base directory for all platforms including macOS bundles"""
     try:
         if getattr(sys, 'frozen', False):
             if sys.platform == 'darwin' and '.app/' in sys.executable:
-                # macOS .app bundle - Resources directory
+                # macOS .app bundle - try Resources directory first
                 bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
                 resources_dir = Path(bundle_dir) / 'Resources'
-                if resources_dir.exists():
+                
+                # Check if Resources directory exists and has content
+                if resources_dir.exists() and any(resources_dir.iterdir()):
+                    print(f"✅ Using Resources directory: {resources_dir}")
                     return resources_dir
                 else:
+                    # Fallback to bundle directory
+                    print(f"✅ Using bundle directory: {Path(bundle_dir)}")
                     return Path(bundle_dir)
             else:
-                # Other platforms or standalone executable
+                # Other platforms - use executable directory
                 return Path(sys.executable).parent
         else:
             # Running as script
             return Path(__file__).resolve().parent
             
     except Exception as e:
-        print(f"Error in get_base_directory: {e}")
+        print(f"❌ Error in get_base_directory: {e}")
         return Path.cwd()
 
 def set_application_icon(self):
@@ -3631,150 +3730,145 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Main function with macOS bundle fix"""
+    """Enhanced main function with comprehensive error handling"""
     
-    # === CRITICAL macOS BUNDLE FIX ===
-    print("🍎 macOS Bundle Fix Starting...")
+    print("=" * 50)
+    print("🚀 AkademiTrack Starting...")
+    print("=" * 50)
+    
+    # Log system info
+    print(f"Platform: {platform.system()} {platform.release()}")
+    print(f"Python: {sys.version}")
+    print(f"Frozen: {getattr(sys, 'frozen', False)}")
+    print(f"Executable: {sys.executable}")
+    print(f"Working dir: {os.getcwd()}")
     
     try:
-        # Fix Python path for bundled app
-        if getattr(sys, 'frozen', False):
-            print(f"Running as bundled app: {sys.executable}")
-            
-            if sys.platform == 'darwin' and '.app/' in sys.executable:
-                # macOS .app bundle
-                bundle_dir = os.path.dirname(os.path.dirname(sys.executable))  # Go up from MacOS to Contents
-                resources_dir = os.path.join(bundle_dir, 'Resources')
-                
-                print(f"Bundle dir: {bundle_dir}")
-                print(f"Resources dir: {resources_dir}")
-                
-                # Add both directories to Python path
-                if os.path.exists(resources_dir):
-                    sys.path.insert(0, resources_dir)
-                    print(f"✅ Added to path: {resources_dir}")
-                
-                # Also add the MacOS directory itself
-                macos_dir = os.path.dirname(sys.executable)
-                sys.path.insert(0, macos_dir)
-                print(f"✅ Added to path: {macos_dir}")
-                
-                # Set working directory to Resources if it exists
-                if os.path.exists(resources_dir):
-                    os.chdir(resources_dir)
-                    print(f"✅ Changed working directory to: {resources_dir}")
-            
-            # List available files for debugging
-            current_dir = os.getcwd()
-            print(f"Current directory: {current_dir}")
-            try:
-                files = os.listdir(current_dir)
-                print(f"Available files: {files[:10]}")  # First 10 files
-                
-                # Check specifically for backend.py
-                if 'backend.py' in files:
-                    print("✅ backend.py found!")
-                else:
-                    print("❌ backend.py NOT found in current directory")
-                    # Try to find it
-                    for root, dirs, files in os.walk(current_dir):
-                        if 'backend.py' in files:
-                            print(f"📍 Found backend.py at: {root}")
-                            sys.path.insert(0, root)
-                            break
-                            
-            except Exception as e:
-                print(f"Error listing files: {e}")
+        # Setup bundle environment
+        is_bundled = setup_bundle_environment()
+        if is_bundled:
+            print("✅ Bundle environment setup complete")
         
-        print("🍎 macOS Bundle Fix Complete")
+        # Verify backend import worked
+        if ImprovedISkoleBot is None:
+            raise ImportError("Backend import failed during startup")
         
-    except Exception as e:
-        print(f"❌ Bundle fix error: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # === CRASH PROTECTION WRAPPER ===
-    try:
-        # Your existing main() code starts here...
-        app = QApplication(sys.argv)
-        app.setStyle('Fusion')
-        
-        # Test backend import immediately
+        # Create QApplication with error handling
         try:
-            print("Testing backend import...")
-            from backend import ImprovedISkoleBot
-            print("✅ Backend import successful!")
-        except ImportError as e:
-            print(f"❌ CRITICAL: Cannot import backend: {e}")
-            print(f"Python path: {sys.path[:3]}...")
-            
-            # Show error dialog instead of crashing
-            from PyQt5.QtWidgets import QMessageBox
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("Import Error")
-            msg.setText(f"Cannot find backend.py:\n{e}\n\nCheck if backend.py is included in the bundle.")
-            msg.exec_()
-            sys.exit(1)
-        
-        # Continue with rest of your main() function...
-        app.setApplicationName("AkademiTrack")
-        app.setApplicationVersion("1.0")
-        app.setOrganizationName("AkademiTrack")
-        
-        # Create window with error handling
-        try:
-            window = AkademiTrackWindow()
+            app = QApplication(sys.argv)
+            app.setStyle('Fusion')  # Use Fusion style for better cross-platform appearance
+            print("✅ QApplication created")
         except Exception as e:
-            print(f"❌ Window creation error: {e}")
+            print(f"❌ Failed to create QApplication: {e}")
+            raise
+        
+        # Set application properties
+        try:
+            app.setApplicationName("AkademiTrack")
+            app.setApplicationVersion("1.0")
+            app.setOrganizationName("AkademiTrack")
+            print("✅ App properties set")
+        except Exception as e:
+            print(f"⚠️ Could not set app properties: {e}")
+        
+        # Import main window class
+        try:
+            # The AkademiTrackWindow should be defined in this same file
+            # Make sure it's after the backend import
+            print("✅ Window class ready")
+        except Exception as e:
+            print(f"❌ Window class import failed: {e}")
+            raise
+        
+        # Create main window with comprehensive error handling
+        try:
+            print("Creating main window...")
+            window = AkademiTrackWindow()
+            print("✅ Main window created")
+        except Exception as e:
+            print(f"❌ Failed to create main window: {e}")
+            import traceback
             traceback.print_exc()
             
-            # Show error instead of silent crash
-            from PyQt5.QtWidgets import QMessageBox
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("Startup Error")
-            msg.setText(f"Failed to create main window:\n{e}")
-            msg.exec_()
-            sys.exit(1)
+            # Show error dialog
+            try:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setWindowTitle("Startup Error")
+                msg.setText(f"Failed to create main window:\n\n{str(e)}")
+                msg.setDetailedText(traceback.format_exc())
+                msg.exec_()
+            except:
+                pass
+            
+            return 1
         
-        # Center and show window
+        # Position and show window
         try:
-            screen = app.primaryScreen().availableGeometry()
-            x = (screen.width() - window.width()) // 2
-            y = (screen.height() - window.height()) // 2
-            window.move(max(0, x), max(0, y))
+            # Center window on screen
+            screen = app.primaryScreen()
+            if screen:
+                screen_rect = screen.availableGeometry()
+                window_rect = window.geometry()
+                
+                x = (screen_rect.width() - window_rect.width()) // 2
+                y = (screen_rect.height() - window_rect.height()) // 2
+                
+                window.move(max(0, x), max(0, y))
+                print("✅ Window positioned")
+            
             window.show()
-            print("✅ Window shown successfully")
+            window.raise_()  # Bring to front
+            window.activateWindow()  # Activate window
+            print("✅ Window shown and activated")
+            
         except Exception as e:
-            print(f"❌ Window display error: {e}")
-            window.show()  # Try to show anyway
+            print(f"⚠️ Window positioning/show error: {e}")
+            # Try to show anyway
+            try:
+                window.show()
+            except:
+                print("❌ Could not show window at all")
+                return 1
         
-        # Run app with crash protection
-        print("🚀 Starting Qt event loop...")
-        exit_code = app.exec_()
-        print(f"App exited with code: {exit_code}")
-        sys.exit(exit_code)
-        
+        # Start event loop with error handling
+        try:
+            print("🚀 Starting Qt event loop...")
+            print("=" * 50)
+            
+            # Run the application
+            exit_code = app.exec_()
+            
+            print("=" * 50)
+            print(f"✅ Application exited cleanly with code: {exit_code}")
+            return exit_code
+            
+        except Exception as e:
+            print(f"❌ Event loop error: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+    
     except Exception as e:
         print(f"❌ CRITICAL ERROR in main(): {e}")
+        import traceback
         traceback.print_exc()
         
-        # Try to show error dialog before crashing
+        # Try to show error dialog
         try:
-            from PyQt5.QtWidgets import QApplication, QMessageBox
-            if not QApplication.instance():
+            if 'app' not in locals():
                 app = QApplication(sys.argv)
             
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("Critical Error")
-            msg.setText(f"Application crashed:\n{e}\n\nCheck Console.app for details.")
+            msg.setWindowTitle("Critical Startup Error")
+            msg.setText(f"The application failed to start:\n\n{str(e)}")
+            msg.setDetailedText(f"Technical details:\n{traceback.format_exc()}")
             msg.exec_()
         except:
-            pass
+            print("Could not show error dialog")
         
-        sys.exit(1)
+        return 1
 
 if __name__ == "__main__":
     main()
