@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false  # Don't cancel other jobs if one fails
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -109,14 +109,14 @@ jobs:
 
       - name: Verify project structure
         run: |
-          echo '=== Project Structure Verification ==='
-          echo 'Current directory contents:'
+          echo "=== Project Structure Verification ==="
+          echo "Current directory contents:"
           ls -la
-          echo 'Python files:'
+          echo "Python files:"
           ls -la *.py
-          echo 'Pictures directory:'
+          echo "Pictures directory:"
           ls -la pictures/ || echo "Pictures directory not found"
-          echo 'Required files check:'
+          echo "Required files check:"
           [ -f "main.py" ] && echo "main.py exists" || echo "main.py missing"
           [ -f "backend.py" ] && echo "backend.py exists" || echo "backend.py missing"
           [ -f "pictures/${{ matrix.icon }}" ] && echo "Icon file exists" || echo "Icon file missing"
@@ -129,22 +129,18 @@ jobs:
           python -c "import PyQt5; print('PyQt5 OK')" || echo "PyQt5 import failed"
           python -c "import PyQt5.QtWidgets; print('PyQt5.QtWidgets OK')" || echo "PyQt5.QtWidgets import failed"
           
-          # Test backend import
           if [ -f "backend.py" ]; then
             python -c "import backend; print('backend.py OK')" || echo "backend.py import failed"
           fi
           
-          # Test main.py imports without running the app
           echo "Testing main.py imports..."
           python -c "
           import sys
           import os
           
-          # Read main.py and extract imports
           with open('main.py', 'r') as f:
               content = f.read()
           
-          # Split at 'if __name__' to avoid running the app
           imports_section = content.split('if __name__')[0]
           
           try:
@@ -161,7 +157,6 @@ jobs:
           echo "Build command: ${{ matrix.build-cmd }}"
           echo "Starting build process..."
           
-          # Execute the build command
           python -m ${{ matrix.build-cmd }}
           
           echo "Build process completed"
@@ -173,7 +168,6 @@ jobs:
           echo "Current directory after build:"
           ls -la
           
-          # Check for different possible outputs
           if [ -d "main.dist" ]; then
             echo "main.dist directory found"
             echo "main.dist size: $(du -sh main.dist/ 2>/dev/null || echo 'unknown')"
@@ -181,14 +175,14 @@ jobs:
             ls -la main.dist/
             echo "Total files in main.dist: $(find main.dist -type f | wc -l)"
           else
-            echo "ℹ No main.dist directory found"
+            echo "No main.dist directory found"
           fi
           
           if [ -d "${{ matrix.executable }}" ] || [ -f "${{ matrix.executable }}" ]; then
             echo "${{ matrix.executable }} found"
             echo "${{ matrix.executable }} size: $(du -sh ${{ matrix.executable }} 2>/dev/null || echo 'unknown')"
           else
-            echo "ℹ ${{ matrix.executable }} not found in current directory"
+            echo "${{ matrix.executable }} not found in current directory"
           fi
         shell: bash
 
@@ -213,7 +207,7 @@ jobs:
             cat app_test.log || echo "No execution log generated"
             
             echo "Checking for Python modules in Resources:"
-            ls -la AkademiTrack.app/Contents/Resources/ | grep -E '\.py|\.so|\.dylib' || echo "No Python files found in Resources"
+            ls -la AkademiTrack.app/Contents/Resources/ | grep -E "\.py|\.so|\.dylib" || echo "No Python files found in Resources"
           else
             echo "No AkademiTrack.app found for testing"
           fi
@@ -225,59 +219,51 @@ jobs:
           if [ -d "AkademiTrack.app" ]; then
             echo "=== macOS App Signing ==="
             
-            # Check architecture
             echo "Checking app architecture:"
             file AkademiTrack.app/Contents/MacOS/AkademiTrack 2>/dev/null || echo "Could not check file type"
             lipo -archs AkademiTrack.app/Contents/MacOS/AkademiTrack 2>/dev/null || echo "Could not check architecture with lipo"
             
-            # Remove existing signature and apply new one
             echo "Applying ad-hoc signature..."
             codesign --remove-signature AkademiTrack.app 2>/dev/null || true
             codesign --force --deep --sign - AkademiTrack.app
             
-            # Verify signature
             codesign --verify --verbose AkademiTrack.app && echo "Signature verified" || echo "Signature verification failed"
             
-            # Remove quarantine attribute
             xattr -d com.apple.quarantine AkademiTrack.app 2>/dev/null || echo "No quarantine attribute to remove"
             
-            # Create installer script
-            cat > install_akademitrack.sh << 'INSTALLER_EOF'
-#!/bin/bash
-echo "=== AkademiTrack Installer for Apple Silicon Macs ==="
-echo "This app is built specifically for M1, M2, M3, M4 Macs (Apple Silicon)"
-echo ""
-
-# Check if running on Apple Silicon
-if [[ $(uname -m) != "arm64" ]]; then
-    echo "⚠️  WARNING: This version is built for Apple Silicon (M1/M2/M3/M4) Macs only."
-    echo "If you're on an Intel Mac, this may not work properly."
-    echo "Press Ctrl+C to cancel or Enter to continue..."
-    read
-fi
-
-# Check for existing installation
-if [ -d "/Applications/AkademiTrack.app" ]; then
-    echo "Removing existing installation..."
-    rm -rf "/Applications/AkademiTrack.app"
-fi
-
-echo "Installing AkademiTrack to Applications folder..."
-cp -R "AkademiTrack.app" "/Applications/"
-
-# Set proper permissions
-chmod -R 755 "/Applications/AkademiTrack.app"
-
-echo "Installation complete!"
-echo ""
-echo "To run AkademiTrack:"
-echo "1. Open Applications folder"
-echo "2. Right-click on AkademiTrack and select 'Open'"
-echo "3. Click 'Open' when macOS asks for confirmation (first run only)"
-echo "4. After first run, you can open normally from Launchpad"
-echo ""
-echo "Note: This is an Apple Silicon (ARM64) build for M1/M2/M3/M4 Macs"
-INSTALLER_EOF
+            cat > install_akademitrack.sh << 'EOF'
+          #!/bin/bash
+          echo "=== AkademiTrack Installer for Apple Silicon Macs ==="
+          echo "This app is built specifically for M1, M2, M3, M4 Macs (Apple Silicon)"
+          echo ""
+          
+          if [[ $(uname -m) != "arm64" ]]; then
+              echo "WARNING: This version is built for Apple Silicon (M1/M2/M3/M4) Macs only."
+              echo "If you're on an Intel Mac, this may not work properly."
+              echo "Press Ctrl+C to cancel or Enter to continue..."
+              read
+          fi
+          
+          if [ -d "/Applications/AkademiTrack.app" ]; then
+              echo "Removing existing installation..."
+              rm -rf "/Applications/AkademiTrack.app"
+          fi
+          
+          echo "Installing AkademiTrack to Applications folder..."
+          cp -R "AkademiTrack.app" "/Applications/"
+          
+          chmod -R 755 "/Applications/AkademiTrack.app"
+          
+          echo "Installation complete!"
+          echo ""
+          echo "To run AkademiTrack:"
+          echo "1. Open Applications folder"
+          echo "2. Right-click on AkademiTrack and select 'Open'"
+          echo "3. Click 'Open' when macOS asks for confirmation (first run only)"
+          echo "4. After first run, you can open normally from Launchpad"
+          echo ""
+          echo "Note: This is an Apple Silicon (ARM64) build for M1/M2/M3/M4 Macs"
+          EOF
             
             chmod +x install_akademitrack.sh
             echo "Installer script created"
@@ -289,7 +275,7 @@ INSTALLER_EOF
       - name: Create Windows installer script
         if: matrix.os == 'windows-latest'
         run: |
-          cat > install_akademitrack.bat << 'INSTALLER_EOF'
+          cat > install_akademitrack.bat << 'EOF'
           @echo off
           echo === AkademiTrack Windows Installer ===
           echo.
@@ -323,74 +309,71 @@ INSTALLER_EOF
           echo 1. Navigate to %INSTALL_DIR% and double-click AkademiTrack.exe
           echo.
           pause
-          INSTALLER_EOF
+          EOF
           echo "Windows installer script created"
         shell: bash
 
       - name: Create Linux installer script
         if: matrix.os == 'ubuntu-latest'
         run: |
-          cat > install_akademitrack.sh << 'INSTALLER_EOF'
-#!/bin/bash
-echo "=== AkademiTrack Linux Installer ==="
-echo ""
-
-INSTALL_DIR="$HOME/AkademiTrack"
-
-if [ -d "$INSTALL_DIR" ]; then
-    echo "Removing existing installation..."
-    rm -rf "$INSTALL_DIR"
-fi
-
-echo "Creating installation directory..."
-mkdir -p "$INSTALL_DIR"
-
-echo "Copying application files..."
-if [ -d "main.dist" ]; then
-    cp -r main.dist/* "$INSTALL_DIR/"
-elif [ -f "AkademiTrack" ]; then
-    cp "AkademiTrack" "$INSTALL_DIR/"
-else
-    echo "Error: Could not find application files to install"
-    exit 1
-fi
-
-# Copy additional resources
-cp -r pictures "$INSTALL_DIR/" 2>/dev/null || echo "No pictures directory to copy"
-
-# Set executable permissions
-chmod +x "$INSTALL_DIR/AkademiTrack" 2>/dev/null || echo "Could not set executable permissions"
-
-echo ""
-echo "✓ Installation complete!"
-echo "AkademiTrack installed to: $INSTALL_DIR"
-echo ""
-
-echo "Creating desktop entry..."
-mkdir -p ~/.local/share/applications
-cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=AkademiTrack
-Comment=Academic tracking application
-Exec=INSTALL_DIR_PLACEHOLDER/AkademiTrack
-Icon=INSTALL_DIR_PLACEHOLDER/pictures/logo.png
-Terminal=false
-Categories=Education;Office;
-DESKTOP_EOF
-
-# Replace placeholder with actual install directory
-sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
-chmod +x ~/.local/share/applications/akademitrack.desktop
-
-echo "Desktop entry created!"
-echo ""
-echo "To run AkademiTrack:"
-echo "1. Search for 'AkademiTrack' in your application menu, OR"
-echo "2. Run: cd $INSTALL_DIR && ./AkademiTrack"
-echo ""
-INSTALLER_EOF
+          cat > install_akademitrack.sh << 'EOF'
+          #!/bin/bash
+          echo "=== AkademiTrack Linux Installer ==="
+          echo ""
+          
+          INSTALL_DIR="$HOME/AkademiTrack"
+          
+          if [ -d "$INSTALL_DIR" ]; then
+              echo "Removing existing installation..."
+              rm -rf "$INSTALL_DIR"
+          fi
+          
+          echo "Creating installation directory..."
+          mkdir -p "$INSTALL_DIR"
+          
+          echo "Copying application files..."
+          if [ -d "main.dist" ]; then
+              cp -r main.dist/* "$INSTALL_DIR/"
+          elif [ -f "AkademiTrack" ]; then
+              cp "AkademiTrack" "$INSTALL_DIR/"
+          else
+              echo "Error: Could not find application files to install"
+              exit 1
+          fi
+          
+          cp -r pictures "$INSTALL_DIR/" 2>/dev/null || echo "No pictures directory to copy"
+          
+          chmod +x "$INSTALL_DIR/AkademiTrack" 2>/dev/null || echo "Could not set executable permissions"
+          
+          echo ""
+          echo "Installation complete!"
+          echo "AkademiTrack installed to: $INSTALL_DIR"
+          echo ""
+          
+          echo "Creating desktop entry..."
+          mkdir -p ~/.local/share/applications
+          cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=AkademiTrack
+          Comment=Academic tracking application
+          Exec=INSTALL_DIR_PLACEHOLDER/AkademiTrack
+          Icon=INSTALL_DIR_PLACEHOLDER/pictures/logo.png
+          Terminal=false
+          Categories=Education;Office;
+          DESKTOP_EOF
+          
+          sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
+          chmod +x ~/.local/share/applications/akademitrack.desktop
+          
+          echo "Desktop entry created!"
+          echo ""
+          echo "To run AkademiTrack:"
+          echo "1. Search for 'AkademiTrack' in your application menu, OR"
+          echo "2. Run: cd $INSTALL_DIR && ./AkademiTrack"
+          echo ""
+          EOF
           chmod +x install_akademitrack.sh
           echo "Linux installer script created"
         shell: bash
@@ -414,7 +397,6 @@ INSTALLER_EOF
               echo "Restructuring Linux build..."
               echo "Moving executable from main.dist to current directory"
               mv main.dist/AkademiTrack . 2>/dev/null || cp main.dist/AkademiTrack .
-              # Keep main.dist for the installer script to use
               echo "Linux build restructured"
             fi
           fi
