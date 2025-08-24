@@ -1,0 +1,25 @@
+name: Build App
+on: [push]
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install nuitka pyqt5
+      - name: Build Windows
+        if: matrix.os == 'windows-latest'
+        run: nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico main.py
+      - name: Build Mac
+        if: matrix.os == 'macos-latest'  
+        run: nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns main.py
+      - name: Build Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --linux-icon=pictures/logo.png main.py
