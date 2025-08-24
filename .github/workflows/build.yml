@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=universal2 main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -45,6 +45,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install nuitka pyqt5
         continue-on-error: false
+
+      - name: Install additional macOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Install Python for both architectures if available
+          python -m pip install --upgrade setuptools wheel
+          # Ensure we have the tools needed for universal builds
+          brew install --quiet python@3.11 || true
+        continue-on-error: true
 
       - name: List files for debugging
         run: |
@@ -100,6 +109,12 @@ jobs:
         run: |
           if [ -d "AkademiTrack.app" ]; then
             echo "Creating ad-hoc signature for AkademiTrack.app"
+            
+            # Check architecture of the built app
+            echo "Checking app architecture:"
+            file AkademiTrack.app/Contents/MacOS/AkademiTrack || echo "Could not check architecture"
+            lipo -archs AkademiTrack.app/Contents/MacOS/AkademiTrack 2>/dev/null || echo "Could not check with lipo"
+            
             codesign --remove-signature AkademiTrack.app 2>/dev/null || true
             codesign --force --deep --sign - AkademiTrack.app
             codesign --verify --verbose AkademiTrack.app
@@ -108,6 +123,7 @@ jobs:
             cat > install_akademitrack.sh << 'INSTALLER_EOF'
           #!/bin/bash
           echo "Installing AkademiTrack..."
+          echo "This app supports both Intel and Apple Silicon Macs"
           if [ -d "/Applications/AkademiTrack.app" ]; then
               echo "Removing existing installation..."
               rm -rf "/Applications/AkademiTrack.app"
@@ -121,6 +137,8 @@ jobs:
           echo "2. Right-click on AkademiTrack and select 'Open'"
           echo "3. Click 'Open' when macOS asks for confirmation"
           echo "4. After first run, you can open normally from Launchpad"
+          echo ""
+          echo "Note: This is a universal binary that works on both Intel and Apple Silicon Macs"
           INSTALLER_EOF
             chmod +x install_akademitrack.sh
             echo "Created installer script"
