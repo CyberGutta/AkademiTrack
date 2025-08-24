@@ -181,7 +181,7 @@ class WelcomeDialog(QDialog):
         instructions_content = f"""
 <div style="font-size: {html_content_size}px; line-height: 1.7;">
 <h3 style="color: #0066cc; font-size: {html_title_size}px; margin-bottom: 15px;">Hva gjør AkademiTrack?</h3>
-<p style="margin-bottom: 18px; font-size: {html_content_size}px;">AkademiTrack automatiserer oppmøteregistrering for STU-timer i iSkole systemet. Programmet:</p>
+<p style="margin-bottom: 18px; font-size: {html_content_size}px;">AkademiTrack automatiserer oppmøteregistrering for STU-timer i iSkole systemet. For denne versjonen trenger du google chrome installert også. Programmet:</p>
 <ul style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
 <li style="margin-bottom: 12px;"><b>🔍 Overvåker timeplan</b> - Henter automatisk dagens STU-timer</li>
 <li style="margin-bottom: 12px;"><b>⏰ Registrerer oppmøte</b> - Registrerer deg automatisk i registreringsvinduet</li>
