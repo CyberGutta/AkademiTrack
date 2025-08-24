@@ -15,11 +15,11 @@ jobs:
           - os: windows-latest
             icon: pictures/logo.ico
             build-cmd: |
-              nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads main.py
+              nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads --include-module=PyQt5 --include-package=PyQt5 --follow-imports --include-plugin-directory=. --include-data-files=*.py --nofollow-import-to=tkinter main.py
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+              nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -95,8 +95,29 @@ jobs:
           fi
         shell: bash
 
-      - name: Move files from main.dist (Windows/Linux)
-        if: matrix.os != 'macos-latest'
+      - name: Restructure Windows build (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: |
+          if [ -d "main.dist" ]; then
+            echo "Creating AkademiTrack directory and moving files from main.dist"
+            mkdir -p AkademiTrack
+            echo "Before move - main.dist contents:"
+            ls -la main.dist/
+            echo "Moving all files from main.dist to AkademiTrack/"
+            mv main.dist/* AkademiTrack/ || cp -r main.dist/* AkademiTrack/
+            echo "Removing empty main.dist directory"
+            rm -rf main.dist
+            echo "After move - AkademiTrack contents:"
+            ls -la AkademiTrack/
+            echo "AkademiTrack directory size:"
+            du -sh AkademiTrack/
+          else
+            echo "No main.dist directory found for Windows build"
+          fi
+        shell: bash
+
+      - name: Move files from main.dist (Linux only)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           if [ -d "main.dist" ]; then
             echo "Moving files from main.dist to current directory"
@@ -116,13 +137,18 @@ jobs:
           echo "=== Final Build Analysis ==="
           echo "Current directory total size:"
           du -sh . 2>/dev/null || dir
-          echo "All files:"
+          echo "All files and directories:"
           ls -la 2>/dev/null || dir
           echo "Looking for any app/executable files:"
           ls -la *.app 2>/dev/null || echo "No .app files"
           ls -la *.exe 2>/dev/null || echo "No .exe files"  
           ls -la AkademiTrack* 2>/dev/null || echo "No AkademiTrack files"
           ls -la main.* 2>/dev/null || echo "No main.* files"
+          if [ -d "AkademiTrack" ]; then
+            echo "AkademiTrack directory contents and size:"
+            ls -la AkademiTrack/
+            du -sh AkademiTrack/ 2>/dev/null || echo "Could not get AkademiTrack size"
+          fi
           if [ -d "main.dist" ]; then
             echo "main.dist contents and size:"
             ls -la main.dist/
@@ -135,9 +161,9 @@ jobs:
         with:
           name: AkademiTrack-${{ matrix.os }}
           path: |
+            AkademiTrack/
             AkademiTrack*
             main.app/
-            main.dist/
             *.exe
             !*.xml
             !*.pyc
