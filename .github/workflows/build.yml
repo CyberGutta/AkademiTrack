@@ -104,6 +104,17 @@ jobs:
           fi
         shell: bash
 
+      - name: Copy backend (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          if [ -d "AkademiTrack.app" ]; then
+            echo "Copying backend.py into AkademiTrack.app bundle..."
+            cp backend.py AkademiTrack.app/Contents/Resources/ || echo "Failed to copy backend.py"
+            ls -la AkademiTrack.app/Contents/Resources/ || true
+          else
+            echo "No AkademiTrack.app found, skipping backend copy"
+          fi
+
       - name: Sign macOS app (ad-hoc) and create installer
         if: matrix.os == 'macos-latest'
         run: |
