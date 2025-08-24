@@ -17,7 +17,7 @@ jobs:
               nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --follow-imports --nofollow-import-to=tkinter --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads --jobs=2 --lto=no main.py
           - os: macos-latest
             build-cmd: |
-              nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --follow-imports --nofollow-import-to=tkinter --output-filename=AkademiTrack --output-dir=. --assume-yes-for-downloads --jobs=2 --lto=no main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --follow-imports --nofollow-import-to=tkinter --output-filename=AkademiTrack --output-dir=. --assume-yes-for-downloads --jobs=2 --lto=no main.py
           - os: ubuntu-latest
             build-cmd: |
               nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --follow-imports --nofollow-import-to=tkinter --output-filename=AkademiTrack --output-dir=. --assume-yes-for-downloads --jobs=2 --lto=no main.py
@@ -67,7 +67,8 @@ jobs:
           fi
           
           if [ -f "AkademiTrack.app" ] || [ -d "AkademiTrack.app" ]; then
-            echo "Found AkademiTrack.app"
+            echo "Found AkademiTrack.app:"
+            ls -la AkademiTrack.app/
           fi
           
           if [ -f "AkademiTrack.exe" ]; then
@@ -91,10 +92,15 @@ jobs:
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             echo '#!/bin/bash' > install.sh
             echo 'echo "Installing AkademiTrack..."' >> install.sh
-            echo 'mkdir -p "$HOME/AkademiTrack"' >> install.sh
-            echo 'cp -r main.dist/* "$HOME/AkademiTrack/"' >> install.sh
-            echo 'chmod +x "$HOME/AkademiTrack/AkademiTrack"' >> install.sh
-            echo 'echo "Done! Run: $HOME/AkademiTrack/AkademiTrack"' >> install.sh
+            if [ -d "AkademiTrack.app" ]; then
+              echo 'cp -R "AkademiTrack.app" "/Applications/"' >> install.sh
+              echo 'echo "Installed to Applications folder"' >> install.sh
+            elif [ -d "main.dist" ]; then
+              echo 'mkdir -p "$HOME/AkademiTrack"' >> install.sh
+              echo 'cp -r main.dist/* "$HOME/AkademiTrack/"' >> install.sh
+              echo 'chmod +x "$HOME/AkademiTrack/AkademiTrack"' >> install.sh
+              echo 'echo "Done! Run: $HOME/AkademiTrack/AkademiTrack"' >> install.sh
+            fi
             chmod +x install.sh
             
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
