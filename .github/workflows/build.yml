@@ -95,6 +95,123 @@ jobs:
           fi
         shell: bash
 
+      - name: Sign macOS app (ad-hoc) and create installer
+        if: matrix.os == 'macos-latest'
+        run: |
+          if [ -d "AkademiTrack.app" ]; then
+            echo "Creating ad-hoc signature for AkademiTrack.app"
+            # Remove any existing signatures
+            codesign --remove-signature AkademiTrack.app 2>/dev/null || true
+            # Apply ad-hoc signature
+            codesign --force --deep --sign - AkademiTrack.app
+            # Verify the signature
+            codesign --verify --verbose AkademiTrack.app
+            echo "Ad-hoc signature applied successfully"
+            
+            # Create a simple installer script
+            cat > install_akademitrack.sh << 'EOF'
+#!/bin/bash
+echo "Installing AkademiTrack..."
+if [ -d "/Applications/AkademiTrack.app" ]; then
+    echo "Removing existing installation..."
+    rm -rf "/Applications/AkademiTrack.app"
+fi
+echo "Copying AkademiTrack.app to Applications folder..."
+cp -R "AkademiTrack.app" "/Applications/"
+echo "Installation complete!"
+echo ""
+echo "To run AkademiTrack:"
+echo "1. Open Applications folder"
+echo "2. Right-click on AkademiTrack and select 'Open'"
+echo "3. Click 'Open' when macOS asks for confirmation"
+echo "4. After first run, you can open normally from Launchpad"
+EOF
+            chmod +x install_akademitrack.sh
+            echo "Created installer script"
+            
+            # Set extended attributes to help with Gatekeeper
+            xattr -w com.apple.quarantine "" AkademiTrack.app 2>/dev/null || true
+          else
+            echo "No AkademiTrack.app found for signing"
+          fi
+        shell: bash
+
+      - name: Create Windows installer script
+        if: matrix.os == 'windows-latest'
+        run: |
+          cat > install_akademitrack.bat << 'EOF'
+@echo off
+echo Installing AkademiTrack...
+set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
+if exist "%INSTALL_DIR%" (
+    echo Removing existing installation...
+    rmdir /s /q "%INSTALL_DIR%"
+)
+echo Creating installation directory...
+mkdir "%INSTALL_DIR%"
+echo Copying files...
+xcopy "AkademiTrack" "%INSTALL_DIR%" /E /I /Y
+echo.
+echo Installation complete!
+echo AkademiTrack installed to: %INSTALL_DIR%
+echo.
+echo To run AkademiTrack:
+echo 1. Navigate to %INSTALL_DIR%
+echo 2. Double-click AkademiTrack.exe
+echo.
+echo Creating desktop shortcut...
+powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.Save()"
+echo Desktop shortcut created!
+pause
+EOF
+          echo "Created Windows installer script"
+        shell: bash
+
+      - name: Create Linux installer script
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cat > install_akademitrack.sh << 'EOF'
+#!/bin/bash
+echo "Installing AkademiTrack..."
+INSTALL_DIR="$HOME/AkademiTrack"
+if [ -d "$INSTALL_DIR" ]; then
+    echo "Removing existing installation..."
+    rm -rf "$INSTALL_DIR"
+fi
+echo "Creating installation directory..."
+mkdir -p "$INSTALL_DIR"
+echo "Copying files..."
+cp AkademiTrack "$INSTALL_DIR/"
+cp -r pictures "$INSTALL_DIR/" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/AkademiTrack"
+echo ""
+echo "Installation complete!"
+echo "AkademiTrack installed to: $INSTALL_DIR"
+echo ""
+echo "To run AkademiTrack:"
+echo "cd $INSTALL_DIR && ./AkademiTrack"
+echo ""
+echo "Creating desktop entry..."
+mkdir -p ~/.local/share/applications
+cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AkademiTrack
+Comment=Academic tracking application
+Exec=INSTALL_DIR_PLACEHOLDER/AkademiTrack
+Icon=INSTALL_DIR_PLACEHOLDER/pictures/logo.png
+Terminal=false
+Categories=Education;Office;
+DESKTOP_EOF
+sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
+chmod +x ~/.local/share/applications/akademitrack.desktop
+echo "Desktop entry created!"
+EOF
+          chmod +x install_akademitrack.sh
+          echo "Created Linux installer script"
+        shell: bash
+
       - name: Restructure Windows build (Windows only)
         if: matrix.os == 'windows-latest'
         run: |
@@ -165,6 +282,8 @@ jobs:
             AkademiTrack*
             main.app/
             *.exe
+            *.sh
+            *.bat
             !*.xml
             !*.pyc
             !main.build/
