@@ -27,8 +27,38 @@ except ImportError:
     print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
 
+def get_resource_path(filename):
+    """Get the path to a resource file, works in development and when bundled"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        if sys.platform == 'darwin':  # macOS
+            # In .app bundle, resources are in Contents/Resources
+            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+            return os.path.join(bundle_dir, 'Resources', filename)
+        else:
+            # Windows/Linux - same directory as executable
+            return os.path.join(os.path.dirname(sys.executable), filename)
+    else:
+        # Running as script
+        return os.path.join(os.path.dirname(__file__), filename)
+    
+def get_base_directory():
+    """Get the base directory for the application"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        if sys.platform == 'darwin':  # macOS
+            # In .app bundle, resources are in Contents/Resources
+            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+            return Path(bundle_dir) / 'Resources'
+        else:
+            # Windows/Linux - same directory as executable
+            return Path(sys.executable).parent
+    else:
+        # Running as script
+        return Path(__file__).resolve().parent
+
 def set_application_icon(self):
-    """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories"""
+    """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories - BUNDLE COMPATIBLE"""
     try:
         import platform
         import os
@@ -37,10 +67,10 @@ def set_application_icon(self):
         # Detect platform for format preferences
         current_platform = platform.system().lower()
         
-        # Define search directories (relative to script location)
-        base_dir = Path(__file__).resolve().parent
+        # MODIFIED: Use get_base_directory for bundle support
+        base_dir = get_base_directory()
         search_dirs = [
-            base_dir,                           # Root directory
+            base_dir,                           # Root directory (or Resources in .app)
             base_dir / "assets",               # Assets folder
             base_dir / "icons",                # Icons folder  
             base_dir / "images",               # Images folder
@@ -199,13 +229,15 @@ def _create_fallback_icon(self):
         print(f"Fallback icon creation failed: {e}")
 
 def set_application_icon_in_main(app_instance):
-    """Enhanced version for the main() function - pass QApplication instance"""
+    """Enhanced version for the main() function - pass QApplication instance - BUNDLE COMPATIBLE"""
     try:
         import platform
         from pathlib import Path
         
         current_platform = platform.system().lower()
-        base_dir = Path(__file__).resolve().parent
+        
+        # MODIFIED: Use get_base_directory for bundle support
+        base_dir = get_base_directory()
         
         search_dirs = [
             base_dir,
@@ -468,10 +500,11 @@ class WelcomeDialog(QDialog):
         self.accept()
 
 class SettingsManager:
-    """Manages application settings including first-time user experience"""
+    """Manages application settings including first-time user experience - BUNDLE COMPATIBLE"""
     
     def __init__(self):
-        self.base_dir = Path(__file__).resolve().parent
+        # MODIFIED: Use get_base_directory for bundle support
+        self.base_dir = get_base_directory()
         self.settings_file = self.base_dir / "settings.json"
         self.default_settings = {
             "first_time_user": True,
@@ -516,6 +549,7 @@ class SettingsManager:
             if settings is None:
                 settings = self.settings
                 
+            # MODIFIED: Ensure parent directory exists for bundle
             self.settings_file.parent.mkdir(parents=True, exist_ok=True)
             
             with open(self.settings_file, 'w', encoding='utf-8') as f:
@@ -526,6 +560,7 @@ class SettingsManager:
             print(f"Error saving settings: {e}")
             return False
     
+    # Rest of the methods remain the same...
     def get(self, key, default=None):
         """Get a setting value"""
         return self.settings.get(key, default)
@@ -1905,6 +1940,7 @@ class AkademiTrackWindow(QMainWindow):
     def init_bot(self):
         """Initialize the bot"""
         self.install_requirements()
+    # Remove the base_directory parameter that doesn't exist
         self.bot = ImprovedISkoleBot(gui_callback=self.log_message)
         # Connect the scheduler stopped signal to our handler
         self.bot.scheduler_stopped_signal.connect(self.on_scheduler_stopped)
