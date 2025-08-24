@@ -117,21 +117,21 @@ jobs:
           echo 'Pictures directory:'
           ls -la pictures/ || echo "Pictures directory not found"
           echo 'Required files check:'
-          [ -f "main.py" ] && echo "✓ main.py exists" || echo "✗ main.py missing"
-          [ -f "backend.py" ] && echo "✓ backend.py exists" || echo "✗ backend.py missing"
-          [ -f "pictures/${{ matrix.icon }}" ] && echo "✓ Icon file exists" || echo "✗ Icon file missing"
+          [ -f "main.py" ] && echo "main.py exists" || echo "main.py missing"
+          [ -f "backend.py" ] && echo "backend.py exists" || echo "backend.py missing"
+          [ -f "pictures/${{ matrix.icon }}" ] && echo "Icon file exists" || echo "Icon file missing"
         shell: bash
 
       - name: Test Python imports and modules
         run: |
           echo "=== Python Import Testing ==="
           python -c "import sys; print('Python version:', sys.version)"
-          python -c "import PyQt5; print('✓ PyQt5 OK')" || echo "✗ PyQt5 import failed"
-          python -c "import PyQt5.QtWidgets; print('✓ PyQt5.QtWidgets OK')" || echo "✗ PyQt5.QtWidgets import failed"
+          python -c "import PyQt5; print('PyQt5 OK')" || echo "PyQt5 import failed"
+          python -c "import PyQt5.QtWidgets; print('PyQt5.QtWidgets OK')" || echo "PyQt5.QtWidgets import failed"
           
           # Test backend import
           if [ -f "backend.py" ]; then
-            python -c "import backend; print('✓ backend.py OK')" || echo "✗ backend.py import failed"
+            python -c "import backend; print('backend.py OK')" || echo "backend.py import failed"
           fi
           
           # Test main.py imports without running the app
@@ -149,9 +149,9 @@ jobs:
           
           try:
               exec(imports_section)
-              print('✓ main.py imports OK')
+              print('main.py imports OK')
           except Exception as e:
-              print(f'✗ main.py import error: {e}')
+              print(f'main.py import error: {e}')
           " || echo "main.py import test failed"
         shell: bash
 
@@ -175,7 +175,7 @@ jobs:
           
           # Check for different possible outputs
           if [ -d "main.dist" ]; then
-            echo "✓ main.dist directory found"
+            echo "main.dist directory found"
             echo "main.dist size: $(du -sh main.dist/ 2>/dev/null || echo 'unknown')"
             echo "main.dist contents:"
             ls -la main.dist/
@@ -185,7 +185,7 @@ jobs:
           fi
           
           if [ -d "${{ matrix.executable }}" ] || [ -f "${{ matrix.executable }}" ]; then
-            echo "✓ ${{ matrix.executable }} found"
+            echo "${{ matrix.executable }} found"
             echo "${{ matrix.executable }} size: $(du -sh ${{ matrix.executable }} 2>/dev/null || echo 'unknown')"
           else
             echo "ℹ ${{ matrix.executable }} not found in current directory"
@@ -236,7 +236,7 @@ jobs:
             codesign --force --deep --sign - AkademiTrack.app
             
             # Verify signature
-            codesign --verify --verbose AkademiTrack.app && echo "✓ Signature verified" || echo "✗ Signature verification failed"
+            codesign --verify --verbose AkademiTrack.app && echo "Signature verified" || echo "Signature verification failed"
             
             # Remove quarantine attribute
             xattr -d com.apple.quarantine AkademiTrack.app 2>/dev/null || echo "No quarantine attribute to remove"
@@ -268,7 +268,7 @@ cp -R "AkademiTrack.app" "/Applications/"
 # Set proper permissions
 chmod -R 755 "/Applications/AkademiTrack.app"
 
-echo "✓ Installation complete!"
+echo "Installation complete!"
 echo ""
 echo "To run AkademiTrack:"
 echo "1. Open Applications folder"
@@ -280,7 +280,7 @@ echo "Note: This is an Apple Silicon (ARM64) build for M1/M2/M3/M4 Macs"
 INSTALLER_EOF
             
             chmod +x install_akademitrack.sh
-            echo "✓ Installer script created"
+            echo "Installer script created"
           else
             echo "No AkademiTrack.app found for signing"
           fi
@@ -290,47 +290,41 @@ INSTALLER_EOF
         if: matrix.os == 'windows-latest'
         run: |
           cat > install_akademitrack.bat << 'INSTALLER_EOF'
-@echo off
-echo === AkademiTrack Windows Installer ===
-echo.
-
-set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
-
-if exist "%INSTALL_DIR%" (
-    echo Removing existing installation...
-    rmdir /s /q "%INSTALL_DIR%"
-)
-
-echo Creating installation directory...
-mkdir "%INSTALL_DIR%"
-
-echo Copying application files...
-if exist "main.dist" (
-    xcopy "main.dist\*" "%INSTALL_DIR%" /E /I /Y
-) else if exist "AkademiTrack" (
-    xcopy "AkademiTrack\*" "%INSTALL_DIR%" /E /I /Y
-) else (
-    echo Error: Could not find application files to install
-    pause
-    exit /b 1
-)
-
-echo.
-echo Installation complete!
-echo AkademiTrack installed to: %INSTALL_DIR%
-echo.
-
-echo Creating desktop shortcut...
-powershell -Command "try { $WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.WorkingDirectory = '%INSTALL_DIR%'; $Shortcut.Save(); Write-Host 'Desktop shortcut created successfully' } catch { Write-Host 'Failed to create desktop shortcut' }"
-
-echo.
-echo To run AkademiTrack:
-echo 1. Use the desktop shortcut, OR
-echo 2. Navigate to %INSTALL_DIR% and double-click AkademiTrack.exe
-echo.
-pause
-INSTALLER_EOF
-          echo "✓ Windows installer script created"
+          @echo off
+          echo === AkademiTrack Windows Installer ===
+          echo.
+          
+          set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
+          
+          if exist "%INSTALL_DIR%" (
+              echo Removing existing installation...
+              rmdir /s /q "%INSTALL_DIR%"
+          )
+          
+          echo Creating installation directory...
+          mkdir "%INSTALL_DIR%"
+          
+          echo Copying application files...
+          if exist "main.dist" (
+              xcopy "main.dist\*" "%INSTALL_DIR%" /E /I /Y
+          ) else if exist "AkademiTrack" (
+              xcopy "AkademiTrack\*" "%INSTALL_DIR%" /E /I /Y
+          ) else (
+              echo Error: Could not find application files to install
+              pause
+              exit /b 1
+          )
+          
+          echo.
+          echo Installation complete!
+          echo AkademiTrack installed to: %INSTALL_DIR%
+          echo.
+          echo To run AkademiTrack:
+          echo 1. Navigate to %INSTALL_DIR% and double-click AkademiTrack.exe
+          echo.
+          pause
+          INSTALLER_EOF
+          echo "Windows installer script created"
         shell: bash
 
       - name: Create Linux installer script
@@ -390,7 +384,7 @@ DESKTOP_EOF
 sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
 chmod +x ~/.local/share/applications/akademitrack.desktop
 
-echo "✓ Desktop entry created!"
+echo "Desktop entry created!"
 echo ""
 echo "To run AkademiTrack:"
 echo "1. Search for 'AkademiTrack' in your application menu, OR"
@@ -398,7 +392,7 @@ echo "2. Run: cd $INSTALL_DIR && ./AkademiTrack"
 echo ""
 INSTALLER_EOF
           chmod +x install_akademitrack.sh
-          echo "✓ Linux installer script created"
+          echo "Linux installer script created"
         shell: bash
 
       - name: Restructure build outputs
@@ -412,7 +406,7 @@ INSTALLER_EOF
               echo "Moving files from main.dist to AkademiTrack/"
               mv main.dist/* AkademiTrack/ 2>/dev/null || cp -r main.dist/* AkademiTrack/
               rm -rf main.dist
-              echo "✓ Windows build restructured"
+              echo "Windows build restructured"
             fi
             
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
@@ -421,7 +415,7 @@ INSTALLER_EOF
               echo "Moving executable from main.dist to current directory"
               mv main.dist/AkademiTrack . 2>/dev/null || cp main.dist/AkademiTrack .
               # Keep main.dist for the installer script to use
-              echo "✓ Linux build restructured"
+              echo "Linux build restructured"
             fi
           fi
         shell: bash
@@ -434,20 +428,20 @@ INSTALLER_EOF
           
           echo "Checking for expected outputs:"
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            [ -d "AkademiTrack.app" ] && echo "✓ AkademiTrack.app found" || echo "✗ AkademiTrack.app missing"
-            [ -f "install_akademitrack.sh" ] && echo "✓ macOS installer found" || echo "✗ macOS installer missing"
+            [ -d "AkademiTrack.app" ] && echo "AkademiTrack.app found" || echo "AkademiTrack.app missing"
+            [ -f "install_akademitrack.sh" ] && echo "macOS installer found" || echo "macOS installer missing"
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            [ -d "AkademiTrack" ] && echo "✓ AkademiTrack directory found" || echo "✗ AkademiTrack directory missing"
-            [ -f "install_akademitrack.bat" ] && echo "✓ Windows installer found" || echo "✗ Windows installer missing"
+            [ -d "AkademiTrack" ] && echo "AkademiTrack directory found" || echo "AkademiTrack directory missing"
+            [ -f "install_akademitrack.bat" ] && echo "Windows installer found" || echo "Windows installer missing"
             if [ -d "AkademiTrack" ]; then
               echo "AkademiTrack directory contents:"
               ls -la AkademiTrack/ | head -10
               echo "AkademiTrack directory size: $(du -sh AkademiTrack/ 2>/dev/null || echo 'unknown')"
             fi
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            [ -f "AkademiTrack" ] && echo "✓ AkademiTrack executable found" || echo "✗ AkademiTrack executable missing"
-            [ -f "install_akademitrack.sh" ] && echo "✓ Linux installer found" || echo "✗ Linux installer missing"
-            [ -d "main.dist" ] && echo "✓ main.dist directory available" || echo "ℹ main.dist not available"
+            [ -f "AkademiTrack" ] && echo "AkademiTrack executable found" || echo "AkademiTrack executable missing"
+            [ -f "install_akademitrack.sh" ] && echo "Linux installer found" || echo "Linux installer missing"
+            [ -d "main.dist" ] && echo "main.dist directory available" || echo "main.dist not available"
           fi
           
           echo "Directory total size: $(du -sh . 2>/dev/null || echo 'unknown')"
