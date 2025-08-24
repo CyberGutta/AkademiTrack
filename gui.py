@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+
 try:
     from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
@@ -23,39 +24,135 @@ except ImportError:
 
 try:
     from backend import ImprovedISkoleBot
-except ImportError:
-    print("backend.py or manual.py file is required in the same directory!")
-    sys.exit(1)
+except ImportError as e:
+    print(f"Backend import error: {e}")
+    # Try different import strategies for bundled app
+    try:
+        import backend
+        ImprovedISkoleBot = backend.ImprovedISkoleBot
+    except ImportError:
+        try:
+            # Last resort - look in current directory
+            current_dir = os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else os.path.dirname(sys.executable)
+            backend_path = os.path.join(current_dir, 'backend.py')
+            if os.path.exists(backend_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("backend", backend_path)
+                backend = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(backend)
+                ImprovedISkoleBot = backend.ImprovedISkoleBot
+            else:
+                print(f"backend.py not found at {backend_path}")
+                print("Available files in directory:", os.listdir(current_dir))
+                sys.exit(1)
+        except Exception as e2:
+            print(f"Failed all backend import attempts: {e2}")
+            sys.exit(1)
+
+def setup_bundle_environment():
+    """Setup environment for bundled application"""
+    if getattr(sys, 'frozen', False):
+        # Running as bundled executable
+        if sys.platform == 'darwin':  # macOS
+            # In .app bundle, add Resources to Python path
+            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+            resources_dir = os.path.join(bundle_dir, 'Resources')
+            if os.path.exists(resources_dir):
+                sys.path.insert(0, resources_dir)
+        else:
+            # Windows/Linux - add executable directory to path
+            exe_dir = os.path.dirname(sys.executable)
+            sys.path.insert(0, exe_dir)
+            
+            setup_bundle_environment()
+
 
 def get_resource_path(filename):
-    """Get the path to a resource file, works in development and when bundled"""
-    if getattr(sys, 'frozen', False):
-        # Running as compiled executable
-        if sys.platform == 'darwin':  # macOS
-            # In .app bundle, resources are in Contents/Resources
-            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-            return os.path.join(bundle_dir, 'Resources', filename)
-        else:
-            # Windows/Linux - same directory as executable
-            return os.path.join(os.path.dirname(sys.executable), filename)
-    else:
-        # Running as script
-        return os.path.join(os.path.dirname(__file__), filename)
+    """Get the path to a resource file - WORKS IN ALL BUNDLE TYPES"""
+    base_dir = get_base_directory()
     
+    # Try multiple locations
+    possible_paths = [
+        base_dir / filename,
+        base_dir / 'pictures' / filename,
+        base_dir / 'assets' / filename,
+        base_dir / 'resources' / filename,
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path)
+    
+    # If not found, return the most likely path
+    return str(base_dir / filename)
+    
+def log_bundle_info():
+    """Log information about bundle environment for debugging"""
+    print(f"=== BUNDLE INFORMATION ===")
+    print(f"sys.frozen: {getattr(sys, 'frozen', False)}")
+    print(f"sys.executable: {sys.executable}")
+    print(f"__file__: {__file__ if '__file__' in globals() else 'Not available'}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Base directory: {get_base_directory()}")
+    print(f"Python path: {sys.path[:3]}...")  # First 3 entries
+    
+    base_dir = get_base_directory()
+    print(f"Files in base directory:")
+    try:
+        for item in os.listdir(base_dir):
+            print(f"  - {item}")
+    except Exception as e:
+        print(f"  Error listing directory: {e}")
+    print(f"========================")
+
 def get_base_directory():
-    """Get the base directory for the application"""
-    if getattr(sys, 'frozen', False):
-        # Running as compiled executable
-        if sys.platform == 'darwin':  # macOS
-            # In .app bundle, resources are in Contents/Resources
-            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-            return Path(bundle_dir) / 'Resources'
+    """Get the base directory for the application - ENHANCED FOR ALL BUNDLE TYPES"""
+    try:
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            if sys.platform == 'darwin':  # macOS
+                # Check if we're in an .app bundle
+                if '.app/Contents/MacOS' in sys.executable:
+                    # In .app bundle, resources are in Contents/Resources
+                    bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+                    resources_dir = Path(bundle_dir) / 'Resources'
+                    if resources_dir.exists():
+                        return resources_dir
+                    else:
+                        # Fallback to bundle root
+                        return Path(bundle_dir)
+                else:
+                    # Standalone macOS executable
+                    return Path(sys.executable).parent
+            else:
+                # Windows/Linux - same directory as executable
+                exe_path = Path(sys.executable)
+                # For nuitka, check if there's a distribution directory
+                possible_dirs = [
+                    exe_path.parent,  # Same directory as exe
+                    exe_path.parent.parent,  # Parent directory (if in subdirectory)
+                ]
+                
+                # Return the first directory that contains our files
+                for dir_path in possible_dirs:
+                    if (dir_path / 'backend.py').exists() or (dir_path / 'pictures').exists():
+                        return dir_path
+                
+                return exe_path.parent
         else:
-            # Windows/Linux - same directory as executable
-            return Path(sys.executable).parent
-    else:
-        # Running as script
-        return Path(__file__).resolve().parent
+            # Running as script
+            return Path(__file__).resolve().parent
+            
+    except Exception as e:
+        print(f"Error determining base directory: {e}")
+        # Ultimate fallback
+        try:
+            if getattr(sys, 'frozen', False):
+                return Path(sys.executable).parent
+            else:
+                return Path(__file__).resolve().parent
+        except:
+            return Path.cwd()
 
 def set_application_icon(self):
     """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories - BUNDLE COMPATIBLE"""
@@ -1987,7 +2084,12 @@ class AkademiTrackWindow(QMainWindow):
                     print(f"Error updating settings console: {e}")
     
     def install_requirements(self):
-        """Install required packages quietly"""
+        """Install required packages quietly - SKIP IN BUNDLED APPS"""
+        # Skip package installation in bundled applications
+        if getattr(sys, 'frozen', False):
+            print("Running as bundled app - skipping package installation")
+            return
+            
         required_packages = [
             'selenium', 'webdriver-manager', 'psutil', 
             'requests', 'schedule', 'browser-cookie3'
@@ -3555,56 +3657,100 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Main function with welcome dialog"""
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
+    """Main function with bundle support and better error handling"""
     
-    # Set application icon globally for taskbar
-    set_application_icon_in_main(app)
+    # Log bundle info for debugging
+    log_bundle_info()
     
-    # Initialize settings manager
-    settings_manager = SettingsManager()
-    
-    # Show welcome dialog for first-time users
-    if settings_manager.should_show_welcome():
-        welcome_dialog = WelcomeDialog()
-        
-        if welcome_dialog.exec_() == QDialog.Accepted:
-            # User clicked "Forstått, start programmet"
-            dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
-            settings_manager.mark_welcome_shown(dont_show_again)
-        else:
-            # User clicked "Lukk" or closed dialog
-            print("User cancelled setup")
-            sys.exit(0)
-    
-    # Create main window
-    window = AkademiTrackWindow()
-    window.settings_manager = settings_manager
-    
-    # Center the window
+    # Ensure we can import Qt
     try:
-        screen = app.primaryScreen().availableGeometry()
-        window_width = window.width()
-        window_height = window.height()
+        from PyQt5.QtWidgets import QApplication
+    except ImportError as e:
+        print(f"Critical error: Cannot import PyQt5: {e}")
+        input("Press Enter to exit...")
+        sys.exit(1)
+    
+    try:
+        app = QApplication(sys.argv)
+        app.setStyle('Fusion')
         
-        x = (screen.width() - window_width) // 2
-        y = (screen.height() - window_height) // 2
+        # Set application properties
+        app.setApplicationName("AkademiTrack")
+        app.setApplicationVersion("1.0")
+        app.setOrganizationName("AkademiTrack")
         
-        x = max(0, min(x, screen.width() - window_width))
-        y = max(0, min(y, screen.height() - window_height))
+        # Set application icon globally for taskbar
+        set_application_icon_in_main(app)
         
-        window.move(x, y)
-        print(f"Window centered at position: {x}, {y}")
+        # Initialize settings manager with error handling
+        try:
+            settings_manager = SettingsManager()
+        except Exception as e:
+            print(f"Error initializing settings: {e}")
+            # Continue without settings
+            settings_manager = None
+        
+        # Show welcome dialog for first-time users
+        if settings_manager and settings_manager.should_show_welcome():
+            try:
+                from PyQt5.QtWidgets import QDialog
+                welcome_dialog = WelcomeDialog()
+                
+                if welcome_dialog.exec_() == QDialog.Accepted:
+                    # User clicked "Forstått, start programmet"
+                    dont_show_again = welcome_dialog.dont_show_checkbox.isChecked()
+                    settings_manager.mark_welcome_shown(dont_show_again)
+                else:
+                    # User clicked "Lukk" or closed dialog
+                    print("User cancelled setup")
+                    sys.exit(0)
+            except Exception as e:
+                print(f"Error with welcome dialog: {e}")
+                # Continue without welcome dialog
+        
+        # Create main window with error handling
+        try:
+            window = AkademiTrackWindow()
+            if settings_manager:
+                window.settings_manager = settings_manager
+        except Exception as e:
+            print(f"Critical error creating main window: {e}")
+            import traceback
+            traceback.print_exc()
+            input("Press Enter to exit...")
+            sys.exit(1)
+        
+        # Center the window
+        try:
+            screen = app.primaryScreen().availableGeometry()
+            window_width = window.width()
+            window_height = window.height()
+            
+            x = (screen.width() - window_width) // 2
+            y = (screen.height() - window_height) // 2
+            
+            x = max(0, min(x, screen.width() - window_width))
+            y = max(0, min(y, screen.height() - window_height))
+            
+            window.move(x, y)
+            print(f"Window centered at position: {x}, {y}")
+            
+        except Exception as e:
+            print(f"Could not center window: {e}")
+            window.move(200, 200)
+        
+        # Show window
+        window.show()
+        
+        # Run application
+        sys.exit(app.exec_())
         
     except Exception as e:
-        print(f"Could not center window: {e}")
-        window.move(200, 200)
-    
-    # Show window
-    window.show()
-    
-    sys.exit(app.exec_())
+        print(f"Critical application error: {e}")
+        import traceback
+        traceback.print_exc()
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
