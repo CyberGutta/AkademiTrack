@@ -193,7 +193,7 @@ class WelcomeDialog(QDialog):
 <ol style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
 <li style="margin-bottom: 15px;"><b>Oppsett og innlogging:</b> Klikk først på "Oppsett og innlogging" for å logge inn i iSkole. Etter du har logget inn på iSkole så kommer nettleseren til å lukke seg automatisk. Hvis du allerede har nettleseren åpen så lukkes den automatisk.</li>
 <li style="margin-bottom: 15px;"><b>Start automatisering:</b> Klikk på "Start automatisering" når du er klar</li>
-<li style="margin-bottom: 15px;"><b>La det kjøre:</b> Programmet kjører i bakgrunnen og registrerer automatisk</li>
+<li style="margin-bottom: 15px;"><b>La det kjøre:</b> Programmet kjører i bakgrunnen og registrerer automatisk. Du kan minimere programmet, men ikke lukk det da stopper automatiseringen.</li>
 <li style="margin-bottom: 15px;"><b>Stopp når ferdig:</b> Stopper automatisk når alle timer er fullført</li>
 </ol>
 
@@ -2630,7 +2630,7 @@ class AkademiTrackWindow(QMainWindow):
                         min-width: 160px;
                     }
                     QPushButton:hover { 
-                        background-color: #c82333; 
+                        background-color: #a60212; 
                     }
                     QPushButton:disabled {
                         background-color: #6c757d;
