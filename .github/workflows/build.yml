@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=universal2 main.py
+              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=universal main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
