@@ -1,25 +1,76 @@
-name: Build App
-on: [push]
+name: Build AkademiTrack
+on: 
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false  # Don't cancel other jobs if one fails
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            icon: pictures/logo.ico
+            build-cmd: |
+              nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads main.py
+          - os: macos-latest
+            icon: pictures/logo.icns
+            build-cmd: |
+              nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+          - os: ubuntu-latest
+            icon: pictures/logo.png
+            build-cmd: |
+              nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --linux-icon=pictures/logo.png --assume-yes-for-downloads main.py
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          pip install nuitka pyqt5
-      - name: Build Windows
-        if: matrix.os == 'windows-latest'
-        run: nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico main.py
-      - name: Build Mac
-        if: matrix.os == 'macos-latest'  
-        run: nuitka --standalone --macos-app-mode=gui --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns main.py
-      - name: Build Linux
+
+      - name: Install system dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --linux-icon=pictures/logo.png main.py
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-dev python3-pyqt5 python3-pyqt5.qtcore python3-pyqt5.qtgui python3-pyqt5.qtwidgets
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nuitka pyqt5
+          pip install -r requirements.txt || echo "No requirements.txt found"
+
+      - name: Create icon files if missing
+        run: |
+          python -c "
+          import os
+          if not os.path.exists('pictures'):
+              os.makedirs('pictures')
+          if not os.path.exists('${{ matrix.icon }}'):
+              print('Warning: Icon file ${{ matrix.icon }} not found, build may fail')
+          "
+
+      - name: List files for debugging
+        run: |
+          echo 'Current directory contents:'
+          ls -la
+          echo 'Pictures directory contents (if exists):'
+          ls -la pictures/ || echo 'Pictures directory not found'
+
+      - name: Build application
+        run: ${{ matrix.build-cmd }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: AkademiTrack-${{ matrix.os }}
+          path: |
+            AkademiTrack*
+            *.app
+          if-no-files-found: error
