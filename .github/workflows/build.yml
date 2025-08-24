@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads main.py
+              nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=. --assume-yes-for-downloads main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
@@ -54,6 +54,7 @@ jobs:
           ls -la pictures/
           echo 'Python files:'
           ls -la *.py
+        shell: bash
 
       - name: Test Python imports
         run: |
@@ -61,11 +62,13 @@ jobs:
           python -c "import PyQt5; print('PyQt5 OK')"
           python -c "import sys; print('Python version:', sys.version)"
           python -c "exec(open('main.py').read().split('if __name__')[0]); print('main.py imports OK')" || echo "main.py import test failed"
+        shell: bash
 
       - name: Build application
         run: |
           echo "Building with command: ${{ matrix.build-cmd }}"
           ${{ matrix.build-cmd }}
+        shell: bash
 
       - name: Check build output size and contents
         run: |
