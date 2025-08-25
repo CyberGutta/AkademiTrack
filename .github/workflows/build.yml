@@ -238,13 +238,28 @@ jobs:
           fi
         shell: bash
 
+      - name: List final build output
+        run: |
+          echo "=== Final Build Analysis ==="
+          echo "Current directory contents:"
+          ls -la
+          echo "Looking for app bundles:"
+          find . -name "*.app" -type d 2>/dev/null || echo "No .app bundles found"
+          echo "Looking for executables:"
+          find . -name "AkademiTrack*" 2>/dev/null || echo "No AkademiTrack files found"
+          echo "Looking for build directories:"
+          find . -name "*.dist" -type d 2>/dev/null || echo "No .dist directories found"
+        shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AkademiTrack-${{ matrix.os }}
           path: |
+            AkademiTrack.app/
             AkademiTrack/
             AkademiTrack*
+            main.dist/
             *.exe
             *.sh
             *.bat
