@@ -109,16 +109,23 @@ jobs:
           APP_PATH=""
           if [ -d "dist/AkademiTrack.app" ]; then
             APP_PATH="dist/AkademiTrack.app"
+            echo "Found app bundle at: $APP_PATH"
           elif [ -d "AkademiTrack.app" ]; then
             APP_PATH="AkademiTrack.app"
+            echo "Found app bundle at: $APP_PATH"
+          elif [ -d "dist/main.app" ]; then
+            echo "Found main.app, renaming to AkademiTrack.app"
+            mv dist/main.app dist/AkademiTrack.app
+            APP_PATH="dist/AkademiTrack.app"
           elif [ -d "main.app" ]; then
-            APP_PATH="main.app"
-            mv main.app AkademiTrack.app
-            APP_PATH="AkademiTrack.app"
+            echo "Found main.app in root, moving and renaming"
+            mkdir -p dist
+            mv main.app dist/AkademiTrack.app
+            APP_PATH="dist/AkademiTrack.app"
           fi
 
           if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
-            echo "Found app bundle at: $APP_PATH"
+            echo "Working with app bundle at: $APP_PATH"
             
             # Ensure proper structure
             mkdir -p "$APP_PATH/Contents/Resources"
@@ -135,19 +142,22 @@ jobs:
               cp -r pictures "$APP_PATH/Contents/Resources/" || echo "Could not copy pictures"
             fi
             
-            # Set executable permissions
-            chmod +x "$APP_PATH/Contents/MacOS"/* || echo "Could not set executable permissions"
-            
-            # Move to dist if not already there
-            if [ "$APP_PATH" != "dist/AkademiTrack.app" ]; then
-              mkdir -p dist
-              mv "$APP_PATH" dist/
+            # Set executable permissions for main executable
+            if [ -f "$APP_PATH/Contents/MacOS/main" ]; then
+              mv "$APP_PATH/Contents/MacOS/main" "$APP_PATH/Contents/MacOS/AkademiTrack"
             fi
+            chmod +x "$APP_PATH/Contents/MacOS/AkademiTrack" 2>/dev/null || chmod +x "$APP_PATH/Contents/MacOS"/* || echo "Could not set executable permissions"
             
-            echo "macOS app structure prepared"
+            echo "macOS app structure prepared successfully"
+            echo "Final app structure:"
+            ls -la "$APP_PATH/Contents/"
           else
             echo "ERROR: No macOS app bundle found after build!"
-            echo "Available files:"
+            echo "Available directories:"
+            find . -name "*.app" -type d || echo "No .app directories found"
+            echo "Available files in dist:"
+            ls -la dist/ || echo "No dist directory"
+            echo "All available files:"
             find . -name "*" -type f | head -20
           fi
         shell: bash
