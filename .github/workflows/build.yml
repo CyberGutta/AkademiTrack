@@ -101,7 +101,7 @@ jobs:
             --follow-imports \
             --nofollow-import-to=tkinter \
             --macos-create-app-bundle \
-            --macos-target-arch=universal2 \
+            --macos-target-arch=arm64 \
             main.py
         shell: bash
 
