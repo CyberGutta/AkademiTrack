@@ -14,16 +14,10 @@ jobs:
         include:
           - os: windows-latest
             icon: pictures/logo.ico
-            build-cmd: |
-              python -m nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=dist --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads --follow-imports --nofollow-import-to=tkinter main.py
           - os: macos-latest
             icon: pictures/logo.icns
-            build-cmd: |
-              python -m nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=dist --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=arm64 --follow-imports --nofollow-import-to=tkinter main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
-            build-cmd: |
-              python -m nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --output-filename=AkademiTrack --output-dir=dist --linux-icon=pictures/logo.png --assume-yes-for-downloads --follow-imports --nofollow-import-to=tkinter main.py
 
     steps:
       - name: Checkout code
@@ -44,7 +38,6 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew install python@3.11 || true
-          # Install Qt5 if needed
           brew install qt@5 || true
 
       - name: Install Python dependencies
@@ -75,27 +68,57 @@ jobs:
       - name: Create dist directory
         run: mkdir -p dist
 
-      - name: Build application
+      - name: Build Windows application
+        if: matrix.os == 'windows-latest'
         run: |
-          echo "Building with command:"
-          echo "${{ matrix.build-cmd }}"
-          echo "Starting build..."
-          
-          # Try the build and capture both stdout and stderr
-          if ! ${{ matrix.build-cmd }}; then
-            echo "Build failed! Checking for common issues..."
-            echo "Python version and modules:"
-            python --version
-            python -c "import PyQt5; print('PyQt5 version:', PyQt5.QtCore.PYQT_VERSION_STR)" || echo "PyQt5 not available"
-            echo "Nuitka version:"
-            python -m nuitka --version || echo "Nuitka not available"
-            echo "Available files:"
-            ls -la
-            echo "Build failed with exit code"
-            exit 1
-          fi
-          
-          echo "Build completed successfully"
+          echo "Building Windows application..."
+          python -m nuitka \
+            --standalone \
+            --windows-console-mode=disable \
+            --enable-plugin=pyqt5 \
+            --include-data-dir=pictures=pictures \
+            --output-filename=AkademiTrack \
+            --output-dir=dist \
+            --windows-icon-from-ico=pictures/logo.ico \
+            --assume-yes-for-downloads \
+            --follow-imports \
+            --nofollow-import-to=tkinter \
+            main.py
+        shell: bash
+
+      - name: Build macOS application
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Building macOS application..."
+          python -m nuitka \
+            --mode=app \
+            --enable-plugin=pyqt5 \
+            --include-data-dir=pictures=pictures \
+            --output-filename=AkademiTrack \
+            --output-dir=dist \
+            --macos-app-icon=pictures/logo.icns \
+            --assume-yes-for-downloads \
+            --macos-target-arch=arm64 \
+            --follow-imports \
+            --nofollow-import-to=tkinter \
+            main.py
+        shell: bash
+
+      - name: Build Linux application
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "Building Linux application..."
+          python -m nuitka \
+            --standalone \
+            --enable-plugin=pyqt5 \
+            --include-data-dir=pictures=pictures \
+            --output-filename=AkademiTrack \
+            --output-dir=dist \
+            --linux-icon=pictures/logo.png \
+            --assume-yes-for-downloads \
+            --follow-imports \
+            --nofollow-import-to=tkinter \
+            main.py
         shell: bash
 
       - name: Check build output
