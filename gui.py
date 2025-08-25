@@ -7,939 +7,25 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# ===== CRITICAL macOS BUNDLE FIX =====
-def setup_bundle_environment():
-    """Setup environment for bundled application - FIXED FOR macOS"""
-    if getattr(sys, 'frozen', False):
-        print(f"🍎 Detected bundled app: {sys.executable}")
-        
-        if sys.platform == 'darwin':  # macOS
-            # In macOS .app bundle, files are embedded in the executable
-            # No need to add paths - Python can find embedded modules
-            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-            resources_dir = os.path.join(bundle_dir, 'Resources')
-            
-            print(f"Bundle structure:")
-            print(f"  Bundle dir: {bundle_dir}")
-            print(f"  Resources dir: {resources_dir}")
-            print(f"  Executable: {sys.executable}")
-            
-            # Set working directory to Resources if it exists (for data files)
-            if os.path.exists(resources_dir):
-                os.chdir(resources_dir)
-                print(f"✅ Changed working directory to: {resources_dir}")
-            
-            return True
-        else:
-            # Windows/Linux - add executable directory to path
-            exe_dir = os.path.dirname(sys.executable)
-            sys.path.insert(0, exe_dir)
-            return True
-    
-    return False
-
-# Call this BEFORE any other imports
-setup_bundle_environment()
-
 try:
     from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
         QWidget, QPushButton, QTextEdit, QLabel, QMessageBox,
         QFrame, QProgressBar, QSizePolicy, QPlainTextEdit, QDialog, QLineEdit
     )
-    from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
-    from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
-    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QCheckBox
-    print("✅ PyQt5 imported successfully")
-
+    from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
+    from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
 except ImportError:
-    print("❌ PyQt5 is required. Please install it with: pip install PyQt5")
+    print("PyQt5 is required. Please install it with: pip install PyQt5")
     sys.exit(1)
 
 try:
     from backend import ImprovedISkoleBot
-except ImportError as e:
-    print(f"Backend import error: {e}")
-    # Try different import strategies for bundled app
-    try:
-        import backend
-        ImprovedISkoleBot = backend.ImprovedISkoleBot
-    except ImportError:
-        try:
-            # Last resort - look in current directory
-            current_dir = os.path.dirname(os.path.abspath(__file__)) if not getattr(sys, 'frozen', False) else os.path.dirname(sys.executable)
-            backend_path = os.path.join(current_dir, 'backend.py')
-            if os.path.exists(backend_path):
-                import importlib.util
-                spec = importlib.util.spec_from_file_location("backend", backend_path)
-                backend = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(backend)
-                ImprovedISkoleBot = backend.ImprovedISkoleBot
-            else:
-                print(f"backend.py not found at {backend_path}")
-                print("Available files in directory:", os.listdir(current_dir))
-                sys.exit(1)
-        except Exception as e2:
-            print(f"Failed all backend import attempts: {e2}")
-            sys.exit(1)
-
-def import_backend_with_fallbacks():
-    """Import backend with multiple fallback strategies for bundled apps"""
-    
-    strategies = [
-        "direct_import",
-        "importlib_import", 
-        "exec_import",
-        "file_search_import"
-    ]
-    
-    for strategy in strategies:
-        try:
-            print(f"🔄 Trying strategy: {strategy}")
-            
-            if strategy == "direct_import":
-                # Strategy 1: Direct import (works for embedded modules)
-                from backend import ImprovedISkoleBot
-                print("✅ Direct import successful!")
-                return ImprovedISkoleBot
-                
-            elif strategy == "importlib_import":
-                # Strategy 2: Importlib (for embedded modules)
-                import importlib
-                backend = importlib.import_module('backend')
-                ImprovedISkoleBot = backend.ImprovedISkoleBot
-                print("✅ Importlib import successful!")
-                return ImprovedISkoleBot
-                
-            elif strategy == "exec_import":
-                # Strategy 3: Try to find and exec backend code
-                try:
-                    import backend
-                    ImprovedISkoleBot = backend.ImprovedISkoleBot
-                    print("✅ Exec import successful!")
-                    return ImprovedISkoleBot
-                except:
-                    continue
-                    
-            elif strategy == "file_search_import":
-                # Strategy 4: Search for backend.py file (last resort)
-                search_dirs = [
-                    os.getcwd(),
-                    os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd(),
-                    os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd(),
-                ]
-                
-                for search_dir in search_dirs:
-                    backend_path = os.path.join(search_dir, 'backend.py')
-                    if os.path.exists(backend_path):
-                        print(f"Found backend.py at: {backend_path}")
-                        import importlib.util
-                        spec = importlib.util.spec_from_file_location("backend", backend_path)
-                        backend = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(backend)
-                        ImprovedISkoleBot = backend.ImprovedISkoleBot
-                        print("✅ File search import successful!")
-                        return ImprovedISkoleBot
-                        
-        except Exception as e:
-            print(f"❌ Strategy {strategy} failed: {e}")
-            continue
-    
-    # If all strategies fail
-    print("❌ ALL IMPORT STRATEGIES FAILED")
-    
-    # Show user-friendly error
-    if getattr(sys, 'frozen', False):
-        print("This appears to be a bundled app with missing components.")
-        print("The backend.py module could not be found or loaded.")
-    
-    return None
-
-# Try to import backend
-ImprovedISkoleBot = import_backend_with_fallbacks()
-if ImprovedISkoleBot is None:
-    print("🚨 CRITICAL: Cannot import backend - app will exit")
-    
-    # Try to show error dialog before exiting
-    try:
-        app = QApplication(sys.argv) if not QApplication.instance() else QApplication.instance()
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Critical)
-        msg.setWindowTitle("Import Error")
-        msg.setText("Critical Error: Cannot load backend module.\n\nThe application cannot start.")
-        msg.setDetailedText("This may be due to:\n1. Missing backend.py in bundle\n2. Incorrect bundle packaging\n3. Import path issues")
-        msg.exec_()
-    except:
-        pass
-    
+except ImportError:
+    print("backend.py or manual.py file is required in the same directory!")
     sys.exit(1)
 
-def get_resource_path(filename):
-    """Get path to resource file - works in all bundle types including macOS"""
-    base_dir = get_base_directory()
-    
-    # Search in multiple possible locations
-    possible_paths = [
-        base_dir / filename,
-        base_dir / 'pictures' / filename,
-        base_dir / 'assets' / filename,
-        base_dir / 'resources' / filename,
-        base_dir / 'icons' / filename,
-        base_dir / 'images' / filename,
-    ]
-    
-    for path in possible_paths:
-        if path.exists():
-            print(f"✅ Found resource: {path}")
-            return str(path)
-    
-    # If not found, return the most likely path
-    fallback_path = base_dir / filename
-    print(f"⚠️ Resource not found, using fallback: {fallback_path}")
-    return str(fallback_path)
-    
-
-def get_base_directory():
-    """FIXED: Get base directory for all platforms including macOS bundles"""
-    try:
-        if getattr(sys, 'frozen', False):
-            if sys.platform == 'darwin' and '.app/' in sys.executable:
-                # macOS .app bundle - try Resources directory first
-                bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-                resources_dir = Path(bundle_dir) / 'Resources'
-                
-                # Check if Resources directory exists and has content
-                if resources_dir.exists() and any(resources_dir.iterdir()):
-                    print(f"✅ Using Resources directory: {resources_dir}")
-                    return resources_dir
-                else:
-                    # Fallback to bundle directory
-                    print(f"✅ Using bundle directory: {Path(bundle_dir)}")
-                    return Path(bundle_dir)
-            else:
-                # Other platforms - use executable directory
-                return Path(sys.executable).parent
-        else:
-            # Running as script
-            return Path(__file__).resolve().parent
-            
-    except Exception as e:
-        print(f"❌ Error in get_base_directory: {e}")
-        return Path.cwd()
-
-def set_application_icon(self):
-    """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories - BUNDLE COMPATIBLE"""
-    try:
-        import platform
-        import os
-        from pathlib import Path
-        
-        # Detect platform for format preferences
-        current_platform = platform.system().lower()
-        
-        # MODIFIED: Use get_base_directory for bundle support
-        base_dir = get_base_directory()
-        search_dirs = [
-            base_dir,                           # Root directory (or Resources in .app)
-            base_dir / "assets",               # Assets folder
-            base_dir / "icons",                # Icons folder  
-            base_dir / "images",               # Images folder
-            base_dir / "pictures",             # Pictures folder (your existing)
-            base_dir / "resources",            # Resources folder
-            base_dir / "res",                  # Res folder
-        ]
-        
-        # Platform-specific format preferences
-        if current_platform == "darwin":  # macOS
-            preferred_formats = ["icns", "png", "ico"]
-            format_priority = {
-                "icns": 1,  # Best for macOS
-                "png": 2,   # Good fallback
-                "ico": 3    # Windows format but works
-            }
-        elif current_platform == "windows":  # Windows
-            preferred_formats = ["ico", "png", "icns"] 
-            format_priority = {
-                "ico": 1,   # Best for Windows
-                "png": 2,   # Good fallback
-                "icns": 3   # Mac format but might work
-            }
-        else:  # Linux and others
-            preferred_formats = ["png", "ico", "icns"]
-            format_priority = {
-                "png": 1,   # Best for Linux
-                "ico": 2,   # Windows format but works
-                "icns": 3   # Mac format but might work
-            }
-        
-        # Common icon filenames to search for
-        icon_names = [
-            "logo",
-            "icon", 
-            "app_icon",
-            "application_icon",
-            "main_icon",
-            "window_icon",
-            f"{self.windowTitle().lower().replace(' ', '_')}_icon",  # Based on window title
-            "akademitrack_icon",  # Your app specific
-            "akademitrack"
-        ]
-        
-        # Build comprehensive list of possible icon paths
-        possible_icons = []
-        
-        for search_dir in search_dirs:
-            if not search_dir.exists():
-                continue
-                
-            for icon_name in icon_names:
-                for format_ext in preferred_formats:
-                    icon_path = search_dir / f"{icon_name}.{format_ext}"
-                    if icon_path.exists():
-                        priority = format_priority.get(format_ext, 99)
-                        possible_icons.append((str(icon_path), priority, format_ext))
-        
-        # Sort by priority (lower number = higher priority)
-        possible_icons.sort(key=lambda x: x[1])
-        
-        # Try to set icon with the best available option
-        icon_set = False
-        for icon_path, priority, format_ext in possible_icons:
-            try:
-                print(f"Attempting to set icon: {icon_path} (format: {format_ext}, priority: {priority})")
-                
-                # Create QIcon from file
-                icon = QIcon(icon_path)
-                
-                # Verify the icon loaded properly
-                if icon.isNull():
-                    print(f"Warning: Icon appears to be null/invalid: {icon_path}")
-                    continue
-                
-                # Test if icon has available sizes (additional validation)
-                available_sizes = icon.availableSizes()
-                if not available_sizes:
-                    print(f"Warning: No available sizes for icon: {icon_path}")
-                    # Continue anyway as some icons might still work
-                
-                # Set window icon
-                self.setWindowIcon(icon)
-                
-                # Set application icon (shows in taskbar)
-                app_instance = QApplication.instance()
-                if app_instance:
-                    app_instance.setWindowIcon(icon)
-                
-                print(f"✅ Icon set successfully from: {icon_path}")
-                print(f"   Platform: {current_platform}")
-                print(f"   Format: {format_ext}")
-                print(f"   Available sizes: {[f'{s.width()}x{s.height()}' for s in available_sizes]}")
-                
-                icon_set = True
-                break
-                
-            except Exception as icon_error:
-                print(f"Failed to set icon from {icon_path}: {icon_error}")
-                continue
-        
-        if not icon_set:
-            print("❌ No suitable icon found. Searched in:")
-            for search_dir in search_dirs:
-                print(f"   - {search_dir}")
-            print("Supported formats:", ", ".join(preferred_formats))
-            print("Expected names:", ", ".join([f"{name}.{ext}" for name in icon_names[:3] for ext in preferred_formats[:2]]))
-            
-            # Fallback: Try to create a simple default icon
-            try:
-                self._create_fallback_icon()
-            except Exception as fallback_error:
-                print(f"Fallback icon creation failed: {fallback_error}")
-                
-    except Exception as e:
-        print(f"Critical error in set_application_icon: {e}")
-        import traceback
-        traceback.print_exc()
-
-def _create_fallback_icon(self):
-    """Create a simple fallback icon programmatically"""
-    try:
-        from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor
-        from PyQt5.QtCore import Qt
-        
-        # Create a 64x64 pixmap
-        pixmap = QPixmap(64, 64)
-        pixmap.fill(QColor(0, 102, 204))  # Blue background (#0066cc)
-        
-        # Draw something simple
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Draw a simple "A" for AkademiTrack
-        painter.setPen(QColor(255, 255, 255))  # White text
-        painter.setFont(painter.font())
-        font = painter.font()
-        font.setPointSize(32)
-        font.setBold(True)
-        painter.setFont(font)
-        
-        painter.drawText(pixmap.rect(), Qt.AlignCenter, "A")
-        painter.end()
-        
-        # Set as icon
-        fallback_icon = QIcon(pixmap)
-        self.setWindowIcon(fallback_icon)
-        
-        app_instance = QApplication.instance()
-        if app_instance:
-            app_instance.setWindowIcon(fallback_icon)
-            
-        print("✅ Fallback icon created and set")
-        
-    except Exception as e:
-        print(f"Fallback icon creation failed: {e}")
-
-def set_application_icon_in_main(app_instance):
-    """Enhanced version for the main() function - pass QApplication instance - BUNDLE COMPATIBLE"""
-    try:
-        import platform
-        from pathlib import Path
-        
-        current_platform = platform.system().lower()
-        
-        # MODIFIED: Use get_base_directory for bundle support
-        base_dir = get_base_directory()
-        
-        search_dirs = [
-            base_dir,
-            base_dir / "assets", 
-            base_dir / "icons",
-            base_dir / "images", 
-            base_dir / "pictures",
-            base_dir / "resources"
-        ]
-        
-        # Platform-specific preferences
-        if current_platform == "darwin":
-            formats = ["icns", "png", "ico"]
-        elif current_platform == "windows":
-            formats = ["ico", "png", "icns"]
-        else:
-            formats = ["png", "ico", "icns"]
-        
-        icon_names = ["logo", "icon", "app_icon", "akademitrack"]
-        
-        # Find best icon
-        for search_dir in search_dirs:
-            if not search_dir.exists():
-                continue
-                
-            for icon_name in icon_names:
-                for format_ext in formats:
-                    icon_path = search_dir / f"{icon_name}.{format_ext}"
-                    if icon_path.exists():
-                        try:
-                            icon = QIcon(str(icon_path))
-                            if not icon.isNull():
-                                app_instance.setWindowIcon(icon)  # Now properly passed
-                                print(f"✅ Application icon set from: {icon_path}")
-                                return True
-                        except Exception as e:
-                            print(f"Failed to load {icon_path}: {e}")
-                            continue
-        
-        print("❌ No suitable application icon found")
-        return False
-        
-    except Exception as e:
-        print(f"Error setting application icon in main: {e}")
-        return False
-
-class WelcomeDialog(QDialog):
-    """Welcome dialog for first-time users - IMPROVED: Responsive sizing and proper centering"""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Velkommen til AkademiTrack")
-        self.setModal(True)
-        
-        # FIXED: Responsive sizing based on screen dimensions
-        self.setup_responsive_size()
-        self.init_ui()
-        
-    def setup_responsive_size(self):
-        """Setup responsive dialog size based on screen dimensions"""
-        try:
-            # Get screen geometry
-            from PyQt5.QtWidgets import QApplication
-            app = QApplication.instance()
-            if app is None:
-                # Fallback if no app instance
-                self.setFixedSize(900, 700)
-                return
-                
-            screen = app.primaryScreen().availableGeometry()
-            screen_width = screen.width()
-            screen_height = screen.height()
-            
-            # Calculate responsive size (60-80% of screen, with reasonable limits)
-            min_width, max_width = 800, 1200
-            min_height, max_height = 600, 900
-            
-            # Use 65% of screen width and 75% of screen height
-            target_width = int(screen_width * 0.65)
-            target_height = int(screen_height * 0.75)
-            
-            # Clamp to reasonable limits
-            final_width = max(min_width, min(max_width, target_width))
-            final_height = max(min_height, min(max_height, target_height))
-            
-            self.setFixedSize(final_width, final_height)
-            
-            # Center on screen immediately without blinking
-            x = (screen_width - final_width) // 2
-            y = (screen_height - final_height) // 2
-            self.move(x, y)
-            
-        except Exception as e:
-            # Fallback to reasonable default size
-            self.setFixedSize(900, 700)
-            # Try to center with fallback positioning
-            try:
-                from PyQt5.QtWidgets import QDesktopWidget
-                desktop = QDesktopWidget()
-                screen_rect = desktop.screenGeometry()
-                x = (screen_rect.width() - 900) // 2
-                y = (screen_rect.height() - 700) // 2
-                self.move(max(0, x), max(0, y))
-            except:
-                pass
-        
-    def init_ui(self):
-        """Initialize the welcome dialog UI with responsive text sizing"""
-        # Get current dialog size for responsive text scaling
-        dialog_width = self.width()
-        dialog_height = self.height()
-        
-        # Calculate scaling factors
-        width_scale = dialog_width / 1000.0  # Base width of 1000px
-        height_scale = dialog_height / 800.0  # Base height of 800px
-        scale_factor = min(width_scale, height_scale)  # Use smaller factor to prevent overflow
-        
-        # Responsive font sizes
-        title_size = max(18, int(28 * scale_factor))
-        subtitle_size = max(14, int(18 * scale_factor))
-        content_size = max(12, int(16 * scale_factor))
-        button_size = max(12, int(16 * scale_factor))
-        
-        self.setStyleSheet(f"""
-            QDialog {{
-                background-color: white;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            }}
-            QLabel {{
-                color: #212529;
-            }}
-            QTextEdit {{
-                background-color: #f8f9fa;
-                color: #495057;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                padding: {max(12, int(20 * scale_factor))}px;
-                font-size: {content_size}px;
-                line-height: 1.6;
-            }}
-            QPushButton {{
-                background-color: #0066cc;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: {max(10, int(14 * scale_factor))}px {max(18, int(28 * scale_factor))}px;
-                font-size: {button_size}px;
-                font-weight: 600;
-                min-height: {max(16, int(24 * scale_factor))}px;
-            }}
-            QPushButton:hover {{
-                background-color: #0052a3;
-            }}
-            QPushButton#secondaryButton {{
-                background-color: #6c757d;
-            }}
-            QPushButton#secondaryButton:hover {{
-                background-color: #545b62;
-            }}
-            QCheckBox {{
-                font-size: {max(11, int(14 * scale_factor))}px;
-                color: #495057;
-            }}
-        """)
-        
-        layout = QVBoxLayout(self)
-        # Responsive spacing and margins
-        spacing = max(20, int(30 * scale_factor))
-        margin = max(30, int(50 * scale_factor))
-        layout.setSpacing(spacing)
-        layout.setContentsMargins(margin, margin, margin, margin)
-        
-        # Header with responsive fonts
-        title = QLabel("🎓 Velkommen til AkademiTrack")
-        title.setFont(QFont("SF Pro Display", title_size, QFont.Bold))
-        title.setStyleSheet("color: #0066cc; margin-bottom: 20px;")
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-        
-        subtitle = QLabel("Automatisk oppmøteregistrering for iSkole")
-        subtitle.setFont(QFont("SF Pro Text", subtitle_size))
-        subtitle.setStyleSheet("color: #6c757d; margin-bottom: 30px;")
-        subtitle.setAlignment(Qt.AlignCenter)
-        layout.addWidget(subtitle)
-        
-        # Instructions text with responsive content
-        instructions_text = QTextEdit()
-        instructions_text.setReadOnly(True)
-        # Responsive height (40-60% of dialog height)
-        text_height = max(300, int(dialog_height * 0.5))
-        instructions_text.setMaximumHeight(text_height)
-        
-        # Responsive font sizes in HTML content
-        html_title_size = max(16, int(22 * scale_factor))
-        html_content_size = max(12, int(16 * scale_factor))
-        html_list_size = max(12, int(16 * scale_factor))
-        
-        instructions_content = f"""
-<div style="font-size: {html_content_size}px; line-height: 1.7;">
-<h3 style="color: #0066cc; font-size: {html_title_size}px; margin-bottom: 15px;">Hva gjør AkademiTrack?</h3>
-<p style="margin-bottom: 18px; font-size: {html_content_size}px;">AkademiTrack automatiserer oppmøteregistrering for STU-timer i iSkole systemet. For denne versjonen trenger du google chrome installert også. Programmet:</p>
-<ul style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
-<li style="margin-bottom: 12px;"><b>🔍 Overvåker timeplan</b> - Henter automatisk dagens STU-timer</li>
-<li style="margin-bottom: 12px;"><b>⏰ Registrerer oppmøte</b> - Registrerer deg automatisk i registreringsvinduet</li>
-<li style="margin-bottom: 12px;"><b>🎯 Intelligent timing</b> - Bare aktiv under STU-timer og registreringsperioder</li>
-<li style="margin-bottom: 12px;"><b>📱 Notifikasjoner</b> - Gir beskjed når registrering er fullført</li>
-</ul>
-
-<h3 style="color: #0066cc; font-size: {html_title_size}px; margin-top: 30px; margin-bottom: 15px;">Slik bruker du programmet:</h3>
-<ol style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
-<li style="margin-bottom: 15px;"><b>Oppsett og innlogging:</b> Klikk først på "Oppsett og innlogging" for å logge inn i iSkole. Etter du har logget inn på iSkole så kommer nettleseren til å lukke seg automatisk. Hvis du allerede har nettleseren åpen så lukkes den automatisk.</li>
-<li style="margin-bottom: 15px;"><b>Start automatisering:</b> Klikk på "Start automatisering" når du er klar</li>
-<li style="margin-bottom: 15px;"><b>La det kjøre:</b> Programmet kjører i bakgrunnen og registrerer automatisk. Du kan minimere programmet, men ikke lukk det da stopper automatiseringen.</li>
-<li style="margin-bottom: 15px;"><b>Stopp når ferdig:</b> Stopper automatisk når alle timer er fullført</li>
-</ol>
-
-<h3 style="color: #dc3545; font-size: {html_title_size}px; margin-top: 30px; margin-bottom: 15px;">⚠️ Viktig informasjon:</h3>
-<ul style="margin-bottom: 25px; padding-left: 30px; font-size: {html_list_size}px;">
-<li style="margin-bottom: 12px;">Programmet fungerer kun for <b>STU-timer</b> (studietimer)</li>
-<li style="margin-bottom: 12px;">Du må ha tilgang til iSkole med Feide-innlogging</li>
-<li style="margin-bottom: 12px;">Programmet kan kjøre i bakgrunnen når det er minimert</li>
-<li style="margin-bottom: 12px;">Bruk "Innstillinger" for å se detaljerte logger og teste manuell registrering</li>
-</ul>
-
-<p style="color: #28a745; font-weight: bold; font-size: {int(html_content_size * 1.1)}px; margin-top: 30px; text-align: center; padding: 20px; background-color: #d4edda; border-radius: 10px; border: 1px solid #c3e6cb;">
-✅ Klar til å starte? Klikk "Forstått, start programmet" nedenfor!
-</p>
-</div>
-        """
-        
-        instructions_text.setHtml(instructions_content)
-        layout.addWidget(instructions_text)
-        
-        # Don't show again checkbox
-        self.dont_show_checkbox = QCheckBox("Ikke vis denne meldingen igjen")
-        self.dont_show_checkbox.setStyleSheet("margin-top: 15px;")
-        layout.addWidget(self.dont_show_checkbox)
-        
-        # Buttons with responsive sizing
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        self.close_button = QPushButton("Lukk")
-        self.close_button.setObjectName("secondaryButton")
-        self.close_button.clicked.connect(self.close_app)
-        button_layout.addWidget(self.close_button)
-        
-        self.continue_button = QPushButton("Forstått, start programmet")
-        self.continue_button.clicked.connect(self.continue_to_app)
-        button_layout.addWidget(self.continue_button)
-        
-        layout.addLayout(button_layout)
-        
-    def close_app(self):
-        """Close the entire application"""
-        self.reject()
-        
-    def continue_to_app(self):
-        """Continue to main application"""
-        self.accept()
-
-class SettingsManager:
-    """Manages application settings including first-time user experience - BUNDLE COMPATIBLE"""
-    
-    def __init__(self):
-        # MODIFIED: Use get_base_directory for bundle support
-        self.base_dir = get_base_directory()
-        self.settings_file = self.base_dir / "settings.json"
-        self.default_settings = {
-            "first_time_user": True,
-            "show_welcome_dialog": True,
-            "window_position": {"x": 200, "y": 200},
-            "window_size": {"width": 600, "height": 440},
-            "auto_start_on_login_success": False,
-            "notification_duration": 5000,
-            "log_level": "INFO",
-            "theme": "light",
-            "check_interval_seconds": 60,
-            "max_registration_attempts": 3
-        }
-        self.settings = self.load_settings()
-    
-    def load_settings(self):
-        """Load settings from file or create with defaults"""
-        try:
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    loaded_settings = json.load(f)
-                
-                # Merge with defaults to handle new settings in updates
-                settings = self.default_settings.copy()
-                settings.update(loaded_settings)
-                
-                # Save back to include any new defaults
-                self.save_settings(settings)
-                return settings
-            else:
-                # First time - create with defaults
-                self.save_settings(self.default_settings)
-                return self.default_settings.copy()
-                
-        except Exception as e:
-            print(f"Error loading settings: {e}")
-            return self.default_settings.copy()
-    
-    def save_settings(self, settings=None):
-        """Save settings to file"""
-        try:
-            if settings is None:
-                settings = self.settings
-                
-            # MODIFIED: Ensure parent directory exists for bundle
-            self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, indent=2, ensure_ascii=False)
-            
-            return True
-        except Exception as e:
-            print(f"Error saving settings: {e}")
-            return False
-    
-    # Rest of the methods remain the same...
-    def get(self, key, default=None):
-        """Get a setting value"""
-        return self.settings.get(key, default)
-    
-    def set(self, key, value):
-        """Set a setting value and save"""
-        self.settings[key] = value
-        self.save_settings()
-    
-    def is_first_time_user(self):
-        """Check if this is a first-time user"""
-        return self.get("first_time_user", True)
-    
-    def should_show_welcome(self):
-        """Check if welcome dialog should be shown"""
-        return self.get("show_welcome_dialog", True)
-    
-    def mark_welcome_shown(self, dont_show_again=False):
-        """Mark welcome dialog as shown"""
-        self.set("first_time_user", False)
-        if dont_show_again:
-            self.set("show_welcome_dialog", False)
-    
-    def save_window_geometry(self, window):
-        """Save window position and size"""
-        try:
-            pos = window.pos()
-            size = window.size()
-            self.settings["window_position"] = {"x": pos.x(), "y": pos.y()}
-            self.settings["window_size"] = {"width": size.width(), "height": size.height()}
-            self.save_settings()
-        except Exception as e:
-            print(f"Error saving window geometry: {e}")
-    
-    def restore_window_geometry(self, window):
-        """Restore window position and size"""
-        try:
-            pos = self.settings.get("window_position", {"x": 200, "y": 200})
-            size = self.settings.get("window_size", {"width": 600, "height": 440})
-            
-            window.resize(size["width"], size["height"])
-            window.move(pos["x"], pos["y"])
-        except Exception as e:
-            print(f"Error restoring window geometry: {e}")
-
-class NotificationWidget(QWidget):
-    """Complete notification widget with proper implementation"""
-    
-    def __init__(self, message, notification_type="info", duration=5000, parent=None):
-        super().__init__(parent)
-        self.message = message
-        self.notification_type = notification_type
-        self.duration = duration
-        
-        # Set window flags for overlay behavior
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_ShowWithoutActivating)
-        
-        self.init_ui()
-        self.setup_animation()
-        
-    def init_ui(self):
-        """Initialize notification UI"""
-        # Set fixed size
-        self.setFixedSize(350, 80)
-        
-        # Create main layout
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        # Create main container
-        container = QFrame()
-        container.setObjectName("notificationContainer")
-        
-        # Set styles based on type
-        if self.notification_type == "success":
-            bg_color = "#d4edda"
-            border_color = "#c3e6cb"
-            text_color = "#155724"
-            icon = "✅"
-        elif self.notification_type == "error":
-            bg_color = "#f8d7da"
-            border_color = "#f5c6cb"
-            text_color = "#721c24"
-            icon = "❌"
-        elif self.notification_type == "warning":
-            bg_color = "#fff3cd"
-            border_color = "#ffeaa7"
-            text_color = "#856404"
-            icon = "⚠️"
-        elif self.notification_type == "completed":
-            bg_color = "#d1ecf1"
-            border_color = "#bee5eb"
-            text_color = "#0c5460"
-            icon = "🎊"
-        else:  # info
-            bg_color = "#d1ecf1"
-            border_color = "#bee5eb"
-            text_color = "#0c5460"
-            icon = "ℹ️"
-        
-        container.setStyleSheet(f"""
-            QFrame#notificationContainer {{
-                background-color: {bg_color};
-                border: 1px solid {border_color};
-                border-radius: 8px;
-                padding: 12px;
-            }}
-            QLabel {{
-                color: {text_color};
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                font-size: 14px;
-                font-weight: 500;
-            }}
-        """)
-        
-        # Container layout
-        container_layout = QHBoxLayout(container)
-        container_layout.setContentsMargins(8, 8, 8, 8)
-        container_layout.setSpacing(8)
-        
-        # Icon label
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("SF Pro Text", 16))
-        container_layout.addWidget(icon_label)
-        
-        # Message label
-        message_label = QLabel(self.message)
-        message_label.setWordWrap(True)
-        container_layout.addWidget(message_label, 1)
-        
-        # Add container to main layout
-        layout.addWidget(container)
-        
-    def setup_animation(self):
-        """Setup slide-in animation"""
-        self.slide_in_animation = QPropertyAnimation(self, b"geometry")
-        self.slide_in_animation.setDuration(300)
-        self.slide_in_animation.setEasingCurve(QEasingCurve.OutCubic)
-        
-    def show_notification(self):
-        """Show notification with slide-in animation"""
-        try:
-            app = QApplication.instance()
-            if not app:
-                return
-                
-            screen = app.primaryScreen().availableGeometry()
-            
-            # Manage existing notifications
-            if not hasattr(app, '_active_notifications'):
-                app._active_notifications = []
-            
-            # Hide older notifications
-            for notification in app._active_notifications[:]:
-                if notification != self and notification.isVisible():
-                    try:
-                        notification.hide_notification()
-                    except:
-                        pass
-            
-            app._active_notifications = [self]  # Keep only this notification
-            
-            # Position calculation
-            margin = 20
-            start_x = screen.right()
-            end_x = screen.right() - self.width() - margin
-            y = screen.top() + margin
-            
-            # Set initial position and show
-            self.setGeometry(start_x, y, self.width(), self.height())
-            self.show()
-            self.raise_()
-            
-            # Start slide animation
-            self.slide_in_animation.setStartValue(QRect(start_x, y, self.width(), self.height()))
-            self.slide_in_animation.setEndValue(QRect(end_x, y, self.width(), self.height()))
-            self.slide_in_animation.start()
-            
-            # Auto-hide after duration
-            QTimer.singleShot(self.duration, self.hide_notification)
-            
-        except Exception as e:
-            print(f"Error showing notification: {e}")
-    
-    def show_notification_original(self):
-        """Alias for show_notification for compatibility"""
-        self.show_notification()
-        
-    def hide_notification(self):
-        """Hide notification with fade out"""
-        try:
-            self.hide()
-            
-            # Remove from active notifications
-            app = QApplication.instance()
-            if app and hasattr(app, '_active_notifications'):
-                try:
-                    app._active_notifications.remove(self)
-                except ValueError:
-                    pass
-                    
-        except Exception as e:
-            print(f"Error hiding notification: {e}")
-
 class PostRequestWindow(QDialog):
-    finished = pyqtSignal()
     def __init__(self, bot, parent=None):
         super().__init__(parent)
         self.bot = bot
@@ -947,34 +33,9 @@ class PostRequestWindow(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the POST request window UI with responsive design and larger inputs"""
+        """Initialize the POST request window UI"""
         self.setWindowTitle("Manual POST Request")
-        
-        # Get screen dimensions for responsive sizing
-        try:
-            app = QApplication.instance()
-            screen = app.primaryScreen().availableGeometry()
-            screen_width = screen.width()
-            screen_height = screen.height()
-            
-            # Calculate responsive size (40% of screen width, 65% of screen height)
-            window_width = max(700, min(900, int(screen_width * 0.45)))
-            window_height = max(600, min(750, int(screen_height * 0.70)))
-            
-            # Center the window
-            x = (screen_width - window_width) // 2
-            y = (screen_height - window_height) // 2
-            
-            self.setGeometry(x, y, window_width, window_height)
-            
-        except Exception as e:
-            # Fallback to larger fixed size if screen detection fails
-            self.setGeometry(300, 300, 750, 650)
-        
-        # Set minimum and maximum sizes for better UX
-        self.setMinimumSize(650, 550)
-        self.setMaximumSize(1100, 900)
-        
+        self.setGeometry(300, 300, 900, 700)
         self.setStyleSheet("""
             QDialog {
                 background-color: white;
@@ -984,163 +45,114 @@ class PostRequestWindow(QDialog):
                 color: #212529;
                 font-size: 14px;
                 font-weight: 500;
-                margin-bottom: 4px;
             }
-            QLineEdit {
+            QLineEdit, QTextEdit {
                 background-color: #f8f9fa;
                 border: 1px solid #dee2e6;
-                border-radius: 6px;
-                padding: 12px 16px;
-                font-size: 15px;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 12px;
                 color: #495057;
-                margin-bottom: 8px;
-                min-height: 24px;
-            }
-            QLineEdit:focus {
-                border-color: #0066cc;
-                background-color: white;
             }
             QPushButton {
                 background-color: #0066cc;
                 color: white;
                 border: none;
                 border-radius: 6px;
-                padding: 12px 18px;
-                font-size: 14px;
+                padding: 8px 16px;
+                font-size: 12px;
                 font-weight: 600;
-                min-height: 20px;
             }
             QPushButton:hover {
                 background-color: #0052a3;
-            }
-            QPushButton#closeButton {
-                background-color: #6c757d;
-            }
-            QPushButton#closeButton:hover {
-                background-color: #545b62;
             }
             QTextEdit#console {
                 background-color: #0b0c10;
                 color: #e6edf3;
                 font-family: 'SF Mono', 'Consolas', 'Fira Code', monospace;
-                font-size: 13px;
+                font-size: 12px;
                 border: 1px solid #1f2833;
-                border-radius: 6px;
-                padding: 10px;
             }
         """)
 
         layout = QVBoxLayout()
-        layout.setSpacing(10)
+        layout.setSpacing(12)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        # Title with better spacing
+        # Title
         title = QLabel("Manual POST Request")
-        title.setFont(QFont("SF Pro Display", 16, QFont.Bold))
-        title.setStyleSheet("color: #212529; margin-bottom: 8px;")
+        title.setFont(QFont("SF Pro Display", 18, QFont.Bold))
         layout.addWidget(title)
 
-        # Scrollable form area for better space usage
-        scroll_area = QWidget()
-        form_layout = QVBoxLayout(scroll_area)
-        form_layout.setSpacing(8)
+        # Form fields
+        form_layout = QVBoxLayout()
         
-        # Create form fields in a more compact layout
-        fields = [
-            ("Fylke ID:", "fylkeid_input", "00"),
-            ("Skole ID:", "skoleid_input", "312"),
-            ("Plan Periode:", "planperi_input", "2025-26"),
-            ("ST Kode:", "stkode_input", "PB"),
-            ("Klasse Trinn:", "kl_trinn_input", "3"),
-            ("Klasse ID:", "kl_id_input", "A"),
-            ("K Navn:", "k_navn_input", "STU"),
-            ("Gruppe Nr:", "gruppe_nr_input", "$"),
-            ("Time Nr:", "timenr_input", "1")
-        ]
+        # Fylkeid
+        form_layout.addWidget(QLabel("Fylke ID:"))
+        self.fylkeid_input = QLineEdit("00")
+        form_layout.addWidget(self.fylkeid_input)
         
-        # Create form in a grid-like layout for better space usage
-        form_grid = QVBoxLayout()
+        # Skoleid  
+        form_layout.addWidget(QLabel("Skole ID:"))
+        self.skoleid_input = QLineEdit("312")
+        form_layout.addWidget(self.skoleid_input)
         
-        for i in range(0, len(fields), 2):  # Process 2 fields per row
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(16)
-            
-            # First field in row
-            field_label, field_attr, field_default = fields[i]
-            left_widget = QWidget()
-            left_layout = QVBoxLayout(left_widget)
-            left_layout.setContentsMargins(0, 0, 0, 0)
-            left_layout.setSpacing(4)
-            
-            left_layout.addWidget(QLabel(field_label))
-            field_input = QLineEdit(field_default)
-            # FIXED: Increased height significantly for better readability
-            field_input.setFixedHeight(48)
-            field_input.setFont(QFont("SF Pro Text", 15))  # Explicit font size
-            setattr(self, field_attr, field_input)
-            left_layout.addWidget(field_input)
-            
-            row_layout.addWidget(left_widget)
-            
-            # Second field in row (if exists)
-            if i + 1 < len(fields):
-                field_label, field_attr, field_default = fields[i + 1]
-                right_widget = QWidget()
-                right_layout = QVBoxLayout(right_widget)
-                right_layout.setContentsMargins(0, 0, 0, 0)
-                right_layout.setSpacing(4)
-                
-                right_layout.addWidget(QLabel(field_label))
-                field_input = QLineEdit(field_default)
-                # FIXED: Increased height significantly for better readability
-                field_input.setFixedHeight(48)
-                field_input.setFont(QFont("SF Pro Text", 15))  # Explicit font size
-                setattr(self, field_attr, field_input)
-                right_layout.addWidget(field_input)
-                
-                row_layout.addWidget(right_widget)
-            else:
-                row_layout.addStretch()  # Fill remaining space if odd number of fields
-            
-            form_grid.addLayout(row_layout)
+        # Planperi
+        form_layout.addWidget(QLabel("Plan Periode:"))
+        self.planperi_input = QLineEdit("2025-26")
+        form_layout.addWidget(self.planperi_input)
         
-        form_layout.addLayout(form_grid)
-        layout.addWidget(scroll_area)
+        # Stkode
+        form_layout.addWidget(QLabel("ST Kode:"))
+        self.stkode_input = QLineEdit("PB")
+        form_layout.addWidget(self.stkode_input)
+        
+        # Kl_trinn
+        form_layout.addWidget(QLabel("Klasse Trinn:"))
+        self.kl_trinn_input = QLineEdit("3")
+        form_layout.addWidget(self.kl_trinn_input)
+        
+        # Kl_id
+        form_layout.addWidget(QLabel("Klasse ID:"))
+        self.kl_id_input = QLineEdit("A")
+        form_layout.addWidget(self.kl_id_input)
+        
+        # K_navn
+        form_layout.addWidget(QLabel("K Navn:"))
+        self.k_navn_input = QLineEdit("STU")
+        form_layout.addWidget(self.k_navn_input)
+        
+        # Gruppe_nr
+        form_layout.addWidget(QLabel("Gruppe Nr:"))
+        self.gruppe_nr_input = QLineEdit("$")
+        form_layout.addWidget(self.gruppe_nr_input)
+        
+        # Timenr
+        form_layout.addWidget(QLabel("Time Nr:"))
+        self.timenr_input = QLineEdit("1")
+        form_layout.addWidget(self.timenr_input)
+        
+        layout.addLayout(form_layout)
 
-        # Buttons with better layout
+        # Buttons
         button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
-        
-        button_layout.addStretch()
-        
         self.send_button = QPushButton("Send POST Request")
         self.send_button.clicked.connect(self.send_post_request)
-        self.send_button.setFixedHeight(44)  # Slightly larger button
         button_layout.addWidget(self.send_button)
 
         self.close_button = QPushButton("Close")
-        self.close_button.setObjectName("closeButton")
         self.close_button.clicked.connect(self.close)
-        self.close_button.setFixedHeight(44)  # Slightly larger button
         button_layout.addWidget(self.close_button)
 
         layout.addLayout(button_layout)
         
-        # Console output - takes remaining space
-        console_label = QLabel("Response:")
-        console_label.setFont(QFont("SF Pro Text", 13, QFont.Bold))
-        console_label.setStyleSheet("margin-top: 8px; margin-bottom: 4px;")
-        layout.addWidget(console_label)
-        
+        # Console output
+        layout.addWidget(QLabel("Response:"))
         self.console = QTextEdit()
         self.console.setObjectName("console")
         self.console.setReadOnly(True)
-        
-        # Make console responsive to window size but don't let it dominate
-        self.console.setMinimumHeight(150)
-        self.console.setMaximumHeight(200)
-        
-        layout.addWidget(self.console, 1)  # Give console the remaining space
+        self.console.setMinimumHeight(200)
+        layout.addWidget(self.console)
 
         self.setLayout(layout)
 
@@ -1219,7 +231,7 @@ class PostRequestWindow(QDialog):
             try:
                 response_data = response.json()
                 self.log("📋 Complete Response JSON:")
-                self.log("=" * 40)
+                self.log("=" * 80)
                 
                 # FIXED: Output complete JSON without any limits
                 complete_json = json.dumps(response_data, indent=2, ensure_ascii=False)
@@ -1232,7 +244,7 @@ class PostRequestWindow(QDialog):
                     # Force GUI update for each chunk
                     self.console.repaint()
                     
-                self.log("=" * 40)
+                self.log("=" * 80)
                 
             except Exception as e:
                 self.log(f"📋 Raw Response Text: {response.text}")
@@ -1248,23 +260,10 @@ class PostRequestWindow(QDialog):
             import traceback
             self.log(f"📋 Full error: {traceback.format_exc()}")
 
-    def resizeEvent(self, event):
-        """Handle window resize to adjust console size"""
-        super().resizeEvent(event)
-        # Keep console at a reasonable fixed size instead of percentage
-        if hasattr(self, 'console'):
-            # Fixed console height that doesn't change much with window size
-            self.console.setMinimumHeight(150)
-            self.console.setMaximumHeight(220)
-
 class SimpleButton(QPushButton):
-    """FIXED: Simple button that never gets visually disabled"""
+    """Clean, simple button"""
     def __init__(self, text, primary=False):
         super().__init__(text)
-        
-        self.setMinimumSize(140, 44)
-        self.setMaximumHeight(60)
-        
         if primary:
             self.setStyleSheet("""
                 QPushButton {
@@ -1276,7 +275,6 @@ class SimpleButton(QPushButton):
                     font-size: 14px;
                     font-weight: 600;
                     min-height: 20px;
-                    min-width: 140px;
                 }
                 QPushButton:hover {
                     background-color: #0052a3;
@@ -1284,7 +282,10 @@ class SimpleButton(QPushButton):
                 QPushButton:pressed {
                     background-color: #003d7a;
                 }
-                /* REMOVED DISABLED STATE - button never looks disabled */
+                QPushButton:disabled {
+                    background-color: #cccccc;
+                    color: #666666;
+                }
             """)
         else:
             self.setStyleSheet("""
@@ -1296,7 +297,6 @@ class SimpleButton(QPushButton):
                     padding: 12px 24px;
                     font-size: 14px;
                     min-height: 20px;
-                    min-width: 140px;
                 }
                 QPushButton:hover {
                     background-color: #e9ecef;
@@ -1305,20 +305,19 @@ class SimpleButton(QPushButton):
                 QPushButton:pressed {
                     background-color: #dee2e6;
                 }
-                /* REMOVED DISABLED STATE - button never looks disabled */
+                QPushButton:disabled {
+                    background-color: #f8f9fa;
+                    color: #6c757d;
+                    border-color: #dee2e6;
+                }
             """)
 
 
 class StatusIndicator(QLabel):
-    """Simple status indicator with working stylesheet and FIXED sizing"""
+    """Simple status indicator with working stylesheet"""
     def __init__(self):
         super().__init__("● Klar") 
-        
-        # FIXED: Force exact size - never changes
-        self.setFixedSize(140, 36)  # Exact fixed size
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        
-        # Set initial style
+        # Set initial style without dynamic color
         self.setStyleSheet("""
             QLabel {
                 color: #6c757d;
@@ -1326,19 +325,15 @@ class StatusIndicator(QLabel):
                 font-weight: bold;
                 padding: 8px 12px;
                 background-color: #f8f9fa;
-                border-radius: 18px;
+                border-radius: 20px;
                 border: 1px solid #dee2e6;
             }
         """)
         
-        # FIXED: Center alignment to prevent text shifting
-        self.setAlignment(Qt.AlignCenter)
-        
     def set_status(self, status, color="#6c757d"):
-        """Set status text and color - FIXED METHOD with exact sizing"""
+        """Set status text and color - FIXED METHOD"""
         self.setText(f"● {status}")
-        
-        # FIXED: Remove all size properties from CSS - rely on setFixedSize only
+        # Use hardcoded colors instead of dynamic CSS
         if color == "#28a745":  # Green/Running
             style = """
                 QLabel {
@@ -1347,7 +342,7 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #d4edda;
-                    border-radius: 18px;
+                    border-radius: 20px;
                     border: 1px solid #c3e6cb;
                 }
             """
@@ -1359,7 +354,7 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #f8d7da;
-                    border-radius: 18px;
+                    border-radius: 20px;
                     border: 1px solid #f5c6cb;
                 }
             """
@@ -1371,7 +366,7 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #fff3cd;
-                    border-radius: 18px;
+                    border-radius: 20px;
                     border: 1px solid #ffeaa7;
                 }
             """
@@ -1383,26 +378,18 @@ class StatusIndicator(QLabel):
                     font-weight: bold;
                     padding: 8px 12px;
                     background-color: #f8f9fa;
-                    border-radius: 18px;
+                    border-radius: 20px;
                     border: 1px solid #dee2e6;
                 }
             """
-        
         self.setStyleSheet(style)
-        
-        # FIXED: Ensure size never changes
-        self.setFixedSize(140, 36)  # Force same size after every update
 
 class SettingsWindow(QWidget):
     """Settings window as a separate independent window"""
-    finished = pyqtSignal()
-
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window)  # Make it a proper window
         self.parent_window = parent
         self.console_widget = None
-        self.post_window = None  # Track POST window instance
-        self.post_window_open = False  # Track POST window state
         self.init_ui()
         
     def init_ui(self):
@@ -1476,7 +463,7 @@ class SettingsWindow(QWidget):
             self.console_widget.setPlainText(self.parent_window.console.toPlainText())
             
     def open_post_request(self):
-        """Open the POST request window from settings - SINGLE INSTANCE"""
+        """Open the POST request window from settings"""
         if not self.parent_window or not self.parent_window.bot:
             self.append_text("❌ No bot instance available")
             return
@@ -1485,37 +472,14 @@ class SettingsWindow(QWidget):
             self.append_text("⚠️ Stop automation first before using POST Request")
             return
         
-        # Check if POST window is already open
-        if self.post_window_open:
-            # If window exists and is visible, just bring it to front
-            if self.post_window and self.post_window.isVisible():
-                self.post_window.raise_()
-                self.post_window.activateWindow()
-                return
-            else:
-                # Window was closed but flag wasn't reset
-                self.post_window_open = False
-        
         # Don't check login status - just check if cookies exist
         if not os.path.exists(self.parent_window.bot.cookies_file):
             self.append_text("❌ No cookies found - please run Setup & Login first")
             return
-        
+            
         self.append_text("🚀 Opening POST Request window...")
-        
-        # Create new window only if none exists
         self.post_window = PostRequestWindow(self.parent_window.bot, self)
-        self.post_window_open = True
-        
-        # Connect close event to reset flag
-        self.post_window.finished.connect(self._on_post_window_closed)
-        
         self.post_window.show()
-
-    def _on_post_window_closed(self):
-        """Reset POST window flag when closed"""
-        self.post_window_open = False
-        self.post_window = None
     
     def append_text(self, text):
         """Append text to console without limits - FIXED VERSION"""
@@ -1539,13 +503,7 @@ class SettingsWindow(QWidget):
         
     def closeEvent(self, event):
         """Handle window close"""
-        self.finished.emit()  # Emit finished signal
         event.accept()
-
-    def close(self):
-        """Override close method to emit signal"""
-        self.finished.emit()
-        super().close()
 
 class SetupThread(QThread):
     """Thread for handling setup operations"""
@@ -1585,65 +543,34 @@ class SetupThread(QThread):
 
 
 class SchedulerThread(QThread):
-    """FIXED: More robust thread that handles termination better"""
+    """Thread for running the bot scheduler"""
     message_signal = pyqtSignal(str)
+    status_signal = pyqtSignal(str)
     
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.setTerminationEnabled(True)
-        self._should_stop = False
+        self.should_stop = False
     
     def run(self):
-        """Enhanced run method with better error handling"""
         try:
-            print("Scheduler thread starting...")
-            
-            # Quick start notification
-            try:
-                self.message_signal.emit("🚀 Automatisering startet")
-            except:
-                pass
-            
-            # Main loop with frequent stop checks
-            while not self._should_stop and self.bot and self.bot.running:
-                try:
-                    # Check if we should stop every iteration
-                    if self._should_stop:
-                        break
-                        
-                    # Run bot scheduler
-                    if hasattr(self.bot, 'run_scheduler'):
-                        self.bot.run_scheduler()
-                    
-                    # Small sleep to prevent CPU spinning
-                    self.msleep(100)
-                    
-                except Exception as e:
-                    print(f"Scheduler error: {e}")
-                    try:
-                        self.message_signal.emit(f"Scheduler error: {e}")
-                    except:
-                        pass
-                    break
-            
-            print("Scheduler thread ending...")
-            
+            self.status_signal.emit("Running")
+            if self.bot.running:
+                self.bot.run_scheduler()
+            self.status_signal.emit("Stopped")
         except Exception as e:
-            print(f"Thread run error: {e}")
-        finally:
-            try:
-                self.message_signal.emit("🛑 Scheduler stopped")
-            except:
-                pass
+            self.message_signal.emit(f"Scheduler error: {e}")
+            self.status_signal.emit("Error")
     
     def stop(self):
-        """Graceful stop method"""
-        self._should_stop = True
+        """Stop the thread gracefully"""
+        self.should_stop = True
+        if self.bot:
+            self.bot.stop_scheduler()
 
 
 class AkademiTrackWindow(QMainWindow):
-    """Simple, clean main window with notification system - FIXED FOR TOP-ONLY NOTIFICATIONS"""
+    """Simple, clean main window"""
     console_signal = pyqtSignal(str)
     
     def __init__(self):
@@ -1655,17 +582,8 @@ class AkademiTrackWindow(QMainWindow):
         self.post_window = None  # CHANGED from manual_window
         self.settings_window = None
         self.is_running = False
-        self._toggle_lock = False  # Prevent spam clicking
-        self._last_notifications = {}
-
         self._orig_stdout = None
         self._orig_stderr = None
-        self.active_notifications = []  # Track active notifications
-
-        self.post_window = None
-        self.settings_window = None
-        self.post_window_open = False
-        self.settings_window_open = False
         
         # Create a hidden console for logging (not displayed in main UI)
         self.console = QPlainTextEdit()
@@ -1676,224 +594,10 @@ class AkademiTrackWindow(QMainWindow):
         
         self.init_ui()
         self.init_bot()
-        self.set_application_icon()
-
         self.log_message("Klikk 'Oppsett og innlogging' først, deretter 'Start automatisering' eller 'POST Request'")
         
-        if hasattr(self, 'bot') and self.bot:
-            try:
-            # Use queued connection for thread safety
-                self.bot.scheduler_stopped_signal.connect(
-                    self.on_scheduler_stopped, 
-                    Qt.QueuedConnection
-                )
-            except:
-                print("Could not connect scheduler signal - continuing anyway")
-
         self.console_signal.connect(self.append_console)
         self._redirect_std_streams()
-
-    def set_application_icon(self):
-        """Enhanced icon setting with support for PNG, ICO, ICNS and multiple directories"""
-        try:
-            import platform
-            import os
-            from pathlib import Path
-            
-            # Detect platform for format preferences
-            current_platform = platform.system().lower()
-            
-            # Define search directories (relative to script location)
-            base_dir = Path(__file__).resolve().parent
-            search_dirs = [
-                base_dir,                           # Root directory
-                base_dir / "assets",               # Assets folder
-                base_dir / "icons",                # Icons folder  
-                base_dir / "images",               # Images folder
-                base_dir / "pictures",             # Pictures folder (your existing)
-                base_dir / "resources",            # Resources folder
-                base_dir / "res",                  # Res folder
-            ]
-            
-            # Platform-specific format preferences
-            if current_platform == "darwin":  # macOS
-                preferred_formats = ["icns", "png", "ico"]
-                format_priority = {
-                    "icns": 1,  # Best for macOS
-                    "png": 2,   # Good fallback
-                    "ico": 3    # Windows format but works
-                }
-            elif current_platform == "windows":  # Windows
-                preferred_formats = ["ico", "png", "icns"] 
-                format_priority = {
-                    "ico": 1,   # Best for Windows
-                    "png": 2,   # Good fallback
-                    "icns": 3   # Mac format but might work
-                }
-            else:  # Linux and others
-                preferred_formats = ["png", "ico", "icns"]
-                format_priority = {
-                    "png": 1,   # Best for Linux
-                    "ico": 2,   # Windows format but works
-                    "icns": 3   # Mac format but might work
-                }
-            
-            # Common icon filenames to search for
-            icon_names = [
-                "logo",
-                "icon", 
-                "app_icon",
-                "application_icon",
-                "main_icon",
-                "window_icon",
-                f"{self.windowTitle().lower().replace(' ', '_')}_icon",  # Based on window title
-                "akademitrack_icon",  # Your app specific
-                "akademitrack"
-            ]
-            
-            # Build comprehensive list of possible icon paths
-            possible_icons = []
-            
-            for search_dir in search_dirs:
-                if not search_dir.exists():
-                    continue
-                    
-                for icon_name in icon_names:
-                    for format_ext in preferred_formats:
-                        icon_path = search_dir / f"{icon_name}.{format_ext}"
-                        if icon_path.exists():
-                            priority = format_priority.get(format_ext, 99)
-                            possible_icons.append((str(icon_path), priority, format_ext))
-            
-            # Sort by priority (lower number = higher priority)
-            possible_icons.sort(key=lambda x: x[1])
-            
-            # Try to set icon with the best available option
-            icon_set = False
-            for icon_path, priority, format_ext in possible_icons:
-                try:
-                    print(f"Attempting to set icon: {icon_path} (format: {format_ext}, priority: {priority})")
-                    
-                    # Create QIcon from file
-                    icon = QIcon(icon_path)
-                    
-                    # Verify the icon loaded properly
-                    if icon.isNull():
-                        print(f"Warning: Icon appears to be null/invalid: {icon_path}")
-                        continue
-                    
-                    # Test if icon has available sizes (additional validation)
-                    available_sizes = icon.availableSizes()
-                    if not available_sizes:
-                        print(f"Warning: No available sizes for icon: {icon_path}")
-                        # Continue anyway as some icons might still work
-                    
-                    # Set window icon
-                    self.setWindowIcon(icon)
-                    
-                    # Set application icon (shows in taskbar)
-                    app_instance = QApplication.instance()
-                    if app_instance:
-                        app_instance.setWindowIcon(icon)
-                    
-                    print(f"✅ Icon set successfully from: {icon_path}")
-                    print(f"   Platform: {current_platform}")
-                    print(f"   Format: {format_ext}")
-                    print(f"   Available sizes: {[f'{s.width()}x{s.height()}' for s in available_sizes]}")
-                    
-                    icon_set = True
-                    break
-                    
-                except Exception as icon_error:
-                    print(f"Failed to set icon from {icon_path}: {icon_error}")
-                    continue
-            
-            if not icon_set:
-                print("❌ No suitable icon found. Searched in:")
-                for search_dir in search_dirs:
-                    print(f"   - {search_dir}")
-                print("Supported formats:", ", ".join(preferred_formats))
-                print("Expected names:", ", ".join([f"{name}.{ext}" for name in icon_names[:3] for ext in preferred_formats[:2]]))
-                
-                # Fallback: Try to create a simple default icon
-                try:
-                    self._create_fallback_icon()
-                except Exception as fallback_error:
-                    print(f"Fallback icon creation failed: {fallback_error}")
-                    
-        except Exception as e:
-            print(f"Critical error in set_application_icon: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _create_fallback_icon(self):
-        """Create a simple fallback icon programmatically"""
-        try:
-            from PyQt5.QtGui import QPixmap, QPainter, QBrush, QColor
-            from PyQt5.QtCore import Qt
-            
-            # Create a 64x64 pixmap
-            pixmap = QPixmap(64, 64)
-            pixmap.fill(QColor(0, 102, 204))  # Blue background (#0066cc)
-            
-            # Draw something simple
-            painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.Antialiasing)
-            
-            # Draw a simple "A" for AkademiTrack
-            painter.setPen(QColor(255, 255, 255))  # White text
-            painter.setFont(painter.font())
-            font = painter.font()
-            font.setPointSize(32)
-            font.setBold(True)
-            painter.setFont(font)
-            
-            painter.drawText(pixmap.rect(), Qt.AlignCenter, "A")
-            painter.end()
-            
-            # Set as icon
-            fallback_icon = QIcon(pixmap)
-            self.setWindowIcon(fallback_icon)
-            
-            app_instance = QApplication.instance()
-            if app_instance:
-                app_instance.setWindowIcon(fallback_icon)
-                
-            print("✅ Fallback icon created and set")
-            
-        except Exception as e:
-            print(f"Fallback icon creation failed: {e}")
-
-    def show_notification(self, message, notification_type="info", duration=5000):
-        """FIXED: Create and show notification properly"""
-        try:
-            # Simple spam prevention
-            current_time = time.time()
-            
-            if not hasattr(self, '_last_notification_time'):
-                self._last_notification_time = 0
-            
-            # Only block if same message within 1 second
-            if (current_time - self._last_notification_time) < 1.0:
-                last_message = getattr(self, '_last_notification_message', '')
-                if last_message == message:
-                    return
-            
-            self._last_notification_time = current_time
-            self._last_notification_message = message
-            
-            # Create notification widget with proper parameters
-            notification = NotificationWidget(message, notification_type, duration, None)
-            
-            # Show the notification
-            notification.show_notification()
-            
-            print(f"Notification shown: {message} ({notification_type})")
-            
-        except Exception as e:
-            print(f"Error showing notification: {e}")
-            import traceback
-            traceback.print_exc()
         
     def init_ui(self):
         """Initialize clean, simple UI"""
@@ -1957,7 +661,7 @@ class AkademiTrackWindow(QMainWindow):
         title.setStyleSheet("color: #212529; margin-bottom: 4px;")
         title.setAlignment(Qt.AlignCenter)
         
-        subtitle = QLabel("Automatisk oppmøteregistrering")
+        subtitle = QLabel("Automatisk frammøteregistrering")
         subtitle.setFont(QFont("SF Pro Text", 14))
         subtitle.setStyleSheet("color: #495057; font-weight: 500;")
         subtitle.setAlignment(Qt.AlignCenter)
@@ -2020,13 +724,6 @@ class AkademiTrackWindow(QMainWindow):
         self.start_button = SimpleButton("Start automatisering", primary=True)
         self.start_button.clicked.connect(self.toggle_automation)
         
-        # FIXED: Override setEnabled to prevent disabling
-        original_setEnabled = self.start_button.setEnabled
-        def force_enabled_start_button(enabled):
-            # Always call with True - never actually disable the start button
-            original_setEnabled(True)
-        self.start_button.setEnabled = force_enabled_start_button
-        
         main_button_layout.addWidget(self.setup_button)
         main_button_layout.addWidget(self.start_button)
         
@@ -2056,35 +753,14 @@ class AkademiTrackWindow(QMainWindow):
         parent_layout.addLayout(controls_layout)
 
     def open_settings(self):
-        """Open settings window as independent window - SINGLE INSTANCE"""
-        # Check if settings window is already open
-        if self.settings_window_open:
-            # If window exists and is visible, just bring it to front
-            if self.settings_window and self.settings_window.isVisible():
-                self.settings_window.raise_()
-                self.settings_window.activateWindow()
-                return
-            else:
-                # Window was closed but flag wasn't reset
-                self.settings_window_open = False
-        
-        # Create new window only if none exists
+        """Open settings window as independent window"""
+        # Always create a new window (don't reuse)
         self.settings_window = SettingsWindow(self)
-        self.settings_window_open = True
-        
-        # Connect close event to reset flag
-        self.settings_window.finished.connect(self._on_settings_window_closed)
-        
         self.settings_window.show()
         
         # Position it relative to main window
         main_pos = self.pos()
         self.settings_window.move(main_pos.x() + 50, main_pos.y() + 50)
-
-    def _on_settings_window_closed(self):
-        """Reset settings window flag when closed"""
-        self.settings_window_open = False
-        self.settings_window = None
     
     def create_status_area(self, parent_layout):
         """Create minimal status area - only for critical errors"""
@@ -2110,7 +786,6 @@ class AkademiTrackWindow(QMainWindow):
     def init_bot(self):
         """Initialize the bot"""
         self.install_requirements()
-    # Remove the base_directory parameter that doesn't exist
         self.bot = ImprovedISkoleBot(gui_callback=self.log_message)
         # Connect the scheduler stopped signal to our handler
         self.bot.scheduler_stopped_signal.connect(self.on_scheduler_stopped)
@@ -2131,9 +806,9 @@ class AkademiTrackWindow(QMainWindow):
         sys.stderr = _StdRedirector(lambda t: self.console_signal.emit(t))
     
     def append_console(self, text):
-        """Append text to console and settings window - handles large JSON properly"""
+        """Append text to console and settings window if open - FIXED VERSION"""
         if text.strip():
-            # Update hidden main console - NO LIMITS for full JSON
+            # Update hidden main console - FIXED: Remove limits
             cursor = self.console.textCursor()
             cursor.movePosition(cursor.End)
             self.console.setTextCursor(cursor)
@@ -2142,27 +817,16 @@ class AkademiTrackWindow(QMainWindow):
             scrollbar = self.console.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
             
-            # Update settings window console if it's open - NO LIMITS
+            # Update settings window console if it's open
             if hasattr(self, 'settings_window') and self.settings_window and hasattr(self.settings_window, 'console_widget'):
                 try:
-                    # Use insertPlainText for large content instead of append
-                    cursor = self.settings_window.console_widget.textCursor()
-                    cursor.movePosition(cursor.End)
-                    self.settings_window.console_widget.setTextCursor(cursor)
-                    self.settings_window.console_widget.insertPlainText(text.strip() + "\n")
-                    
-                    scrollbar = self.settings_window.console_widget.verticalScrollBar()
-                    scrollbar.setValue(scrollbar.maximum())
-                except Exception as e:
-                    print(f"Error updating settings console: {e}")
+                    self.settings_window.append_text(text.strip())
+                except:
+                    pass
+            
     
     def install_requirements(self):
-        """Install required packages quietly - SKIP IN BUNDLED APPS"""
-        # Skip package installation in bundled applications
-        if getattr(sys, 'frozen', False):
-            print("Running as bundled app - skipping package installation")
-            return
-            
+        """Install required packages quietly"""
         required_packages = [
             'selenium', 'webdriver-manager', 'psutil', 
             'requests', 'schedule', 'browser-cookie3'
@@ -2184,144 +848,42 @@ class AkademiTrackWindow(QMainWindow):
                 self.show_error(f"Failed to install packages: {e}")
     
     def log_message(self, message):
-        """FIXED: Enhanced log message handler with working notifications"""
-        try:
-            should_notify = False
-            notification_type = "info"
-            notification_message = ""
-            
-            message_lower = message.lower()
-            
-            # SUCCESS NOTIFICATIONS
-            if ('🎯 registrert studietid' in message_lower or 
-                'attendance registered successfully' in message_lower or
-                'studietid registrert' in message_lower):
-                should_notify = True
-                notification_type = "success"
-                
-                # Extract time number for more specific message
-                if 'timenr' in message_lower:
-                    import re
-                    timenr_match = re.search(r'timenr (\w+)', message_lower)
-                    if timenr_match:
-                        notification_message = f"Studietid registrert - Time {timenr_match.group(1)}"
-                    else:
-                        notification_message = "Studietid registrert"
-                else:
-                    notification_message = "Studietid registrert"
-            
-            # COMPLETION NOTIFICATIONS
-            elif ('🏁 all stu classes for the day are completed' in message_lower or
-                '🎊 all stu classes for the day are completed' in message_lower or
-                'alle studietimer fullført' in message_lower):
-                should_notify = True
-                notification_type = "completed"
-                notification_message = "Alle studietimer fullført i dag!"
-            
-            # SETUP SUCCESS
-            elif ('🎉 setup completed successfully' in message_lower or
-                'setup completed successfully' in message_lower or
-                'oppsett fullført' in message_lower):
-                should_notify = True
-                notification_type = "success"
-                notification_message = "Oppsett fullført!"
-            
-            # ERROR NOTIFICATIONS  
-            elif ('registration failed' in message_lower and 'status' in message_lower):
-                should_notify = True
-                notification_type = "error"
-                notification_message = "Registrering mislyktes"
-            
-            elif 'setup failed' in message_lower:
-                should_notify = True
-                notification_type = "error"
-                notification_message = "Oppsett mislyktes"
-            
-            # WARNING NOTIFICATIONS
-            elif ('cookie authentication failed' in message_lower or 
-                'session expired' in message_lower or
-                'økt utløpt' in message_lower):
-                should_notify = True
-                notification_type = "warning"
-                notification_message = "Økt utløpt - Kjør oppsett på nytt"
-            
-            # AUTOMATION STATUS
-            elif ('🚀 automatisering startet' in message_lower or 
-                ('automation' in message_lower and 'started' in message_lower) or
-                ('scheduler started' in message_lower)):
-                should_notify = True
-                notification_type = "info"
-                notification_message = "Automatisering startet"
-            
-            # STOP MESSAGES (with duplicate prevention)
-            elif (any(stop_phrase in message_lower for stop_phrase in [
-                'scheduler stopped',
-                '🛑 scheduler stopped', 
-                '🛑 stopping scheduler',
-                'automatisering stoppet'
-            ])):
-                # Only show stop notification once per stop event
-                if not hasattr(self, '_current_stop_event_time'):
-                    self._current_stop_event_time = time.time()
-                    should_notify = True
-                    notification_type = "error"
-                    notification_message = "Automatisering stoppet"
-                elif time.time() - self._current_stop_event_time > 5.0:
-                    # Reset after 5 seconds to allow new stop events
-                    self._current_stop_event_time = time.time()
-                    should_notify = True
-                    notification_type = "error"
-                    notification_message = "Automatisering stoppet"
-            
-            # SHOW NOTIFICATION if conditions met
-            if should_notify and notification_message:
-                print(f"Triggering notification: {notification_message} ({notification_type})")
-                self.show_notification(notification_message, notification_type)
-            
-            # Handle status messages and UI updates
-            if any(keyword in message_lower for keyword in ['cookie', 'expired', 'login', 'setup']):
-                if 'expired' in message_lower or 'invalid' in message_lower:
-                    self.status_message.setText("⚠️ Økt utløpt - Kjør 'Oppsett og innlogging'")
-                    self.status_message.setVisible(True)
-                    self.status_message.setStyleSheet("""
-                        color: #856404;
-                        background-color: #fff3cd;
-                        border: 1px solid #ffeaa7;
-                        border-radius: 8px;
-                        padding: 12px 16px;
-                        margin: 8px 0;
-                    """)
-                    QTimer.singleShot(5000, lambda: self.status_message.setVisible(False))
-            
-            elif 'error' in message_lower and 'critical' in message_lower:
-                self.status_message.setText(message)
+        """Show only critical messages, update status indicator for others."""
+        if any(keyword in message.lower() for keyword in ['cookie', 'expired', 'login', 'setup']):
+            if 'expired' in message.lower() or 'invalid' in message.lower():
+                self.status_message.setText("⚠️ Økt utløpt - Kjør 'Oppsett og innlogging'")
                 self.status_message.setVisible(True)
                 self.status_message.setStyleSheet("""
-                    color: #721c24;
-                    background-color: #f8d7da;
-                    border: 1px solid #f5c6cb;
+                    color: #856404;
+                    background-color: #fff3cd;
+                    border: 1px solid #ffeaa7;
                     border-radius: 8px;
                     padding: 12px 16px;
                     margin: 8px 0;
                 """)
-                QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
-            
-            # FIXED: Better status indicator updates with specific conditions
-            elif ('scheduler stopped' in message_lower and 
-                  not hasattr(self, '_stopping_in_progress')):
-                self.status_indicator.set_status("Klar", "#6c757d")
-            elif (('started' in message_lower and 'automatisering' in message_lower) or 
-                  'scheduler started' in message_lower):
-                self.status_indicator.set_status("Kjører", "#28a745")
-            elif 'setup completed' in message_lower:
-                self.status_indicator.set_status("Klar", "#28a745")
-            elif 'failed' in message_lower:
-                self.status_indicator.set_status("Feil", "#dc3545")
-            
-        except Exception as e:
-            print(f"Error in log_message: {e}")
-            import traceback
-            traceback.print_exc()
+                QTimer.singleShot(5000, lambda: self.status_message.setVisible(False))
+        
+        elif 'error' in message.lower() and 'critical' in message.lower():
+            self.status_message.setText(message)
+            self.status_message.setVisible(True)
+            self.status_message.setStyleSheet("""
+                color: #721c24;
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                border-radius: 8px;
+                padding: 12px 16px;
+                margin: 8px 0;
+            """)
+            QTimer.singleShot(3000, lambda: self.status_message.setVisible(False))
+        
+        elif 'scheduler stopped' in message.lower():
+            self.status_indicator.set_status("Klar", "#6c757d")
+        elif 'started' in message.lower() or 'automatisering starta' in message.lower():
+            self.status_indicator.set_status("Running", "#28a745")
+        elif 'setup completed' in message.lower():
+            self.status_indicator.set_status("Klar", "#28a745")
+        elif 'failed' in message.lower():
+            self.status_indicator.set_status("Feil", "#dc3545")
     
     def setup_and_login(self):
         """Handle setup and login"""
@@ -2353,6 +915,7 @@ class AkademiTrackWindow(QMainWindow):
         
         if success:
             self.status_indicator.set_status("Klar", "#28a745")
+            self.show_info("Oppsett fullført!")
         else:
             if getattr(self.bot, 'last_setup_cancelled', False):
                 self.bot.last_setup_cancelled = False
@@ -2362,697 +925,67 @@ class AkademiTrackWindow(QMainWindow):
             self.show_error("Oppsett mislyktes. Prøv igjen.")
     
     def toggle_automation(self):
-        """FIXED: Never disable start button during toggle"""
+        """Toggle automation - COMPLETELY CRASH PROOF"""
         try:
-            if self._toggle_lock:
-                print("Toggle already in progress, ignoring...")
+            # Immediate return if already processing ANY action
+            if hasattr(self, '_processing_any_action') and self._processing_any_action:
+                print("Action already in progress, ignoring click...")
                 return
                 
-            self._toggle_lock = True
+            # Set global action lock
+            self._processing_any_action = True
             
-            # REMOVED: Don't disable button here anymore
-            # if hasattr(self, 'start_button'):
-            #     self.start_button.setEnabled(False)
+            # Disable button immediately to prevent further clicks
+            self.start_button.setEnabled(False)
             
             if not self.is_running:
-                QTimer.singleShot(50, self._safe_start_automation)
+                print("Toggle: Starting automation...")
+                self.start_button.setText("Starter...")
+                self._safe_start_automation()
             else:
-                QTimer.singleShot(50, self._safe_stop_automation)
-                    
-        except Exception as e:
-            print(f"Toggle error: {e}")
-            self._release_toggle_lock()
-
-    def _async_start_automation(self):
-        """Async start - runs in next event loop cycle"""
-        try:
-            print("🚀 Async start...")
-            
-            # Quick checks only
-            if not self.bot or not os.path.exists(self.bot.cookies_file):
-                self.show_notification("Trenger oppsett først", "warning")
-                self._reset_button_to_start()
-                return
-            
-            # Set states immediately
-            self.is_running = True
-            self.bot.running = True
-            
-            # Kill old thread WITHOUT waiting (async)
-            self._async_cleanup_thread()
-            
-            # Create new thread - NO signal connections yet
-            self.scheduler_thread = SchedulerThread(self.bot)
-            
-            # Start thread immediately - connect signals AFTER starting
-            self.scheduler_thread.start()
-            
-            # Connect signals AFTER thread is running
-            QTimer.singleShot(50, self._connect_thread_signals)
-            
-            # Update UI immediately
-            self._set_button_to_stop()
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-            
-            print("✅ Start completed")
-            
-        except Exception as e:
-            print(f"Async start error: {e}")
-            QTimer.singleShot(50, self._force_reset_everything)
-
-    def _async_stop_automation(self):
-        """Async stop - runs in next event loop cycle"""
-        try:
-            print("🛑 Async stop...")
-            
-            # Set states immediately - no blocking operations
-            self.is_running = False
-            
-            if hasattr(self, 'bot') and self.bot:
-                self.bot.running = False
-            
-            # Update UI immediately - don't wait for thread
-            self._reset_button_to_start()
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-            
-            # Kill thread asynchronously - don't block GUI
-            QTimer.singleShot(10, self._async_cleanup_thread)
-            
-            print("✅ Stop completed")
-            
-        except Exception as e:
-            print(f"Async stop error: {e}")
-            QTimer.singleShot(50, self._force_reset_everything)
-
-    def _async_cleanup_thread(self):
-        """Cleanup thread asynchronously to prevent UI blocking"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                # Terminate without waiting
-                try:
-                    self.scheduler_thread.terminate()
-                except:
-                    pass
-                self.scheduler_thread = None
-                print("Async thread cleanup completed")
-        except:
-            if hasattr(self, 'scheduler_thread'):
-                self.scheduler_thread = None
-
-    def _connect_thread_signals(self):
-        """Connect thread signals after thread is running"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                # Use Qt.QueuedConnection for thread safety
-                self.scheduler_thread.message_signal.connect(
-                    self._ultra_safe_message_handler,
-                    Qt.QueuedConnection
-                )
-                print("Signals connected")
-        except Exception as e:
-            print(f"Signal connection error: {e}")
-
-    def _ultra_safe_message_handler(self, message):
-        """Ultra-safe message handler - cannot block or crash"""
-        try:
-            # Process message in next event loop to prevent blocking
-            QTimer.singleShot(0, lambda: self._process_message_safe(message))
-        except:
-            pass
-
-    def _process_message_safe(self, message):
-        """Process message safely without blocking"""
-        try:
-            if message and hasattr(self, 'log_message'):
-                self.log_message(message)
-        except:
-            try:
-                print(f"Log: {message}")
-            except:
-                pass
-
-    def _stop_automation_bulletproof(self):
-        """BULLETPROOF stop that CANNOT crash"""
-        try:
-            print("🛑 Stopping automation...")
-            
-            # Set flags IMMEDIATELY - no delays
-            self.is_running = False
-            
-            # Stop bot immediately
-            if hasattr(self, 'bot') and self.bot:
-                self.bot.running = False
-            
-            # NUCLEAR thread cleanup - no mercy
-            self._nuclear_thread_cleanup()
-            
-            # Reset UI immediately
-            self._reset_button_to_start()
-            
-            # Update status
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-            
-            # Log stop - but don't let this crash anything
-            try:
-                print("🛑 Automation stopped successfully")
-            except:
-                pass
-            
-        except Exception as e:
-            print(f"Stop error: {e}")
-            # Even if stop fails, force reset
-            self._force_reset_everything()
-
-    def _reset_button_to_start(self):
-        """Reset button - ultra fast"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)
+                print("Toggle: Stopping automation...")  
+                self.start_button.setText("Stopper...")
+                self._safe_stop_automation()
                 
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-                
-        except:
-            pass
+        except Exception as e:
+            print(f"CRITICAL ERROR in toggle_automation: {e}")
+            # Emergency reset
+            self._emergency_reset()
+        finally:
+            # Always release the lock after a delay
+            QTimer.singleShot(1000, self._release_action_lock)
 
-    def _nuclear_thread_cleanup(self):
-        """Nuclear option - destroy all threads"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                print("💥 Nuclear thread cleanup...")
-                
-                # Don't even try to disconnect signals - just kill
-                try:
-                    self.scheduler_thread.terminate()
-                    # Give it 500ms max, then move on
-                    self.scheduler_thread.wait(500)
-                except:
-                    pass
-                
-                # Clear reference no matter what
-                self.scheduler_thread = None
-                print("Thread destroyed")
-        except:
-            # Always clear reference
-            if hasattr(self, 'scheduler_thread'):
-                self.scheduler_thread = None
+    def start_automation(self):
+        """Public start method - delegates to safe internal method"""
+        print("Public start_automation called")
+        self._safe_start_automation()
 
-    def _start_automation_bulletproof(self):
-        """Start automation with zero crash possibility"""
+    def _safe_start_automation(self):
+        """Internal safe start method"""
         try:
-            print("Starting automation...")
-            
             # Check cookies
-            if not self.bot or not os.path.exists(self.bot.cookies_file):
-                self.show_notification("Trenger oppsett først", "warning")
-                self._reset_button_to_start()
-                return
-            
-            # Kill any existing threads FIRST
-            self._nuclear_thread_cleanup()
-            
-            # Set bot running
-            self.bot.running = True
-            self.is_running = True
-            
-            # Create new thread WITHOUT signal connections initially
-            self.scheduler_thread = SchedulerThread(self.bot)
-            
-            # Connect signals using QueuedConnection for thread safety
-            self.scheduler_thread.message_signal.connect(
-                self._safe_message_handler, 
-                Qt.QueuedConnection
-            )
-            
-            # Start thread
-            self.scheduler_thread.start()
-            
-            # Update UI immediately
-            self._set_button_to_stop()
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-            
-            # Log success
-            print("🚀 Automation started successfully")
-            
-        except Exception as e:
-            print(f"Start error: {e}")
-            self._force_reset_everything()
-
-    def _set_button_to_stop(self):
-        """Set button to stop - ultra fast"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Stopp automatisering")  
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-                
-        except:
-            pass
-
-    def _force_reset_everything(self):
-        """Force reset - async version"""
-        try:
-            print("🚨 ASYNC FORCE RESET")
-            
-            # Set states immediately
-            self.is_running = False
-            
-            # Stop bot
-            if hasattr(self, 'bot'):
+            cookies_ok = False
+            if os.path.exists(self.bot.cookies_file):
                 try:
-                    self.bot.running = False
-                except:
-                    pass
-            
-            # Reset UI immediately
-            self._reset_button_to_start()
-            
-            # Cleanup thread asynchronously
-            QTimer.singleShot(10, self._async_cleanup_thread)
-            
-            print("Async reset completed")
-            
-        except:
-            pass
+                    if self.bot.load_cookies_from_file() and self.bot.test_cookies():
+                        cookies_ok = True
+                    else:
+                        self.log_message("🔑 Økten er utløpt - kjører oppsett og pålogging")
+                except Exception as e:
+                    self.log_message(f"Cookie validation error: {e}")
+            else:
+                self.log_message("🔑 Ingen informasjonskapsel funnet - kjører oppsett og innlogging")
 
-    def _safe_message_handler(self, message):
-        """Thread-safe message handler that cannot crash"""
-        try:
-            if message and hasattr(self, 'log_message'):
-                self.log_message(message)
-        except:
-            # Silent fail - never crash on logging
-            print(f"Log: {message}")
-
-    def _emergency_recovery(self):
-        """Ultimate crash recovery"""
-        try:
-            print("🚨 EMERGENCY RECOVERY")
-            
-            # Force all states
-            self.is_running = False
-            
-            if hasattr(self, 'bot') and self.bot:
-                self.bot.running = False
-            
-            # Kill threads
-            self._force_cleanup_threads()
-            
-            # Reset UI
-            try:
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)
-                if hasattr(self, 'setup_button'):
-                    self.setup_button.setEnabled(True)
-            except:
-                pass
-                
-            print("Emergency recovery completed")
-            
-        except Exception as e:
-            print(f"Emergency recovery failed: {e}")
-
-    def _update_status_safe(self, status):
-        """Safe status update that won't crash"""
-        try:
-            if status == "Stoppet" and self.is_running:
-                # Auto-stop if scheduler reports stopped
-                self.is_running = False
-                self._update_ui_stopped()
-                
-        except Exception as e:
-            print(f"Status update error: {e}")
-
-    def _update_ui_running(self):
-        """Update UI to running state"""
-        try:
-            self.start_button.setText("Stopp automatisering")
-            self.start_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #dc3545;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 12px 24px;
-                    font-size: 14px;
-                    font-weight: 600;
-                }
-                QPushButton:hover { background-color: #c82333; }
-            """)
-            self.start_button.setEnabled(True)
-            
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-                
-        except Exception as e:
-            print(f"UI update error: {e}")
-
-    def _update_ui_stopped(self):
-        """Update UI to stopped state"""
-        try:
-            self.start_button.setText("Start automatisering")
-            self.start_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #0066cc;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 12px 24px;
-                    font-size: 14px;
-                    font-weight: 600;
-                }
-                QPushButton:hover { background-color: #0052a3; }
-            """)
-            self.start_button.setEnabled(True)
-            
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-                
-        except Exception as e:
-            print(f"UI update error: {e}")
-
-    def _safe_signal_handler(self, func):
-        """Wrapper to prevent signal crashes"""
-        try:
-            func()
-        except Exception as e:
-            print(f"Signal handler error: {e}")
-
-    def _force_cleanup_threads(self):
-        """Brutally clean up any existing threads"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                print("🔪 Killing existing thread...")
-                
-                # Don't bother with graceful disconnect - just terminate
-                try:
-                    if self.scheduler_thread.isRunning():
-                        self.scheduler_thread.terminate()
-                        # Short wait only
-                        self.scheduler_thread.wait(1000)
-                except:
-                    pass
-                
-                self.scheduler_thread = None
-                print("Thread killed")
-        except:
-            self.scheduler_thread = None
-
-
-    def crash_safe_reset(self):
-        """Ultimate crash-safe reset - FIXED: Always keep start button enabled"""
-        try:
-            print("CRASH SAFE RESET")
-            
-            # Force all states
-            self.is_running = False
-            
-            # Kill thread without any ceremony
-            if hasattr(self, 'scheduler_thread'):
-                try:
-                    if self.scheduler_thread:
-                        self.scheduler_thread.terminate()
-                except:
-                    pass
-                self.scheduler_thread = None
-            
-            # Reset bot
-            if hasattr(self, 'bot') and self.bot:
-                try:
-                    self.bot.running = False
-                except:
-                    pass
-            
-            # Reset UI - each element separately with try/catch
-            try:
-                if hasattr(self, 'start_button'):
-                    self.start_button.setText("Start automatisering") 
-                    # FIXED: Always keep start button enabled
-                    self.start_button.setEnabled(True)
-            except:
-                pass
-                
-            try:
-                if hasattr(self, 'setup_button'):
-                    self.setup_button.setEnabled(True)
-            except:
-                pass
-                
-            try:
-                if hasattr(self, 'status_indicator'):
-                    self.status_indicator.set_status("Reset", "#dc3545")
-            except:
-                pass
-            
-            print("Crash safe reset completed")
-            
-        except Exception as e:
-            print(f"CRITICAL ERROR in crash safe reset: {e}")
-            # Ultimate fallback
-            try:
-                self.is_running = False
-                # FIXED: Always ensure start button stays enabled
-                if hasattr(self, 'start_button'):
-                    self.start_button.setEnabled(True)
-            except:
-                pass
-
-    def stop_automation_safe(self):
-        """Crash-safe stop method"""
-        try:
-            print("Safe stop initiated...")
-            
-            # Set states immediately
-            self.is_running = False
-            
-            # Stop bot immediately
-            if hasattr(self, 'bot') and self.bot:
-                try:
-                    self.bot.running = False
-                except:
-                    pass
-            
-            # Kill thread brutally - no waiting
-            self.kill_thread_brutally()
-            
-            # Update UI
-            self.update_ui_to_stopped()
-            
-            # Log stop
-            try:
-                self.log_message("🛑 Scheduler stopped")
-            except:
-                print("🛑 Scheduler stopped")
-            
-            print("Safe stop completed")
-            
-        except Exception as e:
-            print(f"Error in stop_automation_safe: {e}")
-            import traceback
-            traceback.print_exc()
-            self.crash_safe_reset()
-
-    def kill_thread_brutally(self):
-        """Brutally kill any existing thread - no mercy"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                print("Killing existing thread...")
-                
-                # Don't try to disconnect signals - just kill
-                try:
-                    if self.scheduler_thread.isRunning():
-                        self.scheduler_thread.terminate()
-                        # Don't wait - just move on
-                except:
-                    pass
-                
-                # Clear reference
-                self.scheduler_thread = None
-                print("Thread killed")
-                
-        except Exception as e:
-            print(f"Error killing thread: {e}")
-            # Always clear reference
-            self.scheduler_thread = None
-
-    def start_automation_safe(self):
-        """Crash-safe start method - FIXED: Keep button active even without cookies"""
-        try:
-            # Check cookies first - but don't disable button
-            if not hasattr(self, 'bot') or not self.bot:
-                print("No bot instance")
-                self.crash_safe_reset()
-                return
-                
-            if not os.path.exists(self.bot.cookies_file):
-                self.show_notification("Trenger oppsett først", "warning", 3000)
-                # FIXED: Don't call crash_safe_reset() - just return and keep button active
+            if not cookies_ok:
+                self.setup_and_login()
+                self._reset_start_button()
                 return
 
-            # Kill any existing thread BEFORE creating new one
-            self.kill_thread_brutally()
-            
-            # Start bot
+            # Start the automation
             self.bot.running = True
             
-            # Create new thread with error handling
-            try:
-                self.scheduler_thread = SchedulerThread(self.bot)
-                
-                # Connect signals with error handling
-                if hasattr(self.scheduler_thread, 'message_signal'):
-                    self.scheduler_thread.message_signal.connect(self.safe_log_message)
-                if hasattr(self.scheduler_thread, 'status_signal'):
-                    self.scheduler_thread.status_signal.connect(self.safe_update_status)
-                    
-                self.scheduler_thread.start()
-                print("Thread started successfully")
-                
-            except Exception as e:
-                print(f"Error creating/starting thread: {e}")
-                self.crash_safe_reset()
-                return
-
-            # Update state
-            self.is_running = True
-            self.update_ui_to_running()
-            
-            # Log success
-            try:
-                self.log_message("🚀 Automatisering startet")
-            except:
-                print("🚀 Automatisering startet")
-            
-        except Exception as e:
-            print(f"Error in start_automation_safe: {e}")
-            import traceback
-            traceback.print_exc()
-            self.crash_safe_reset()
-
-    def safe_log_message(self, message):
-        """Safe wrapper for log_message to prevent signal crashes"""
-        try:
-            self.log_message(message)
-        except Exception as e:
-            print(f"Error in safe_log_message: {e}")
-            print(f"Original message: {message}")
-
-    def safe_update_status(self, status):
-        """Safe wrapper for update_status to prevent signal crashes"""
-        try:
-            self.update_status(status)
-        except Exception as e:
-            print(f"Error in safe_update_status: {e}")
-            print(f"Original status: {status}")
-
-    def update_ui_to_running(self):
-        """Update UI to running state - crash safe"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Stopp automatisering")
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-                
-        except Exception as e:
-            print(f"Error updating UI to running: {e}")
-
-    def update_ui_to_stopped(self):
-        """Update UI to stopped state - crash safe"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-                
-        except Exception as e:
-            print(f"Error updating UI to stopped: {e}")
-
-    def stop_automation_simple(self):
-        """Simplified stop method that avoids complex threading issues"""
-        try:
-            print("Simple stop initiated...")
-            
-            # Immediately set states
-            self.is_running = False
-            
-            # Update button immediately and safely
-            if hasattr(self, 'start_button'):
-                try:
-                    self.start_button.setEnabled(False)
-                    self.start_button.setText("Stopper...")
-                except:
-                    pass
-            
-            # Stop bot immediately
-            if hasattr(self, 'bot') and self.bot:
-                try:
-                    self.bot.running = False
-                    print("Bot stopped")
-                except:
-                    pass
-            
-            # Simple thread cleanup - no timeouts or complex logic
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                try:
-                    # Just terminate - don't wait for graceful shutdown
-                    self.scheduler_thread.terminate()
-                    self.scheduler_thread = None
-                    print("Thread terminated")
-                except:
-                    self.scheduler_thread = None
-                    pass
-            
-            # Reset UI immediately - no timers
-            self.reset_ui_simple()
-            
-            print("Simple stop completed")
-            
-        except Exception as e:
-            print(f"Error in simple stop: {e}")
-            self.simple_reset()
-
-    def start_automation_simple(self):
-        """Simplified start method - FIXED: Keep button active even without cookies"""
-        try:
-            # Check cookies exist - but don't disable button
-            if not os.path.exists(self.bot.cookies_file):
-                self.show_notification("Trenger oppsett først", "warning", 3000)
-                # FIXED: Just return - don't disable button or reset
-                return
-
-            # Start bot
-            self.bot.running = True
-            
-            # Kill any existing thread simply
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                try:
-                    self.scheduler_thread.terminate()
-                except:
-                    pass
-                self.scheduler_thread = None
+            # Kill any existing thread first
+            self._force_kill_scheduler_thread()
             
             # Create new thread
             self.scheduler_thread = SchedulerThread(self.bot)
@@ -3062,431 +995,52 @@ class AkademiTrackWindow(QMainWindow):
 
             # Update state
             self.is_running = True
-            self.update_button_to_stop()
+            self._set_stop_button_style()
+            self.setup_button.setEnabled(False)
+            self.status_indicator.set_status("Kjører", "#28a745")
             
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-            
-            self.log_message("🚀 Automatisering startet")
+            print("Sikker start fullført")
             
         except Exception as e:
-            print(f"Error in simple start: {e}")
-            self.simple_reset()
+            print(f"feil i _safe_start_automation: {e}")
+            self._emergency_reset()
 
-    def update_button_to_stop(self):
-        """Update button to stop state - simplified"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Stopp automatisering")
-                self.start_button.setEnabled(True)
-        except Exception as e:
-            print(f"Error updating button: {e}")
+    
+    def stop_automation(self):
+        """Public stop method - delegates to safe internal method"""  
+        print("Kode: stopp_automatisering kalt")
+        self._safe_stop_automation()
 
-    def simple_reset(self):
-        """Simplest possible reset - FIXED: Always keep start button enabled"""
+    def _safe_stop_automation(self):
+        """Internal safe stop method - BULLETPROOF"""
         try:
-            print("SIMPLE RESET")
+            print("Sikker start...")
             
-            # Force all states
+            # Set stopping state immediately
             self.is_running = False
+            self.status_indicator.set_status("Stopper...", "#ffc107")
             
-            # Kill thread brutally
-            if hasattr(self, 'scheduler_thread'):
-                try:
-                    if self.scheduler_thread:
-                        self.scheduler_thread.terminate()
-                except:
-                    pass
-                self.scheduler_thread = None
-            
-            # Reset bot
+            # Stop bot
             if hasattr(self, 'bot') and self.bot:
                 try:
                     self.bot.running = False
+                    self.bot.stop_scheduler()
+                    print("bot stoppet")
                 except:
-                    pass
+                    print("Feil ved å stoppe botten, fortsetter...")
             
-            # Reset button - FIXED: Always keep enabled
-            if hasattr(self, 'start_button'):
-                try:
-                    self.start_button.setText("Start automatisering") 
-                    self.start_button.setEnabled(True)  # FIXED: Always enabled
-                except:
-                    pass
-                    
-            if hasattr(self, 'setup_button'):
-                try:
-                    self.setup_button.setEnabled(True)
-                except:
-                    pass
+            # Force kill thread
+            self._force_kill_scheduler_thread()
             
-            print("Simple reset completed")
-            
-        except Exception as e:
-            print(f"Error in simple reset: {e}")
-            # FIXED: Always ensure start button is enabled
-            try:
-                if hasattr(self, 'start_button'):
-                    self.start_button.setEnabled(True)
-            except:
-                pass
-
-    def reset_ui_simple(self):
-        """Simple UI reset without complex styling"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-                
-            print("UI reset completed")
-            
-        except Exception as e:
-            print(f"Error in UI reset: {e}")
-
-
-
-    def _release_toggle_lock(self):
-        """Release toggle lock to allow next action"""
-        try:
-            QTimer.singleShot(500, self._do_release_lock)  # Small delay to prevent immediate spam
-        except:
-            self._toggle_lock = False
-
-    def _do_release_lock(self):
-        """Actually release the lock"""
-        self._toggle_lock = False
-        print("Toggle lock released")
-
-    def start_automation(self):
-        """Public method redirect"""
-        self.start_automation_safe()
-
-    def _safe_start_automation(self):
-        """FIXED: Keep start button always enabled"""
-        try:
-            print("🚀 Starting automation...")
-            
-            # Check prerequisites - show notification but keep button enabled
-            if not self.bot or not os.path.exists(self.bot.cookies_file):
-                self.show_notification("Trenger oppsett først", "warning")
-                self._release_toggle_lock()
-                # BUTTON STAYS ENABLED - just return
-                return
-            
-            # Rest of the method unchanged...
-            self._force_cleanup_existing_threads()
-            self.is_running = True
-            self.bot.running = True
-            
-            self.scheduler_thread = SchedulerThread(self.bot)
-            try:
-                self.scheduler_thread.message_signal.connect(
-                    self._thread_safe_log_message, 
-                    Qt.QueuedConnection
-                )
-            except Exception as e:
-                print(f"Signal connection error: {e}")
-            
-            self.scheduler_thread.start()
-            self._update_ui_to_running()
-            self.show_notification("Automatisering startet", "info")
-            print("✅ Start completed successfully")
-            
-        except Exception as e:
-            print(f"Start error: {e}")
-            self._emergency_reset()
-        finally:
-            self._release_toggle_lock()
-
-    def _thread_safe_log_message(self, message):
-        """Thread-safe message handler"""
-        try:
-            # Use QTimer to process in main thread
-            QTimer.singleShot(0, lambda: self.log_message(message))
-        except Exception as e:
-            print(f"Thread message error: {e}")
-
-
-    def _update_ui_to_running(self):
-        """FIXED: Update UI to running state - button always enabled"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Stopp automatisering")
-                self.start_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: #dc3545;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 12px 24px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        min-height: 20px;
-                        min-width: 160px;
-                    }
-                    QPushButton:hover { 
-                        background-color: #a60212; 
-                    }
-                    QPushButton:pressed {
-                        background-color: #66000a;
-                    }
-                """)
-                # FIXED: Always keep enabled
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(False)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Kjører", "#28a745")
-                
-        except Exception as e:
-            print(f"UI update error: {e}")
-
-    def _force_cleanup_existing_threads(self):
-        """FIXED: Aggressive thread cleanup that won't hang"""
-        try:
-            if hasattr(self, 'scheduler_thread') and self.scheduler_thread:
-                print("💀 Killing existing thread...")
-                
-                # Don't try to disconnect signals - just terminate
-                try:
-                    if self.scheduler_thread.isRunning():
-                        self.scheduler_thread.terminate()
-                        # Very short wait - don't block UI
-                        self.scheduler_thread.wait(200)  # Max 200ms
-                except:
-                    pass
-                
-                # Clear reference
-                self.scheduler_thread = None
-                print("Thread killed")
-                
-        except Exception as e:
-            print(f"Thread cleanup error: {e}")
-            # Always clear reference
-            if hasattr(self, 'scheduler_thread'):
-                self.scheduler_thread = None
-
-    def setup_and_login(self):
-        """Handle setup and login - FIXED: Keep start button enabled"""
-        if self.is_running:
-            self.show_warning("Stopp automatisering først")
-            return
-            
-        if self.setup_thread and self.setup_thread.isRunning():
-            return
-        
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-        self.setup_button.setEnabled(False)
-        self.setup_button.setText("Setter opp...")
-        self.status_indicator.set_status("Setter opp...", "#0066cc")
-        
-        # FIXED: Don't disable start button during setup
-        # Keep it enabled so user can try to start if they want
-        
-        self.bot.last_setup_cancelled = False
-        self.setup_thread = SetupThread(self.bot)
-        self.setup_thread.message_signal.connect(self.log_message)
-        self.setup_thread.finished_signal.connect(self.on_setup_finished)
-        self.setup_thread.progress_signal.connect(self.progress_bar.setValue)
-        self.setup_thread.start()
-    
-    def on_setup_finished(self, success):
-        """Handle setup completion - FIXED: Keep start button enabled"""
-        self.progress_bar.setVisible(False)
-        self.setup_button.setEnabled(True)
-        self.setup_button.setText("Oppsett og innlogging")
-        
-        # FIXED: Never disable start button - always keep it enabled
-        # if hasattr(self, 'start_button'):
-        #     self.start_button.setEnabled(True)  # Always enabled anyway
-        
-        if success:
-            self.status_indicator.set_status("Klar", "#28a745")
-        else:
-            if getattr(self.bot, 'last_setup_cancelled', False):
-                self.bot.last_setup_cancelled = False
-                self.status_indicator.set_status("Ready", "#6c757d")
-                return
-            self.status_indicator.set_status("Oppsett mislyktes", "#dc3545")
-            self.show_error("Oppsett mislyktes. Prøv igjen.")
-
-
-    def reset_setup_ui(self):
-        """Reset setup UI elements"""
-        try:
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setText("Oppsett og innlogging")
-                self.setup_button.setEnabled(True)
-            if hasattr(self, 'start_button'):
-                self.start_button.setEnabled(True)
-        except Exception as e:
-            print(f"Error resetting setup UI: {e}")
-
-    def stop_automation(self):
-        """Public method redirect"""
-        self.stop_automation_safe()
-
-    def _safe_stop_automation(self):
-        """FIXED: Bulletproof stop method"""
-        try:
-            print("🛑 Stopping automation...")
-            
-            # Set states immediately
-            self.is_running = False
-            
-            if hasattr(self, 'bot') and self.bot:
-                self.bot.running = False
-            
-            # Update UI immediately
-            self._update_ui_to_stopped()
-            
-            # Kill thread asynchronously to prevent blocking
-            QTimer.singleShot(10, self._async_cleanup_thread)
-            
-            # Show notification
-            self.show_notification("Automatisering stoppet", "error")
-            
-            print("✅ Stop completed successfully")
-            
-        except Exception as e:
-            print(f"Stop error: {e}")
-            self._emergency_reset()
-        finally:
-            self._release_toggle_lock()
-
-    def _update_ui_to_stopped(self):
-        """FIXED: Update UI to stopped state - button always enabled"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: #0066cc;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 12px 24px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        min-height: 20px;
-                        min-width: 160px;
-                    }
-                    QPushButton:hover { 
-                        background-color: #0052a3; 
-                    }
-                    QPushButton:pressed {
-                        background-color: #003d7a;
-                    }
-                """)
-                # FIXED: Always keep enabled - NEVER disable
-                self.start_button.setEnabled(True)
-                
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-                
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-                
-        except Exception as e:
-            print(f"UI update error: {e}")
-
-    def _cleanup_scheduler_thread(self):
-        """Safely cleanup scheduler thread - FIXED to prevent exceptions"""
-        try:
-            if not hasattr(self, 'scheduler_thread') or not self.scheduler_thread:
-                print("No scheduler thread to cleanup")
-                return
-                
-            print("Cleaning up scheduler thread...")
-            
-            # Disconnect signals safely
-            try:
-                if self.scheduler_thread.message_signal:
-                    self.scheduler_thread.message_signal.disconnect()
-            except:
-                pass
-                
-            try:
-                if self.scheduler_thread.status_signal:
-                    self.scheduler_thread.status_signal.disconnect()
-            except:
-                pass
-            
-            # Stop the thread gracefully
-            if self.scheduler_thread.isRunning():
-                try:
-                    # Try to stop gracefully first
-                    self.scheduler_thread.stop()
-                    
-                    # Wait for graceful stop (max 2 seconds)
-                    if self.scheduler_thread.wait(2000):
-                        print("Thread stopped gracefully")
-                    else:
-                        print("Graceful stop timeout, terminating thread...")
-                        self.scheduler_thread.terminate()
-                        # Wait for termination (max 1 second)
-                        if self.scheduler_thread.wait(1000):
-                            print("Thread terminated successfully")
-                        else:
-                            print("Thread termination timeout")
-                            
-                except Exception as e:
-                    print(f"Error during thread cleanup: {e}")
-                    # Force terminate as last resort
-                    try:
-                        self.scheduler_thread.terminate()
-                        self.scheduler_thread.wait(500)
-                    except:
-                        print("Force termination failed")
-            
-            # Clear the thread reference
-            self.scheduler_thread = None
-            print("Scheduler thread cleanup completed")
-            
-        except Exception as e:
-            print(f"Error in _cleanup_scheduler_thread: {e}")
-            # Always clear the reference even if cleanup fails
-            self.scheduler_thread = None
-
-    def _complete_stop_process(self):
-        """Complete the stop process - FIXED to prevent exceptions"""
-        try:
-            print("Completing stop process...")
-            
-            # Reset UI elements safely
+            # Reset UI
             self._reset_start_button()
+            self.setup_button.setEnabled(True)
+            self.status_indicator.set_status("Stoppet", "#6c757d")
             
-            # Re-enable setup button
-            if hasattr(self, 'setup_button'):
-                self.setup_button.setEnabled(True)
-            
-            # Update status indicator
-            if hasattr(self, 'status_indicator'):
-                self.status_indicator.set_status("Stoppet", "#dc3545")
-            
-            # Clear any stopping flags
-            if hasattr(self, '_stopping_in_progress'):
-                self._stopping_in_progress = False
-            
-            # Log the stop message
-            self.log_message("🛑 Scheduler stopped")
-            
-            print("Stop process completed successfully")
+            print("T-stopp fullført")
             
         except Exception as e:
-            print(f"Error completing stop process: {e}")
-            # Force emergency reset if completion fails
+            print(f"Feil i _safe_stop_automation: {e}")
             self._emergency_reset()
 
     def _force_kill_scheduler_thread(self):
@@ -3527,41 +1081,13 @@ class AkademiTrackWindow(QMainWindow):
             self.scheduler_thread = None
     
     def _reset_start_button(self):
-        """Reset start button to initial state - FIXED to prevent exceptions"""
-        try:
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)
-                self.start_button.setStyleSheet("""
-                    QPushButton {
-                        background-color: #0066cc;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        padding: 12px 24px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        min-height: 20px;
-                    }
-                    QPushButton:hover {
-                        background-color: #0052a3;
-                    }
-                    QPushButton:pressed {
-                        background-color: #003d7a;
-                    }
-                """)
-                print("Start button reset successfully")
-        except Exception as e:
-            print(f"Error resetting start button: {e}")
-
-    def _set_stop_button_style(self):
-        """Set button to stop style - FIXED WITH PROPER HOVER EFFECTS"""
-        self.start_button.setText("Stopp automatisering")
+        """Reset start button to initial state"""
+        self.start_button.setText("Start automatisering")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545;
-                color: white;
+                background-color: #0066cc !important;
+                color: white !important;
                 border: none;
                 border-radius: 8px;
                 padding: 12px 24px;
@@ -3570,104 +1096,84 @@ class AkademiTrackWindow(QMainWindow):
                 min-height: 20px;
             }
             QPushButton:hover {
-                background-color: #8a010f;
+                background-color: #0052a3 !important;
             }
-            QPushButton:pressed {
-                background-color: #66000a;
+        """)
+
+    def _set_stop_button_style(self):
+        """Set button to stop style"""
+        self.start_button.setText("Stopp automatisering")
+        self.start_button.setEnabled(True)
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545 !important;
+                color: white !important;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                min-height: 20px;
             }
-            QPushButton:disabled {
-                background-color: #6c757d;
-                color: #dee2e6;
+            QPushButton:hover {
+                background-color: #c82333 !important;
             }
         """)
 
     def _release_action_lock(self):
-        """Release the action lock and stop flag - FASTER"""
+        """Release the action lock"""
         try:
             self._processing_any_action = False
-            if hasattr(self, '_stopping_in_progress'):
-                self._stopping_in_progress = False
-            print("Action lock released")
-        except Exception as e:
-            print(f"Error releasing lock: {e}")
-            # Force clear anyway
-            self._processing_any_action = False
+            print("Handlingslåsen er løsnet, klar for nye handlinger. Knappen kan altså trykkes igjen.")
+        except:
+            pass
 
     def _emergency_reset(self):
-        """Emergency reset - FIXED: Always keep start button enabled"""
+        """Emergency reset all states"""
         try:
-            print("🚨 EMERGENCY RESET")
-            
+            print("EMERGENCY RESET!")
             self.is_running = False
-            self._toggle_lock = False
+            self._force_kill_scheduler_thread()
+            self._reset_start_button()
+            self.setup_button.setEnabled(True)
+            self.status_indicator.set_status("Reset", "#dc3545")
             
-            if hasattr(self, 'scheduler_thread'):
-                try:
-                    if self.scheduler_thread:
-                        self.scheduler_thread.terminate()
-                except:
-                    pass
-                self.scheduler_thread = None
-            
-            if hasattr(self, 'bot') and self.bot:
-                try:
-                    self.bot.running = False
-                except:
-                    pass
-            
-            # FIXED: Always keep start button enabled
-            if hasattr(self, 'start_button'):
-                self.start_button.setText("Start automatisering")
-                self.start_button.setEnabled(True)  # NEVER DISABLE
+            # Clear all locks
+            self._processing_any_action = False
+            if hasattr(self, '_starter'):
+                self._starting = False
+            if hasattr(self, '_stopper'):
+                self._stopping = False
                 
-            self._update_ui_to_stopped()
-            print("Emergency reset completed")
-            
         except Exception as e:
-            print(f"Emergency reset failed: {e}")
-            # ULTIMATE FALLBACK: Always ensure button is enabled
-            if hasattr(self, 'start_button'):
-                try:
-                    self.start_button.setEnabled(True)
-                except:
-                    pass
+            print(f"feil i emergency reset: {e}")
+
 
     def on_scheduler_stopped(self):
-        """Handle stop signal - async version"""
+        """Handle when scheduler stops itself - SAFE VERSION"""
         try:
-            # Just set flag - use timer for UI updates
-            self.is_running = False
-            QTimer.singleShot(100, self._handle_stop_ui_update)
-        except:
-            pass
-    
-    def _handle_stop_ui_update(self):
-        """Update UI after stop - runs async"""
-        try:
-            if not self.is_running:
-                self._reset_button_to_start()
-                if hasattr(self, 'status_indicator'):
-                    self.status_indicator.set_status("Stoppet", "#dc3545")
-        except:
-            pass
-
-    def _handle_scheduler_stopped_ui(self):
-        """Handle UI updates for scheduler stopped - runs in main thread"""
-        try:
-            if not self.is_running:  # Double check
-                self._update_ui_stopped()
+            print("Signal for stoppet planlegger mottatt")
+            
+            # Only update if we're actually running
+            if hasattr(self, 'is_running') and self.is_running:
+                # Don't call stop methods, just update UI
+                self.is_running = False
+                self._reset_start_button()
+                self.setup_button.setEnabled(True)
+                self.status_indicator.set_status("Fullført", "#6c757d")
+                
         except Exception as e:
-            print(f"Error updating UI after scheduler stop: {e}")      
-
+            print(f"Feil i on_scheduler_stopped: {e}")
+    
     def update_status(self, status):
         """Update status indicator"""
         if not self.is_running and status == "Running":
             return
             
         if status == "Kjører":
-            self.status_indicator.set_status("Kjører", "#28a745")
+            self.status_indicator.set_status("Running", "#28a745")
         elif status == "Feil":
-            self.status_indicator.set_status("Feil", "#dc3545")
+            self.status_indicator.set_status("Error", "#dc3545")
             self.stop_automation()
         elif status == "Stoppet":
             self.stop_automation()
@@ -3730,145 +1236,26 @@ class AkademiTrackWindow(QMainWindow):
 
 
 def main():
-    """Enhanced main function with comprehensive error handling"""
-    
-    print("=" * 50)
-    print("🚀 AkademiTrack Starting...")
-    print("=" * 50)
-    
-    # Log system info
-    print(f"Platform: {platform.system()} {platform.release()}")
-    print(f"Python: {sys.version}")
-    print(f"Frozen: {getattr(sys, 'frozen', False)}")
-    print(f"Executable: {sys.executable}")
-    print(f"Working dir: {os.getcwd()}")
+    """Main function"""
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
     
     try:
-        # Setup bundle environment
-        is_bundled = setup_bundle_environment()
-        if is_bundled:
-            print("✅ Bundle environment setup complete")
+        window = AkademiTrackWindow()
+        window.show()
         
-        # Verify backend import worked
-        if ImprovedISkoleBot is None:
-            raise ImportError("Backend import failed during startup")
+        screen = app.primaryScreen().geometry()
+        window.move(
+            (screen.width() - window.width()) // 2,
+            (screen.height() - window.height()) // 2
+        )
         
-        # Create QApplication with error handling
-        try:
-            app = QApplication(sys.argv)
-            app.setStyle('Fusion')  # Use Fusion style for better cross-platform appearance
-            print("✅ QApplication created")
-        except Exception as e:
-            print(f"❌ Failed to create QApplication: {e}")
-            raise
+        sys.exit(app.exec_())
         
-        # Set application properties
-        try:
-            app.setApplicationName("AkademiTrack")
-            app.setApplicationVersion("1.0")
-            app.setOrganizationName("AkademiTrack")
-            print("✅ App properties set")
-        except Exception as e:
-            print(f"⚠️ Could not set app properties: {e}")
-        
-        # Import main window class
-        try:
-            # The AkademiTrackWindow should be defined in this same file
-            # Make sure it's after the backend import
-            print("✅ Window class ready")
-        except Exception as e:
-            print(f"❌ Window class import failed: {e}")
-            raise
-        
-        # Create main window with comprehensive error handling
-        try:
-            print("Creating main window...")
-            window = AkademiTrackWindow()
-            print("✅ Main window created")
-        except Exception as e:
-            print(f"❌ Failed to create main window: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            # Show error dialog
-            try:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setWindowTitle("Startup Error")
-                msg.setText(f"Failed to create main window:\n\n{str(e)}")
-                msg.setDetailedText(traceback.format_exc())
-                msg.exec_()
-            except:
-                pass
-            
-            return 1
-        
-        # Position and show window
-        try:
-            # Center window on screen
-            screen = app.primaryScreen()
-            if screen:
-                screen_rect = screen.availableGeometry()
-                window_rect = window.geometry()
-                
-                x = (screen_rect.width() - window_rect.width()) // 2
-                y = (screen_rect.height() - window_rect.height()) // 2
-                
-                window.move(max(0, x), max(0, y))
-                print("✅ Window positioned")
-            
-            window.show()
-            window.raise_()  # Bring to front
-            window.activateWindow()  # Activate window
-            print("✅ Window shown and activated")
-            
-        except Exception as e:
-            print(f"⚠️ Window positioning/show error: {e}")
-            # Try to show anyway
-            try:
-                window.show()
-            except:
-                print("❌ Could not show window at all")
-                return 1
-        
-        # Start event loop with error handling
-        try:
-            print("🚀 Starting Qt event loop...")
-            print("=" * 50)
-            
-            # Run the application
-            exit_code = app.exec_()
-            
-            print("=" * 50)
-            print(f"✅ Application exited cleanly with code: {exit_code}")
-            return exit_code
-            
-        except Exception as e:
-            print(f"❌ Event loop error: {e}")
-            import traceback
-            traceback.print_exc()
-            return 1
-    
     except Exception as e:
-        print(f"❌ CRITICAL ERROR in main(): {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Try to show error dialog
-        try:
-            if 'app' not in locals():
-                app = QApplication(sys.argv)
-            
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("Critical Startup Error")
-            msg.setText(f"The application failed to start:\n\n{str(e)}")
-            msg.setDetailedText(f"Technical details:\n{traceback.format_exc()}")
-            msg.exec_()
-        except:
-            print("Could not show error dialog")
-        
-        return 1
+        print(f"Kunne ikke starte: {e}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
