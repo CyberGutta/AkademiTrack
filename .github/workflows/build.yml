@@ -192,35 +192,35 @@ jobs:
             
             # Create/fix Info.plist
             cat > "$APP_PATH/Contents/Info.plist" << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleExecutable</key>
-    <string>AkademiTrack</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.akademitrack.app</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>AkademiTrack</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>10.14</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSRequiresAquaSystemAppearance</key>
-    <false/>
-</dict>
-</plist>
-EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>AkademiTrack</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.akademitrack.app</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>AkademiTrack</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.14</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSRequiresAquaSystemAppearance</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
             
             echo "App bundle structure fixed successfully"
             echo "Final app contents:"
@@ -337,120 +337,120 @@ EOF
           # Windows installer
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             cat > dist/install_akademitrack.bat << 'EOF'
-@echo off
-echo Installing AkademiTrack...
-set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
+          @echo off
+          echo Installing AkademiTrack...
+          set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
 
-if exist "%INSTALL_DIR%" (
-    echo Removing existing installation...
-    rmdir /s /q "%INSTALL_DIR%"
-)
+          if exist "%INSTALL_DIR%" (
+              echo Removing existing installation...
+              rmdir /s /q "%INSTALL_DIR%"
+          )
 
-echo Creating installation directory...
-mkdir "%INSTALL_DIR%"
+          echo Creating installation directory...
+          mkdir "%INSTALL_DIR%"
 
-echo Copying files...
-xcopy "AkademiTrack" "%INSTALL_DIR%" /E /I /Y
+          echo Copying files...
+          xcopy "AkademiTrack" "%INSTALL_DIR%" /E /I /Y
 
-echo Creating desktop shortcut...
-powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.Save()"
+          echo Creating desktop shortcut...
+          powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.Save()"
 
-echo.
-echo Installation complete!
-echo AkademiTrack installed to: %INSTALL_DIR%
-echo Desktop shortcut created!
-pause
-EOF
+          echo.
+          echo Installation complete!
+          echo AkademiTrack installed to: %INSTALL_DIR%
+          echo Desktop shortcut created!
+          pause
+          EOF
           fi
           
           # macOS installer
           if [ "${{ matrix.os }}" == "macos-latest" ]; then
             cat > dist/install_akademitrack.sh << 'EOF'
-#!/bin/bash
-echo "Installing AkademiTrack for macOS..."
+          #!/bin/bash
+          echo "Installing AkademiTrack for macOS..."
 
-# Check if running with necessary permissions
-if [ ! -w "/Applications" ]; then
-    echo "This installer needs permission to write to /Applications"
-    echo "Please run with: sudo ./install_akademitrack.sh"
-    echo "Or manually drag AkademiTrack.app to your Applications folder"
-    exit 1
-fi
+          # Check if running with necessary permissions
+          if [ ! -w "/Applications" ]; then
+              echo "This installer needs permission to write to /Applications"
+              echo "Please run with: sudo ./install_akademitrack.sh"
+              echo "Or manually drag AkademiTrack.app to your Applications folder"
+              exit 1
+          fi
 
-if [ -d "/Applications/AkademiTrack.app" ]; then
-    echo "Removing existing installation..."
-    rm -rf "/Applications/AkademiTrack.app"
-fi
+          if [ -d "/Applications/AkademiTrack.app" ]; then
+              echo "Removing existing installation..."
+              rm -rf "/Applications/AkademiTrack.app"
+          fi
 
-echo "Copying AkademiTrack.app to Applications..."
-cp -R "AkademiTrack.app" "/Applications/"
+          echo "Copying AkademiTrack.app to Applications..."
+          cp -R "AkademiTrack.app" "/Applications/"
 
-# Set proper permissions
-chmod +x "/Applications/AkademiTrack.app/Contents/MacOS/AkademiTrack"
+          # Set proper permissions
+          chmod +x "/Applications/AkademiTrack.app/Contents/MacOS/AkademiTrack"
 
-# Remove quarantine attribute
-xattr -cr "/Applications/AkademiTrack.app" 2>/dev/null || true
+          # Remove quarantine attribute
+          xattr -cr "/Applications/AkademiTrack.app" 2>/dev/null || true
 
-echo ""
-echo "Installation complete!"
-echo ""
-echo "To run AkademiTrack:"
-echo "1. Open Applications folder (Cmd+Shift+A)"
-echo "2. Double-click AkademiTrack"
-echo "3. If macOS shows a security warning:"
-echo "   - Right-click AkademiTrack and select 'Open'"
-echo "   - Or go to System Preferences > Security & Privacy"
-echo "   - Click 'Open Anyway' next to the AkademiTrack message"
-echo ""
-echo "Alternative: Run directly from command line:"
-echo "open /Applications/AkademiTrack.app"
-EOF
+          echo ""
+          echo "Installation complete!"
+          echo ""
+          echo "To run AkademiTrack:"
+          echo "1. Open Applications folder (Cmd+Shift+A)"
+          echo "2. Double-click AkademiTrack"
+          echo "3. If macOS shows a security warning:"
+          echo "   - Right-click AkademiTrack and select 'Open'"
+          echo "   - Or go to System Preferences > Security & Privacy"
+          echo "   - Click 'Open Anyway' next to the AkademiTrack message"
+          echo ""
+          echo "Alternative: Run directly from command line:"
+          echo "open /Applications/AkademiTrack.app"
+          EOF
             chmod +x dist/install_akademitrack.sh
           fi
           
           # Linux installer
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             cat > dist/install_akademitrack.sh << 'EOF'
-#!/bin/bash
-echo "Installing AkademiTrack for Linux..."
-INSTALL_DIR="$HOME/AkademiTrack"
+          #!/bin/bash
+          echo "Installing AkademiTrack for Linux..."
+          INSTALL_DIR="$HOME/AkademiTrack"
 
-if [ -d "$INSTALL_DIR" ]; then
-    echo "Removing existing installation..."
-    rm -rf "$INSTALL_DIR"
-fi
+          if [ -d "$INSTALL_DIR" ]; then
+              echo "Removing existing installation..."
+              rm -rf "$INSTALL_DIR"
+          fi
 
-echo "Creating installation directory..."
-mkdir -p "$INSTALL_DIR"
+          echo "Creating installation directory..."
+          mkdir -p "$INSTALL_DIR"
 
-echo "Copying files..."
-cp -r AkademiTrack/* "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/AkademiTrack"
+          echo "Copying files..."
+          cp -r AkademiTrack/* "$INSTALL_DIR/"
+          chmod +x "$INSTALL_DIR/AkademiTrack"
 
-echo "Creating desktop entry..."
-mkdir -p ~/.local/share/applications
-cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=AkademiTrack
-Comment=Academic tracking application
-Exec=INSTALL_DIR_PLACEHOLDER/AkademiTrack
-Icon=INSTALL_DIR_PLACEHOLDER/pictures/logo.png
-Terminal=false
-Categories=Education;Office;
-DESKTOP_EOF
-sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
-chmod +x ~/.local/share/applications/akademitrack.desktop
+          echo "Creating desktop entry..."
+          mkdir -p ~/.local/share/applications
+          cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=AkademiTrack
+          Comment=Academic tracking application
+          Exec=INSTALL_DIR_PLACEHOLDER/AkademiTrack
+          Icon=INSTALL_DIR_PLACEHOLDER/pictures/logo.png
+          Terminal=false
+          Categories=Education;Office;
+          DESKTOP_EOF
+          sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
+          chmod +x ~/.local/share/applications/akademitrack.desktop
 
-echo ""
-echo "Installation complete!"
-echo "Desktop entry created!"
-echo ""
-echo "You can now:"
-echo "1. Find AkademiTrack in your application menu"
-echo "2. Run directly: $INSTALL_DIR/AkademiTrack"
-EOF
+          echo ""
+          echo "Installation complete!"
+          echo "Desktop entry created!"
+          echo ""
+          echo "You can now:"
+          echo "1. Find AkademiTrack in your application menu"
+          echo "2. Run directly: $INSTALL_DIR/AkademiTrack"
+          EOF
             chmod +x dist/install_akademitrack.sh
           fi
         shell: bash
