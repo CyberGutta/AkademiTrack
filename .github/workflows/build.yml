@@ -15,15 +15,15 @@ jobs:
           - os: windows-latest
             icon: pictures/logo.ico
             build-cmd: |
-              nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=. --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads --follow-imports --nofollow-import-to=tkinter main.py
+              python -m nuitka --standalone --windows-console-mode=disable --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=dist --windows-icon-from-ico=pictures/logo.ico --assume-yes-for-downloads --follow-imports --nofollow-import-to=tkinter main.py
           - os: macos-latest
             icon: pictures/logo.icns
             build-cmd: |
-              nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=. --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=arm64 --follow-imports main.py
+              python -m nuitka --mode=app --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=dist --macos-app-icon=pictures/logo.icns --assume-yes-for-downloads --macos-target-arch=universal2 --follow-imports --nofollow-import-to=tkinter main.py
           - os: ubuntu-latest
             icon: pictures/logo.png
             build-cmd: |
-              nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=. --linux-icon=pictures/logo.png --assume-yes-for-downloads --follow-imports main.py
+              python -m nuitka --standalone --enable-plugin=pyqt5 --include-data-dir=pictures=pictures --include-module=backend --include-module=gui --output-filename=AkademiTrack --output-dir=dist --linux-icon=pictures/logo.png --assume-yes-for-downloads --follow-imports --nofollow-import-to=tkinter main.py
 
     steps:
       - name: Checkout code
@@ -38,162 +38,260 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-dev python3-pyqt5
+          sudo apt-get install -y python3-dev python3-pyqt5 libqt5core5a libqt5gui5 libqt5widgets5
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install python@3.11 || true
+          # Install Qt5 if needed
+          brew install qt@5 || true
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install nuitka pyqt5 requests selenium webdriver-manager schedule psutil browser-cookie3
-        continue-on-error: false
 
-      - name: Install additional macOS dependencies
-        if: matrix.os == 'macos-latest'
+      - name: Verify files exist
         run: |
-          python -m pip install --upgrade setuptools wheel
-          brew install --quiet python@3.11 || true
-        continue-on-error: true
+          echo "Verifying project files..."
+          ls -la
+          echo "Python files:"
+          ls -la *.py || echo "No Python files found"
+          echo "Pictures directory:"
+          ls -la pictures/ || echo "No pictures directory found"
+          echo "Icon file for this OS: ${{ matrix.icon }}"
+          ls -la ${{ matrix.icon }} || echo "Icon file not found"
 
-      - name: Verify Python modules before build
+      - name: Test Python imports
         run: |
           echo "Testing Python imports..."
+          python -c "import sys; print(f'Python version: {sys.version}')"
           python -c "import PyQt5; print('PyQt5 OK')"
-          python -c "import backend; print('backend.py OK')" || echo "backend.py import failed"
-          python -c "import gui; print('gui.py OK')" || echo "gui.py import failed"
-          python -c "import main; print('main.py OK')" || echo "main.py import failed"
-          echo "Files in current directory:"
-          ls -la *.py
-        shell: bash
+          python -c "import backend; print('backend.py OK')" || echo "WARNING: backend.py import failed"
+          python -c "import gui; print('gui.py OK')" || echo "WARNING: gui.py import failed"
+          python -c "import main; print('main.py OK')" || echo "WARNING: main.py import failed"
+
+      - name: Create dist directory
+        run: mkdir -p dist
 
       - name: Build application
         run: |
-          echo "Building with command: ${{ matrix.build-cmd }}"
-          python -m ${{ matrix.build-cmd }}
+          echo "Building with command:"
+          echo "${{ matrix.build-cmd }}"
+          echo "Starting build..."
+          ${{ matrix.build-cmd }}
         shell: bash
 
-      - name: Fix macOS bundle structure
+      - name: Check build output
+        run: |
+          echo "=== Build Output Analysis ==="
+          echo "Current directory contents:"
+          ls -la
+          echo ""
+          echo "Dist directory contents:"
+          ls -la dist/ || echo "No dist directory found"
+          echo ""
+          echo "Looking for .app bundles (macOS):"
+          find . -name "*.app" -type d || echo "No .app bundles found"
+          echo ""
+          echo "Looking for executable files:"
+          find . -name "*AkademiTrack*" -type f || echo "No AkademiTrack executables found"
+          echo ""
+          echo "Looking for any dist directories:"
+          find . -name "*.dist" -type d || echo "No .dist directories found"
+        shell: bash
+
+      - name: Fix macOS app structure
         if: matrix.os == 'macos-latest'
         run: |
-          if [ -d "AkademiTrack.app" ]; then
-            echo "Copying Python modules into app bundle..."
-            
-            # Copy the Python files to Resources so they're accessible
-            cp backend.py AkademiTrack.app/Contents/Resources/ || echo "Could not copy backend.py"
-            cp gui.py AkademiTrack.app/Contents/Resources/ || echo "Could not copy gui.py"
-            
-            # Also copy to MacOS directory for imports
-            cp backend.py AkademiTrack.app/Contents/MacOS/ || echo "Could not copy backend.py to MacOS"
-            cp gui.py AkademiTrack.app/Contents/MacOS/ || echo "Could not copy gui.py to MacOS"
-            
-            echo "Files now in Resources:"
-            ls -la AkademiTrack.app/Contents/Resources/
-            echo "Files now in MacOS:"
-            ls -la AkademiTrack.app/Contents/MacOS/
-            
-            # Set executable permissions
-            chmod +x AkademiTrack.app/Contents/MacOS/AkademiTrack
-            
-            echo "Bundle structure fixed"
-          else
-            echo "No AkademiTrack.app found"
+          # Look for the app in various possible locations
+          APP_PATH=""
+          if [ -d "dist/AkademiTrack.app" ]; then
+            APP_PATH="dist/AkademiTrack.app"
+          elif [ -d "AkademiTrack.app" ]; then
+            APP_PATH="AkademiTrack.app"
+          elif [ -d "main.app" ]; then
+            APP_PATH="main.app"
+            mv main.app AkademiTrack.app
+            APP_PATH="AkademiTrack.app"
           fi
 
-      - name: Sign macOS app and create installer
+          if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
+            echo "Found app bundle at: $APP_PATH"
+            
+            # Ensure proper structure
+            mkdir -p "$APP_PATH/Contents/Resources"
+            mkdir -p "$APP_PATH/Contents/MacOS"
+            
+            # Copy Python modules
+            cp backend.py "$APP_PATH/Contents/Resources/" || echo "Could not copy backend.py"
+            cp gui.py "$APP_PATH/Contents/Resources/" || echo "Could not copy gui.py"
+            cp backend.py "$APP_PATH/Contents/MacOS/" || echo "Could not copy backend.py to MacOS"
+            cp gui.py "$APP_PATH/Contents/MacOS/" || echo "Could not copy gui.py to MacOS"
+            
+            # Copy pictures if they exist
+            if [ -d "pictures" ]; then
+              cp -r pictures "$APP_PATH/Contents/Resources/" || echo "Could not copy pictures"
+            fi
+            
+            # Set executable permissions
+            chmod +x "$APP_PATH/Contents/MacOS"/* || echo "Could not set executable permissions"
+            
+            # Move to dist if not already there
+            if [ "$APP_PATH" != "dist/AkademiTrack.app" ]; then
+              mkdir -p dist
+              mv "$APP_PATH" dist/
+            fi
+            
+            echo "macOS app structure prepared"
+          else
+            echo "ERROR: No macOS app bundle found after build!"
+            echo "Available files:"
+            find . -name "*" -type f | head -20
+          fi
+        shell: bash
+
+      - name: Sign macOS app
         if: matrix.os == 'macos-latest'
         run: |
-          if [ -d "AkademiTrack.app" ]; then
-            echo "Creating ad-hoc signature for AkademiTrack.app"
-            
-            # Remove any existing signature first
-            codesign --remove-signature AkademiTrack.app 2>/dev/null || true
-            
-            # Sign with ad-hoc signature
-            codesign --force --deep --sign - AkademiTrack.app
-            codesign --verify --verbose AkademiTrack.app
-            echo "Ad-hoc signature applied successfully"
-            
-            # Remove quarantine attribute
-            xattr -d com.apple.quarantine AkademiTrack.app 2>/dev/null || true
-            
-            # Create installer script
-            cat > install_akademitrack.sh << 'INSTALLER_EOF'
+          if [ -d "dist/AkademiTrack.app" ]; then
+            echo "Signing macOS app with ad-hoc signature"
+            codesign --remove-signature dist/AkademiTrack.app 2>/dev/null || true
+            codesign --force --deep --sign - dist/AkademiTrack.app
+            codesign --verify --verbose dist/AkademiTrack.app
+            xattr -d com.apple.quarantine dist/AkademiTrack.app 2>/dev/null || true
+            echo "macOS app signed successfully"
+          else
+            echo "No app bundle found for signing"
+          fi
+        shell: bash
+
+      - name: Organize Windows build
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "Organizing Windows build..."
+          if [ -d "dist/main.dist" ]; then
+            echo "Moving from dist/main.dist to dist/AkademiTrack"
+            mv dist/main.dist dist/AkademiTrack
+          elif [ -d "main.dist" ]; then
+            echo "Moving from main.dist to dist/AkademiTrack"
+            mkdir -p dist
+            mv main.dist dist/AkademiTrack
+          fi
+          
+          if [ -d "dist/AkademiTrack" ]; then
+            echo "Windows build organized successfully"
+            echo "Build size: $(du -sh dist/AkademiTrack)"
+          else
+            echo "ERROR: Windows build not found!"
+          fi
+        shell: bash
+
+      - name: Organize Linux build
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "Organizing Linux build..."
+          if [ -d "dist/main.dist" ]; then
+            echo "Moving from dist/main.dist to dist/AkademiTrack"
+            mv dist/main.dist dist/AkademiTrack
+          elif [ -d "main.dist" ]; then
+            echo "Moving from main.dist to dist/AkademiTrack"
+            mkdir -p dist
+            mv main.dist dist/AkademiTrack
+          fi
+          
+          if [ -d "dist/AkademiTrack" ]; then
+            echo "Setting executable permissions"
+            chmod +x dist/AkademiTrack/AkademiTrack
+            echo "Linux build organized successfully"
+            echo "Build size: $(du -sh dist/AkademiTrack)"
+          else
+            echo "ERROR: Linux build not found!"
+          fi
+        shell: bash
+
+      - name: Create installer scripts
+        run: |
+          echo "Creating installer scripts..."
+          
+          # Windows installer
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cat > dist/install_akademitrack.bat << 'EOF'
+          @echo off
+          echo Installing AkademiTrack...
+          set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
+          
+          if exist "%INSTALL_DIR%" (
+              echo Removing existing installation...
+              rmdir /s /q "%INSTALL_DIR%"
+          )
+          
+          echo Creating installation directory...
+          mkdir "%INSTALL_DIR%"
+          
+          echo Copying files...
+          xcopy "AkademiTrack" "%INSTALL_DIR%" /E /I /Y
+          
+          echo Creating desktop shortcut...
+          powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.Save()"
+          
+          echo.
+          echo Installation complete!
+          echo AkademiTrack installed to: %INSTALL_DIR%
+          echo Desktop shortcut created!
+          pause
+          EOF
+          fi
+          
+          # macOS installer
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            cat > dist/install_akademitrack.sh << 'EOF'
           #!/bin/bash
-          echo "Installing AkademiTrack (Universal Binary for Intel & Apple Silicon)..."
-          echo ""
+          echo "Installing AkademiTrack for macOS..."
           
           if [ -d "/Applications/AkademiTrack.app" ]; then
               echo "Removing existing installation..."
               rm -rf "/Applications/AkademiTrack.app"
           fi
-          echo "Copying AkademiTrack.app to Applications folder..."
+          
+          echo "Copying AkademiTrack.app to Applications..."
           cp -R "AkademiTrack.app" "/Applications/"
           
-          # Remove quarantine attribute from installed app
+          # Remove quarantine attribute
           xattr -d com.apple.quarantine "/Applications/AkademiTrack.app" 2>/dev/null || true
           
+          echo ""
           echo "Installation complete!"
           echo ""
           echo "To run AkademiTrack:"
           echo "1. Open Applications folder"
           echo "2. Double-click AkademiTrack"
           echo "3. If macOS shows security warning, right-click and select 'Open'"
-          echo "4. Click 'Open' when asked for confirmation"
           echo ""
-          echo "This is a Universal Binary that works on both Intel and Apple Silicon Macs"
-          INSTALLER_EOF
-            chmod +x install_akademitrack.sh
-            echo "Created installer script"
-          else
-            echo "No AkademiTrack.app found for signing"
+          EOF
+            chmod +x dist/install_akademitrack.sh
           fi
-        shell: bash
-
-      - name: Create Windows installer script
-        if: matrix.os == 'windows-latest'
-        run: |
-          cat > install_akademitrack.bat << 'INSTALLER_EOF'
-          @echo off
-          echo Installing AkademiTrack...
-          set "INSTALL_DIR=%USERPROFILE%\AkademiTrack"
-          if exist "%INSTALL_DIR%" (
-              echo Removing existing installation...
-              rmdir /s /q "%INSTALL_DIR%"
-          )
-          echo Creating installation directory...
-          mkdir "%INSTALL_DIR%"
-          echo Copying files...
-          xcopy "AkademiTrack" "%INSTALL_DIR%" /E /I /Y
-          echo.
-          echo Installation complete!
-          echo AkademiTrack installed to: %INSTALL_DIR%
-          echo.
-          echo Creating desktop shortcut...
-          powershell -Command "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\AkademiTrack.lnk'); $Shortcut.TargetPath = '%INSTALL_DIR%\AkademiTrack.exe'; $Shortcut.Save()"
-          echo Desktop shortcut created!
-          pause
-          INSTALLER_EOF
-          echo "Created Windows installer script"
-        shell: bash
-
-      - name: Create Linux installer script
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          cat > install_akademitrack.sh << 'INSTALLER_EOF'
+          
+          # Linux installer
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            cat > dist/install_akademitrack.sh << 'EOF'
           #!/bin/bash
-          echo "Installing AkademiTrack..."
+          echo "Installing AkademiTrack for Linux..."
           INSTALL_DIR="$HOME/AkademiTrack"
+          
           if [ -d "$INSTALL_DIR" ]; then
               echo "Removing existing installation..."
               rm -rf "$INSTALL_DIR"
           fi
+          
           echo "Creating installation directory..."
           mkdir -p "$INSTALL_DIR"
+          
           echo "Copying files..."
-          cp AkademiTrack "$INSTALL_DIR/"
-          cp -r pictures "$INSTALL_DIR/" 2>/dev/null || true
+          cp -r AkademiTrack/* "$INSTALL_DIR/"
           chmod +x "$INSTALL_DIR/AkademiTrack"
-          echo ""
-          echo "Installation complete!"
-          echo ""
+          
           echo "Creating desktop entry..."
           mkdir -p ~/.local/share/applications
           cat > ~/.local/share/applications/akademitrack.desktop << 'DESKTOP_EOF'
@@ -209,46 +307,46 @@ jobs:
           DESKTOP_EOF
           sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" ~/.local/share/applications/akademitrack.desktop
           chmod +x ~/.local/share/applications/akademitrack.desktop
+          
+          echo ""
+          echo "Installation complete!"
           echo "Desktop entry created!"
-          INSTALLER_EOF
-          chmod +x install_akademitrack.sh
-          echo "Created Linux installer script"
-        shell: bash
-
-      - name: Restructure Windows build
-        if: matrix.os == 'windows-latest'
-        run: |
-          if [ -d "main.dist" ]; then
-            echo "Creating AkademiTrack directory and moving files from main.dist"
-            mkdir -p AkademiTrack
-            mv main.dist/* AkademiTrack/ || cp -r main.dist/* AkademiTrack/
-            rm -rf main.dist
-            echo "AkademiTrack directory created with size:"
-            du -sh AkademiTrack/
+          EOF
+            chmod +x dist/install_akademitrack.sh
           fi
         shell: bash
 
-      - name: Move files from main.dist (Linux only)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Final verification
         run: |
-          if [ -d "main.dist" ]; then
-            echo "Moving files from main.dist to current directory"
-            mv main.dist/* . || true
-            rmdir main.dist || true
+          echo "=== Final Build Verification ==="
+          echo "Dist directory contents:"
+          ls -la dist/ || echo "No dist directory"
+          echo ""
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            if [ -d "dist/AkademiTrack.app" ]; then
+              echo "✅ macOS app bundle found"
+              echo "App bundle contents:"
+              ls -la dist/AkademiTrack.app/Contents/
+            else
+              echo "❌ macOS app bundle missing"
+            fi
+          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+            if [ -d "dist/AkademiTrack" ]; then
+              echo "✅ Windows build found"
+              echo "Windows build contents:"
+              ls -la dist/AkademiTrack/ | head -10
+            else
+              echo "❌ Windows build missing"
+            fi
+          elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            if [ -d "dist/AkademiTrack" ]; then
+              echo "✅ Linux build found"
+              echo "Linux build contents:"
+              ls -la dist/AkademiTrack/ | head -10
+            else
+              echo "❌ Linux build missing"
+            fi
           fi
-        shell: bash
-
-      - name: List final build output
-        run: |
-          echo "=== Final Build Analysis ==="
-          echo "Current directory contents:"
-          ls -la
-          echo "Looking for app bundles:"
-          find . -name "*.app" -type d 2>/dev/null || echo "No .app bundles found"
-          echo "Looking for executables:"
-          find . -name "AkademiTrack*" 2>/dev/null || echo "No AkademiTrack files found"
-          echo "Looking for build directories:"
-          find . -name "*.dist" -type d 2>/dev/null || echo "No .dist directories found"
         shell: bash
 
       - name: Upload artifacts
@@ -256,14 +354,30 @@ jobs:
         with:
           name: AkademiTrack-${{ matrix.os }}
           path: |
-            AkademiTrack.app/
-            AkademiTrack/
-            AkademiTrack*
-            main.dist/
-            *.exe
-            *.sh
-            *.bat
-            !*.xml
-            !*.pyc
-            !main.build/
-          if-no-files-found: warn
+            dist/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create release assets (on main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          echo "Preparing release assets..."
+          cd dist
+          if [ "${{ matrix.os }}" == "macos-latest" ] && [ -d "AkademiTrack.app" ]; then
+            tar -czf ../AkademiTrack-macOS.tar.gz AkademiTrack.app install_akademitrack.sh
+          elif [ "${{ matrix.os }}" == "windows-latest" ] && [ -d "AkademiTrack" ]; then
+            zip -r ../AkademiTrack-Windows.zip AkademiTrack install_akademitrack.bat
+          elif [ "${{ matrix.os }}" == "ubuntu-latest" ] && [ -d "AkademiTrack" ]; then
+            tar -czf ../AkademiTrack-Linux.tar.gz AkademiTrack install_akademitrack.sh
+          fi
+        shell: bash
+
+      - name: Upload release assets
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AkademiTrack-Release-${{ matrix.os }}
+          path: |
+            *.tar.gz
+            *.zip
+          if-no-files-found: ignore
