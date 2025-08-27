@@ -1,10 +1,3 @@
-//
-//  AkademiTrackApp.swift
-//  AkademiTrack
-//
-//  Created by Andreas Nilsen on 27/08/2025.
-//
-
 import SwiftUI
 
 @main
@@ -13,7 +6,7 @@ struct AkademiTrackApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
