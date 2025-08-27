@@ -9,104 +9,116 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Login Credentials").font(.system(size: 14, weight: .medium))) {
-                    TextField("Username", text: $username)
-                        .textContentType(.username)
-                        .autocorrectionDisabled()
-                        .font(.system(size: 14))
+        VStack(spacing: 15) {
+                // Header
+                VStack(spacing: 6) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.blue.opacity(0.9))
                     
-                    HStack {
-                        if showPassword {
-                            TextField("Password", text: $password)
-                                .font(.system(size: 14))
-                        } else {
-                            SecureField("Password", text: $password)
-                                .font(.system(size: 14))
-                        }
-                        
-                        Button(action: {
-                            showPassword.toggle()
-                        }) {
-                            Image(systemName: showPassword ? "eye.slash" : "eye")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: 14))
+                    Text("Settings")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                .padding(.top, 10)
+                
+                // Login Credentials Section
+                VStack(spacing: 12) {
+                    Text("Login Credentials")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    // Username Field
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Username")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary.opacity(0.9))
+                        TextField("Enter your username", text: $username)
+                            .textFieldStyle(.roundedBorder)
+                            .textContentType(.username)
+                            .autocorrectionDisabled()
+                            .font(.system(size: 14))
+                            .frame(height: 35)
+                    }
+                    
+                    // Password Field
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Password")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary.opacity(0.9))
+                        HStack {
+                            if showPassword {
+                                TextField("Enter your password", text: $password)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 14))
+                                    .frame(height: 35)
+                            } else {
+                                SecureField("Enter your password", text: $password)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 14))
+                                    .frame(height: 35)
+                            }
+                            
+                            Button(action: {
+                                showPassword.toggle()
+                            }) {
+                                Image(systemName: showPassword ? "eye.slash" : "eye")
+                                    .foregroundColor(.secondary.opacity(0.8))
+                                    .font(.system(size: 16))
+                            }
+                            .padding(.leading, -30)
                         }
                     }
                 }
+                .padding(16)
+                .background(Color.gray.opacity(0.12))
+                .cornerRadius(12)
                 
-                Section(header: Text("Actions").font(.system(size: 14, weight: .medium))) {
+                // Action Buttons
+                VStack(spacing: 12) {
                     Button("Save Credentials") {
                         saveCredentials()
                     }
                     .disabled(username.isEmpty || password.isEmpty)
-                    .font(.system(size: 14))
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(username.isEmpty || password.isEmpty ? Color.gray.opacity(0.4) : Color.blue.opacity(0.9))
+                    .foregroundColor(.white)
+                    .font(.system(size: 14, weight: .semibold))
+                    .cornerRadius(10)
                     
                     Button("Clear Credentials") {
                         clearCredentials()
                     }
-                    .foregroundColor(.red)
-                    .font(.system(size: 14))
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(Color.red.opacity(0.15))
+                    .foregroundColor(.red.opacity(0.9))
+                    .font(.system(size: 14, weight: .semibold))
+                    .cornerRadius(10)
                 }
                 
+                // Status Message
                 if !saveStatus.isEmpty {
-                    Section {
-                        Text(saveStatus)
-                            .foregroundColor(saveStatus.contains("successfully") ? .green : .red)
-                            .font(.system(size: 13))
-                    }
+                    Text(saveStatus)
+                        .foregroundColor(saveStatus.contains("successfully") ? .green.opacity(0.9) : .red.opacity(0.9))
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(8)
+                        .background(saveStatus.contains("successfully") ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
+                        .cornerRadius(6)
                 }
                 
-                Section(header: Text("Information").font(.system(size: 14, weight: .medium))) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Your credentials are encrypted and stored securely in the device keychain.")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                        
-                        Text("The app will automatically register your attendance for study periods (STU) during scheduled times.")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 4)
+                Spacer()
+                
+                // Done Button
+                Button("Done") {
+                    dismiss()
                 }
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(Color.gray.opacity(0.15))
+                .foregroundColor(.blue.opacity(0.9))
+                .font(.system(size: 14, weight: .semibold))
+                .cornerRadius(10)
             }
-            .navigationTitle("Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(.system(size: 15))
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(.system(size: 15))
-                }
-                #else
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(.system(size: 15))
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(.system(size: 15))
-                }
-                #endif
-            }
-        }
+            .padding(24)
+            .frame(width: 350, height: 500) // Smaller but taller settings window
         .onAppear {
             loadCredentials()
         }
