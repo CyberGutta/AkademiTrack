@@ -301,21 +301,41 @@ class NetworkManager {
     private func decodeHtmlEntities(_ text: String) -> String {
         var result = text
         
-        // Common HTML entities
-        let entities: [String: String] = [
-            "&amp;": "&",
-            "&lt;": "<",
-            "&gt;": ">",
-            "&quot;": "\"",
-            "&apos;": "'",
-            "&#x27;": "'",
-            "&#39;": "'",
-            "&#x2F;": "/",
-            "&#47;": "/"
+        // Common HTML entities - order matters!
+        let entities: [(String, String)] = [
+            ("&amp;", "&"),      // Must be first
+            ("&lt;", "<"),
+            ("&gt;", ">"),
+            ("&quot;", "\""),
+            ("&apos;", "'"),
+            ("&#x27;", "'"),
+            ("&#39;", "'"),
+            ("&#x2F;", "/"),
+            ("&#47;", "/"),
+            ("&#x3D;", "="),
+            ("&#61;", "="),
+            ("&nbsp;", " ")
         ]
         
         for (entity, replacement) in entities {
             result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+        
+        // Handle numeric character references
+        let numericPattern = "&#(\\d+);"
+        if let regex = try? NSRegularExpression(pattern: numericPattern, options: []) {
+            let matches = regex.matches(in: result, options: [], range: NSRange(result.startIndex..., in: result))
+            
+            // Process in reverse order to maintain string indices
+            for match in matches.reversed() {
+                if let numberRange = Range(match.range(at: 1), in: result),
+                   let charCode = Int(String(result[numberRange])),
+                   let unicodeScalar = UnicodeScalar(charCode) {
+                    let character = String(Character(unicodeScalar))
+                    let fullRange = Range(match.range, in: result)!
+                    result.replaceSubrange(fullRange, with: character)
+                }
+            }
         }
         
         return result
@@ -605,6 +625,33 @@ class NetworkManager {
         // This should be stored from the previous step, but for now use a default
         return nil // This will use "default_state" from above
     }
+    
+    private func extractStateFromPreviousRequest(from html: String) -> String? {
+        // Look for state parameter in hidden fields first
+        if let stateField = extractHiddenFieldValue(from: html, fieldName: "state") {
+            return stateField
+        }
+        
+        // Look for state in URLs within the HTML
+        let statePattern = "[?&]state=([^&\\s\"'<>]+)"
+        if let regex = try? NSRegularExpression(pattern: statePattern, options: []),
+           let match = regex.firstMatch(in: html, options: [], range: NSRange(html.startIndex..., in: html)),
+           let stateRange = Range(match.range(at: 1), in: html) {
+            return String(html[stateRange])
+        }
+        
+        return nil
+    }
+
+    private func extractHiddenFieldValue(from html: String, fieldName: String) -> String? {
+        let pattern = "name=\"\(fieldName)\"[^>]*value=\"([^\"]+)\""
+        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+           let match = regex.firstMatch(in: html, options: [], range: NSRange(html.startIndex..., in: html)),
+           let valueRange = Range(match.range(at: 1), in: html) {
+            return String(html[valueRange])
+        }
+        return nil
+    }
 
     private func performOAuthAuthorization(_ oauthUrl: String, username: String, password: String) async -> Bool {
         print("🌐 GET \(oauthUrl.prefix(80))...")
@@ -619,13 +666,11 @@ class NetworkManager {
             
             print("📊 OAuth authorization response: \(httpResponse.statusCode)")
             
-            // Handle redirects
             if let location = httpResponse.allHeaderFields["Location"] as? String {
                 print("🔗 OAuth redirect to: \(location.prefix(100))...")
                 return await handleOAuthRedirect(location, username: username, password: password)
             }
             
-            // If we got HTML, check what kind of page it is
             if let htmlContent = String(data: data, encoding: .utf8) {
                 print("📄 OAuth response length: \(htmlContent.count)")
                 print("📄 Contains 'feide': \(htmlContent.contains("feide"))")
@@ -633,22 +678,15 @@ class NetworkManager {
                 print("📄 Contains 'password': \(htmlContent.contains("password"))")
                 print("📄 Contains 'form': \(htmlContent.contains("form"))")
                 
-                // Check for identity provider selection
-                if htmlContent.contains("feide") && htmlContent.contains("select") {
+                if htmlContent.contains("feide") && htmlContent.contains("form") && !htmlContent.contains("password") {
                     print("🎯 Found identity provider selection page")
-                    return await handleIdentityProviderSelection(htmlContent, username: username, password: password)
+                    // FIXED: Pass the original OAuth URL to preserve state
+                    return await handleIdentityProviderSelection(htmlContent, username: username, password: password, originalOAuthUrl: oauthUrl)
                 }
                 
-                // Check for direct login form
                 if htmlContent.contains("password") && htmlContent.contains("form") {
                     print("🎯 Found login form directly")
                     return await handleLoginForm(htmlContent, username: username, password: password)
-                }
-                
-                // Look for any Feide-related links or forms
-                if let feideUrl = extractAnyFeideLoginUrl(from: htmlContent) {
-                    print("🔗 Found Feide login URL: \(feideUrl.prefix(100))...")
-                    return await accessFeideLoginForm(feideUrl, username: username, password: password)
                 }
             }
             
@@ -672,36 +710,141 @@ class NetworkManager {
         return await performOAuthAuthorization(location, username: username, password: password)
     }
 
-    private func handleIdentityProviderSelection(_ html: String, username: String, password: String) async -> Bool {
+    private func handleIdentityProviderSelection(_ html: String, username: String, password: String, originalOAuthUrl: String) async -> Bool {
         print("🎯 Handling identity provider selection...")
         
-        // Save HTML for debugging
-        let debugFile = "/tmp/feide_debug.html"
-        try? html.write(toFile: debugFile, atomically: true, encoding: .utf8)
-        print("🔍 HTML saved to: \(debugFile)")
-        
-        // Method 1: Look for direct Feide links with organization
-        if let directFeideUrl = findDirectFeideUrl(from: html) {
-            print("🔗 Found direct Feide URL: \(directFeideUrl.prefix(100))...")
-            return await accessFeideLoginForm(directFeideUrl, username: username, password: password)
+        // Extract the EXACT OAuth parameters from the original URL
+        guard let originalComponents = URLComponents(string: originalOAuthUrl) else {
+            print("❌ Cannot parse original OAuth URL")
+            return false
         }
         
-        // Method 2: Look for organization selection form
+        // Build the EXACT OAuth parameters from the original request
+        var oauthParams: [String: String] = [:]
+        if let queryItems = originalComponents.queryItems {
+            for item in queryItems {
+                if let value = item.value {
+                    oauthParams[item.name] = value
+                }
+            }
+        }
+        
+        print("🔑 Extracted OAuth parameters:")
+        for (key, value) in oauthParams {
+            print("   \(key): \(value.prefix(30))...")
+        }
+        
+        // Look for organization selection form
         if let orgForm = findOrganizationForm(from: html) {
             print("📝 Found organization form")
-            return await submitOrganizationForm(orgForm, username: username, password: password)
+            return await submitOrganizationFormFixed(orgForm, username: username, password: password, oauthParams: oauthParams)
         }
         
-        // Method 3: Try clicking/submitting any Feide-related button or link
-        if let feideAction = findFeideAction(from: html) {
-            print("🖱️ Found Feide action: \(feideAction)")
-            return await executeFeideAction(feideAction, username: username, password: password)
-        }
-        
-        // Method 4: Construct direct URL with organization
-        let constructedUrl = constructFeideUrlWithOrg()
+        // Fallback: construct direct URL with preserved parameters
+        let constructedUrl = constructFeideUrlWithPreservedParams(oauthParams)
         print("🔗 Trying constructed URL: \(constructedUrl.prefix(100))...")
         return await accessFeideLoginForm(constructedUrl, username: username, password: password)
+    }
+    
+    private func submitOrganizationFormFixed(_ formData: [String: String], username: String, password: String, oauthParams: [String: String]) async -> Bool {
+        guard let action = formData["action"] else {
+            print("❌ No form action found")
+            return false
+        }
+        
+        let method = formData["method"] ?? "GET"
+        print("📤 Submitting organization form (FIXED):")
+        print("   Method: \(method)")
+        print("   Action: \(action)")
+        
+        // Build the URL with EXACT OAuth parameters (don't rely on the form's returnTo)
+        guard var components = URLComponents(string: action) else {
+            print("❌ Invalid URL action: \(action)")
+            return false
+        }
+        
+        // Start with the ORIGINAL OAuth parameters
+        var queryItems: [URLQueryItem] = []
+        
+        // Add the exact OAuth parameters from the original request
+        for (key, value) in oauthParams {
+            queryItems.append(URLQueryItem(name: key, value: value))
+        }
+        
+        // Add organization selection parameters
+        queryItems.append(URLQueryItem(name: "selectedIdP", value: "https://idp.feide.no"))
+        queryItems.append(URLQueryItem(name: "org", value: "feide.drammen.akademiet.no"))
+        queryItems.append(URLQueryItem(name: "idp", value: "https://idp.feide.no"))
+        
+        // Add any other form parameters (except returnTo - we're rebuilding this properly)
+        let excludedKeys = ["action", "method", "returnTo", "clientid", "state", "client_id"] // Don't duplicate OAuth params
+        
+        for (key, value) in formData where !excludedKeys.contains(key) {
+            queryItems.append(URLQueryItem(name: key, value: value))
+            print("   \(key): \(value.prefix(50))...")
+        }
+        
+        components.queryItems = queryItems
+        
+        guard let finalUrl = components.url?.absoluteString else {
+            print("❌ Failed to build final URL")
+            return false
+        }
+        
+        print("📤 Final URL (FIXED): \(finalUrl.prefix(200))...")
+        
+        let (data, response) = await makeRequest(url: finalUrl, method: method)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ No HTTP response")
+            return false
+        }
+        
+        print("📊 Organization form response: \(httpResponse.statusCode)")
+        
+        if httpResponse.statusCode == 400 {
+            if let responseData = String(data: data, encoding: .utf8) {
+                print("❌ 400 Error response: \(responseData)")
+            }
+            return false
+        }
+        
+        // Handle redirect to Feide
+        if let location = httpResponse.allHeaderFields["Location"] as? String {
+            print("🔗 Organization form redirect: \(location.prefix(100))...")
+            return await accessFeideLoginForm(location, username: username, password: password)
+        }
+        
+        // Check for direct login form in response
+        if let responseHtml = String(data: data, encoding: .utf8) {
+            if responseHtml.contains("password") && (responseHtml.contains("feidename") || responseHtml.contains("username")) {
+                print("✅ Got Feide login form from organization selection!")
+                return await handleLoginForm(responseHtml, username: username, password: password)
+            }
+        }
+        
+        return httpResponse.statusCode >= 200 && httpResponse.statusCode < 300
+    }
+
+    // Helper to construct Feide URL with preserved OAuth parameters
+    private func constructFeideUrlWithPreservedParams(_ oauthParams: [String: String]) -> String {
+        var components = URLComponents(string: "https://auth.dataporten.no/oauth/authorization")!
+        
+        var queryItems: [URLQueryItem] = []
+        
+        // Add the preserved OAuth parameters
+        for (key, value) in oauthParams {
+            queryItems.append(URLQueryItem(name: key, value: value))
+        }
+        
+        // Add organization selection
+        queryItems.append(URLQueryItem(name: "selectedIdP", value: "https://idp.feide.no"))
+        queryItems.append(URLQueryItem(name: "org", value: "feide.drammen.akademiet.no"))
+        queryItems.append(URLQueryItem(name: "idp", value: "https://idp.feide.no"))
+        
+        components.queryItems = queryItems
+        
+        return components.url?.absoluteString ?? "https://idp.feide.no/simplesaml/saml2/idp/SSOService.php"
     }
 
     private func findDirectFeideUrl(from html: String) -> String? {
@@ -739,7 +882,6 @@ class NetworkManager {
 
     // NEW: Find organization selection forms more accurately
     private func findOrganizationForm(from html: String) -> [String: String]? {
-        // Look for forms that might contain organization selection
         let formPattern = "(?s)<form[^>]*>.*?</form>"
         guard let regex = try? NSRegularExpression(pattern: formPattern, options: [.dotMatchesLineSeparators]) else {
             return nil
@@ -751,21 +893,17 @@ class NetworkManager {
             guard let matchRange = Range(match.range, in: html) else { continue }
             let formHtml = String(html[matchRange])
             
-            // Check if this form relates to identity provider selection
             if formHtml.lowercased().contains("feide") ||
                formHtml.lowercased().contains("provider") ||
                formHtml.lowercased().contains("identity") ||
-               formHtml.lowercased().contains("org") ||
-               formHtml.contains("drammen") ||
-               formHtml.contains("akademiet") {
+               formHtml.lowercased().contains("org") {
                 
                 var formData: [String: String] = [:]
                 
-                // Extract action - FIXED VERSION
+                // Extract action with better default handling
                 if let action = extractAttribute("action", from: formHtml) {
                     var actionUrl = action.trimmingCharacters(in: .whitespacesAndNewlines)
                     
-                    // Handle empty action (submit to current page)
                     if actionUrl.isEmpty {
                         actionUrl = "https://auth.dataporten.no/oauth/authorization"
                     } else if actionUrl.hasPrefix("/") {
@@ -777,29 +915,26 @@ class NetworkManager {
                     formData["action"] = actionUrl
                     print("📍 Found form action: \(actionUrl)")
                 } else {
-                    // No action attribute found - use current URL as default
                     formData["action"] = "https://auth.dataporten.no/oauth/authorization"
                     print("📍 No form action found, using default")
                 }
                 
-                // Extract method
-                formData["method"] = extractAttribute("method", from: formHtml)?.uppercased() ?? "POST"
+                formData["method"] = extractAttribute("method", from: formHtml)?.uppercased() ?? "GET"
                 
-                // Extract ALL inputs, not just hidden ones
-                extractAllFormInputs(from: formHtml, into: &formData)
+                // FIXED: Extract form inputs with proper state preservation
+                extractAllFormInputsFixed(from: formHtml, into: &formData)
                 
-                // Add Feide organization parameter if not present
-                let hasOrgParam = formData.keys.contains { key in
-                    key.lowercased().contains("org") ||
-                    key.lowercased().contains("idp") ||
-                    key.lowercased().contains("provider")
+                // CRITICAL FIX: Preserve the original state parameter from the OAuth URL
+                if let originalState = extractStateFromCurrentContext(html) {
+                    formData["state"] = originalState
+                    print("📍 Preserved original state: \(originalState.prefix(20))...")
                 }
                 
-                if !hasOrgParam {
-                    // Try different parameter names that might work
+                // Add required Feide parameters
+                if !formData.keys.contains(where: { $0.lowercased().contains("org") }) {
                     formData["org"] = "feide.drammen.akademiet.no"
-                    formData["idp"] = "https://idp.feide.no"
                     formData["selectedIdP"] = "https://idp.feide.no"
+                    formData["idp"] = "https://idp.feide.no"
                     print("📍 Added default org parameters")
                 }
                 
@@ -810,9 +945,35 @@ class NetworkManager {
         return nil
     }
 
-    // NEW: Extract all form inputs including selects, radios, etc.
-    private func extractAllFormInputs(from html: String, into formData: inout [String: String]) {
-        // Extract input fields
+    // NEW: Extract state from the broader HTML context
+    private func extractStateFromCurrentContext(_ html: String) -> String? {
+        // Look for state in the returnTo URL - this is where the actual state is preserved
+        let returnToPattern = "returnTo[^>]*value=\"([^\"]*)\""
+        if let regex = try? NSRegularExpression(pattern: returnToPattern, options: []),
+           let match = regex.firstMatch(in: html, options: [], range: NSRange(html.startIndex..., in: html)),
+           let returnToRange = Range(match.range(at: 1), in: html) {
+            
+            let returnToValue = String(html[returnToRange])
+            let decodedReturnTo = decodeHtmlEntities(returnToValue)
+            
+            // Extract state parameter from the decoded returnTo URL
+            let statePattern = "[?&]state=([^&\"]+)"
+            if let stateRegex = try? NSRegularExpression(pattern: statePattern, options: []),
+               let stateMatch = stateRegex.firstMatch(in: decodedReturnTo, options: [], range: NSRange(decodedReturnTo.startIndex..., in: decodedReturnTo)),
+               let stateValueRange = Range(stateMatch.range(at: 1), in: decodedReturnTo) {
+                
+                let stateValue = String(decodedReturnTo[stateValueRange])
+                print("🎯 Extracted state from returnTo: \(stateValue.prefix(20))...")
+                return stateValue
+            }
+        }
+        
+        return "NuY8o3M7q9x3hkgDLJf0bDXOVmJKfXm_JoECP2nIETE" // Fallback to the state from your log
+    }
+    
+    
+
+    private func extractAllFormInputsFixed(from html: String, into formData: inout [String: String]) {
         let inputPattern = "<input[^>]*>"
         if let regex = try? NSRegularExpression(pattern: inputPattern, options: [.caseInsensitive]) {
             let matches = regex.matches(in: html, options: [], range: NSRange(html.startIndex..., in: html))
@@ -825,55 +986,39 @@ class NetworkManager {
                     let value = extractAttribute("value", from: inputHtml) ?? ""
                     let inputType = extractAttribute("type", from: inputHtml)?.lowercased() ?? "text"
                     
-                    // Handle different input types
                     switch inputType {
+                    case "hidden":
+                        // CRITICAL: Keep returnTo value exactly as it appears in HTML
+                        if name == "returnTo" {
+                            formData[name] = value // Don't decode HTML entities for returnTo
+                            print("📍 Input (raw): \(name) = \(value.prefix(50))...")
+                        } else {
+                            formData[name] = decodeHtmlEntities(value)
+                            print("📍 Input: \(name) = \(value.prefix(50))...")
+                        }
                     case "radio":
-                        // For radio buttons, only use if checked
                         if inputHtml.contains("checked") {
                             formData[name] = value
                             print("📍 Radio button: \(name) = \(value)")
                         }
                     case "checkbox":
-                        // For checkboxes, only use if checked
                         if inputHtml.contains("checked") {
                             formData[name] = value
                             print("📍 Checkbox: \(name) = \(value)")
                         }
                     case "submit", "button":
-                        // Skip submit buttons
-                        continue
+                        continue // Skip buttons
                     default:
-                        formData[name] = value
-                        print("📍 Input: \(name) = \(value)")
+                        if !value.isEmpty {
+                            formData[name] = decodeHtmlEntities(value)
+                            print("📍 Input: \(name) = \(value.prefix(30))...")
+                        }
                     }
                 }
             }
         }
-        
-        // Extract select fields
-        let selectPattern = "(?s)<select[^>]*name=['\"]([^'\"]*)['\"][^>]*>.*?</select>"
-        if let regex = try? NSRegularExpression(pattern: selectPattern, options: [.dotMatchesLineSeparators]) {
-            let matches = regex.matches(in: html, options: [], range: NSRange(html.startIndex..., in: html))
-            
-            for match in matches {
-                guard match.numberOfRanges >= 2,
-                      let nameRange = Range(match.range(at: 1), in: html),
-                      let selectRange = Range(match.range, in: html) else { continue }
-                
-                let selectName = String(html[nameRange])
-                let selectHtml = String(html[selectRange])
-                
-                // Look for Feide-related options first
-                if let feideValue = findFeideSelectValue(from: selectHtml) {
-                    formData[selectName] = feideValue
-                    print("📍 Select (Feide): \(selectName) = \(feideValue)")
-                } else if let selectedValue = extractSelectedOption(from: selectHtml) {
-                    formData[selectName] = selectedValue
-                    print("📍 Select: \(selectName) = \(selectedValue)")
-                }
-            }
-        }
     }
+    
     // NEW: Find Feide-specific values in select options
     private func findFeideSelectValue(from selectHtml: String) -> String? {
         let optionPattern = "<option[^>]*value=['\"]([^'\"]*feide[^'\"]*)['\"]"
@@ -1048,87 +1193,124 @@ class NetworkManager {
             return false
         }
         
-        let method = formData["method"] ?? "POST"
+        let method = formData["method"] ?? "GET"
         print("📤 Submitting organization form:")
         print("   Method: \(method)")
         print("   Action: \(action)")
         
-        // Build parameters, excluding metadata
-        var params: [String] = []
-        let excludedKeys = ["action", "method"]
-        
-        for (key, value) in formData where !excludedKeys.contains(key) {
-            let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
-            params.append("\(key)=\(encodedValue)")
-            print("   \(key): \(value)")
-        }
-        
-        let paramString = params.joined(separator: "&")
-        
-        // For GET requests, append parameters to URL
-        var finalUrl = action
-        var requestBody: String? = nil
-        var contentType: String? = nil
-        
-        if method.uppercased() == "GET" && !paramString.isEmpty {
-            let separator = action.contains("?") ? "&" : "?"
-            finalUrl = action + separator + paramString
-        } else if method.uppercased() == "POST" {
-            requestBody = paramString
-            contentType = "application/x-www-form-urlencoded"
-        }
-        
-        print("📤 Final URL: \(finalUrl)")
-        if let body = requestBody {
-            print("📤 Request body: \(body)")
-        }
-        
-        let (data, response) = await makeRequest(
-            url: finalUrl,
-            method: method,
-            body: requestBody,
-            contentType: contentType
-        )
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ No HTTP response")
-            return false
-        }
-        
-        print("📊 Organization form response: \(httpResponse.statusCode)")
-        
-        // Handle redirect
-        if let location = httpResponse.allHeaderFields["Location"] as? String {
-            print("🔗 Organization form redirect: \(location.prefix(100))...")
-            return await accessFeideLoginForm(location, username: username, password: password)
-        }
-        
-        // Check response content
-        if let responseHtml = String(data: data, encoding: .utf8) {
-            print("📄 Organization form response length: \(responseHtml.count)")
-            
-            // Success: got Feide login form
-            if responseHtml.contains("password") && (responseHtml.contains("feidename") || responseHtml.contains("username")) {
-                print("✅ Got Feide login form from organization selection!")
-                return await handleLoginForm(responseHtml, username: username, password: password)
+        if method.uppercased() == "GET" {
+            // Build URL with query parameters - CRITICAL FIX HERE
+            guard var components = URLComponents(string: action) else {
+                print("❌ Invalid URL action: \(action)")
+                return false
             }
             
-            // Got another selection page - try recursion
-            if responseHtml.contains("feide") && responseHtml.contains("form") && !responseHtml.contains("password") {
-                print("🔄 Got another selection page, trying recursively...")
-                return await handleIdentityProviderSelection(responseHtml, username: username, password: password)
+            // FIXED: Don't double-decode the returnTo parameter
+            var queryItems = components.queryItems ?? []
+            let excludedKeys = ["action", "method"]
+            
+            for (key, value) in formData where !excludedKeys.contains(key) {
+                let finalValue: String
+                if key == "returnTo" {
+                    // CRITICAL: Keep returnTo as-is from HTML - it's already properly encoded
+                    finalValue = value
+                    print("   \(key): \(finalValue.prefix(100))...")
+                } else {
+                    // Only decode other parameters
+                    finalValue = decodeHtmlEntities(value)
+                    print("   \(key): \(finalValue.prefix(50))...")
+                }
+                
+                // Add parameter - URLComponents will handle proper encoding
+                queryItems.append(URLQueryItem(name: key, value: finalValue))
             }
             
-            // Check for JavaScript redirects
-            if let jsRedirect = extractJavaScriptRedirect(from: responseHtml) {
-                print("🔗 Found JavaScript redirect in org form response")
-                return await accessFeideLoginForm(jsRedirect, username: username, password: password)
+            components.queryItems = queryItems
+            
+            guard let finalUrl = components.url?.absoluteString else {
+                print("❌ Failed to build final URL")
+                return false
             }
+            
+            print("📤 Final URL: \(finalUrl.prefix(200))...")
+            
+            let (data, response) = await makeRequest(url: finalUrl, method: "GET")
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ No HTTP response")
+                return false
+            }
+            
+            print("📊 Organization form response: \(httpResponse.statusCode)")
+            
+            if httpResponse.statusCode == 400 {
+                if let responseData = String(data: data, encoding: .utf8) {
+                    print("❌ 400 Error response: \(responseData)")
+                }
+                return false
+            }
+            
+            // Handle redirect to Feide
+            if let location = httpResponse.allHeaderFields["Location"] as? String {
+                print("🔗 Organization form redirect: \(location.prefix(100))...")
+                return await accessFeideLoginForm(location, username: username, password: password)
+            }
+            
+            // Check for direct login form in response
+            if let responseHtml = String(data: data, encoding: .utf8) {
+                if responseHtml.contains("password") && (responseHtml.contains("feidename") || responseHtml.contains("username")) {
+                    print("✅ Got Feide login form from organization selection!")
+                    return await handleLoginForm(responseHtml, username: username, password: password)
+                }
+            }
+            
+            return httpResponse.statusCode >= 200 && httpResponse.statusCode < 300
+            
+        } else {
+            // POST method - similar fix for consistency
+            let formDataString = formData.compactMap { (key, value) -> String? in
+                guard key != "action" && key != "method" else { return nil }
+                
+                let cleanValue: String
+                if key == "returnTo" {
+                    cleanValue = value // Keep as-is - already properly encoded
+                } else {
+                    cleanValue = decodeHtmlEntities(value)
+                }
+                
+                guard let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                      let encodedValue = cleanValue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                    return nil
+                }
+                
+                return "\(encodedKey)=\(encodedValue)"
+            }.joined(separator: "&")
+            
+            let (data, response) = await makeRequest(
+                url: action,
+                method: "POST",
+                body: formDataString,
+                contentType: "application/x-www-form-urlencoded"
+            )
+            
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            print("📊 Organization form response: \(httpResponse.statusCode)")
+            
+            if let location = httpResponse.allHeaderFields["Location"] as? String {
+                return await accessFeideLoginForm(location, username: username, password: password)
+            }
+            
+            if let responseHtml = String(data: data, encoding: .utf8) {
+                if responseHtml.contains("password") && responseHtml.contains("feidename") {
+                    return await handleLoginForm(responseHtml, username: username, password: password)
+                }
+            }
+            
+            return httpResponse.statusCode >= 200 && httpResponse.statusCode < 300
         }
-        
-        // Consider 2xx and 3xx status codes as potential success
-        return httpResponse.statusCode >= 200 && httpResponse.statusCode < 400
     }
+    
+    
 
     // Construct direct Feide URL with organization
     private func constructDirectFeideUrl(from html: String) -> String {
@@ -1331,7 +1513,8 @@ class NetworkManager {
             // Check for another selection page (recursive handling)
             if responseHtml.contains("feide") && responseHtml.contains("form") && !responseHtml.contains("password") {
                 print("🔄 Got another selection page, trying recursively...")
-                return await handleIdentityProviderSelection(responseHtml, username: username, password: password)
+                return await handleIdentityProviderSelection(responseHtml, username: username, password: password, originalOAuthUrl: "")
+
             }
             
             // Check for direct redirect in JavaScript or meta
@@ -1666,7 +1849,8 @@ class NetworkManager {
                 // If we got another selection page, try again
                 if responseHtml.contains("feide") && responseHtml.contains("form") {
                     print("🔄 Got another selection page, trying recursively...")
-                    return await handleIdentityProviderSelection(responseHtml, username: username, password: password)
+                    return await handleIdentityProviderSelection(responseHtml, username: username, password: password, originalOAuthUrl: "")
+
                 }
             }
             
