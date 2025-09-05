@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Linq;
 using System.Windows.Input;
+using System.Diagnostics;
 using Avalonia.Threading;
 
 namespace AkademiTrack.ViewModels
@@ -75,10 +76,11 @@ namespace AkademiTrack.ViewModels
             _httpClient = new HttpClient();
             _statusMessage = "Ready to start automation";
 
-            // Initialize simple commands
+            // Initialize commands
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync, () => !IsAutomationRunning);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync, () => IsAutomationRunning);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
+            GetCookiesCommand = new SimpleCommand(GetCookiesFromBrowserAsync);
         }
 
         public string Greeting { get; } = "AkademiTrack Automation System";
@@ -113,10 +115,11 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Commands
+        // Commands - All declared here
         public ICommand StartAutomationCommand { get; }
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand GetCookiesCommand { get; }
 
         // Thread-safe UI update methods
         private void UpdateStatus(string message)
@@ -143,6 +146,55 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private async Task GetCookiesFromBrowserAsync()
+        {
+            try
+            {
+                UpdateStatus("Opening browser for login. Please complete the login process...");
+
+                var loginUrl = "https://iskole.net/elev/?ojr=login";
+
+                try
+                {
+                    if (OperatingSystem.IsWindows())
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = loginUrl,
+                            UseShellExecute = true
+                        });
+                    }
+                    else if (OperatingSystem.IsMacOS())
+                    {
+                        Process.Start("open", loginUrl);
+                    }
+                    else if (OperatingSystem.IsLinux())
+                    {
+                        Process.Start("xdg-open", loginUrl);
+                    }
+
+                    UpdateStatus("Browser opened. After logging in, follow these steps:\n\n" +
+                               "1. Press F12 to open Developer Tools\n" +
+                               "2. Go to Application → Cookies → https://iskole.net\n" +
+                               "3. Find and copy these cookies:\n" +
+                               "   - JSESSIONID\n" +
+                               "   - _WL_AUTHCOOKIE_JSESSIONID\n" +
+                               "   - X-Oracle-BMC-LBS-Route\n" +
+                               "4. Click 'Settings' to open cookies.json file\n" +
+                               "5. Replace placeholder values with real cookie values\n" +
+                               "6. Click 'Start Automation'");
+                }
+                catch (Exception ex)
+                {
+                    UpdateStatus($"Could not open browser: {ex.Message}\n\nManually go to: {loginUrl}\n\nThen follow cookie extraction instructions above.");
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Error: {ex.Message}");
+            }
+        }
+
         private async Task StartAutomationAsync()
         {
             if (IsAutomationRunning)
@@ -155,7 +207,6 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Run the automation loop on a background thread
                 await Task.Run(() => RunAutomationLoop(_cancellationTokenSource.Token));
             }
             catch (OperationCanceledException)
@@ -183,8 +234,41 @@ namespace AkademiTrack.ViewModels
 
         private async Task OpenSettingsAsync()
         {
-            UpdateStatus("Settings window would open here");
-            // TODO: Implement settings window
+            const string cookiesPath = "cookies.json";
+
+            if (!File.Exists(cookiesPath))
+            {
+                await CreateSampleCookiesFileAsync(cookiesPath);
+                UpdateStatus($"Created sample cookies.json at: {Path.GetFullPath(cookiesPath)}");
+            }
+            else
+            {
+                UpdateStatus($"Opening cookies file location: {Path.GetFullPath(cookiesPath)}");
+            }
+
+            try
+            {
+                var fullPath = Path.GetFullPath(cookiesPath);
+                var directory = Path.GetDirectoryName(fullPath);
+
+                if (OperatingSystem.IsWindows())
+                {
+                    Process.Start("explorer.exe", directory);
+                }
+                else if (OperatingSystem.IsMacOS())
+                {
+                    Process.Start("open", directory);
+                }
+                else if (OperatingSystem.IsLinux())
+                {
+                    Process.Start("xdg-open", directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Could not open folder: {ex.Message}");
+            }
+
             await Task.CompletedTask;
         }
 
@@ -196,26 +280,23 @@ namespace AkademiTrack.ViewModels
                 {
                     UpdateStatus("Fetching schedule data...");
 
-                    // Get current week's data
                     var scheduleData = await GetScheduleDataAsync(cancellationToken);
 
                     if (scheduleData?.Items != null && scheduleData.Items.Any())
                     {
                         UpdateStatus($"Found {scheduleData.Items.Count} schedule items");
 
-                        // Process each schedule item
                         foreach (var item in scheduleData.Items)
                         {
                             if (cancellationToken.IsCancellationRequested)
                                 break;
 
-                            // Check if this is a current or upcoming class that needs attendance
                             if (ShouldMarkAttendance(item))
                             {
                                 UpdateStatus($"Marking attendance for {item.Fag} at {item.StartKl}");
                                 await MarkAttendanceAsync(item, cancellationToken);
                                 UpdateStatus($"Successfully marked attendance for {item.Fag}");
-                                await Task.Delay(2000, cancellationToken); // Small delay between requests
+                                await Task.Delay(2000, cancellationToken);
                             }
                         }
 
@@ -226,19 +307,17 @@ namespace AkademiTrack.ViewModels
                         UpdateStatus("No schedule data found");
                     }
 
-                    // Wait 5 minutes before next check
                     UpdateStatus("Waiting 5 minutes for next check...");
                     await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
                     UpdateStatus("Automation cancelled by user");
-                    throw; // Re-throw to exit the loop
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     UpdateStatus($"Error: {ex.Message}");
-                    // Wait 30 seconds before retry on error
                     await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
                 }
             }
@@ -251,21 +330,18 @@ namespace AkademiTrack.ViewModels
                 var cookies = await LoadCookiesFromFileAsync();
                 if (cookies == null || !cookies.Any())
                 {
-                    throw new Exception("Failed to load cookies from cookies.json. Make sure the file exists and contains valid cookies.");
+                    throw new Exception("Failed to load cookies from cookies.json. Use 'Get Cookies' button to extract cookies from browser.");
                 }
 
-                // Use current date for start, and 7 days later for end
                 var startDate = DateTime.Now.ToString("yyyyMMdd");
                 var endDate = DateTime.Now.AddDays(7).ToString("yyyyMMdd");
 
                 var baseUrl = "https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev";
                 var finder = $"RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312,startDate={startDate},endDate={endDate}";
-
                 var url = $"{baseUrl}?finder={Uri.EscapeDataString(finder)}&onlyData=true&limit=1000&totalResults=true";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
 
-                // Add headers
                 request.Headers.Add("Host", "iskole.net");
                 request.Headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
                 request.Headers.Add("Accept-Language", "no-NB");
@@ -281,7 +357,6 @@ namespace AkademiTrack.ViewModels
                 request.Headers.Add("Priority", "u=1, i");
                 request.Headers.Add("Connection", "keep-alive");
 
-                // Add cookies
                 var cookieString = string.Join("; ", cookies.Select(c => $"{c.Key}={c.Value}"));
                 request.Headers.Add("Cookie", cookieString);
 
@@ -321,9 +396,7 @@ namespace AkademiTrack.ViewModels
             var authCookie = cookies.GetValueOrDefault("_WL_AUTHCOOKIE_JSESSIONID", "");
             var oracleRoute = cookies.GetValueOrDefault("X-Oracle-BMC-LBS-Route", "");
 
-            // Clean JSESSIONID
             var jsessionIdClean = jsessionId.Split('!')[0];
-
             var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
 
             var payload = new
@@ -341,7 +414,7 @@ namespace AkademiTrack.ViewModels
                     new { k_navn = item.KNavn },
                     new { gruppe_nr = item.GruppeNr },
                     new { timenr = item.Timenr },
-                    new { fravaerstype = "M" }, // M for present
+                    new { fravaerstype = "M" },
                     new { ip = await GetPublicIpAsync() }
                 }
             };
@@ -351,7 +424,6 @@ namespace AkademiTrack.ViewModels
 
             var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
 
-            // Add headers
             request.Headers.Add("Host", "iskole.net");
             request.Headers.Add("Cookie", $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionIdClean}; _WL_AUTHCOOKIE_JSESSIONID={authCookie}");
             request.Headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
@@ -387,7 +459,8 @@ namespace AkademiTrack.ViewModels
 
                 if (!File.Exists(cookiesPath))
                 {
-                    throw new FileNotFoundException($"cookies.json file not found at: {Path.GetFullPath(cookiesPath)}");
+                    await CreateSampleCookiesFileAsync(cookiesPath);
+                    throw new FileNotFoundException($"Created cookies.json template at: {Path.GetFullPath(cookiesPath)}. Please use 'Get Cookies' button to get real cookies from browser.");
                 }
 
                 var jsonString = await File.ReadAllTextAsync(cookiesPath);
@@ -401,26 +474,41 @@ namespace AkademiTrack.ViewModels
 
                 if (cookiesArray == null || !cookiesArray.Any())
                 {
-                    throw new Exception("No cookies found in cookies.json or invalid format");
+                    throw new Exception("No cookies found in cookies.json");
                 }
 
                 var cookieDict = cookiesArray.ToDictionary(c => c.Name, c => c.Value);
 
-                // Verify essential cookies are present
                 var requiredCookies = new[] { "JSESSIONID", "_WL_AUTHCOOKIE_JSESSIONID" };
-                var missingCookies = requiredCookies.Where(rc => !cookieDict.ContainsKey(rc)).ToArray();
+                var invalidCookies = requiredCookies.Where(rc => !cookieDict.ContainsKey(rc) ||
+                    cookieDict[rc].StartsWith("YOUR_") ||
+                    string.IsNullOrWhiteSpace(cookieDict[rc])).ToArray();
 
-                if (missingCookies.Any())
+                if (invalidCookies.Any())
                 {
-                    throw new Exception($"Missing required cookies: {string.Join(", ", missingCookies)}");
+                    throw new Exception($"Invalid cookies detected: {string.Join(", ", invalidCookies)}. Please use 'Get Cookies' button to extract real cookies from browser.");
                 }
 
                 return cookieDict;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error loading cookies: {ex.Message}", ex);
+                throw new Exception($"Cookie error: {ex.Message}", ex);
             }
+        }
+
+        private async Task CreateSampleCookiesFileAsync(string cookiesPath)
+        {
+            var sampleCookies = new Cookie[]
+            {
+                new Cookie { Name = "JSESSIONID", Value = "YOUR_JSESSIONID_HERE" },
+                new Cookie { Name = "_WL_AUTHCOOKIE_JSESSIONID", Value = "YOUR_WL_AUTHCOOKIE_JSESSIONID_HERE" },
+                new Cookie { Name = "X-Oracle-BMC-LBS-Route", Value = "YOUR_ORACLE_BMC_LBS_ROUTE_HERE" }
+            };
+
+            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+            var jsonString = JsonSerializer.Serialize(sampleCookies, jsonOptions);
+            await File.WriteAllTextAsync(cookiesPath, jsonString);
         }
 
         private async Task<string> GetPublicIpAsync()
@@ -432,7 +520,7 @@ namespace AkademiTrack.ViewModels
             }
             catch
             {
-                return "0.0.0.0"; // Fallback
+                return "0.0.0.0";
             }
         }
 
@@ -440,37 +528,24 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Parse the date and time
                 if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var itemDate))
                 {
-                    Console.WriteLine($"Could not parse date: {item.Dato}");
                     return false;
                 }
 
                 if (!TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
                 {
-                    Console.WriteLine($"Could not parse time: {item.StartKl}");
                     return false;
                 }
 
                 var classDateTime = itemDate.Add(startTime);
                 var now = DateTime.Now;
-
-                // Mark attendance if class is within the next 15 minutes or currently ongoing (up to 45 minutes after start)
                 var timeDiff = classDateTime - now;
 
-                bool shouldMark = timeDiff.TotalMinutes >= -45 && timeDiff.TotalMinutes <= 15;
-
-                if (shouldMark)
-                {
-                    Console.WriteLine($"Should mark attendance for {item.Fag} - Class time: {classDateTime}, Now: {now}, Diff: {timeDiff.TotalMinutes:F1} minutes");
-                }
-
-                return shouldMark;
+                return timeDiff.TotalMinutes >= -45 && timeDiff.TotalMinutes <= 15;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error in ShouldMarkAttendance: {ex.Message}");
                 return false;
             }
         }
@@ -482,7 +557,6 @@ namespace AkademiTrack.ViewModels
         }
     }
 
-    // Data models remain the same...
     public class Cookie
     {
         public string Name { get; set; }

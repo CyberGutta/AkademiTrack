@@ -10,7 +10,7 @@
         Title="AkademiTrack"
         Background="#F8F9FA"
         MinWidth="600"
-        MinHeight="400">
+        MinHeight="500">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel/>
@@ -62,6 +62,21 @@
 			<Setter Property="Background" Value="#545B62"/>
 		</Style>
 
+		<Style Selector="Button.cookies">
+			<Setter Property="Background" Value="#28A745"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="120"/>
+		</Style>
+
+		<Style Selector="Button.cookies:pointerover">
+			<Setter Property="Background" Value="#218838"/>
+		</Style>
+
 		<Style Selector="TextBlock.title">
 			<Setter Property="FontSize" Value="32"/>
 			<Setter Property="FontWeight" Value="Light"/>
@@ -107,12 +122,21 @@
                        IsEnabled="{Binding IsAutomationRunning}"/>
 			</StackPanel>
 
-			<!-- Settings Button -->
-			<Button Content="Settings"
-                   Classes="settings"
-                   HorizontalAlignment="Center"
-                   Command="{Binding OpenSettingsCommand}"
-                   Margin="0,16,0,0"/>
+			<!-- Cookie and Settings Buttons -->
+			<StackPanel Orientation="Horizontal"
+                       HorizontalAlignment="Center"
+                       Spacing="12">
+
+				<Button Content="Get Cookies"
+                       Classes="cookies"
+                       Command="{Binding GetCookiesCommand}"
+                       ToolTip.Tip="Extract cookies from browser after login"/>
+
+				<Button Content="Settings"
+                       Classes="settings"
+                       Command="{Binding OpenSettingsCommand}"
+                       ToolTip.Tip="Open cookies file location"/>
+			</StackPanel>
 
 			<!-- Status Section -->
 			<Border Background="White"
@@ -120,7 +144,8 @@
                    Padding="20"
                    Margin="0,20,0,0"
                    BorderThickness="1"
-                   BorderBrush="#E9ECEF">
+                   BorderBrush="#E9ECEF"
+                   MaxWidth="600">
 
 				<StackPanel Spacing="8">
 					<TextBlock Text="Status"
