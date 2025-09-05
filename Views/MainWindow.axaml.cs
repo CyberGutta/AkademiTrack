@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using AkademiTrack.ViewModels;
 
 namespace AkademiTrack.Views
 {
@@ -7,6 +8,7 @@ namespace AkademiTrack.Views
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new MainWindowViewModel();
         }
     }
 }

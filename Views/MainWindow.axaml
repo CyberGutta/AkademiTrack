@@ -7,14 +7,134 @@
         x:Class="AkademiTrack.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="AkademiTrack">
+        Title="AkademiTrack"
+        Background="#F8F9FA"
+        MinWidth="600"
+        MinHeight="400">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+	<Design.DataContext>
+		<vm:MainWindowViewModel/>
+	</Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+	<Window.Styles>
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#007ACC"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinWidth" Value="140"/>
+		</Style>
 
+		<Style Selector="Button.primary:pointerover">
+			<Setter Property="Background" Value="#005A9E"/>
+		</Style>
+
+		<Style Selector="Button.secondary">
+			<Setter Property="Background" Value="#DC3545"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinWidth" Value="140"/>
+		</Style>
+
+		<Style Selector="Button.secondary:pointerover">
+			<Setter Property="Background" Value="#B02A37"/>
+		</Style>
+
+		<Style Selector="Button.settings">
+			<Setter Property="Background" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="100"/>
+		</Style>
+
+		<Style Selector="Button.settings:pointerover">
+			<Setter Property="Background" Value="#545B62"/>
+		</Style>
+
+		<Style Selector="TextBlock.title">
+			<Setter Property="FontSize" Value="32"/>
+			<Setter Property="FontWeight" Value="Light"/>
+			<Setter Property="Foreground" Value="#212529"/>
+			<Setter Property="Margin" Value="0,0,0,8"/>
+		</Style>
+
+		<Style Selector="TextBlock.subtitle">
+			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Margin" Value="0,0,0,40"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid>
+		<StackPanel HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Spacing="20">
+
+			<!-- App Title -->
+			<TextBlock Text="AkademiTrack"
+                      Classes="title"
+                      HorizontalAlignment="Center"/>
+
+			<TextBlock Text="Academic Progress Automation"
+                      Classes="subtitle"
+                      HorizontalAlignment="Center"/>
+
+			<!-- Main Control Buttons -->
+			<StackPanel Orientation="Horizontal"
+                       HorizontalAlignment="Center"
+                       Spacing="16">
+
+				<Button Content="Start Automation"
+                       Classes="primary"
+                       Command="{Binding StartAutomationCommand}"
+                       IsEnabled="{Binding !IsAutomationRunning}"/>
+
+				<Button Content="Stop Automation"
+                       Classes="secondary"
+                       Command="{Binding StopAutomationCommand}"
+                       IsEnabled="{Binding IsAutomationRunning}"/>
+			</StackPanel>
+
+			<!-- Settings Button -->
+			<Button Content="Settings"
+                   Classes="settings"
+                   HorizontalAlignment="Center"
+                   Command="{Binding OpenSettingsCommand}"
+                   Margin="0,16,0,0"/>
+
+			<!-- Status Section -->
+			<Border Background="White"
+                   CornerRadius="8"
+                   Padding="20"
+                   Margin="0,20,0,0"
+                   BorderThickness="1"
+                   BorderBrush="#E9ECEF">
+
+				<StackPanel Spacing="8">
+					<TextBlock Text="Status"
+                              FontWeight="SemiBold"
+                              FontSize="14"
+                              Foreground="#495057"/>
+
+					<TextBlock Text="{Binding StatusMessage}"
+                              FontSize="14"
+                              Foreground="#6C757D"
+                              TextWrapping="Wrap"/>
+				</StackPanel>
+			</Border>
+
+		</StackPanel>
+	</Grid>
 </Window>
