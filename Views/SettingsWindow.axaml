@@ -1,0 +1,180 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AkademiTrack.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+        x:Class="AkademiTrack.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Settings - AkademiTrack"
+        Background="#F8F9FA"
+        Width="500"
+        Height="400"
+        MinWidth="450"
+        MinHeight="350"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner">
+
+	<Design.DataContext>
+		<vm:SettingsViewModel/>
+	</Design.DataContext>
+
+	<Window.Styles>
+		<!-- Settings Button Style -->
+		<Style Selector="Button.settings-action">
+			<Setter Property="Background" Value="#007ACC"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="120"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+		</Style>
+
+		<Style Selector="Button.settings-action:pointerover">
+			<Setter Property="Background" Value="#005A9E"/>
+		</Style>
+
+		<!-- Cancel/Close Button Style -->
+		<Style Selector="Button.cancel">
+			<Setter Property="Background" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="80"/>
+		</Style>
+
+		<Style Selector="Button.cancel:pointerover">
+			<Setter Property="Background" Value="#545B62"/>
+		</Style>
+
+		<!-- Section Headers -->
+		<Style Selector="TextBlock.section-header">
+			<Setter Property="FontSize" Value="18"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="#212529"/>
+			<Setter Property="Margin" Value="0,0,0,8"/>
+		</Style>
+
+		<!-- Setting Item Headers -->
+		<Style Selector="TextBlock.setting-title">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="#495057"/>
+			<Setter Property="Margin" Value="0,0,0,4"/>
+		</Style>
+
+		<!-- Setting Descriptions -->
+		<Style Selector="TextBlock.setting-description">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Margin" Value="0,0,0,8"/>
+		</Style>
+
+		<!-- Info Panel Style -->
+		<Style Selector="Border.info-panel">
+			<Setter Property="Background" Value="#E7F3FF"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="12"/>
+		</Style>
+
+		<!-- Setting Item Container -->
+		<Style Selector="Border.setting-item">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#E9ECEF"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid Margin="20">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<!-- Header -->
+		<StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,20">
+			<TextBlock Text="Settings"
+                      FontSize="28"
+                      FontWeight="Light"
+                      Foreground="#212529"/>
+			<TextBlock Text="Configure AkademiTrack preferences and file locations"
+                      FontSize="14"
+                      Foreground="#6C757D"/>
+		</StackPanel>
+
+		<!-- Main Content -->
+		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+			<StackPanel Spacing="16">
+
+				<!-- File Management Section -->
+				<TextBlock Text="File Management" Classes="section-header"/>
+
+				<!-- Open Program Folder Setting -->
+				<Border Classes="setting-item">
+					<StackPanel Spacing="8">
+						<TextBlock Text="Program Files" Classes="setting-title"/>
+						<TextBlock Text="Access the program directory where cookies and configuration files are stored."
+                                  Classes="setting-description"/>
+						<Button Content="Open Program Folder"
+                               Classes="settings-action"
+                               Command="{Binding OpenProgramFolderCommand}"
+                               ToolTip.Tip="Opens the folder where AkademiTrack stores its files"/>
+					</StackPanel>
+				</Border>
+
+				<!-- Application Info Section -->
+				<TextBlock Text="Application Information" Classes="section-header"/>
+
+				<Border Classes="info-panel">
+					<StackPanel Spacing="6">
+						<TextBlock Text="Application Details"
+                                  FontWeight="SemiBold"
+                                  FontSize="13"
+                                  Foreground="#007ACC"/>
+						<TextBlock Text="{Binding ApplicationInfo}"
+                                  FontSize="12"
+                                  Foreground="#495057"
+                                  TextWrapping="Wrap"/>
+					</StackPanel>
+				</Border>
+
+				<!-- Future Settings Placeholder -->
+				<Border Classes="setting-item" Opacity="0.6">
+					<StackPanel Spacing="8">
+						<TextBlock Text="Additional Settings" Classes="setting-title"/>
+						<TextBlock Text="More configuration options will be added in future updates."
+                                  Classes="setting-description"/>
+					</StackPanel>
+				</Border>
+
+			</StackPanel>
+		</ScrollViewer>
+
+		<!-- Footer Buttons -->
+		<StackPanel Grid.Row="2"
+                   Orientation="Horizontal"
+                   HorizontalAlignment="Right"
+                   Spacing="12"
+                   Margin="0,20,0,0">
+			<Button Content="Close"
+                   Classes="cancel"
+                   Command="{Binding CloseCommand}"
+                   IsDefault="True"/>
+		</StackPanel>
+
+	</Grid>
+</Window>

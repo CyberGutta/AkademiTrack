@@ -1,21 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Text.Json;
-using System.Text;
-using System.Threading;
-using System.Linq;
-using System.Windows.Input;
-using System.Diagnostics;
+﻿using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using WebDriverManager.DriverConfigs.Impl;
-using WebDriverManager;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using WebDriverManager;
+using WebDriverManager.DriverConfigs.Impl;
 
 namespace AkademiTrack.ViewModels
 {
@@ -730,39 +732,24 @@ namespace AkademiTrack.ViewModels
 
         private async Task OpenSettingsAsync()
         {
-            const string cookiesPath = "cookies.json";
-
-            if (!File.Exists(cookiesPath))
-            {
-                await CreateSampleCookiesFileAsync(cookiesPath);
-                UpdateStatus($"Created sample cookies.json at: {Path.GetFullPath(cookiesPath)}");
-            }
-            else
-            {
-                UpdateStatus($"Opening cookies file location: {Path.GetFullPath(cookiesPath)}");
-            }
-
             try
             {
-                var fullPath = Path.GetFullPath(cookiesPath);
-                var directory = Path.GetDirectoryName(fullPath);
+                // Create and show the settings window
+                var settingsWindow = new AkademiTrack.Views.SettingsWindow();
 
-                if (OperatingSystem.IsWindows())
-                {
-                    Process.Start("explorer.exe", directory);
-                }
-                else if (OperatingSystem.IsMacOS())
-                {
-                    Process.Start("open", directory);
-                }
-                else if (OperatingSystem.IsLinux())
-                {
-                    Process.Start("xdg-open", directory);
-                }
+                // If you want it to be modal (blocks interaction with main window)
+                await settingsWindow.ShowDialog(Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.MainWindow
+                    : null);
+
+                // If you want it to be non-modal (both windows can be used simultaneously)
+                // settingsWindow.Show();
+
+                UpdateStatus("Settings window opened");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Could not open folder: {ex.Message}");
+                UpdateStatus($"Error opening settings: {ex.Message}");
             }
 
             await Task.CompletedTask;
