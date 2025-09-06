@@ -35,7 +35,7 @@
 			<Setter Property="Padding" Value="20,12"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="MinWidth" Value="160"/>
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
@@ -63,7 +63,7 @@
 			<Setter Property="Padding" Value="20,12"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="MinWidth" Value="160"/>
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
@@ -90,26 +90,11 @@
 			<Setter Property="Padding" Value="16,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="100"/>
+			<Setter Property="MinWidth" Value="120"/>
 		</Style>
 
 		<Style Selector="Button.settings:pointerover">
 			<Setter Property="Background" Value="#545B62"/>
-		</Style>
-
-		<Style Selector="Button.cookies">
-			<Setter Property="Background" Value="#28A745"/>
-			<Setter Property="Foreground" Value="White"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="16,10"/>
-			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="120"/>
-		</Style>
-
-		<Style Selector="Button.cookies:pointerover">
-			<Setter Property="Background" Value="#218838"/>
 		</Style>
 
 		<Style Selector="TextBlock.title">
@@ -125,6 +110,14 @@
 			<Setter Property="Foreground" Value="#6C757D"/>
 			<Setter Property="Margin" Value="0,0,0,40"/>
 		</Style>
+
+		<Style Selector="TextBlock.info">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Margin" Value="0,0,0,20"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+		</Style>
 	</Window.Styles>
 
 	<Grid>
@@ -137,47 +130,43 @@
                       Classes="title"
                       HorizontalAlignment="Center"/>
 
-			<TextBlock Text="Academic Progress Automation"
+			<TextBlock Text="Automated Attendance System"
                       Classes="subtitle"
                       HorizontalAlignment="Center"/>
 
-			<!-- Main Control Buttons - BOTH ALWAYS VISIBLE -->
+			<!-- Info Text -->
+			<TextBlock Text="Click Start to begin automated attendance monitoring.&#x0a;The system will handle login and cookie management automatically."
+                      Classes="info"
+                      HorizontalAlignment="Center"
+                      TextWrapping="Wrap"
+                      MaxWidth="500"/>
+
+			<!-- Main Control Buttons - Simplified to just Start/Stop -->
 			<StackPanel Orientation="Horizontal"
                        HorizontalAlignment="Center"
                        Spacing="16">
 
-				<!-- Start button - disabled when automation is running -->
+				<!-- Start button - handles everything including login -->
 				<Button Content="Start Automation"
                        Classes="start-button"
                        Command="{Binding StartAutomationCommand}"
-                       IsEnabled="{Binding !IsAutomationRunning}"/>
+                       IsEnabled="{Binding !IsAutomationRunning}"
+                       ToolTip.Tip="Starts automation with automatic login and cookie management"/>
 
-				<!-- Stop button - disabled when automation is NOT running -->
+				<!-- Stop button -->
 				<Button Content="Stop Automation"
                        Classes="stop-button"
                        Command="{Binding StopAutomationCommand}"
-                       IsEnabled="{Binding IsAutomationRunning}"/>
+                       IsEnabled="{Binding IsAutomationRunning}"
+                       ToolTip.Tip="Stops the automation process"/>
 			</StackPanel>
 
-			<!-- Cookie and Settings Buttons -->
-			<StackPanel Orientation="Horizontal"
-                       HorizontalAlignment="Center"
-                       Spacing="12">
-
-				<Button Content="Login and Extract"
-                       Classes="cookies"
-                       Command="{Binding LoginAndExtractCommand}"
-                       ToolTip.Tip="Open browser to login and extract fresh cookies"/>
-
-				<Button Content="Get Cookies"
-                       Classes="cookies"
-                       Command="{Binding GetCookiesCommand}"
-                       ToolTip.Tip="Check existing cookies or extract new ones"/>
-
-				<Button Content="Settings"
+			<!-- Settings Button - Only for advanced users -->
+			<StackPanel HorizontalAlignment="Center">
+				<Button Content="Advanced Settings"
                        Classes="settings"
                        Command="{Binding OpenSettingsCommand}"
-                       ToolTip.Tip="Open cookies file location"/>
+                       ToolTip.Tip="Open cookies file location for manual configuration"/>
 			</StackPanel>
 
 			<!-- Status Section -->
@@ -195,7 +184,7 @@
                               FontSize="14"
                               Foreground="#495057"/>
 
-					<ScrollViewer MaxHeight="200"
+					<ScrollViewer MaxHeight="250"
                                  VerticalScrollBarVisibility="Auto">
 						<TextBlock Text="{Binding StatusMessage}"
                                   FontSize="14"

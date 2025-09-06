@@ -82,14 +82,12 @@ namespace AkademiTrack.ViewModels
         {
             _httpClient = new HttpClient();
             _statusMessage = "Ready to start automation";
-            _isAutomationRunning = false; // Explicitly set initial state
+            _isAutomationRunning = false;
 
-            // Initialize commands - they will always be present, UI binding controls enabled state
+            // Initialize commands - simplified interface
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
-            GetCookiesCommand = new SimpleCommand(GetFreshCookiesAsync);
-            LoginAndExtractCommand = new SimpleCommand(LoginAndExtractCookiesAsync);
         }
 
         public string Greeting { get; } = "AkademiTrack Automation System";
@@ -129,8 +127,6 @@ namespace AkademiTrack.ViewModels
 
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
-        public ICommand GetCookiesCommand { get; }
-        public ICommand LoginAndExtractCommand { get; }
 
         // Thread-safe UI update methods
         private void UpdateStatus(string message)
@@ -611,13 +607,102 @@ namespace AkademiTrack.ViewModels
             if (IsAutomationRunning)
                 return;
 
-            _cancellationTokenSource = new CancellationTokenSource();
-
             UpdateAutomationState(true);
-            UpdateStatus("Starting automation...");
+            UpdateStatus("Initializing automation...");
 
             try
             {
+                // Step 1: Check if we have valid cookies
+                UpdateStatus("[1/3] Checking authentication cookies...");
+                var existingCookies = await LoadExistingCookiesAsync();
+
+                if (existingCookies == null)
+                {
+                    UpdateStatus("[1/3] No valid cookies found. Starting browser login process...");
+
+                    // Automatically extract cookies through browser login
+                    try
+                    {
+                        await LoginAndExtractCookiesAsync();
+
+                        // Verify cookies were extracted successfully
+                        var newCookies = await LoadExistingCookiesAsync();
+                        if (newCookies == null)
+                        {
+                            UpdateStatus("FAILED: Cookie extraction unsuccessful. Cannot start automation without authentication.");
+                            UpdateAutomationState(false);
+                            return;
+                        }
+
+                        UpdateStatus("[1/3] SUCCESS: Authentication cookies obtained!");
+                    }
+                    catch (Exception ex)
+                    {
+                        UpdateStatus($"FAILED: Cookie extraction failed - {ex.Message}");
+                        UpdateStatus("Cannot start automation without valid authentication cookies.");
+                        UpdateAutomationState(false);
+                        return;
+                    }
+                }
+                else
+                {
+                    UpdateStatus("[1/3] Valid authentication cookies found!");
+                }
+
+                // Step 2: Test cookie validity with a quick API call
+                UpdateStatus("[2/3] Validating authentication with server...");
+                try
+                {
+                    var testSchedule = await GetScheduleDataAsync(CancellationToken.None);
+                    if (testSchedule?.Items == null)
+                    {
+                        UpdateStatus("[2/3] Authentication test failed. Refreshing cookies...");
+
+                        // Cookies might be expired, try to get fresh ones
+                        await LoginAndExtractCookiesAsync();
+                        var refreshedCookies = await LoadExistingCookiesAsync();
+
+                        if (refreshedCookies == null)
+                        {
+                            UpdateStatus("FAILED: Unable to refresh authentication. Automation cannot start.");
+                            UpdateAutomationState(false);
+                            return;
+                        }
+
+                        // Test again with fresh cookies
+                        testSchedule = await GetScheduleDataAsync(CancellationToken.None);
+                        if (testSchedule?.Items == null)
+                        {
+                            UpdateStatus("FAILED: Authentication still invalid after refresh. Please check your login credentials.");
+                            UpdateAutomationState(false);
+                            return;
+                        }
+                    }
+
+                    UpdateStatus("[2/3] Authentication validated successfully!");
+                }
+                catch (Exception ex)
+                {
+                    UpdateStatus($"[2/3] Authentication validation failed: {ex.Message}");
+                    UpdateStatus("Attempting to refresh authentication...");
+
+                    try
+                    {
+                        await LoginAndExtractCookiesAsync();
+                        UpdateStatus("[2/3] Authentication refreshed. Proceeding with automation...");
+                    }
+                    catch (Exception refreshEx)
+                    {
+                        UpdateStatus($"FAILED: Cannot refresh authentication - {refreshEx.Message}");
+                        UpdateAutomationState(false);
+                        return;
+                    }
+                }
+
+                // Step 3: Start the main automation loop
+                UpdateStatus("[3/3] Starting automated attendance monitoring...");
+                _cancellationTokenSource = new CancellationTokenSource();
+
                 await Task.Run(() => RunAutomationLoop(_cancellationTokenSource.Token));
             }
             catch (OperationCanceledException)
@@ -626,7 +711,7 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Automation error: {ex.Message}");
+                UpdateStatus($"Automation startup error: {ex.Message}");
             }
             finally
             {
