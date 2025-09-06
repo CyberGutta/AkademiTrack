@@ -11,6 +11,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -161,7 +162,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if (OperatingSystem.IsWindows())
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     var process = new Process
                     {
@@ -186,14 +187,34 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                var chromeExecutables = new[]
+                // Chrome executable paths for different platforms
+                var chromeExecutables = new List<string>();
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    @"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                    @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                    "/usr/bin/google-chrome",
-                    "/usr/bin/chromium-browser"
-                };
+                    chromeExecutables.AddRange(new[]
+                    {
+                        @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                        @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+                    });
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    chromeExecutables.AddRange(new[]
+                    {
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                        "/Applications/Chromium.app/Contents/MacOS/Chromium"
+                    });
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    chromeExecutables.AddRange(new[]
+                    {
+                        "/usr/bin/google-chrome",
+                        "/usr/bin/chromium-browser",
+                        "/usr/bin/google-chrome-stable"
+                    });
+                }
 
                 foreach (var chromePath in chromeExecutables)
                 {
@@ -231,16 +252,44 @@ namespace AkademiTrack.ViewModels
             return null;
         }
 
-        private async Task<bool> DownloadChromeDriverForChrome140Async()
+        private async Task<bool> DownloadChromeDriverAsync(string chromeVersion)
         {
             try
             {
-                UpdateStatus("Downloading ChromeDriver 140 for your Chrome version...");
+                UpdateStatus($"Downloading ChromeDriver for Chrome {chromeVersion}...");
 
-                var driverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+                var driverFileName = GetChromeDriverFileName();
+                var driverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, driverFileName);
 
-                // For Chrome 140, we need to get ChromeDriver from the new Chrome for Testing API
-                var chromeDriverUrl = "https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/win64/chromedriver-win64.zip";
+                // Determine the correct ChromeDriver URL based on platform and Chrome version
+                string chromeDriverUrl;
+                string platformFolder;
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    platformFolder = "win64";
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    // Check if it's Apple Silicon or Intel Mac
+                    var arch = RuntimeInformation.OSArchitecture;
+                    platformFolder = arch == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
+                }
+                else
+                {
+                    platformFolder = "linux64";
+                }
+
+                // For Chrome 140+, use the new Chrome for Testing API
+                if (chromeVersion.StartsWith("140."))
+                {
+                    chromeDriverUrl = $"https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/{platformFolder}/chromedriver-{platformFolder}.zip";
+                }
+                else
+                {
+                    // For older versions, try the legacy approach
+                    chromeDriverUrl = $"https://storage.googleapis.com/chrome-for-testing-public/{chromeVersion}/{platformFolder}/chromedriver-{platformFolder}.zip";
+                }
 
                 using var httpClient = new HttpClient();
                 httpClient.Timeout = TimeSpan.FromMinutes(5);
@@ -248,19 +297,37 @@ namespace AkademiTrack.ViewModels
                 UpdateStatus("Downloading ChromeDriver zip file...");
                 var zipBytes = await httpClient.GetByteArrayAsync(chromeDriverUrl);
 
-                var tempZipPath = Path.Combine(Path.GetTempPath(), "chromedriver_140.zip");
+                var tempZipPath = Path.Combine(Path.GetTempPath(), "chromedriver.zip");
                 await File.WriteAllBytesAsync(tempZipPath, zipBytes);
 
                 UpdateStatus("Extracting ChromeDriver...");
 
-                // Extract the chromedriver.exe from the zip
-                using (var archive = System.IO.Compression.ZipFile.OpenRead(tempZipPath))
+                // Extract the chromedriver from the zip
+                using (var archive = ZipFile.OpenRead(tempZipPath))
                 {
-                    var driverEntry = archive.Entries.FirstOrDefault(e => e.Name == "chromedriver.exe");
+                    var driverEntry = archive.Entries.FirstOrDefault(e => e.Name.StartsWith("chromedriver"));
                     if (driverEntry != null)
                     {
                         driverEntry.ExtractToFile(driverPath, overwrite: true);
-                        UpdateStatus("ChromeDriver 140 downloaded and extracted successfully!");
+                        
+                        // On Unix systems, make the file executable
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            var chmod = new Process
+                            {
+                                StartInfo = new ProcessStartInfo
+                                {
+                                    FileName = "chmod",
+                                    Arguments = $"+x \"{driverPath}\"",
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                }
+                            };
+                            chmod.Start();
+                            chmod.WaitForExit();
+                        }
+                        
+                        UpdateStatus($"ChromeDriver downloaded and extracted successfully to {driverPath}!");
 
                         // Clean up temp file
                         File.Delete(tempZipPath);
@@ -268,15 +335,20 @@ namespace AkademiTrack.ViewModels
                     }
                     else
                     {
-                        throw new Exception("chromedriver.exe not found in downloaded zip");
+                        throw new Exception("chromedriver not found in downloaded zip");
                     }
                 }
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Failed to download ChromeDriver 140: {ex.Message}");
+                UpdateStatus($"Failed to download ChromeDriver: {ex.Message}");
                 return false;
             }
+        }
+
+        private string GetChromeDriverFileName()
+        {
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "chromedriver.exe" : "chromedriver";
         }
 
         private async Task SetupChromeDriverAsync()
@@ -288,33 +360,48 @@ namespace AkademiTrack.ViewModels
                 var chromeVersion = await GetChromeVersionAsync();
                 UpdateStatus($"Detected Chrome version: {chromeVersion ?? "Unknown"}");
 
-                // First, check if local chromedriver.exe exists and is working
-                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+                var driverFileName = GetChromeDriverFileName();
+                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, driverFileName);
+
+                // First, check if local chromedriver exists and is working
                 if (File.Exists(localDriverPath))
                 {
-                    UpdateStatus("Found local chromedriver.exe, testing compatibility...");
+                    UpdateStatus("Found local chromedriver, testing compatibility...");
 
                     try
                     {
                         // Test the local driver
-                        var testService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory);
+                        var testService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory, driverFileName);
                         testService.HideCommandPromptWindow = true;
+                        
+                        // macOS specific: Set a custom port to avoid conflicts
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                        {
+                            testService.Port = GetAvailablePort();
+                        }
 
                         var testOptions = new ChromeOptions();
                         testOptions.AddArgument("--headless");
                         testOptions.AddArgument("--no-sandbox");
                         testOptions.AddArgument("--disable-dev-shm-usage");
+                        
+                        // macOS specific arguments
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                        {
+                            testOptions.AddArgument("--disable-gpu");
+                            testOptions.AddArgument("--remote-debugging-port=0");
+                        }
 
-                        using (var testDriver = new ChromeDriver(testService, testOptions, TimeSpan.FromSeconds(10)))
+                        using (var testDriver = new ChromeDriver(testService, testOptions, TimeSpan.FromSeconds(30)))
                         {
                             testDriver.Navigate().GoToUrl("about:blank");
-                            UpdateStatus("Local chromedriver.exe is working correctly!");
+                            UpdateStatus("Local chromedriver is working correctly!");
                             return;
                         }
                     }
                     catch (Exception ex)
                     {
-                        UpdateStatus($"Local chromedriver.exe failed test: {ex.Message}");
+                        UpdateStatus($"Local chromedriver failed test: {ex.Message}");
                         UpdateStatus("Will attempt to download correct version...");
 
                         // Delete the incompatible driver
@@ -326,10 +413,10 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // For Chrome 140, try direct download first
-                if (chromeVersion?.StartsWith("140.") == true)
+                // Try to download the correct ChromeDriver version
+                if (!string.IsNullOrEmpty(chromeVersion))
                 {
-                    var downloadSuccess = await DownloadChromeDriverForChrome140Async();
+                    var downloadSuccess = await DownloadChromeDriverAsync(chromeVersion);
                     if (downloadSuccess)
                     {
                         return;
@@ -354,38 +441,81 @@ namespace AkademiTrack.ViewModels
                 }
 
                 // If everything failed, provide manual instructions
-                var majorVersion = !string.IsNullOrEmpty(chromeVersion) ? chromeVersion.Split('.')[0] : "140";
-
-                var detailedInstructions = $@"ChromeDriver setup failed. Manual setup required:
-
-CHROME VERSION DETECTED: {chromeVersion ?? "Could not detect"}
-MAJOR VERSION: {majorVersion}
-
-MANUAL SETUP STEPS FOR CHROME 140:
-1. Go to https://googlechromelabs.github.io/chrome-for-testing/
-2. Find ChromeDriver version 140.0.7339.81 (matches your Chrome exactly)
-3. Download the win64 version
-4. Extract chromedriver.exe from the zip file
-5. Place chromedriver.exe in this application's folder:
-   {AppDomain.CurrentDomain.BaseDirectory}
-6. Restart the application and try again
-
-ALTERNATIVE - DOWNLOAD LINK:
-https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/win64/chromedriver-win64.zip
-
-CURRENT FOLDER: {AppDomain.CurrentDomain.BaseDirectory}
-EXPECTED FILE: chromedriver.exe
-
-ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
-
-                UpdateStatus(detailedInstructions);
-                throw new Exception(detailedInstructions);
+                var platformInstructions = GetPlatformSpecificInstructions(chromeVersion);
+                UpdateStatus(platformInstructions);
+                throw new Exception(platformInstructions);
             }
             catch (Exception ex)
             {
                 UpdateStatus($"ChromeDriver setup completely failed: {ex.Message}");
                 throw new Exception($"ChromeDriver setup failed: {ex.Message}", ex);
             }
+        }
+
+        private string GetPlatformSpecificInstructions(string chromeVersion)
+        {
+            var majorVersion = !string.IsNullOrEmpty(chromeVersion) ? chromeVersion.Split('.')[0] : "140";
+            var driverFileName = GetChromeDriverFileName();
+            var currentFolder = AppDomain.CurrentDomain.BaseDirectory;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                var arch = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "mac-arm64" : "mac-x64";
+                return $@"ChromeDriver setup failed. Manual setup required for macOS:
+
+CHROME VERSION DETECTED: {chromeVersion ?? "Could not detect"}
+ARCHITECTURE: {arch}
+
+MANUAL SETUP STEPS FOR macOS:
+1. Go to https://googlechromelabs.github.io/chrome-for-testing/
+2. Find ChromeDriver version {chromeVersion ?? "140.0.7339.81"} for {arch}
+3. Download the {arch} version
+4. Extract chromedriver from the zip file
+5. Place chromedriver (no .exe extension) in this application's folder:
+   {currentFolder}
+6. Open Terminal and run: chmod +x ""{Path.Combine(currentFolder, "chromedriver")}""
+7. Run the application with: xattr -d com.apple.quarantine ""{Path.Combine(currentFolder, "chromedriver")}""
+8. Restart the application and try again
+
+DOWNLOAD LINK:
+https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/{arch}/chromedriver-{arch}.zip
+
+CURRENT FOLDER: {currentFolder}
+EXPECTED FILE: {driverFileName}
+
+TROUBLESHOOTING:
+- If you get 'cannot be opened because the developer cannot be verified', run:
+  xattr -d com.apple.quarantine ""{Path.Combine(currentFolder, "chromedriver")}""
+- Make sure chromedriver has execute permissions: chmod +x chromedriver";
+            }
+            else
+            {
+                return $@"ChromeDriver setup failed. Manual setup required:
+
+CHROME VERSION DETECTED: {chromeVersion ?? "Could not detect"}
+MAJOR VERSION: {majorVersion}
+
+MANUAL SETUP STEPS:
+1. Go to https://googlechromelabs.github.io/chrome-for-testing/
+2. Find ChromeDriver version {chromeVersion ?? "140.0.7339.81"} (matches your Chrome exactly)
+3. Download the correct platform version
+4. Extract {driverFileName} from the zip file
+5. Place {driverFileName} in this application's folder:
+   {currentFolder}
+6. Restart the application and try again
+
+CURRENT FOLDER: {currentFolder}
+EXPECTED FILE: {driverFileName}";
+            }
+        }
+
+        private int GetAvailablePort()
+        {
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
         }
 
         private async Task LoginAndExtractCookiesAsync()
@@ -397,11 +527,12 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
 
                 // Create Chrome service with proper configuration
                 ChromeDriverService chromeDriverService;
-                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+                var driverFileName = GetChromeDriverFileName();
+                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, driverFileName);
 
                 if (File.Exists(localDriverPath))
                 {
-                    chromeDriverService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory);
+                    chromeDriverService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory, driverFileName);
                 }
                 else
                 {
@@ -410,8 +541,15 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
 
                 chromeDriverService.HideCommandPromptWindow = true;
                 chromeDriverService.SuppressInitialDiagnosticInformation = true;
+                
+                // macOS specific: Use a custom port to avoid conflicts
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    chromeDriverService.Port = GetAvailablePort();
+                    UpdateStatus($"Using port {chromeDriverService.Port} for ChromeDriver on macOS");
+                }
 
-                // Enhanced Chrome options for Chrome 140 compatibility
+                // Enhanced Chrome options with platform-specific settings
                 var chromeOptions = new ChromeOptions();
 
                 // Essential stability options
@@ -419,19 +557,32 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                 chromeOptions.AddArgument("--disable-dev-shm-usage");
                 chromeOptions.AddArgument("--disable-blink-features=AutomationControlled");
                 chromeOptions.AddArgument("--log-level=3");
-                chromeOptions.AddArgument("--disable-gpu");
                 chromeOptions.AddArgument("--disable-extensions");
                 chromeOptions.AddArgument("--no-first-run");
                 chromeOptions.AddArgument("--disable-default-apps");
+
+                // Platform-specific options
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    // macOS specific options
+                    chromeOptions.AddArgument("--disable-gpu");
+                    chromeOptions.AddArgument("--remote-debugging-port=0"); // Let Chrome choose the port
+                    chromeOptions.AddArgument("--disable-web-security");
+                    chromeOptions.AddArgument("--allow-running-insecure-content");
+                    chromeOptions.AddArgument("--disable-features=VizDisplayCompositor,MacV2GPUSandbox");
+                }
+                else
+                {
+                    chromeOptions.AddArgument("--disable-gpu");
+                }
 
                 // CRITICAL: Add this to prevent immediate closure
                 chromeOptions.AddArgument("--disable-background-timer-throttling");
                 chromeOptions.AddArgument("--disable-backgrounding-occluded-windows");
                 chromeOptions.AddArgument("--disable-renderer-backgrounding");
 
-                // Chrome 140 specific stability options
+                // Chrome version specific stability options
                 chromeOptions.AddArgument("--disable-search-engine-choice-screen");
-                chromeOptions.AddArgument("--disable-features=VizDisplayCompositor");
 
                 // Remove automation detection
                 chromeOptions.AddExcludedArgument("enable-automation");
@@ -441,7 +592,7 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                 chromeOptions.AddArgument("--start-maximized");
 
                 // Updated user agent for Chrome 140
-                chromeOptions.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+                chromeOptions.AddArgument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
 
                 try
                 {
@@ -532,10 +683,20 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                 {
                     UpdateStatus("ERROR: Chrome browser was closed unexpectedly during startup.");
                     UpdateStatus("TROUBLESHOOTING STEPS:");
-                    UpdateStatus("1. Ensure Chrome browser is installed and updated");
-                    UpdateStatus("2. Close all Chrome instances and try again");
-                    UpdateStatus("3. Run application as administrator if needed");
-                    UpdateStatus("4. Check Windows Defender/Antivirus isn't blocking ChromeDriver");
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        UpdateStatus("1. Check if Chrome is installed in /Applications/Google Chrome.app");
+                        UpdateStatus("2. Try running: xattr -d com.apple.quarantine chromedriver");
+                        UpdateStatus("3. Make sure chromedriver has execute permissions: chmod +x chromedriver");
+                        UpdateStatus("4. Close all Chrome instances and try again");
+                    }
+                    else
+                    {
+                        UpdateStatus("1. Ensure Chrome browser is installed and updated");
+                        UpdateStatus("2. Close all Chrome instances and try again");
+                        UpdateStatus("3. Run application as administrator if needed");
+                        UpdateStatus("4. Check antivirus isn't blocking ChromeDriver");
+                    }
                     throw new Exception("Browser closed during startup - see troubleshooting steps above");
                 }
                 catch (WebDriverException webEx) when (webEx.Message.Contains("session not created"))
@@ -544,22 +705,34 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                     UpdateStatus("ERROR: Could not create Chrome session - ChromeDriver version mismatch.");
                     UpdateStatus($"Your Chrome version: {chromeVersion ?? "unknown"}");
                     UpdateStatus("SOLUTION:");
-                    UpdateStatus("1. Download matching ChromeDriver from https://googlechromelabs.github.io/chrome-for-testing/");
-                    UpdateStatus("2. Place chromedriver.exe in application folder");
-                    UpdateStatus("3. Or update Chrome to latest version");
+                    UpdateStatus(GetPlatformSpecificInstructions(chromeVersion));
                     throw new Exception($"ChromeDriver version mismatch with Chrome {chromeVersion}");
                 }
                 catch (WebDriverException webEx) when (webEx.Message.Contains("unknown error: DevToolsActivePort"))
                 {
                     UpdateStatus("ERROR: Chrome failed to start properly.");
-                    UpdateStatus("SOLUTION: Close all Chrome instances and try again.");
-                    UpdateStatus("If problem persists, restart your computer.");
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        UpdateStatus("SOLUTION for macOS:");
+                        UpdateStatus("1. Close all Chrome instances: pkill -f Chrome");
+                        UpdateStatus("2. Clear Chrome user data if needed");
+                        UpdateStatus("3. Try running chromedriver manually to test: ./chromedriver --version");
+                    }
+                    else
+                    {
+                        UpdateStatus("SOLUTION: Close all Chrome instances and try again.");
+                        UpdateStatus("If problem persists, restart your computer.");
+                    }
                     throw new Exception("Chrome startup failure - close all Chrome instances and retry");
                 }
                 catch (WebDriverException webEx)
                 {
                     UpdateStatus($"WebDriver error: {webEx.Message}");
                     UpdateStatus("This usually indicates a ChromeDriver or Chrome browser issue.");
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        UpdateStatus("macOS: Try running 'xattr -d com.apple.quarantine chromedriver' and 'chmod +x chromedriver'");
+                    }
                     throw new Exception($"WebDriver error: {webEx.Message}");
                 }
                 catch (Exception ex)
@@ -684,6 +857,8 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                 summaryLines.AddRange(seleniumCookies.Select(c => $"  - {c.Name} = {c.Value.Substring(0, Math.Min(20, c.Value.Length))}..."));
 
                 await File.WriteAllLinesAsync("cookie_summary.txt", summaryLines);
+                
+                UpdateStatus($"Cookies saved successfully to: {Path.GetFullPath("cookies.json")}");
             }
             catch (Exception ex)
             {
@@ -1243,11 +1418,21 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
 
                 request.Headers.Add("Host", "iskole.net");
-                request.Headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
+                request.Headers.Add("Sec-Ch-Ua-Platform", "\"macOS\"");
                 request.Headers.Add("Accept-Language", "no-NB");
                 request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
                 request.Headers.Add("Sec-Ch-Ua", "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"140\"");
-                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+                
+                // Use appropriate User-Agent for the platform
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+                }
+                else
+                {
+                    request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+                }
+                
                 request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
                 request.Headers.Add("Sec-Fetch-Site", "same-origin");
                 request.Headers.Add("Sec-Fetch-Mode", "cors");
@@ -1377,12 +1562,23 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
 
             request.Headers.Add("Host", "iskole.net");
             request.Headers.Add("Cookie", $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionIdClean}; _WL_AUTHCOOKIE_JSESSIONID={authCookie}");
-            request.Headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
+            
+            // Platform-specific headers
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                request.Headers.Add("Sec-Ch-Ua-Platform", "\"macOS\"");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+            }
+            else
+            {
+                request.Headers.Add("Sec-Ch-Ua-Platform", "\"Windows\"");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
+            }
+            
             request.Headers.Add("Accept-Language", "nb-NO,nb;q=0.9");
             request.Headers.Add("Sec-Ch-Ua", "\"Chromium\";v=\"140\", \"Not;A=Brand\";v=\"99\"");
             request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
             request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
             request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
             request.Headers.Add("Origin", "https://iskole.net");
             request.Headers.Add("Sec-Fetch-Site", "same-origin");
@@ -1546,8 +1742,6 @@ ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
         public int ElevForerTilstedevaerelse { get; set; }
         public int Kollisjon { get; set; }
         public string TidsromTilstedevaerelse { get; set; }
-
-        // Add the missing Timenr property
         public string Timenr { get; set; }
     }
 }
