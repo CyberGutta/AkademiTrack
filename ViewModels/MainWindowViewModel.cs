@@ -124,6 +124,7 @@ namespace AkademiTrack.ViewModels
 
         // Commands - All declared here
         public ICommand StartAutomationCommand { get; }
+
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand GetCookiesCommand { get; }
@@ -277,8 +278,6 @@ namespace AkademiTrack.ViewModels
                 throw new Exception($"ChromeDriver setup failed: {ex.Message}", ex);
             }
         }
-
-        
 
         private async Task LoginAndExtractCookiesAsync()
         {
@@ -673,52 +672,348 @@ namespace AkademiTrack.ViewModels
 
         private async Task RunAutomationLoop(CancellationToken cancellationToken)
         {
+            var loopCount = 0;
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    UpdateStatus("Fetching schedule data...");
+                    loopCount++;
+                    UpdateStatus($"[Loop #{loopCount}] Starting automation cycle at {DateTime.Now:HH:mm:ss}");
 
+                    // Load cookies first
+                    UpdateStatus("[1/4] Loading authentication cookies...");
+                    var cookies = await LoadCookiesFromFileAsync();
+
+                    if (cookies == null || !cookies.Any())
+                    {
+                        UpdateStatus("ERROR: No valid cookies found. Use 'Login & Extract' to get fresh cookies.");
+                        UpdateStatus("STOPPING AUTOMATION: No authentication - cannot proceed without cookies");
+                        UpdateAutomationState(false);
+                        return;
+                    }
+
+                    var requiredCookies = new[] { "JSESSIONID", "_WL_AUTHCOOKIE_JSESSIONID" };
+                    var foundCookies = requiredCookies.Where(rc => cookies.ContainsKey(rc)).ToArray();
+                    UpdateStatus($"[1/4] Cookies loaded: {foundCookies.Length}/{requiredCookies.Length} required cookies found");
+
+                    // Fetch schedule data
+                    UpdateStatus("[2/4] Fetching schedule data from server...");
                     var scheduleData = await GetScheduleDataAsync(cancellationToken);
 
-                    if (scheduleData?.Items != null && scheduleData.Items.Any())
+                    // Check if schedule data is null or has no items
+                    if (scheduleData?.Items == null || !scheduleData.Items.Any())
                     {
-                        UpdateStatus($"Found {scheduleData.Items.Count} schedule items");
+                        UpdateStatus("[2/4] No schedule data found or empty response from server");
+                        UpdateStatus("STOPPING AUTOMATION: No classes found in schedule - nothing to monitor");
+                        UpdateAutomationState(false);
+                        return;
+                    }
 
-                        foreach (var item in scheduleData.Items)
+                    UpdateStatus($"[2/4] SUCCESS: Found {scheduleData.Items.Count} schedule items");
+
+                    // Check if there are any relevant classes (today or future)
+                    var now = DateTime.Now;
+                    var today = now.Date;
+                    var relevantClasses = scheduleData.Items
+                        .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                                      date >= today.AddDays(-1)) // Include yesterday's classes that might still be in attendance window
+                        .ToList();
+
+                    if (!relevantClasses.Any())
+                    {
+                        UpdateStatus("[2/4] No current or future classes found in schedule data");
+                        UpdateStatus("STOPPING AUTOMATION: No classes to monitor - all found classes are from the past");
+                        UpdateAutomationState(false);
+                        return;
+                    }
+
+                    // Check for classes that are actually actionable (within attendance window)
+                    var actionableClasses = relevantClasses
+                        .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                                      TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time) &&
+                                      date.Add(time) > now.AddMinutes(-45)) // Still within attendance window
+                        .ToList();
+
+                    if (!actionableClasses.Any())
+                    {
+                        UpdateStatus($"[2/4] Found {relevantClasses.Count} classes but none are actionable");
+                        UpdateStatus("STOPPING AUTOMATION: No classes within attendance window (45min before to 15min after class time)");
+
+                        // Show when the next classes are
+                        var futureClasses = relevantClasses
+                            .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                                          TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time) &&
+                                          date.Add(time) > now)
+                            .OrderBy(item => DateTime.ParseExact(item.Dato, "yyyyMMdd", null).Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null)))
+                            .Take(3)
+                            .ToList();
+
+                        if (futureClasses.Any())
                         {
-                            if (cancellationToken.IsCancellationRequested)
-                                break;
-
-                            if (ShouldMarkAttendance(item))
+                            UpdateStatus("Next upcoming classes:");
+                            foreach (var cls in futureClasses)
                             {
-                                UpdateStatus($"Marking attendance for {item.Fag} at {item.StartKl}");
-                                await MarkAttendanceAsync(item, cancellationToken);
-                                UpdateStatus($"Successfully marked attendance for {item.Fag}");
-                                await Task.Delay(2000, cancellationToken);
+                                var timeInfo = GetTimeInfo(cls, now);
+                                UpdateStatus($"  - {cls.Fag} at {cls.StartKl} ({timeInfo})");
                             }
+                            UpdateStatus("Start the automation closer to class time for attendance marking.");
                         }
 
-                        UpdateStatus("Completed processing all schedule items");
-                    }
-                    else
-                    {
-                        UpdateStatus("No schedule data found");
+                        UpdateAutomationState(false);
+                        return;
                     }
 
-                    UpdateStatus("Waiting 5 minutes for next check...");
-                    await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+                    // Show details of actionable classes
+                    var upcomingClasses = new List<string>();
+                    var currentClasses = new List<string>();
+                    var pastClasses = new List<string>();
+
+                    foreach (var item in actionableClasses)
+                    {
+                        var timeInfo = GetTimeInfo(item, now);
+                        var displayText = $"{item.Fag} at {item.StartKl} ({timeInfo})";
+
+                        if (timeInfo.Contains("minutes ago"))
+                            pastClasses.Add(displayText);
+                        else if (timeInfo.Contains("NOW") || timeInfo.Contains("in "))
+                            currentClasses.Add(displayText);
+                        else
+                            upcomingClasses.Add(displayText);
+                    }
+
+                    UpdateStatus($"[2/4] Found {actionableClasses.Count} actionable classes:");
+                    if (currentClasses.Any())
+                    {
+                        UpdateStatus($"  CURRENT/SOON: {string.Join(", ", currentClasses)}");
+                    }
+                    if (upcomingClasses.Any())
+                    {
+                        UpdateStatus($"  UPCOMING: {string.Join(", ", upcomingClasses.Take(2))}");
+                    }
+                    if (pastClasses.Any())
+                    {
+                        UpdateStatus($"  PAST: {pastClasses.Count} completed classes");
+                    }
+
+                    // Process attendance
+                    UpdateStatus("[3/4] Processing attendance requirements...");
+                    var attendanceMarked = 0;
+                    var attendanceSkipped = 0;
+                    var attendanceErrors = 0;
+
+                    foreach (var item in scheduleData.Items)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        if (ShouldMarkAttendance(item))
+                        {
+                            try
+                            {
+                                UpdateStatus($"[3/4] Marking attendance for {item.Fag} at {item.StartKl}...");
+                                await MarkAttendanceAsync(item, cancellationToken);
+                                attendanceMarked++;
+                                UpdateStatus($"[3/4] SUCCESS: Attendance marked for {item.Fag}");
+                                await Task.Delay(2000, cancellationToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                attendanceErrors++;
+                                UpdateStatus($"[3/4] ERROR marking attendance for {item.Fag}: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            attendanceSkipped++;
+                        }
+                    }
+
+                    UpdateStatus($"[3/4] Summary: {attendanceMarked} marked | {attendanceSkipped} skipped | {attendanceErrors} errors");
+
+                    // Analyze what to do next
+                    var nextActionable = GetNextActionableClass(scheduleData.Items, now);
+                    if (nextActionable != null)
+                    {
+                        UpdateStatus($"[3/4] Next action: {nextActionable}");
+                    }
+
+                    // Determine wait strategy based on what's happening
+                    var waitTime = DetermineWaitTime(scheduleData.Items, now, attendanceMarked, out string waitReason);
+                    UpdateStatus($"[4/4] {waitReason}");
+                    await DelayWithCountdown(waitTime, "Next check", cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
                     UpdateStatus("Automation cancelled by user");
                     throw;
                 }
+                catch (HttpRequestException httpEx)
+                {
+                    UpdateStatus($"NETWORK ERROR: {httpEx.Message}");
+                    UpdateStatus("REASON FOR 30SEC WAIT: Network connection failed - quick retry");
+                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Network retry", cancellationToken);
+                }
+                catch (JsonException jsonEx)
+                {
+                    UpdateStatus($"JSON PARSE ERROR: {jsonEx.Message}");
+                    UpdateStatus("REASON FOR 30SEC WAIT: Server returned invalid data - quick retry");
+                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Parse retry", cancellationToken);
+                }
                 catch (Exception ex)
                 {
-                    UpdateStatus($"Error: {ex.Message}");
-                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+                    UpdateStatus($"UNEXPECTED ERROR: {ex.Message}");
+                    UpdateStatus("REASON FOR 30SEC WAIT: Unknown error occurred - quick retry");
+                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Error retry", cancellationToken);
                 }
+            }
+        }
+
+        private async Task DelayWithCountdown(TimeSpan delay, string actionName, CancellationToken cancellationToken)
+        {
+            var endTime = DateTime.Now.Add(delay);
+            var updateInterval = TimeSpan.FromSeconds(delay.TotalSeconds > 60 ? 30 : 10);
+
+            while (DateTime.Now < endTime && !cancellationToken.IsCancellationRequested)
+            {
+                var remaining = endTime - DateTime.Now;
+
+                if (remaining.TotalSeconds > 60)
+                {
+                    UpdateStatus($"Timer: {actionName} in {remaining.Minutes}m {remaining.Seconds}s (at {endTime:HH:mm:ss})");
+                }
+                else
+                {
+                    UpdateStatus($"Timer: {actionName} in {remaining.Seconds}s");
+                }
+
+                var waitTime = remaining < updateInterval ? remaining : updateInterval;
+                await Task.Delay(waitTime, cancellationToken);
+            }
+        }
+
+        private string GetTimeInfo(ScheduleItem item, DateTime now)
+        {
+            try
+            {
+                if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var itemDate))
+                {
+                    return "Invalid date";
+                }
+
+                if (!TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
+                {
+                    return "Invalid time";
+                }
+
+                var classDateTime = itemDate.Add(startTime);
+                var timeDiff = classDateTime - now;
+
+                if (Math.Abs(timeDiff.TotalMinutes) < 15)
+                {
+                    return "NOW";
+                }
+                else if (timeDiff.TotalMinutes < 0)
+                {
+                    return $"{Math.Abs(timeDiff.TotalMinutes):F0} minutes ago";
+                }
+                else if (timeDiff.TotalHours < 24)
+                {
+                    return $"in {timeDiff.TotalHours:F0}h {timeDiff.Minutes}m";
+                }
+                else
+                {
+                    return $"in {timeDiff.Days}d";
+                }
+            }
+            catch
+            {
+                return "Time error";
+            }
+        }
+
+        private TimeSpan DetermineWaitTime(List<ScheduleItem> items, DateTime now, int attendanceMarked, out string reason)
+        {
+            try
+            {
+                var upcomingClasses = items
+                    .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                                  TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time))
+                    .Select(item => new
+                    {
+                        Item = item,
+                        DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null).Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
+                    })
+                    .Where(x => x.DateTime > now.AddMinutes(-45))
+                    .OrderBy(x => x.DateTime)
+                    .ToList();
+
+                if (!upcomingClasses.Any())
+                {
+                    reason = "REASON FOR 5MIN WAIT: No upcoming classes in attendance window - checking for new schedule data";
+                    return TimeSpan.FromMinutes(5);
+                }
+
+                var nextClass = upcomingClasses.First();
+                var timeUntilClass = nextClass.DateTime - now;
+                var attendanceWindowStart = nextClass.DateTime.AddMinutes(-15);
+                var timeUntilWindow = attendanceWindowStart - now;
+
+                if (timeUntilWindow.TotalMinutes <= 2)
+                {
+                    reason = $"REASON FOR 2MIN WAIT: {nextClass.Item.Fag} attendance window opens in {timeUntilWindow.TotalMinutes:F0} minutes - checking frequently";
+                    return TimeSpan.FromMinutes(2);
+                }
+                else if (timeUntilWindow.TotalMinutes <= 10)
+                {
+                    reason = $"REASON FOR 3MIN WAIT: {nextClass.Item.Fag} at {nextClass.Item.StartKl} - attendance window opens in {timeUntilWindow.TotalMinutes:F0} minutes";
+                    return TimeSpan.FromMinutes(3);
+                }
+                else if (timeUntilWindow.TotalMinutes <= 30)
+                {
+                    reason = $"REASON FOR 5MIN WAIT: {nextClass.Item.Fag} at {nextClass.Item.StartKl} - attendance opens in {timeUntilWindow.TotalMinutes:F0} minutes";
+                    return TimeSpan.FromMinutes(5);
+                }
+                else if (timeUntilWindow.TotalHours <= 2)
+                {
+                    reason = $"REASON FOR 15MIN WAIT: Next class ({nextClass.Item.Fag}) is in {timeUntilWindow.TotalHours:F1} hours - no immediate action needed";
+                    return TimeSpan.FromMinutes(15);
+                }
+                else
+                {
+                    reason = $"REASON FOR 30MIN WAIT: Next class ({nextClass.Item.Fag}) is {timeUntilWindow.TotalHours:F1} hours away - long interval check";
+                    return TimeSpan.FromMinutes(30);
+                }
+            }
+            catch (Exception ex)
+            {
+                reason = $"REASON FOR 5MIN WAIT: Error calculating optimal wait time ({ex.Message}) - using default interval";
+                return TimeSpan.FromMinutes(5);
+            }
+        }
+
+        private string GetNextActionableClass(List<ScheduleItem> items, DateTime now)
+        {
+            try
+            {
+                var nextClass = items
+                    .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                                  TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time) &&
+                                  date.Add(time) > now.AddMinutes(-45))
+                    .OrderBy(item => DateTime.ParseExact(item.Dato, "yyyyMMdd", null).Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null)))
+                    .FirstOrDefault();
+
+                if (nextClass != null)
+                {
+                    var timeInfo = GetTimeInfo(nextClass, now);
+                    return $"{nextClass.Fag} at {nextClass.StartKl} ({timeInfo})";
+                }
+
+                return "No upcoming classes in attendance window";
+            }
+            catch
+            {
+                return "Error calculating next class";
             }
         }
 
@@ -726,18 +1021,27 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                UpdateStatus("Loading cookies for API request...");
                 var cookies = await LoadCookiesFromFileAsync();
                 if (cookies == null || !cookies.Any())
                 {
                     throw new Exception("Failed to load cookies from cookies.json. Use 'Login & Extract' button to get fresh cookies.");
                 }
 
-                var startDate = DateTime.Now.ToString("yyyyMMdd");
-                var endDate = DateTime.Now.AddDays(7).ToString("yyyyMMdd");
+                UpdateStatus($"Building API request URL...");
+                var baseUrl = "https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote";
+                var finder = $"RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312";
+                var url = $"{baseUrl}?finder={Uri.EscapeDataString(finder)}&onlyData=true&limit=99&offset=0&totalResults=true";
 
-                var baseUrl = "https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev";
-                var finder = $"RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312,startDate={startDate},endDate={endDate}";
-                var url = $"{baseUrl}?finder={Uri.EscapeDataString(finder)}&onlyData=true&limit=1000&totalResults=true";
+                UpdateStatus($"API URL: {url}");
+
+                // Create HttpClient with automatic decompression
+                using var clientHandler = new HttpClientHandler()
+                {
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+                };
+
+                using var httpClient = new HttpClient(clientHandler);
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
 
@@ -751,34 +1055,85 @@ namespace AkademiTrack.ViewModels
                 request.Headers.Add("Sec-Fetch-Site", "same-origin");
                 request.Headers.Add("Sec-Fetch-Mode", "cors");
                 request.Headers.Add("Sec-Fetch-Dest", "empty");
-                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
-                request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-                request.Headers.Add("Priority", "u=1, i");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+                request.Headers.Add("Priority", "u=4, i");
                 request.Headers.Add("Connection", "keep-alive");
 
                 var cookieString = string.Join("; ", cookies.Select(c => $"{c.Key}={c.Value}"));
                 request.Headers.Add("Cookie", cookieString);
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                UpdateStatus($"Sending GET request to server...");
+                var response = await httpClient.SendAsync(request, cancellationToken);
+
+                UpdateStatus($"Server response: HTTP {(int)response.StatusCode} {response.StatusCode}");
 
                 if (response.IsSuccessStatusCode)
                 {
                     var jsonString = await response.Content.ReadAsStringAsync();
-                    var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(jsonString, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
 
-                    return scheduleResponse;
+                    UpdateStatus($"Raw response length: {jsonString.Length} characters");
+                    UpdateStatus($"Response starts with: {jsonString.Substring(0, Math.Min(100, jsonString.Length))}");
+
+                    if (string.IsNullOrWhiteSpace(jsonString))
+                    {
+                        UpdateStatus("ERROR: Server returned empty response");
+                        return new ScheduleResponse { Items = new List<ScheduleItem>() };
+                    }
+
+                    try
+                    {
+                        var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(jsonString, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                        UpdateStatus($"Parsed {scheduleResponse?.Items?.Count ?? 0} schedule items successfully");
+                        return scheduleResponse ?? new ScheduleResponse { Items = new List<ScheduleItem>() };
+                    }
+                    catch (JsonException ex)
+                    {
+                        UpdateStatus($"JSON parsing failed: {ex.Message}");
+                        UpdateStatus($"Problematic JSON: {jsonString}");
+                        throw;
+                    }
                 }
                 else
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    throw new Exception($"Failed to fetch schedule data. Status: {response.StatusCode}, Response: {errorContent}");
+                    UpdateStatus($"Server error response: {errorContent}");
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        throw new Exception("Authentication failed - cookies may be expired. Use 'Login & Extract' to get fresh cookies.");
+                    }
+                    else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    {
+                        throw new Exception("Access forbidden - insufficient permissions or expired session.");
+                    }
+                    else
+                    {
+                        throw new Exception($"Server returned error {(int)response.StatusCode}: {response.StatusCode}. Response: {errorContent}");
+                    }
                 }
+            }
+            catch (HttpRequestException httpEx)
+            {
+                UpdateStatus($"Network error: {httpEx.Message}");
+                throw new Exception($"Network error connecting to server: {httpEx.Message}", httpEx);
+            }
+            catch (TaskCanceledException)
+            {
+                UpdateStatus("Request timed out");
+                throw new Exception("Request timed out - server may be slow or unreachable");
+            }
+            catch (JsonException ex)
+            {
+                UpdateStatus($"JSON error: {ex.Message}");
+                throw new Exception($"Failed to parse JSON response: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
+                UpdateStatus($"Unexpected error in GetScheduleDataAsync: {ex.Message}");
                 throw new Exception($"Error in GetScheduleDataAsync: {ex.Message}", ex);
             }
         }
