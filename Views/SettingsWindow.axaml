@@ -10,9 +10,9 @@
         Title="Settings - AkademiTrack"
         Background="#F8F9FA"
         Width="500"
-        Height="400"
+        Height="450"
         MinWidth="450"
-        MinHeight="350"
+        MinHeight="450"
         CanResize="True"
         WindowStartupLocation="CenterOwner">
 
