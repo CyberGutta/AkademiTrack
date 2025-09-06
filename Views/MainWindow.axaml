@@ -17,7 +17,17 @@
 	</Design.DataContext>
 
 	<Window.Styles>
-		<Style Selector="Button.primary">
+		<!-- Force all buttons to always be visible -->
+		<Style Selector="Button">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+
+		<Style Selector="Button:disabled">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+
+		<!-- Start Button Styles -->
+		<Style Selector="Button.start-button">
 			<Setter Property="Background" Value="#007ACC"/>
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
@@ -26,13 +36,26 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
-		<Style Selector="Button.primary:pointerover">
+		<Style Selector="Button.start-button:pointerover /template/ ContentPresenter">
 			<Setter Property="Background" Value="#005A9E"/>
 		</Style>
 
-		<Style Selector="Button.secondary">
+		<!-- Disabled Start Button Style -->
+		<Style Selector="Button.start-button:disabled /template/ ContentPresenter">
+			<Setter Property="Background" Value="#CCCCCC"/>
+			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+		</Style>
+
+		<Style Selector="Button.start-button:disabled">
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Opacity" Value="1.0"/>
+		</Style>
+
+		<!-- Stop Button Styles -->
+		<Style Selector="Button.stop-button">
 			<Setter Property="Background" Value="#DC3545"/>
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
@@ -41,10 +64,22 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
-		<Style Selector="Button.secondary:pointerover">
+		<Style Selector="Button.stop-button:pointerover /template/ ContentPresenter">
 			<Setter Property="Background" Value="#B02A37"/>
+		</Style>
+
+		<!-- Disabled Stop Button Style -->
+		<Style Selector="Button.stop-button:disabled /template/ ContentPresenter">
+			<Setter Property="Background" Value="#CCCCCC"/>
+			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+		</Style>
+
+		<Style Selector="Button.stop-button:disabled">
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Opacity" Value="1.0"/>
 		</Style>
 
 		<Style Selector="Button.settings">
@@ -106,18 +141,20 @@
                       Classes="subtitle"
                       HorizontalAlignment="Center"/>
 
-			<!-- Main Control Buttons -->
+			<!-- Main Control Buttons - BOTH ALWAYS VISIBLE -->
 			<StackPanel Orientation="Horizontal"
                        HorizontalAlignment="Center"
                        Spacing="16">
 
+				<!-- Start button - disabled when automation is running -->
 				<Button Content="Start Automation"
-                       Classes="primary"
+                       Classes="start-button"
                        Command="{Binding StartAutomationCommand}"
                        IsEnabled="{Binding !IsAutomationRunning}"/>
 
+				<!-- Stop button - disabled when automation is NOT running -->
 				<Button Content="Stop Automation"
-                       Classes="secondary"
+                       Classes="stop-button"
                        Command="{Binding StopAutomationCommand}"
                        IsEnabled="{Binding IsAutomationRunning}"/>
 			</StackPanel>
@@ -127,10 +164,15 @@
                        HorizontalAlignment="Center"
                        Spacing="12">
 
+				<Button Content="Login and Extract"
+                       Classes="cookies"
+                       Command="{Binding LoginAndExtractCommand}"
+                       ToolTip.Tip="Open browser to login and extract fresh cookies"/>
+
 				<Button Content="Get Cookies"
                        Classes="cookies"
                        Command="{Binding GetCookiesCommand}"
-                       ToolTip.Tip="Extract cookies from browser after login"/>
+                       ToolTip.Tip="Check existing cookies or extract new ones"/>
 
 				<Button Content="Settings"
                        Classes="settings"
@@ -145,7 +187,7 @@
                    Margin="0,20,0,0"
                    BorderThickness="1"
                    BorderBrush="#E9ECEF"
-                   MaxWidth="600">
+                   MaxWidth="700">
 
 				<StackPanel Spacing="8">
 					<TextBlock Text="Status"
@@ -153,10 +195,13 @@
                               FontSize="14"
                               Foreground="#495057"/>
 
-					<TextBlock Text="{Binding StatusMessage}"
-                              FontSize="14"
-                              Foreground="#6C757D"
-                              TextWrapping="Wrap"/>
+					<ScrollViewer MaxHeight="200"
+                                 VerticalScrollBarVisibility="Auto">
+						<TextBlock Text="{Binding StatusMessage}"
+                                  FontSize="14"
+                                  Foreground="#6C757D"
+                                  TextWrapping="Wrap"/>
+					</ScrollViewer>
 				</StackPanel>
 			</Border>
 

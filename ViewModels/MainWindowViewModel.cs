@@ -28,14 +28,15 @@ namespace AkademiTrack.ViewModels
         public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null)
         {
             _execute = execute;
-            _canExecute = canExecute;
+            _canExecute = canExecute ?? (() => true); // Default to always enabled
         }
 
         public event EventHandler CanExecuteChanged;
 
         public bool CanExecute(object parameter)
         {
-            return !_isExecuting && (_canExecute?.Invoke() ?? true);
+            // Always return true - let the UI binding handle the enabled state
+            return !_isExecuting && _canExecute();
         }
 
         public async void Execute(object parameter)
@@ -81,10 +82,11 @@ namespace AkademiTrack.ViewModels
         {
             _httpClient = new HttpClient();
             _statusMessage = "Ready to start automation";
+            _isAutomationRunning = false; // Explicitly set initial state
 
-            // Initialize commands
-            StartAutomationCommand = new SimpleCommand(StartAutomationAsync, () => !IsAutomationRunning);
-            StopAutomationCommand = new SimpleCommand(StopAutomationAsync, () => IsAutomationRunning);
+            // Initialize commands - they will always be present, UI binding controls enabled state
+            StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
+            StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
             GetCookiesCommand = new SimpleCommand(GetFreshCookiesAsync);
             LoginAndExtractCommand = new SimpleCommand(LoginAndExtractCookiesAsync);
@@ -148,10 +150,21 @@ namespace AkademiTrack.ViewModels
             if (Dispatcher.UIThread.CheckAccess())
             {
                 IsAutomationRunning = isRunning;
+
+                // Force command state updates
+                ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
+                ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
             }
             else
             {
-                Dispatcher.UIThread.Post(() => IsAutomationRunning = isRunning);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    IsAutomationRunning = isRunning;
+
+                    // Force command state updates
+                    ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
+                    ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                });
             }
         }
 
