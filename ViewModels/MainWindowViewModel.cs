@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -30,14 +31,13 @@ namespace AkademiTrack.ViewModels
         public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null)
         {
             _execute = execute;
-            _canExecute = canExecute ?? (() => true); // Default to always enabled
+            _canExecute = canExecute ?? (() => true);
         }
 
         public event EventHandler CanExecuteChanged;
 
         public bool CanExecute(object parameter)
         {
-            // Always return true - let the UI binding handle the enabled state
             return !_isExecuting && _canExecute();
         }
 
@@ -86,7 +86,6 @@ namespace AkademiTrack.ViewModels
             _statusMessage = "Ready to start automation";
             _isAutomationRunning = false;
 
-            // Initialize commands - simplified interface
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
@@ -117,20 +116,16 @@ namespace AkademiTrack.ViewModels
                     _isAutomationRunning = value;
                     OnPropertyChanged();
 
-                    // Update command states
                     ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
                 }
             }
         }
 
-        // Commands - All declared here
         public ICommand StartAutomationCommand { get; }
-
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
 
-        // Thread-safe UI update methods
         private void UpdateStatus(string message)
         {
             if (Dispatcher.UIThread.CheckAccess())
@@ -148,8 +143,6 @@ namespace AkademiTrack.ViewModels
             if (Dispatcher.UIThread.CheckAccess())
             {
                 IsAutomationRunning = isRunning;
-
-                // Force command state updates
                 ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
             }
@@ -158,8 +151,6 @@ namespace AkademiTrack.ViewModels
                 Dispatcher.UIThread.Post(() =>
                 {
                     IsAutomationRunning = isRunning;
-
-                    // Force command state updates
                     ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
                 });
@@ -170,7 +161,6 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Try to get Chrome version from registry on Windows
                 if (OperatingSystem.IsWindows())
                 {
                     var process = new Process
@@ -196,7 +186,6 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // Fallback: Try to execute Chrome with --version
                 var chromeExecutables = new[]
                 {
                     @"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -242,50 +231,159 @@ namespace AkademiTrack.ViewModels
             return null;
         }
 
+        private async Task<bool> DownloadChromeDriverForChrome140Async()
+        {
+            try
+            {
+                UpdateStatus("Downloading ChromeDriver 140 for your Chrome version...");
+
+                var driverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+
+                // For Chrome 140, we need to get ChromeDriver from the new Chrome for Testing API
+                var chromeDriverUrl = "https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/win64/chromedriver-win64.zip";
+
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+                UpdateStatus("Downloading ChromeDriver zip file...");
+                var zipBytes = await httpClient.GetByteArrayAsync(chromeDriverUrl);
+
+                var tempZipPath = Path.Combine(Path.GetTempPath(), "chromedriver_140.zip");
+                await File.WriteAllBytesAsync(tempZipPath, zipBytes);
+
+                UpdateStatus("Extracting ChromeDriver...");
+
+                // Extract the chromedriver.exe from the zip
+                using (var archive = System.IO.Compression.ZipFile.OpenRead(tempZipPath))
+                {
+                    var driverEntry = archive.Entries.FirstOrDefault(e => e.Name == "chromedriver.exe");
+                    if (driverEntry != null)
+                    {
+                        driverEntry.ExtractToFile(driverPath, overwrite: true);
+                        UpdateStatus("ChromeDriver 140 downloaded and extracted successfully!");
+
+                        // Clean up temp file
+                        File.Delete(tempZipPath);
+                        return true;
+                    }
+                    else
+                    {
+                        throw new Exception("chromedriver.exe not found in downloaded zip");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Failed to download ChromeDriver 140: {ex.Message}");
+                return false;
+            }
+        }
+
         private async Task SetupChromeDriverAsync()
         {
             try
             {
                 UpdateStatus("Setting up ChromeDriver...");
 
-                // Simple approach - just use the latest available ChromeDriver
-                // This usually works well as Chrome auto-updates and ChromeDriver is backward compatible
+                var chromeVersion = await GetChromeVersionAsync();
+                UpdateStatus($"Detected Chrome version: {chromeVersion ?? "Unknown"}");
+
+                // First, check if local chromedriver.exe exists and is working
+                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+                if (File.Exists(localDriverPath))
+                {
+                    UpdateStatus("Found local chromedriver.exe, testing compatibility...");
+
+                    try
+                    {
+                        // Test the local driver
+                        var testService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory);
+                        testService.HideCommandPromptWindow = true;
+
+                        var testOptions = new ChromeOptions();
+                        testOptions.AddArgument("--headless");
+                        testOptions.AddArgument("--no-sandbox");
+                        testOptions.AddArgument("--disable-dev-shm-usage");
+
+                        using (var testDriver = new ChromeDriver(testService, testOptions, TimeSpan.FromSeconds(10)))
+                        {
+                            testDriver.Navigate().GoToUrl("about:blank");
+                            UpdateStatus("Local chromedriver.exe is working correctly!");
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        UpdateStatus($"Local chromedriver.exe failed test: {ex.Message}");
+                        UpdateStatus("Will attempt to download correct version...");
+
+                        // Delete the incompatible driver
+                        try
+                        {
+                            File.Delete(localDriverPath);
+                        }
+                        catch { }
+                    }
+                }
+
+                // For Chrome 140, try direct download first
+                if (chromeVersion?.StartsWith("140.") == true)
+                {
+                    var downloadSuccess = await DownloadChromeDriverForChrome140Async();
+                    if (downloadSuccess)
+                    {
+                        return;
+                    }
+                }
+
+                // Try WebDriverManager as fallback
+                Exception webDriverManagerException = null;
                 try
                 {
+                    UpdateStatus("Attempting automatic ChromeDriver download via WebDriverManager...");
                     var driverManager = new DriverManager();
                     var chromeConfig = new ChromeConfig();
                     driverManager.SetUpDriver(chromeConfig);
-                    UpdateStatus("ChromeDriver setup successful");
+                    UpdateStatus("ChromeDriver downloaded successfully via WebDriverManager");
+                    return;
                 }
                 catch (Exception ex)
                 {
+                    webDriverManagerException = ex;
                     UpdateStatus($"WebDriverManager failed: {ex.Message}");
-
-                    // Alternative approach: Check if chromedriver.exe exists in the application directory
-                    var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
-                    if (File.Exists(localDriverPath))
-                    {
-                        UpdateStatus("Using local chromedriver.exe");
-                        return;
-                    }
-
-                    // If all else fails, provide clear instructions
-                    var chromeVersion = await GetChromeVersionAsync();
-                    var majorVersion = !string.IsNullOrEmpty(chromeVersion) ? chromeVersion.Split('.')[0] : "latest";
-
-                    throw new Exception(
-                        $"ChromeDriver setup failed. Manual setup required:\n\n" +
-                        $"1. Go to https://chromedriver.chromium.org/downloads\n" +
-                        $"2. Download ChromeDriver for Chrome {majorVersion}\n" +
-                        $"3. Extract chromedriver.exe to your application folder\n" +
-                        $"4. Try again\n\n" +
-                        $"Your Chrome version: {chromeVersion ?? "unknown"}\n" +
-                        $"Error: {ex.Message}"
-                    );
                 }
+
+                // If everything failed, provide manual instructions
+                var majorVersion = !string.IsNullOrEmpty(chromeVersion) ? chromeVersion.Split('.')[0] : "140";
+
+                var detailedInstructions = $@"ChromeDriver setup failed. Manual setup required:
+
+CHROME VERSION DETECTED: {chromeVersion ?? "Could not detect"}
+MAJOR VERSION: {majorVersion}
+
+MANUAL SETUP STEPS FOR CHROME 140:
+1. Go to https://googlechromelabs.github.io/chrome-for-testing/
+2. Find ChromeDriver version 140.0.7339.81 (matches your Chrome exactly)
+3. Download the win64 version
+4. Extract chromedriver.exe from the zip file
+5. Place chromedriver.exe in this application's folder:
+   {AppDomain.CurrentDomain.BaseDirectory}
+6. Restart the application and try again
+
+ALTERNATIVE - DOWNLOAD LINK:
+https://storage.googleapis.com/chrome-for-testing-public/140.0.7339.81/win64/chromedriver-win64.zip
+
+CURRENT FOLDER: {AppDomain.CurrentDomain.BaseDirectory}
+EXPECTED FILE: chromedriver.exe
+
+ERROR DETAILS: {webDriverManagerException?.Message ?? "Unknown error"}";
+
+                UpdateStatus(detailedInstructions);
+                throw new Exception(detailedInstructions);
             }
             catch (Exception ex)
             {
+                UpdateStatus($"ChromeDriver setup completely failed: {ex.Message}");
                 throw new Exception($"ChromeDriver setup failed: {ex.Message}", ex);
             }
         }
@@ -295,215 +393,269 @@ namespace AkademiTrack.ViewModels
             try
             {
                 UpdateStatus("Setting up Chrome WebDriver...");
-
-                // Setup ChromeDriver - simplified approach
                 await SetupChromeDriverAsync();
 
-                // Set up Chrome options
+                // Create Chrome service with proper configuration
+                ChromeDriverService chromeDriverService;
+                var localDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chromedriver.exe");
+
+                if (File.Exists(localDriverPath))
+                {
+                    chromeDriverService = ChromeDriverService.CreateDefaultService(AppDomain.CurrentDomain.BaseDirectory);
+                }
+                else
+                {
+                    chromeDriverService = ChromeDriverService.CreateDefaultService();
+                }
+
+                chromeDriverService.HideCommandPromptWindow = true;
+                chromeDriverService.SuppressInitialDiagnosticInformation = true;
+
+                // Enhanced Chrome options for Chrome 140 compatibility
                 var chromeOptions = new ChromeOptions();
+
+                // Essential stability options
                 chromeOptions.AddArgument("--no-sandbox");
                 chromeOptions.AddArgument("--disable-dev-shm-usage");
                 chromeOptions.AddArgument("--disable-blink-features=AutomationControlled");
+                chromeOptions.AddArgument("--log-level=3");
+                chromeOptions.AddArgument("--disable-gpu");
+                chromeOptions.AddArgument("--disable-extensions");
+                chromeOptions.AddArgument("--no-first-run");
+                chromeOptions.AddArgument("--disable-default-apps");
+
+                // CRITICAL: Add this to prevent immediate closure
+                chromeOptions.AddArgument("--disable-background-timer-throttling");
+                chromeOptions.AddArgument("--disable-backgrounding-occluded-windows");
+                chromeOptions.AddArgument("--disable-renderer-backgrounding");
+
+                // Chrome 140 specific stability options
+                chromeOptions.AddArgument("--disable-search-engine-choice-screen");
+                chromeOptions.AddArgument("--disable-features=VizDisplayCompositor");
+
+                // Remove automation detection
                 chromeOptions.AddExcludedArgument("enable-automation");
                 chromeOptions.AddAdditionalOption("useAutomationExtension", false);
 
-                // Add user agent to appear more like a regular browser
-                chromeOptions.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36");
+                // Set window properties
+                chromeOptions.AddArgument("--start-maximized");
+
+                // Updated user agent for Chrome 140
+                chromeOptions.AddArgument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
 
                 try
                 {
-                    // Create WebDriver instance
-                    _webDriver = new ChromeDriver(chromeOptions);
+                    UpdateStatus("Creating Chrome WebDriver instance...");
+                    UpdateStatus("If browser closes immediately, this indicates ChromeDriver compatibility issues.");
 
-                    // Execute script to hide webdriver property
-                    var script = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})";
-                    ((IJavaScriptExecutor)_webDriver).ExecuteScript(script);
+                    // Create WebDriver with extended timeout
+                    _webDriver = new ChromeDriver(chromeDriverService, chromeOptions, TimeSpan.FromSeconds(120));
 
-                    UpdateStatus("Browser started successfully. Opening login page...");
+                    // Immediately check if browser is responsive
+                    UpdateStatus("Testing browser responsiveness...");
+                    var title = _webDriver.Title; // This will throw if browser closed immediately
 
-                    // Navigate to login page
+                    UpdateStatus("Chrome browser opened successfully!");
+
+                    // Set timeouts
+                    _webDriver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(15);
+                    _webDriver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(45);
+
+                    UpdateStatus("Navigating to login page...");
                     _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
-                    // Wait a moment for page to load
-                    await Task.Delay(2000);
+                    // Wait longer for page to load
+                    await Task.Delay(8000);
 
-                    UpdateStatus("Login page loaded. Please complete the login process in the browser...\n" +
-                               "After successful login, the system will automatically detect and extract cookies.\n" +
-                               "Do not close the browser window.");
-
-                    // Wait for login to complete by checking for specific elements or URL changes
-                    var loginSuccessful = await WaitForLoginCompletionAsync();
-
-                    if (loginSuccessful)
+                    // Check if navigation was successful
+                    var currentUrl = _webDriver.Url;
+                    if (currentUrl.Contains("login") || currentUrl.Contains("iskole.net"))
                     {
-                        // Navigate to the required page to ensure session is active
-                        UpdateStatus("Login detected! Navigating to attendance page...");
-                        _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
-                        await Task.Delay(3000); // Give it more time to load
+                        UpdateStatus("Login page loaded successfully!");
+                        UpdateStatus("=== INSTRUCTIONS ===");
+                        UpdateStatus("1. Complete the login process in the browser window");
+                        UpdateStatus("2. After successful login, navigate to:");
+                        UpdateStatus("   https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
+                        UpdateStatus("3. The system will automatically detect when you reach this page");
+                        UpdateStatus("4. DO NOT close the browser window!");
+                        UpdateStatus("==================");
 
-                        UpdateStatus("Extracting cookies from browser session...");
+                        // Wait for user to complete login and navigate to the correct page
+                        var loginSuccessful = await WaitForSpecificUrlAsync();
 
-                        // Extract cookies
-                        var cookies = _webDriver.Manage().Cookies.AllCookies.ToList();
-
-                        if (cookies.Any())
+                        if (loginSuccessful)
                         {
-                            await SaveCookiesToFileAsync(cookies);
-                            UpdateStatus($"Successfully extracted and saved {cookies.Count} cookies to cookies.json");
+                            UpdateStatus("SUCCESS: Login detected and user is on the correct page!");
+                            await Task.Delay(3000);
 
-                            // Verify we have the required cookies
-                            var cookieDict = cookies.ToDictionary(c => c.Name, c => c.Value);
-                            var requiredCookies = new[] { "JSESSIONID", "_WL_AUTHCOOKIE_JSESSIONID" };
-                            var foundCookies = requiredCookies.Where(rc => cookieDict.ContainsKey(rc)).ToArray();
+                            UpdateStatus("Extracting authentication cookies...");
+                            var cookies = _webDriver.Manage().Cookies.AllCookies.ToList();
 
-                            if (foundCookies.Length > 0)
+                            if (cookies.Any())
                             {
-                                UpdateStatus($"SUCCESS: Required cookies found: {string.Join(", ", foundCookies)}\n" +
-                                           "Cookie extraction completed successfully! You can now start the automation.");
+                                await SaveCookiesToFileAsync(cookies);
+                                UpdateStatus($"Extracted {cookies.Count} cookies successfully!");
+
+                                var cookieDict = cookies.ToDictionary(c => c.Name, c => c.Value);
+                                var requiredCookies = new[] { "JSESSIONID", "_WL_AUTHCOOKIE_JSESSIONID" };
+                                var foundCookies = requiredCookies.Where(rc => cookieDict.ContainsKey(rc)).ToArray();
+
+                                if (foundCookies.Length > 0)
+                                {
+                                    UpdateStatus($"SUCCESS: Found required cookies: {string.Join(", ", foundCookies)}");
+                                    UpdateStatus("Cookie extraction completed! You can now use the automation.");
+                                }
+                                else
+                                {
+                                    UpdateStatus("WARNING: Required authentication cookies not found.");
+                                    UpdateStatus("Please ensure you are fully logged in and try again.");
+                                }
                             }
                             else
                             {
-                                UpdateStatus("WARNING: Required cookies (JSESSIONID, _WL_AUTHCOOKIE_JSESSIONID) not found.\n" +
-                                           "Please ensure you are fully logged in and try again.");
+                                UpdateStatus("ERROR: No cookies found in browser session.");
+                                UpdateStatus("Please ensure you are properly logged in.");
                             }
                         }
                         else
                         {
-                            UpdateStatus("No cookies found. Please ensure you are properly logged in and try again.");
+                            UpdateStatus("TIMEOUT: User did not reach the required page within the time limit.");
+                            UpdateStatus("Please try again and make sure to navigate to the timetable page.");
                         }
                     }
                     else
                     {
-                        UpdateStatus("Login timeout or failed. Please try again.");
+                        throw new Exception($"Failed to navigate to login page. Current URL: {currentUrl}");
                     }
+                }
+                catch (WebDriverException webEx) when (webEx.Message.Contains("chrome not reachable"))
+                {
+                    UpdateStatus("ERROR: Chrome browser was closed unexpectedly during startup.");
+                    UpdateStatus("TROUBLESHOOTING STEPS:");
+                    UpdateStatus("1. Ensure Chrome browser is installed and updated");
+                    UpdateStatus("2. Close all Chrome instances and try again");
+                    UpdateStatus("3. Run application as administrator if needed");
+                    UpdateStatus("4. Check Windows Defender/Antivirus isn't blocking ChromeDriver");
+                    throw new Exception("Browser closed during startup - see troubleshooting steps above");
+                }
+                catch (WebDriverException webEx) when (webEx.Message.Contains("session not created"))
+                {
+                    var chromeVersion = await GetChromeVersionAsync();
+                    UpdateStatus("ERROR: Could not create Chrome session - ChromeDriver version mismatch.");
+                    UpdateStatus($"Your Chrome version: {chromeVersion ?? "unknown"}");
+                    UpdateStatus("SOLUTION:");
+                    UpdateStatus("1. Download matching ChromeDriver from https://googlechromelabs.github.io/chrome-for-testing/");
+                    UpdateStatus("2. Place chromedriver.exe in application folder");
+                    UpdateStatus("3. Or update Chrome to latest version");
+                    throw new Exception($"ChromeDriver version mismatch with Chrome {chromeVersion}");
+                }
+                catch (WebDriverException webEx) when (webEx.Message.Contains("unknown error: DevToolsActivePort"))
+                {
+                    UpdateStatus("ERROR: Chrome failed to start properly.");
+                    UpdateStatus("SOLUTION: Close all Chrome instances and try again.");
+                    UpdateStatus("If problem persists, restart your computer.");
+                    throw new Exception("Chrome startup failure - close all Chrome instances and retry");
+                }
+                catch (WebDriverException webEx)
+                {
+                    UpdateStatus($"WebDriver error: {webEx.Message}");
+                    UpdateStatus("This usually indicates a ChromeDriver or Chrome browser issue.");
+                    throw new Exception($"WebDriver error: {webEx.Message}");
                 }
                 catch (Exception ex)
                 {
-                    if (ex.Message.Contains("session not created") || ex.Message.Contains("version"))
-                    {
-                        UpdateStatus($"ChromeDriver version mismatch error: {ex.Message}\n\n" +
-                                   "Solutions:\n" +
-                                   "1. Update Google Chrome to the latest version\n" +
-                                   "2. Or download the correct ChromeDriver manually from https://chromedriver.chromium.org/\n" +
-                                   "3. Place chromedriver.exe in your application folder");
-                    }
-                    else
-                    {
-                        UpdateStatus($"WebDriver error: {ex.Message}");
-                    }
+                    UpdateStatus($"Unexpected error during browser setup: {ex.Message}");
                     throw;
                 }
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Error during cookie extraction: {ex.Message}");
+                UpdateStatus($"Cookie extraction failed: {ex.Message}");
+                throw;
             }
             finally
             {
-                // Clean up WebDriver
+                // Keep browser open longer for user to see results
                 try
                 {
                     if (_webDriver != null)
                     {
-                        await Task.Delay(2000); // Give user a moment to see the result
+                        UpdateStatus("Keeping browser open for 10 seconds...");
+                        await Task.Delay(10000);
+
                         UpdateStatus("Closing browser...");
                         _webDriver.Quit();
                         _webDriver.Dispose();
                         _webDriver = null;
-                        UpdateStatus("Browser closed. Cookie extraction process completed.");
+                        UpdateStatus("Browser closed. Process completed.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    UpdateStatus($"Error closing browser: {ex.Message}");
+                    UpdateStatus($"Error while closing browser: {ex.Message}");
+                    // Don't rethrow here - this is cleanup
                 }
             }
         }
 
-        private async Task<bool> WaitForLoginCompletionAsync()
+        private async Task<bool> WaitForSpecificUrlAsync()
         {
-            // Wait for login completion by checking for URL change or specific elements
-            var maxWaitTime = TimeSpan.FromMinutes(10); // Maximum wait time
-            var checkInterval = TimeSpan.FromSeconds(3);
+            var maxWaitTime = TimeSpan.FromMinutes(15); // Longer timeout for user to complete login
+            var checkInterval = TimeSpan.FromSeconds(2);
             var startTime = DateTime.Now;
+            var targetUrl = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan";
 
-            UpdateStatus("Waiting for login completion... (timeout: 10 minutes)");
+            UpdateStatus($"Waiting for user to reach: {targetUrl}");
+            UpdateStatus("Timeout: 15 minutes");
 
             while (DateTime.Now - startTime < maxWaitTime)
             {
                 try
                 {
                     var currentUrl = _webDriver.Url;
-                    UpdateStatus($"Checking login status... Current URL: {currentUrl.Substring(0, Math.Min(50, currentUrl.Length))}...");
+                    var remainingTime = maxWaitTime - (DateTime.Now - startTime);
 
-                    // Check if we're on a page that indicates successful login
-                    if (currentUrl.Contains("isFeideinnlogget=true") ||
-                        (currentUrl.Contains("/elev/") && !currentUrl.Contains("login")))
+                    UpdateStatus($"Current URL: {currentUrl}");
+                    UpdateStatus($"Time remaining: {remainingTime.Minutes}:{remainingTime.Seconds:00}");
+
+                    // Check if user has reached the target URL exactly
+                    if (currentUrl.Contains("isFeideinnlogget=true") && currentUrl.Contains("ojr=timeplan"))
                     {
-                        UpdateStatus("Login successful! URL indicates logged in state.");
+                        UpdateStatus("SUCCESS! User has reached the timetable page.");
                         return true;
                     }
 
-                    // Check for elements that indicate we're logged in
-                    try
+                    // Also accept if they're on a related logged-in page
+                    if (currentUrl.Contains("isFeideinnlogget=true"))
                     {
-                        // Look for common elements that appear after login
-                        var possibleSelectors = new[]
-                        {
-                            "[data-logged-in]",
-                            ".user-menu",
-                            ".logout",
-                            "a[href*='logout']",
-                            ".nav-user",
-                            ".user-info",
-                            "[href*='fravar']",
-                            "[href*='timeplan']"
-                        };
-
-                        foreach (var selector in possibleSelectors)
-                        {
-                            var elements = _webDriver.FindElements(By.CssSelector(selector));
-                            if (elements.Any())
-                            {
-                                UpdateStatus($"Login detected! Found element: {selector}");
-                                return true;
-                            }
-                        }
-
-                        // Check for absence of login form
-                        var loginElements = _webDriver.FindElements(By.CssSelector("input[type='password'], .login-form, #login"));
-                        if (!loginElements.Any() && !currentUrl.Contains("login"))
-                        {
-                            UpdateStatus("Login appears successful - no login form detected.");
-                            return true;
-                        }
+                        UpdateStatus("User is logged in but not on timetable page yet.");
+                        UpdateStatus("Please navigate to the timetable (timeplan) page to continue.");
                     }
-                    catch
+                    else if (!currentUrl.Contains("login"))
                     {
-                        // Ignore element search errors and continue
+                        UpdateStatus("User appears to be past login page...");
                     }
-
-                    var remainingTime = maxWaitTime - (DateTime.Now - startTime);
-                    UpdateStatus($"Still waiting for login... {remainingTime.Minutes}:{remainingTime.Seconds:00} remaining");
+                    else
+                    {
+                        UpdateStatus("User is still on login page...");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    UpdateStatus($"Checking login status... Error: {ex.Message}");
+                    UpdateStatus($"Error checking URL: {ex.Message}");
                 }
 
                 await Task.Delay(checkInterval);
             }
 
-            // If we reach here, timeout occurred
-            UpdateStatus("Login timeout reached. Attempting cookie extraction anyway...");
-            return false; // Changed to false to indicate timeout
+            UpdateStatus("Timeout reached. User did not reach the required page in time.");
+            return false;
         }
 
         private async Task SaveCookiesToFileAsync(IList<OpenQA.Selenium.Cookie> seleniumCookies)
         {
             try
             {
-                // Convert Selenium cookies to our Cookie format
                 var cookieList = seleniumCookies.Select(c => new Cookie
                 {
                     Name = c.Name,
@@ -519,11 +671,9 @@ namespace AkademiTrack.ViewModels
                 var jsonString = JsonSerializer.Serialize(cookieList, jsonOptions);
                 await File.WriteAllTextAsync("cookies.json", jsonString);
 
-                // Also save as cookie string format for debugging
                 var cookieString = string.Join("; ", seleniumCookies.Select(c => $"{c.Name}={c.Value}"));
                 await File.WriteAllTextAsync("cookies.txt", cookieString);
 
-                // Create a summary file with cookie info
                 var summaryLines = new List<string>
                 {
                     $"Cookie extraction completed at: {DateTime.Now}",
@@ -571,7 +721,6 @@ namespace AkademiTrack.ViewModels
 
                 var cookieDict = cookiesArray.ToDictionary(c => c.Name, c => c.Value);
 
-                // Validate required cookies
                 var requiredCookies = new[] { "JSESSIONID", "_WL_AUTHCOOKIE_JSESSIONID" };
                 var invalidCookies = requiredCookies.Where(rc => !cookieDict.ContainsKey(rc) ||
                     cookieDict[rc].StartsWith("YOUR_") ||
@@ -579,7 +728,7 @@ namespace AkademiTrack.ViewModels
 
                 if (invalidCookies.Any())
                 {
-                    return null; // Invalid cookies
+                    return null;
                 }
 
                 return cookieDict;
@@ -588,20 +737,6 @@ namespace AkademiTrack.ViewModels
             {
                 return null;
             }
-        }
-
-        private async Task GetFreshCookiesAsync()
-        {
-            // Check if we already have valid cookies
-            var existingCookies = await LoadExistingCookiesAsync();
-
-            if (existingCookies != null)
-            {
-                UpdateStatus("Valid cookies already exist. Use 'Login & Extract' to get fresh cookies if needed.");
-                return;
-            }
-
-            await LoginAndExtractCookiesAsync();
         }
 
         private async Task StartAutomationAsync()
@@ -614,7 +749,6 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Step 1: Check if we have valid cookies
                 UpdateStatus("[1/3] Checking authentication cookies...");
                 var existingCookies = await LoadExistingCookiesAsync();
 
@@ -622,12 +756,10 @@ namespace AkademiTrack.ViewModels
                 {
                     UpdateStatus("[1/3] No valid cookies found. Starting browser login process...");
 
-                    // Automatically extract cookies through browser login
                     try
                     {
                         await LoginAndExtractCookiesAsync();
 
-                        // Verify cookies were extracted successfully
                         var newCookies = await LoadExistingCookiesAsync();
                         if (newCookies == null)
                         {
@@ -651,7 +783,6 @@ namespace AkademiTrack.ViewModels
                     UpdateStatus("[1/3] Valid authentication cookies found!");
                 }
 
-                // Step 2: Test cookie validity with a quick API call
                 UpdateStatus("[2/3] Validating authentication with server...");
                 try
                 {
@@ -660,7 +791,6 @@ namespace AkademiTrack.ViewModels
                     {
                         UpdateStatus("[2/3] Authentication test failed. Refreshing cookies...");
 
-                        // Cookies might be expired, try to get fresh ones
                         await LoginAndExtractCookiesAsync();
                         var refreshedCookies = await LoadExistingCookiesAsync();
 
@@ -671,7 +801,6 @@ namespace AkademiTrack.ViewModels
                             return;
                         }
 
-                        // Test again with fresh cookies
                         testSchedule = await GetScheduleDataAsync(CancellationToken.None);
                         if (testSchedule?.Items == null)
                         {
@@ -701,7 +830,6 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // Step 3: Start the main automation loop
                 UpdateStatus("[3/3] Starting automated attendance monitoring...");
                 _cancellationTokenSource = new CancellationTokenSource();
 
@@ -734,16 +862,11 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Create and show the settings window
                 var settingsWindow = new AkademiTrack.Views.SettingsWindow();
 
-                // If you want it to be modal (blocks interaction with main window)
                 await settingsWindow.ShowDialog(Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
                     ? desktop.MainWindow
                     : null);
-
-                // If you want it to be non-modal (both windows can be used simultaneously)
-                // settingsWindow.Show();
 
                 UpdateStatus("Settings window opened");
             }
@@ -766,7 +889,6 @@ namespace AkademiTrack.ViewModels
                     loopCount++;
                     UpdateStatus($"[Loop #{loopCount}] Starting automation cycle at {DateTime.Now:HH:mm:ss}");
 
-                    // Load cookies first
                     UpdateStatus("[1/4] Loading authentication cookies...");
                     var cookies = await LoadCookiesFromFileAsync();
 
@@ -782,11 +904,9 @@ namespace AkademiTrack.ViewModels
                     var foundCookies = requiredCookies.Where(rc => cookies.ContainsKey(rc)).ToArray();
                     UpdateStatus($"[1/4] Cookies loaded: {foundCookies.Length}/{requiredCookies.Length} required cookies found");
 
-                    // Fetch schedule data
                     UpdateStatus("[2/4] Fetching schedule data from server...");
                     var scheduleData = await GetScheduleDataAsync(cancellationToken);
 
-                    // Check if schedule data is null or has no items
                     if (scheduleData?.Items == null || !scheduleData.Items.Any())
                     {
                         UpdateStatus("[2/4] No schedule data found or empty response from server");
@@ -797,12 +917,11 @@ namespace AkademiTrack.ViewModels
 
                     UpdateStatus($"[2/4] SUCCESS: Found {scheduleData.Items.Count} schedule items");
 
-                    // Check if there are any relevant classes (today or future)
                     var now = DateTime.Now;
                     var today = now.Date;
                     var relevantClasses = scheduleData.Items
                         .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
-                                      date >= today.AddDays(-1)) // Include yesterday's classes that might still be in attendance window
+                                      date >= today.AddDays(-1))
                         .ToList();
 
                     if (!relevantClasses.Any())
@@ -813,11 +932,10 @@ namespace AkademiTrack.ViewModels
                         return;
                     }
 
-                    // Check for classes that are actually actionable (within attendance window)
                     var actionableClasses = relevantClasses
                         .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
                                       TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time) &&
-                                      date.Add(time) > now.AddMinutes(-45)) // Still within attendance window
+                                      date.Add(time) > now.AddMinutes(-45))
                         .ToList();
 
                     if (!actionableClasses.Any())
@@ -825,7 +943,6 @@ namespace AkademiTrack.ViewModels
                         UpdateStatus($"[2/4] Found {relevantClasses.Count} classes but none are actionable");
                         UpdateStatus("STOPPING AUTOMATION: No classes within attendance window (45min before to 15min after class time)");
 
-                        // Show when the next classes are
                         var futureClasses = relevantClasses
                             .Where(item => DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
                                           TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time) &&
@@ -849,7 +966,6 @@ namespace AkademiTrack.ViewModels
                         return;
                     }
 
-                    // Show details of actionable classes
                     var upcomingClasses = new List<string>();
                     var currentClasses = new List<string>();
                     var pastClasses = new List<string>();
@@ -881,7 +997,6 @@ namespace AkademiTrack.ViewModels
                         UpdateStatus($"  PAST: {pastClasses.Count} completed classes");
                     }
 
-                    // Process attendance
                     UpdateStatus("[3/4] Processing attendance requirements...");
                     var attendanceMarked = 0;
                     var attendanceSkipped = 0;
@@ -916,14 +1031,12 @@ namespace AkademiTrack.ViewModels
 
                     UpdateStatus($"[3/4] Summary: {attendanceMarked} marked | {attendanceSkipped} skipped | {attendanceErrors} errors");
 
-                    // Analyze what to do next
                     var nextActionable = GetNextActionableClass(scheduleData.Items, now);
                     if (nextActionable != null)
                     {
                         UpdateStatus($"[3/4] Next action: {nextActionable}");
                     }
 
-                    // Determine wait strategy based on what's happening
                     var waitTime = DetermineWaitTime(scheduleData.Items, now, attendanceMarked, out string waitReason);
                     UpdateStatus($"[4/4] {waitReason}");
                     await DelayWithCountdown(waitTime, "Next check", cancellationToken);
@@ -1120,7 +1233,6 @@ namespace AkademiTrack.ViewModels
 
                 UpdateStatus($"API URL: {url}");
 
-                // Create HttpClient with automatic decompression
                 using var clientHandler = new HttpClientHandler()
                 {
                     AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
@@ -1135,7 +1247,7 @@ namespace AkademiTrack.ViewModels
                 request.Headers.Add("Accept-Language", "no-NB");
                 request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
                 request.Headers.Add("Sec-Ch-Ua", "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"140\"");
-                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
                 request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
                 request.Headers.Add("Sec-Fetch-Site", "same-origin");
                 request.Headers.Add("Sec-Fetch-Mode", "cors");
@@ -1270,7 +1382,7 @@ namespace AkademiTrack.ViewModels
             request.Headers.Add("Sec-Ch-Ua", "\"Chromium\";v=\"140\", \"Not;A=Brand\";v=\"99\"");
             request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
             request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36");
+            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36");
             request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
             request.Headers.Add("Origin", "https://iskole.net");
             request.Headers.Add("Sec-Fetch-Site", "same-origin");
@@ -1427,7 +1539,6 @@ namespace AkademiTrack.ViewModels
         public string KNavn { get; set; }
         public string GruppeNr { get; set; }
         public string Dato { get; set; }
-        public long Timenr { get; set; }
         public string StartKl { get; set; }
         public string SluttKl { get; set; }
         public int UndervisningPaagaar { get; set; }
@@ -1435,5 +1546,8 @@ namespace AkademiTrack.ViewModels
         public int ElevForerTilstedevaerelse { get; set; }
         public int Kollisjon { get; set; }
         public string TidsromTilstedevaerelse { get; set; }
+
+        // Add the missing Timenr property
+        public string Timenr { get; set; }
     }
 }
