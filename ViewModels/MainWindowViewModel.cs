@@ -945,52 +945,99 @@ STEPS:
                 try
                 {
                     UpdateStatus("Loading schedule data...");
-                    var scheduleData = await ProcessScheduleDataAsync(cancellationToken);
-                    if (scheduleData == null) return;
-
-                    // Find the next class that needs attendance
-                    var nextClass = GetNextClassNeedingAttendance(scheduleData.Items);
+                    var scheduleData = await GetScheduleDataAsync(cancellationToken);
                     
-                    if (nextClass == null)
+                    if (scheduleData?.Items?.Any() != true)
                     {
-                        UpdateStatus("No upcoming classes found. Checking again in 1 hour...");
-                        await DelayWithCountdown(TimeSpan.FromHours(1), "Schedule refresh", cancellationToken);
+                        UpdateStatus("No schedule data found. Checking again in 30 minutes...");
+                        await DelayWithCountdown(TimeSpan.FromMinutes(30), "schedule refresh", cancellationToken);
                         continue;
                     }
 
-                    var now = DateTime.Now;
-                    var attendanceTime = nextClass.DateTime.AddMinutes(-15); // 15 minutes before class
-                    var waitTime = attendanceTime - now;
+                    UpdateStatus($"Found {scheduleData.Items.Count} schedule items");
 
-                    if (waitTime.TotalMinutes > 0)
+                    // Find ALL upcoming classes (like Python does)
+                    var now = DateTime.Now;
+                    var upcomingClasses = scheduleData.Items
+                        .Where(item => 
+                        {
+                            if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) ||
+                                !TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
+                                return false;
+                            
+                            var classDateTime = date.Add(startTime);
+                            return classDateTime > now.AddMinutes(-15); // Classes not more than 15 minutes ago
+                        })
+                        .Select(item => new
+                        {
+                            Item = item,
+                            DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None)
+                                .Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
+                        })
+                        .OrderBy(x => x.DateTime)
+                        .ToList();
+
+                    if (!upcomingClasses.Any())
                     {
-                        UpdateStatus($"Next class: {nextClass.Item.Fag} at {nextClass.Item.StartKl}");
-                        UpdateStatus($"Attendance opens at: {attendanceTime:HH:mm:ss}");
-                        await DelayWithCountdown(waitTime, $"attendance for {nextClass.Item.Fag}", cancellationToken);
+                        UpdateStatus("No upcoming classes found. Checking again in 30 minutes...");
+                        await DelayWithCountdown(TimeSpan.FromMinutes(30), "schedule refresh", cancellationToken);
+                        continue;
                     }
 
-                    // Time to mark attendance
-                    if (!cancellationToken.IsCancellationRequested)
+                    // Find the next class that needs attendance
+                    var nextClassNeedingAttendance = upcomingClasses
+                        .FirstOrDefault(cls => cls.Item.ElevForerTilstedevaerelse == 0); // 0 = not registered
+
+                    if (nextClassNeedingAttendance == null)
                     {
-                        UpdateStatus($"Marking attendance for {nextClass.Item.Fag}...");
+                        // No classes need attendance, wait until the next class starts then check again
+                        var nextClass = upcomingClasses.First();
+                        var waitUntilNextClass = nextClass.DateTime.AddMinutes(5) - now; // Wait until 5 min after next class starts
+                        
+                        if (waitUntilNextClass.TotalMinutes > 0)
+                        {
+                            UpdateStatus($"No classes need attendance. Next check after {nextClass.Item.Fag} ends...");
+                            await DelayWithCountdown(waitUntilNextClass, "next schedule check", cancellationToken);
+                        }
+                        continue;
+                    }
+
+                    // We found a class that needs attendance
+                    var timeDiff = nextClassNeedingAttendance.DateTime - now;
+                    
+                    UpdateStatus($"Next class needing attendance: {nextClassNeedingAttendance.Item.Fag} at {nextClassNeedingAttendance.Item.StartKl}");
+                    UpdateStatus($"Class starts in {timeDiff.TotalMinutes:F0} minutes");
+
+                    // If class is more than 15 minutes away, wait until 15 minutes before
+                    if (timeDiff.TotalMinutes > 15)
+                    {
+                        var waitTime = timeDiff.Subtract(TimeSpan.FromMinutes(15));
+                        UpdateStatus($"Waiting {waitTime.TotalMinutes:F0} minutes until attendance window opens...");
+                        await DelayWithCountdown(waitTime, $"attendance window for {nextClassNeedingAttendance.Item.Fag}", cancellationToken);
+                    }
+                    // If class is starting soon or already started (within 15 minutes), mark attendance now
+                    else if (timeDiff.TotalMinutes > -15) // Not more than 15 minutes ago
+                    {
+                        UpdateStatus($"Attendance window is open for {nextClassNeedingAttendance.Item.Fag}!");
+                        
                         try
                         {
-                            await MarkAttendanceAsync(nextClass.Item, cancellationToken);
-                            UpdateStatus($"✓ Attendance marked successfully for {nextClass.Item.Fag}");
+                            await MarkAttendanceAsync(nextClassNeedingAttendance.Item, cancellationToken);
+                            UpdateStatus($"✓ Attendance marked successfully for {nextClassNeedingAttendance.Item.Fag}");
                         }
                         catch (Exception ex)
                         {
-                            UpdateStatus($"✗ Failed to mark attendance for {nextClass.Item.Fag}: {ex.Message}");
+                            UpdateStatus($"✗ Failed to mark attendance for {nextClassNeedingAttendance.Item.Fag}: {ex.Message}");
                         }
-                    }
 
-                    // Wait until after class ends before checking for next class
-                    var classEndTime = nextClass.DateTime.Add(TimeSpan.ParseExact(nextClass.Item.SluttKl, "HHmm", null));
-                    var waitUntilAfterClass = classEndTime.AddMinutes(5) - DateTime.Now;
-                    
-                    if (waitUntilAfterClass.TotalMinutes > 0)
+                        // Wait 2 minutes before checking again
+                        await DelayWithCountdown(TimeSpan.FromMinutes(2), "next check", cancellationToken);
+                    }
+                    else
                     {
-                        await DelayWithCountdown(waitUntilAfterClass, "next schedule check", cancellationToken);
+                        // Class was too long ago, skip it and check again
+                        UpdateStatus($"Class {nextClassNeedingAttendance.Item.Fag} was too long ago, checking for next class...");
+                        await DelayWithCountdown(TimeSpan.FromMinutes(1), "next check", cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
@@ -1001,7 +1048,7 @@ STEPS:
                 catch (Exception ex)
                 {
                     UpdateStatus($"Error in automation loop: {ex.Message}");
-                    await DelayWithCountdown(TimeSpan.FromMinutes(5), "Error retry", cancellationToken);
+                    await DelayWithCountdown(TimeSpan.FromMinutes(5), "error retry", cancellationToken);
                 }
             }
         }
@@ -1011,57 +1058,72 @@ STEPS:
         {
             var now = DateTime.Now;
             
-            // Debug: Print all items for troubleshooting
-            UpdateStatus($"DEBUG: Checking {items.Count} schedule items at {now:HH:mm:ss}");
+            UpdateStatus($"DEBUG: Checking {items.Count} schedule items for classes needing attendance...");
             
-            foreach (var item in items)
+            // First, let's see what we have in the schedule
+            foreach (var item in items.Take(5)) // Show first 5 for debugging
             {
-                if (DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
-                    TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time))
+                if (DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var debugDate) &&
+                    TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var debugTime))
                 {
-                    var classDateTime = date.Add(time);
-                    UpdateStatus($"DEBUG: {item.Fag} at {item.StartKl} - ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}, DateTime: {classDateTime}");
+                    var debugDateTime = debugDate.Add(debugTime);
+                    UpdateStatus($"DEBUG: {item.Fag} at {item.StartKl} on {debugDate:yyyy-MM-dd}, ElevForerTilstedevaerelse={item.ElevForerTilstedevaerelse}, DateTime={debugDateTime}");
                 }
             }
             
-            return items
+            var result = items
                 .Where(item => 
                 {
                     // Parse date and time
                     if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) ||
                         !TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
                     {
+                        UpdateStatus($"DEBUG: Failed to parse date/time for {item.Fag}");
                         return false;
                     }
 
                     var classDateTime = date.Add(startTime);
                     
-                    // Check if class is today and in the future (or just started)
-                    var isToday = date.Date == now.Date;
-                    var isUpcoming = classDateTime >= now.AddMinutes(-15); // Allow 15 min after start
+                    // Only consider classes that are upcoming (not more than 15 minutes in the past)
+                    var isUpcoming = classDateTime >= now.AddMinutes(-15);
                     
-                    // Check if attendance is needed - try different possible field names
+                    // Try multiple ways to detect if attendance is needed
                     var needsAttendance = item.ElevForerTilstedevaerelse == 0 || 
-                                        item.ElevForerTilstedevaerelse == null ||
-                                        string.Equals(item.Typefravaer, "Nei", StringComparison.OrdinalIgnoreCase) ||
-                                        string.IsNullOrEmpty(item.Typefravaer);
+                                        string.IsNullOrEmpty(item.Typefravaer) ||
+                                        item.Typefravaer == "" ||
+                                        item.Typefravaer == null;
                     
-                    var shouldInclude = isToday && isUpcoming && needsAttendance;
+                    var shouldInclude = isUpcoming && needsAttendance;
                     
-                    if (shouldInclude)
-                    {
-                        UpdateStatus($"DEBUG: MATCH FOUND - {item.Fag} at {item.StartKl}");
-                    }
+                    UpdateStatus($"DEBUG: {item.Fag} - Upcoming: {isUpcoming}, NeedsAttendance: {needsAttendance}, Include: {shouldInclude}");
                     
                     return shouldInclude;
                 })
                 .Select(item => new
                 {
                     Item = item,
-                    DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null).Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
+                    DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None)
+                        .Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
                 })
                 .OrderBy(x => x.DateTime)
                 .FirstOrDefault();
+                
+            if (result == null)
+            {
+                UpdateStatus("DEBUG: No classes found needing attendance");
+                // Let's also check if we have ANY upcoming classes at all
+                var anyUpcoming = items.Any(item => 
+                    DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                    TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime) &&
+                    date.Add(startTime) >= now.AddMinutes(-15));
+                UpdateStatus($"DEBUG: Any upcoming classes at all: {anyUpcoming}");
+            }
+            else
+            {
+                UpdateStatus($"DEBUG: Found next class: {result.Item.Fag} at {result.DateTime}");
+            }
+            
+            return result;
         }
 
         private async Task<ScheduleResponse> ProcessScheduleDataAsync(CancellationToken cancellationToken)
