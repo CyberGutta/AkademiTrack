@@ -966,17 +966,12 @@ STEPS:
 
                     Debug.WriteLine($"Total schedule items received: {scheduleData.Items.Count}", "SCHEDULE");
 
-                    // Filter for studietid (STU) classes only - FIX: Define the variable properly
+                    // Filter for studietid (STU) classes only
                     var studietidClasses = scheduleData.Items
                         .Where(item => item.Fag != null && item.Fag.Contains("STU"))
                         .ToList();
 
                     Debug.WriteLine($"Filtered STU classes: {studietidClasses.Count}", "FILTER");
-
-                    foreach (var stuClass in studietidClasses)
-                    {
-                        Debug.WriteLine($"STU Class: {stuClass.Fag} at {stuClass.StartKl}, Registered: {stuClass.ElevForerTilstedevaerelse}, Type: {stuClass.Typefravaer}", "FILTER");
-                    }
 
                     if (!studietidClasses.Any())
                     {
@@ -988,102 +983,23 @@ STEPS:
                     }
 
                     var now = DateTime.Now;
-                    Debug.WriteLine($"Current time for analysis: {now:HH:mm:ss}", "ANALYSIS");
 
-                    // Analyze studietid classes
-                    var studietidAnalysis = AnalyzeStudietidClasses(studietidClasses, now);
+                    // Process studietid classes
+                    await ProcessStudietidClasses(studietidClasses, now, cancellationToken);
 
-                    Debug.WriteLine("=== STU CLASS ANALYSIS ===", "ANALYSIS");
-                    Debug.WriteLine($"Total STU classes: {studietidAnalysis.Total}", "ANALYSIS");
-                    Debug.WriteLine($"Already registered: {studietidAnalysis.AlreadyRegistered}", "ANALYSIS");
-                    Debug.WriteLine($"Upcoming (future): {studietidAnalysis.Upcoming}", "ANALYSIS");
-                    Debug.WriteLine($"Current (ready to register): {studietidAnalysis.Current}", "ANALYSIS");
-                    Debug.WriteLine($"Past (missed): {studietidAnalysis.Past}", "ANALYSIS");
-
-                    // FIX: Use the correctly named variable
-                    await AnalyzeAndProcessStudietid(studietidClasses);
-
-                    UpdateStatus($"STU Analysis: {studietidAnalysis.AlreadyRegistered} registered, {studietidAnalysis.Current} ready, {studietidAnalysis.Upcoming} upcoming");
-
-                    // Check if all studietid classes are already registered
-                    if (studietidAnalysis.AlreadyRegistered == studietidAnalysis.Total)
+                    // Check completion status
+                    var completionStatus = CheckStudietidCompletion(studietidClasses, now);
+                    if (completionStatus.IsComplete)
                     {
-                        Debug.WriteLine("All STU classes are registered - automation complete!", "SUCCESS");
-                        UpdateStatus("SUCCESS: All studietid classes for today have been registered!");
-                        UpdateStatus("AUTOMATION COMPLETE: All studietid registrations done for today.");
+                        UpdateStatus(completionStatus.Message);
                         UpdateAutomationState(false);
                         return;
                     }
 
-                    // Check if there are any studietid classes that can still be registered
-                    if (studietidAnalysis.Current == 0 && studietidAnalysis.Upcoming == 0)
-                    {
-                        Debug.WriteLine("No more STU classes can be registered (all past deadline)", "AUTOMATION");
-                        UpdateStatus("All remaining studietid classes have passed their registration window.");
-                        UpdateStatus("AUTOMATION COMPLETE: No more studietid classes can be registered today.");
-                        UpdateAutomationState(false);
-                        return;
-                    }
-
-                    // Find the next studietid class that needs registration
-                    var nextStudietidClass = FindNextStudietidClassToRegister(studietidClasses, now);
-
-                    if (nextStudietidClass == null)
-                    {
-                        Debug.WriteLine("No STU classes currently need registration", "WAIT");
-                        UpdateStatus("No studietid classes currently need registration. Checking again in 5 minutes...");
-                        await DelayWithCountdown(TimeSpan.FromMinutes(5), "next STU check", cancellationToken);
-                        continue;
-                    }
-
-                    var classDateTime = DateTime.ParseExact(nextStudietidClass.Dato, "yyyyMMdd", null)
-                        .Add(TimeSpan.ParseExact(nextStudietidClass.StartKl, "HHmm", null));
-                    var timeDiff = classDateTime - now;
-
-                    Debug.WriteLine($"Next STU class: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl}", "NEXT");
-                    Debug.WriteLine($"Class starts in {timeDiff.TotalMinutes:F1} minutes", "NEXT");
-
-                    UpdateStatus($"Next studietid: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl} (in {timeDiff.TotalMinutes:F0} minutes)");
-
-                    // If class is more than 15 minutes away, wait until 15 minutes before
-                    if (timeDiff.TotalMinutes > 15)
-                    {
-                        var waitTime = timeDiff.Subtract(TimeSpan.FromMinutes(15));
-                        Debug.WriteLine($"Class is {timeDiff.TotalMinutes:F0} minutes away - waiting {waitTime.TotalMinutes:F0} minutes", "WAIT");
-                        UpdateStatus($"Waiting {waitTime.TotalMinutes:F0} minutes until studietid registration window opens...");
-                        await DelayWithCountdown(waitTime, $"STU registration window for {nextStudietidClass.Fag}", cancellationToken);
-                    }
-                    // If class is within registration window (-15 to +15 minutes from start time)
-                    else if (timeDiff.TotalMinutes >= -15 && timeDiff.TotalMinutes <= 15)
-                    {
-                        Debug.WriteLine($"STU registration window is OPEN for {nextStudietidClass.Fag}!", "REGISTER");
-                        UpdateStatus($"Studietid registration window is open for {nextStudietidClass.Fag}!");
-
-                        try
-                        {
-                            await MarkAttendanceAsync(nextStudietidClass, cancellationToken);
-
-                            Debug.WriteLine($"SUCCESS: Studietid attendance registered for {nextStudietidClass.Fag}", "SUCCESS");
-                            UpdateStatus($"✓ SUCCESS: Studietid attendance registered for {nextStudietidClass.Fag}");
-
-                            Debug.WriteLine("Waiting 2 minutes for system to update...", "WAIT");
-                            await DelayWithCountdown(TimeSpan.FromMinutes(2), "system update", cancellationToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"FAILED to register {nextStudietidClass.Fag}: {ex.Message}", "ERROR");
-                            UpdateStatus($"✗ FAILED: Could not register studietid attendance for {nextStudietidClass.Fag}: {ex.Message}");
-
-                            Debug.WriteLine("Waiting 1 minute before retry...", "WAIT");
-                            await DelayWithCountdown(TimeSpan.FromMinutes(1), "retry", cancellationToken);
-                        }
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"STU class {nextStudietidClass.Fag} registration window has passed", "MISSED");
-                        UpdateStatus($"Registration window passed for {nextStudietidClass.Fag}, checking for next studietid class...");
-                        await DelayWithCountdown(TimeSpan.FromMinutes(1), "next STU check", cancellationToken);
-                    }
+                    // Determine next wait time
+                    var waitTime = DetermineStudietidWaitTime(studietidClasses, now, out string reason);
+                    UpdateStatus(reason);
+                    await DelayWithCountdown(waitTime, "next STU check", cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1094,12 +1010,148 @@ STEPS:
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"ERROR in automation loop: {ex.Message}", "ERROR");
-                    Debug.WriteLine($"Stack trace: {ex.StackTrace}", "ERROR");
                     UpdateStatus($"Error in studietid automation: {ex.Message}");
-                    Debug.WriteLine("Waiting 5 minutes before retry...", "WAIT");
                     await DelayWithCountdown(TimeSpan.FromMinutes(5), "error recovery", cancellationToken);
                 }
             }
+        }
+
+        private async Task ProcessStudietidClasses(List<ScheduleItem> studietidClasses, DateTime now, CancellationToken cancellationToken)
+        {
+            Debug.WriteLine("=== PROCESSING STU CLASSES ===", "PROCESS");
+
+            foreach (var stuClass in studietidClasses)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                var classStatus = GetStudietidClassStatus(stuClass, now);
+                Debug.WriteLine($"STU Class: {stuClass.Fag} at {stuClass.StartKl} - Status: {classStatus.Status}", "PROCESS");
+
+                if (classStatus.Status == StudietidStatus.ReadyToRegister)
+                {
+                    Debug.WriteLine($"REGISTRATION WINDOW OPEN: {stuClass.Fag} at {stuClass.StartKl}", "REGISTER");
+                    UpdateStatus($"Registering for studietid: {stuClass.Fag} at {stuClass.StartKl}");
+
+                    try
+                    {
+                        await MarkAttendanceAsync(stuClass, cancellationToken);
+                        Debug.WriteLine($"✅ SUCCESS: Registered for {stuClass.Fag}", "SUCCESS");
+                        UpdateStatus($"✓ Successfully registered for studietid: {stuClass.Fag}");
+
+                        // Wait for system to update
+                        await Task.Delay(2000, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"❌ FAILED to register {stuClass.Fag}: {ex.Message}", "ERROR");
+                        UpdateStatus($"✗ Failed to register for studietid {stuClass.Fag}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private (StudietidStatus Status, string Message, DateTime? ClassTime) GetStudietidClassStatus(ScheduleItem stuClass, DateTime now)
+        {
+            // Check if already registered
+            if (stuClass.ElevForerTilstedevaerelse == 1 || stuClass.Typefravaer == "M")
+            {
+                return (StudietidStatus.AlreadyRegistered, "Already registered", null);
+            }
+
+            // Parse class time
+            if (!DateTime.TryParseExact(stuClass.Dato, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var classDate) ||
+                !TimeSpan.TryParseExact(stuClass.StartKl, "HHmm", CultureInfo.InvariantCulture, out var startTime))
+            {
+                Debug.WriteLine($"Failed to parse time for {stuClass.Fag}: Date={stuClass.Dato}, Time={stuClass.StartKl}", "ERROR");
+                return (StudietidStatus.ParseError, "Could not parse date/time", null);
+            }
+
+            var classDateTime = classDate.Add(startTime);
+            var timeDiff = classDateTime - now;
+
+            // Registration window: 15 minutes before to 15 minutes after class starts
+            if (timeDiff.TotalMinutes > 15)
+            {
+                return (StudietidStatus.Upcoming, $"Upcoming in {timeDiff.TotalMinutes:F0} minutes", classDateTime);
+            }
+            else if (timeDiff.TotalMinutes >= -15 && timeDiff.TotalMinutes <= 15)
+            {
+                return (StudietidStatus.ReadyToRegister, "Registration window open", classDateTime);
+            }
+            else
+            {
+                return (StudietidStatus.Missed, "Registration window closed", classDateTime);
+            }
+        }
+
+        private (bool IsComplete, string Message) CheckStudietidCompletion(List<ScheduleItem> studietidClasses, DateTime now)
+        {
+            var analysis = AnalyzeStudietidClasses(studietidClasses, now);
+
+            Debug.WriteLine($"STU Analysis - Total: {analysis.Total}, Registered: {analysis.AlreadyRegistered}, Current: {analysis.Current}, Upcoming: {analysis.Upcoming}, Missed: {analysis.Past}", "ANALYSIS");
+
+            // All classes are registered
+            if (analysis.AlreadyRegistered == analysis.Total)
+            {
+                return (true, "SUCCESS: All studietid classes for today have been registered!");
+            }
+
+            // No more classes can be registered (all are either registered or missed)
+            if (analysis.Current == 0 && analysis.Upcoming == 0)
+            {
+                return (true, "AUTOMATION COMPLETE: No more studietid classes can be registered today.");
+            }
+
+            return (false, $"Continuing automation - {analysis.AlreadyRegistered}/{analysis.Total} registered, {analysis.Current} ready, {analysis.Upcoming} upcoming");
+        }
+
+        private TimeSpan DetermineStudietidWaitTime(List<ScheduleItem> studietidClasses, DateTime now, out string reason)
+        {
+            var nextClass = studietidClasses
+                .Select(stuClass => GetStudietidClassStatus(stuClass, now))
+                .Where(status => status.Status == StudietidStatus.Upcoming && status.ClassTime.HasValue)
+                .OrderBy(status => status.ClassTime.Value)
+                .FirstOrDefault();
+
+            if (nextClass.ClassTime == null)
+            {
+                reason = "No upcoming studietid classes - checking for schedule updates in 30 minutes";
+                return TimeSpan.FromMinutes(30);
+            }
+
+            var timeUntilClass = nextClass.ClassTime.Value - now;
+            var timeUntilWindow = nextClass.ClassTime.Value.AddMinutes(-15) - now;
+
+            if (timeUntilWindow.TotalMinutes <= 2)
+            {
+                reason = $"Next studietid class registration opens in {timeUntilWindow.TotalMinutes:F0} minutes - checking in 1 minute";
+                return TimeSpan.FromMinutes(1);
+            }
+            else if (timeUntilWindow.TotalMinutes <= 10)
+            {
+                reason = $"Next studietid registration window opens in {timeUntilWindow.TotalMinutes:F0} minutes - checking in 2 minutes";
+                return TimeSpan.FromMinutes(2);
+            }
+            else if (timeUntilWindow.TotalMinutes <= 30)
+            {
+                reason = $"Next studietid class in {timeUntilWindow.TotalMinutes:F0} minutes - checking in 5 minutes";
+                return TimeSpan.FromMinutes(5);
+            }
+            else
+            {
+                reason = $"Next studietid class in {timeUntilWindow.TotalHours:F1} hours - checking in 15 minutes";
+                return TimeSpan.FromMinutes(15);
+            }
+        }
+
+        // Add this enum to your class
+        private enum StudietidStatus
+        {
+            AlreadyRegistered,
+            Upcoming,
+            ReadyToRegister,
+            Missed,
+            ParseError
         }
 
         private (int Total, int AlreadyRegistered, int Upcoming, int Current, int Past) AnalyzeStudietidClasses(List<ScheduleItem> studietidClasses, DateTime now)
@@ -1112,25 +1164,23 @@ STEPS:
 
             foreach (var stuClass in studietidClasses)
             {
-                // Check if already registered
-                if (IsStudietidAlreadyRegistered(stuClass))
-                {
-                    alreadyRegistered++;
-                    continue;
-                }
+                var status = GetStudietidClassStatus(stuClass, now);
 
-                if (DateTime.TryParseExact(stuClass.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
-                    TimeSpan.TryParseExact(stuClass.StartKl, "HHmm", null, out var startTime))
+                switch (status.Status)
                 {
-                    var classDateTime = date.Add(startTime);
-                    var timeDiff = classDateTime - now;
-
-                    if (timeDiff.TotalMinutes > 15)
+                    case StudietidStatus.AlreadyRegistered:
+                        alreadyRegistered++;
+                        break;
+                    case StudietidStatus.Upcoming:
                         upcoming++;
-                    else if (timeDiff.TotalMinutes >= -15)
+                        break;
+                    case StudietidStatus.ReadyToRegister:
                         current++;
-                    else
+                        break;
+                    case StudietidStatus.Missed:
+                    case StudietidStatus.ParseError:
                         past++;
+                        break;
                 }
             }
 
@@ -1639,6 +1689,15 @@ STEPS:
                 Debug.WriteLine($"  {header.Key}: {string.Join(", ", header.Value)}", "API");
             }
 
+            // Also log content headers if they exist
+            if (response.Content?.Headers != null)
+            {
+                foreach (var header in response.Content.Headers)
+                {
+                    Debug.WriteLine($"  {header.Key}: {string.Join(", ", header.Value)}", "API");
+                }
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
@@ -1658,9 +1717,36 @@ STEPS:
             var jsonString = await response.Content.ReadAsStringAsync();
             Debug.WriteLine($"Raw response length: {jsonString.Length} characters", "API");
 
-            // Log first 500 characters of response for debugging
-            var preview = jsonString.Length > 500 ? jsonString.Substring(0, 500) + "..." : jsonString;
+            // Log much more of the response - up to 5000 characters for complete visibility
+            var preview = jsonString.Length > 5000 ? jsonString.Substring(0, 5000) + "..." : jsonString;
             Debug.WriteLine($"Response preview: {preview}", "API");
+
+            // Also break it into chunks if it's very long to avoid console truncation
+            if (jsonString.Length > 2000)
+            {
+                Debug.WriteLine("=== FULL JSON RESPONSE IN CHUNKS ===", "API");
+                const int chunkSize = 2000;
+                for (int i = 0; i < jsonString.Length; i += chunkSize)
+                {
+                    int length = Math.Min(chunkSize, jsonString.Length - i);
+                    string chunk = jsonString.Substring(i, length);
+                    Debug.WriteLine($"CHUNK {(i / chunkSize) + 1}: {chunk}", "API");
+                }
+                Debug.WriteLine("=== END OF CHUNKED RESPONSE ===", "API");
+            }
+
+            // Also log the full response to a file for complete debugging
+            try
+            {
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var debugFileName = $"api_response_{timestamp}.json";
+                await File.WriteAllTextAsync(debugFileName, jsonString);
+                Debug.WriteLine($"Full response saved to: {debugFileName}", "API");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Could not save full response to file: {ex.Message}", "API");
+            }
 
             if (string.IsNullOrWhiteSpace(jsonString))
             {
@@ -1671,23 +1757,49 @@ STEPS:
             try
             {
                 Debug.WriteLine("Parsing JSON response...", "API");
+
+                // First, let's try to parse as a generic JsonDocument to see the structure
+                using (JsonDocument document = JsonDocument.Parse(jsonString))
+                {
+                    Debug.WriteLine("JSON structure analysis:", "API");
+                    Debug.WriteLine($"  Root element kind: {document.RootElement.ValueKind}", "API");
+
+                    if (document.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        Debug.WriteLine("  Root properties:", "API");
+                        foreach (var property in document.RootElement.EnumerateObject().Take(10)) // First 10 properties
+                        {
+                            Debug.WriteLine($"    {property.Name}: {property.Value.ValueKind}", "API");
+                        }
+                    }
+                }
+
+                // Now parse into our object
                 var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(jsonString, new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
                 var itemCount = scheduleResponse?.Items?.Count ?? 0;
                 Debug.WriteLine($"Successfully parsed {itemCount} schedule items", "API");
 
-                // Log each schedule item for debugging
+                // Log detailed information about each schedule item
                 if (scheduleResponse?.Items != null)
                 {
                     Debug.WriteLine("SCHEDULE ITEMS DETAILS:", "SCHEDULE");
-                    foreach (var item in scheduleResponse.Items)
+                    for (int i = 0; i < scheduleResponse.Items.Count; i++)
                     {
-                        Debug.WriteLine($"  ID: {item.Id}, Fag: {item.Fag}, Date: {item.Dato}, Time: {item.StartKl}-{item.SluttKl}", "SCHEDULE");
-                        Debug.WriteLine($"    ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}, Typefravaer: {item.Typefravaer}", "SCHEDULE");
+                        var item = scheduleResponse.Items[i];
+                        Debug.WriteLine($"  [{i}] ID: {item.Id}, Fag: {item.Fag}, Date: {item.Dato}, Time: {item.StartKl}-{item.SluttKl}", "SCHEDULE");
+                        Debug.WriteLine($"      ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}, Typefravaer: '{item.Typefravaer}'", "SCHEDULE");
+                        Debug.WriteLine($"      Stkode: {item.Stkode}, KlTrinn: {item.KlTrinn}, KlId: {item.KlId}, KNavn: {item.KNavn}", "SCHEDULE");
+                        Debug.WriteLine($"      GruppeNr: {item.GruppeNr}, Timenr: {item.Timenr}", "SCHEDULE");
+                        Debug.WriteLine($"      UndervisningPaagaar: {item.UndervisningPaagaar}, Kollisjon: {item.Kollisjon}", "SCHEDULE");
+                        Debug.WriteLine($"      TidsromTilstedevaerelse: '{item.TidsromTilstedevaerelse}'", "SCHEDULE");
                     }
+
+                    Debug.WriteLine($"SCHEDULE: Total schedule items received: {scheduleResponse.Items.Count}", "SCHEDULE");
                 }
 
                 return scheduleResponse ?? new ScheduleResponse { Items = new List<ScheduleItem>() };
@@ -1695,7 +1807,79 @@ STEPS:
             catch (JsonException ex)
             {
                 Debug.WriteLine($"JSON parsing failed: {ex.Message}", "ERROR");
-                Debug.WriteLine($"Raw JSON that failed: {jsonString}", "ERROR");
+                Debug.WriteLine($"JSON parsing failed at path: {ex.Path}", "ERROR");
+                Debug.WriteLine($"JSON parsing failed at position: {ex.BytePositionInLine}", "ERROR");
+
+                // Save the problematic JSON to a file for debugging
+                try
+                {
+                    var errorFileName = $"json_parse_error_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+                    await File.WriteAllTextAsync(errorFileName, jsonString);
+                    Debug.WriteLine($"Problematic JSON saved to: {errorFileName}", "ERROR");
+                }
+                catch (Exception fileEx)
+                {
+                    Debug.WriteLine($"Could not save problematic JSON: {fileEx.Message}", "ERROR");
+                }
+
+                // Try to extract partial data if possible
+                try
+                {
+                    using JsonDocument document = JsonDocument.Parse(jsonString);
+                    if (document.RootElement.TryGetProperty("items", out JsonElement itemsElement) ||
+                        document.RootElement.TryGetProperty("Items", out itemsElement))
+                    {
+                        Debug.WriteLine($"Found items array with {itemsElement.GetArrayLength()} elements", "API");
+
+                        // Try to parse individual items to see which one is problematic
+                        var itemsList = new List<ScheduleItem>();
+                        int successCount = 0;
+                        int errorCount = 0;
+
+                        foreach (var itemElement in itemsElement.EnumerateArray())
+                        {
+                            try
+                            {
+                                var item = JsonSerializer.Deserialize<ScheduleItem>(itemElement.GetRawText(), new JsonSerializerOptions
+                                {
+                                    PropertyNameCaseInsensitive = true,
+                                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                                });
+
+                                if (item != null)
+                                {
+                                    itemsList.Add(item);
+                                    successCount++;
+                                }
+                            }
+                            catch (Exception itemEx)
+                            {
+                                errorCount++;
+                                Debug.WriteLine($"Failed to parse individual item: {itemEx.Message}", "ERROR");
+                                Debug.WriteLine($"Problematic item JSON: {itemElement.GetRawText()}", "ERROR");
+                            }
+                        }
+
+                        Debug.WriteLine($"Partial parsing result: {successCount} successful, {errorCount} failed", "API");
+
+                        if (itemsList.Count > 0)
+                        {
+                            return new ScheduleResponse { Items = itemsList };
+                        }
+                    }
+                }
+                catch (Exception partialEx)
+                {
+                    Debug.WriteLine($"Partial parsing also failed: {partialEx.Message}", "ERROR");
+                }
+
+                throw new JsonException($"Failed to parse JSON response: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unexpected error during response processing: {ex.Message}", "ERROR");
+                Debug.WriteLine($"Exception type: {ex.GetType().Name}", "ERROR");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}", "ERROR");
                 throw;
             }
         }
