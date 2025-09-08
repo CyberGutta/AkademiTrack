@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -965,7 +966,7 @@ STEPS:
 
                     Debug.WriteLine($"Total schedule items received: {scheduleData.Items.Count}", "SCHEDULE");
 
-                    // Filter for studietid (STU) classes only
+                    // Filter for studietid (STU) classes only - FIX: Define the variable properly
                     var studietidClasses = scheduleData.Items
                         .Where(item => item.Fag != null && item.Fag.Contains("STU"))
                         .ToList();
@@ -998,6 +999,9 @@ STEPS:
                     Debug.WriteLine($"Upcoming (future): {studietidAnalysis.Upcoming}", "ANALYSIS");
                     Debug.WriteLine($"Current (ready to register): {studietidAnalysis.Current}", "ANALYSIS");
                     Debug.WriteLine($"Past (missed): {studietidAnalysis.Past}", "ANALYSIS");
+
+                    // FIX: Use the correctly named variable
+                    await AnalyzeAndProcessStudietid(studietidClasses);
 
                     UpdateStatus($"STU Analysis: {studietidAnalysis.AlreadyRegistered} registered, {studietidAnalysis.Current} ready, {studietidAnalysis.Upcoming} upcoming");
 
@@ -1937,12 +1941,257 @@ STEPS:
         {
             try
             {
-                var response = await _httpClient.GetStringAsync("https://api.ipify.org");
-                return response.Trim();
+                using (var client = new HttpClient())
+                {
+                    var response = await client.GetStringAsync("https://api.ipify.org");
+                    return response.Trim();
+                }
             }
             catch
             {
-                return "0.0.0.0";
+                return "0.0.0.0"; // Fallback
+            }
+        }
+
+        private async Task<bool> RegisterForStudietid(ScheduleItem stuClass)
+        {
+            try
+            {
+                Debug.WriteLine($"REGISTRATION: Attempting to register for {stuClass.Fag} at {stuClass.StartKl}", "REGISTRATION");
+
+                // Load cookies
+                var cookies = await LoadCookiesFromFileAsync();
+                if (cookies == null)
+                {
+                    Debug.WriteLine("REGISTRATION: Failed to load cookies", "ERROR");
+                    return false;
+                }
+
+                // Extract cookie values
+                string jsessionid = cookies.GetValueOrDefault("JSESSIONID", "");
+                string wlAuthCookie = cookies.GetValueOrDefault("_WL_AUTHCOOKIE_JSESSIONID", "");
+                string oracleRoute = cookies.GetValueOrDefault("X-Oracle-BMC-LBS-Route", "");
+
+                if (string.IsNullOrEmpty(jsessionid) || string.IsNullOrEmpty(wlAuthCookie))
+                {
+                    Debug.WriteLine("REGISTRATION: Missing required cookies", "ERROR");
+                    return false;
+                }
+
+                // Get public IP
+                string publicIp = await GetPublicIpAsync();
+                Debug.WriteLine($"REGISTRATION: Using IP: {publicIp}", "REGISTRATION");
+
+                // Prepare payload exactly like Python script
+                var parameters = new object[]
+                {
+            new { fylkeid = "00" },
+            new { skoleid = "312" },
+            new { planperi = "2025-26" },
+            new { ansidato = stuClass.Dato },
+            new { stkode = stuClass.Stkode },
+            new { kl_trinn = stuClass.KlTrinn },
+            new { kl_id = stuClass.KlId },
+            new { k_navn = stuClass.KNavn },
+            new { gruppe_nr = stuClass.GruppeNr },
+            new { timenr = stuClass.Timenr },
+            new { fravaerstype = "M" }, // M for present/møtt
+            new { ip = publicIp }
+                };
+
+                var payload = new
+                {
+                    name = "lagre_oppmote",
+                    parameters = parameters
+                };
+
+                // Build URL
+                string url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionid}";
+                Debug.WriteLine($"REGISTRATION: URL: {url}", "REGISTRATION");
+
+                // Create HTTP request
+                using var httpClient = new HttpClient();
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/vnd.oracle.adf.action+json");
+
+                var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+
+                // Add headers exactly like Python
+                string jsessionidClean = jsessionid.Split('!')[0];
+                var headers = new Dictionary<string, string>
+                {
+                    ["Host"] = "iskole.net",
+                    ["Cookie"] = $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionidClean}; _WL_AUTHCOOKIE_JSESSIONID={wlAuthCookie}",
+                    ["Sec-Ch-Ua-Platform"] = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "\"macOS\"" : "\"Windows\"",
+                    ["Accept-Language"] = "nb-NO,nb;q=0.9",
+                    ["Sec-Ch-Ua"] = "\"Chromium\";v=\"140\", \"Not;A=Brand\";v=\"99\"",
+                    ["Sec-Ch-Ua-Mobile"] = "?0",
+                    ["X-Requested-With"] = "XMLHttpRequest",
+                    ["User-Agent"] = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+                        ? "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36"
+                        : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.81 Safari/537.36",
+                    ["Accept"] = "application/json, text/javascript, */*; q=0.01",
+                    ["Origin"] = "https://iskole.net",
+                    ["Sec-Fetch-Site"] = "same-origin",
+                    ["Sec-Fetch-Mode"] = "cors",
+                    ["Sec-Fetch-Dest"] = "empty",
+                    ["Referer"] = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar",
+                    ["Accept-Encoding"] = "gzip, deflate, br",
+                    ["Priority"] = "u=4, i",
+                    ["Connection"] = "keep-alive"
+                };
+
+                foreach (var header in headers)
+                {
+                    request.Headers.Add(header.Key, header.Value);
+                }
+
+                Debug.WriteLine("REGISTRATION: Sending POST request to register for studietid...", "REGISTRATION");
+
+                // Send POST request
+                var response = await httpClient.SendAsync(request);
+                var responseText = await response.Content.ReadAsStringAsync();
+
+                Debug.WriteLine($"REGISTRATION: Response Status: {response.StatusCode}", "REGISTRATION");
+                Debug.WriteLine($"REGISTRATION: Response: {responseText}", "REGISTRATION");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"REGISTRATION: ✅ Successfully registered for {stuClass.Fag} at {stuClass.StartKl}", "SUCCESS");
+                    return true;
+                }
+                else
+                {
+                    Debug.WriteLine($"REGISTRATION: ❌ Failed to register for {stuClass.Fag} at {stuClass.StartKl}", "ERROR");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"REGISTRATION: Exception during registration: {ex.Message}", "ERROR");
+                return false;
+            }
+        }
+
+        private Dictionary<string, string> LoadCookies()
+        {
+            try
+            {
+                string cookiesPath = "cookies.json"; // Adjust path as needed
+                if (!File.Exists(cookiesPath))
+                {
+                    Console.WriteLine($"REGISTRATION: Cookie file not found: {cookiesPath}");
+                    return null;
+                }
+
+                var cookiesJson = File.ReadAllText(cookiesPath);
+                var cookiesArray = System.Text.Json.JsonSerializer.Deserialize<JsonElement[]>(cookiesJson);
+
+                var cookies = new Dictionary<string, string>();
+                foreach (var cookie in cookiesArray)
+                {
+                    if (cookie.TryGetProperty("name", out var name) && cookie.TryGetProperty("value", out var value))
+                    {
+                        cookies[name.GetString()] = value.GetString();
+                    }
+                }
+
+                return cookies;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"REGISTRATION: Error loading cookies: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task AnalyzeAndProcessStudietid(List<ScheduleItem> studietidClasses)
+        {
+            Debug.WriteLine("ANALYSIS: === STU CLASS ANALYSIS ===", "ANALYSIS");
+            Debug.WriteLine($"ANALYSIS: Total STU classes: {studietidClasses.Count}", "ANALYSIS");
+
+            DateTime currentTime = DateTime.Now;
+            Debug.WriteLine($"ANALYSIS: Current time for analysis: {currentTime:HH:mm:ss}", "ANALYSIS");
+
+            int alreadyRegistered = 0;
+            int upcoming = 0;
+            int readyToRegister = 0;
+            int missed = 0;
+
+            foreach (var stuClass in studietidClasses)
+            {
+                // Parse class time
+                if (!DateTime.TryParseExact(stuClass.Dato, "yyyyMMdd", null, DateTimeStyles.None, out DateTime classDate) ||
+                    !TimeSpan.TryParseExact(stuClass.StartKl, "HHmm", null, out TimeSpan startTime))
+                {
+                    Debug.WriteLine($"ANALYSIS: Could not parse time for class {stuClass.Fag}", "ANALYSIS");
+                    continue;
+                }
+
+                DateTime classStartTime = classDate.Add(startTime);
+                DateTime classEndTime = classStartTime.AddMinutes(45); // Assuming 45 min classes
+                var timeDiff = classStartTime - currentTime;
+
+                // Check if already registered (either ElevForerTilstedevaerelse = 1 OR Typefravaer = "M")
+                if (stuClass.ElevForerTilstedevaerelse == 1 || stuClass.Typefravaer == "M")
+                {
+                    alreadyRegistered++;
+                    Debug.WriteLine($"ANALYSIS: ✅ {stuClass.Fag} at {stuClass.StartKl} - Already registered", "ANALYSIS");
+                    continue;
+                }
+
+                // Check timing - registration window is 15 minutes before to 15 minutes after class starts
+                if (timeDiff.TotalMinutes > 15)
+                {
+                    upcoming++;
+                    Debug.WriteLine($"ANALYSIS: ⏳ {stuClass.Fag} at {stuClass.StartKl} - Upcoming (in {timeDiff.TotalMinutes:F0} minutes)", "ANALYSIS");
+                }
+                else if (timeDiff.TotalMinutes >= -15 && timeDiff.TotalMinutes <= 15)
+                {
+                    readyToRegister++;
+                    Debug.WriteLine($"ANALYSIS: 🎯 {stuClass.Fag} at {stuClass.StartKl} - READY TO REGISTER!", "ANALYSIS");
+
+                    // REGISTER NOW!
+                    try
+                    {
+                        bool success = await RegisterForStudietid(stuClass);
+                        if (success)
+                        {
+                            Debug.WriteLine($"ANALYSIS: ✅ Registration successful for {stuClass.Fag}", "SUCCESS");
+                            UpdateStatus($"✓ Successfully registered for studietid: {stuClass.Fag}");
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"ANALYSIS: ❌ Registration failed for {stuClass.Fag}", "ERROR");
+                            UpdateStatus($"✗ Failed to register for studietid: {stuClass.Fag}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"ANALYSIS: ❌ Registration exception for {stuClass.Fag}: {ex.Message}", "ERROR");
+                        UpdateStatus($"✗ Registration error for {stuClass.Fag}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    missed++;
+                    Debug.WriteLine($"ANALYSIS: ❌ {stuClass.Fag} at {stuClass.StartKl} - Missed (registration window closed)", "ANALYSIS");
+                }
+            }
+
+            Debug.WriteLine($"ANALYSIS: Already registered: {alreadyRegistered}", "ANALYSIS");
+            Debug.WriteLine($"ANALYSIS: Upcoming (future): {upcoming}", "ANALYSIS");
+            Debug.WriteLine($"ANALYSIS: Current (ready to register): {readyToRegister}", "ANALYSIS");
+            Debug.WriteLine($"ANALYSIS: Past (missed): {missed}", "ANALYSIS");
+
+            if (readyToRegister == 0 && upcoming == 0 && alreadyRegistered == studietidClasses.Count)
+            {
+                Debug.WriteLine("SUCCESS: All STU classes are registered - automation complete!", "SUCCESS");
+                UpdateStatus("SUCCESS: All studietid classes are now registered!");
+            }
+            else if (upcoming > 0)
+            {
+                Debug.WriteLine($"WAITING: {upcoming} STU classes upcoming - will register when time arrives", "WAIT");
+                UpdateStatus($"Waiting for {upcoming} upcoming studietid classes to reach registration window");
             }
         }
 
