@@ -24,41 +24,44 @@ using WebDriverManager.DriverConfigs.Impl;
 namespace AkademiTrack.ViewModels
 {
     public class SimpleCommand : ICommand
+{
+    private readonly Func<Task> _execute;
+    private readonly Func<bool> _canExecute;
+    private bool _isExecuting;
+    private readonly bool _disableWhenExecuting;
+
+    public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null, bool disableWhenExecuting = true)
     {
-        private readonly Func<Task> _execute;
-        private readonly Func<bool> _canExecute;
-        private bool _isExecuting;
-
-        public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null)
-        {
-            _execute = execute;
-            _canExecute = canExecute ?? (() => true);
-        }
-
-        public event EventHandler CanExecuteChanged;
-
-        public bool CanExecute(object parameter) => !_isExecuting && _canExecute();
-
-        public async void Execute(object parameter)
-        {
-            if (!CanExecute(parameter)) return;
-
-            _isExecuting = true;
-            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-
-            try
-            {
-                await _execute();
-            }
-            finally
-            {
-                _isExecuting = false;
-                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        _execute = execute;
+        _canExecute = canExecute ?? (() => true);
+        _disableWhenExecuting = disableWhenExecuting;
     }
+
+    public event EventHandler CanExecuteChanged;
+
+    public bool CanExecute(object parameter) => 
+        _disableWhenExecuting ? (!_isExecuting && _canExecute()) : _canExecute();
+
+    public async void Execute(object parameter)
+    {
+        if (!CanExecute(parameter)) return;
+
+        _isExecuting = true;
+        CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+
+        try
+        {
+            await _execute();
+        }
+        finally
+        {
+            _isExecuting = false;
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
 
     public partial class MainWindowViewModel : ViewModelBase, INotifyPropertyChanged
     {
@@ -80,8 +83,8 @@ namespace AkademiTrack.ViewModels
             _httpClient = new HttpClient();
             _statusMessage = "Ready to start automation";
 
-            StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
-            StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
+            StartAutomationCommand = new SimpleCommand(StartAutomationAsync, () => !IsAutomationRunning);
+            StopAutomationCommand = new SimpleCommand(StopAutomationAsync, () => IsAutomationRunning);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
         }
 
@@ -132,20 +135,21 @@ namespace AkademiTrack.ViewModels
         }
 
         private void UpdateAutomationState(bool isRunning)
-        {
+{
             if (Dispatcher.UIThread.CheckAccess())
             {
                 IsAutomationRunning = isRunning;
-                ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-                ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                // Fix: Cast and call RaiseCanExecuteChanged properly
+                (StartAutomationCommand as SimpleCommand)?.RaiseCanExecuteChanged();
+                (StopAutomationCommand as SimpleCommand)?.RaiseCanExecuteChanged();
             }
             else
             {
                 Dispatcher.UIThread.Post(() =>
                 {
                     IsAutomationRunning = isRunning;
-                    ((SimpleCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-                    ((SimpleCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                    (StartAutomationCommand as SimpleCommand)?.RaiseCanExecuteChanged();
+                    (StopAutomationCommand as SimpleCommand)?.RaiseCanExecuteChanged();
                 });
             }
         }
@@ -905,11 +909,17 @@ STEPS:
 
         private async Task StopAutomationAsync()
         {
+            UpdateStatus("Stop button clicked - cancelling automation...");
+            
             if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 _cancellationTokenSource.Cancel();
-                UpdateStatus("Stopping automation...");
+                UpdateStatus("Cancellation requested...");
             }
+            
+            // Force update the automation state
+            UpdateAutomationState(false);
+            UpdateStatus("Automation stopped by user");
         }
 
         private async Task OpenSettingsAsync()
@@ -930,45 +940,128 @@ STEPS:
 
         private async Task RunAutomationLoop(CancellationToken cancellationToken)
         {
-            var loopCount = 0;
-
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    loopCount++;
-                    UpdateStatus($"[Loop #{loopCount}] Starting automation cycle at {DateTime.Now:HH:mm:ss}");
-
+                    UpdateStatus("Loading schedule data...");
                     var scheduleData = await ProcessScheduleDataAsync(cancellationToken);
-                    if (scheduleData == null) return; // Automation stopped
+                    if (scheduleData == null) return;
 
-                    await ProcessAttendanceAsync(scheduleData, cancellationToken);
+                    // Find the next class that needs attendance
+                    var nextClass = GetNextClassNeedingAttendance(scheduleData.Items);
+                    
+                    if (nextClass == null)
+                    {
+                        UpdateStatus("No upcoming classes found. Checking again in 1 hour...");
+                        await DelayWithCountdown(TimeSpan.FromHours(1), "Schedule refresh", cancellationToken);
+                        continue;
+                    }
 
-                    var waitTime = DetermineWaitTime(scheduleData.Items, DateTime.Now, out string waitReason);
-                    UpdateStatus($"[4/4] {waitReason}");
-                    await DelayWithCountdown(waitTime, "Next check", cancellationToken);
+                    var now = DateTime.Now;
+                    var attendanceTime = nextClass.DateTime.AddMinutes(-15); // 15 minutes before class
+                    var waitTime = attendanceTime - now;
+
+                    if (waitTime.TotalMinutes > 0)
+                    {
+                        UpdateStatus($"Next class: {nextClass.Item.Fag} at {nextClass.Item.StartKl}");
+                        UpdateStatus($"Attendance opens at: {attendanceTime:HH:mm:ss}");
+                        await DelayWithCountdown(waitTime, $"attendance for {nextClass.Item.Fag}", cancellationToken);
+                    }
+
+                    // Time to mark attendance
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        UpdateStatus($"Marking attendance for {nextClass.Item.Fag}...");
+                        try
+                        {
+                            await MarkAttendanceAsync(nextClass.Item, cancellationToken);
+                            UpdateStatus($"✓ Attendance marked successfully for {nextClass.Item.Fag}");
+                        }
+                        catch (Exception ex)
+                        {
+                            UpdateStatus($"✗ Failed to mark attendance for {nextClass.Item.Fag}: {ex.Message}");
+                        }
+                    }
+
+                    // Wait until after class ends before checking for next class
+                    var classEndTime = nextClass.DateTime.Add(TimeSpan.ParseExact(nextClass.Item.SluttKl, "HHmm", null));
+                    var waitUntilAfterClass = classEndTime.AddMinutes(5) - DateTime.Now;
+                    
+                    if (waitUntilAfterClass.TotalMinutes > 0)
+                    {
+                        await DelayWithCountdown(waitUntilAfterClass, "next schedule check", cancellationToken);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
                     UpdateStatus("Automation cancelled by user");
                     throw;
                 }
-                catch (HttpRequestException httpEx)
-                {
-                    UpdateStatus($"NETWORK ERROR: {httpEx.Message}");
-                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Network retry", cancellationToken);
-                }
-                catch (JsonException jsonEx)
-                {
-                    UpdateStatus($"JSON PARSE ERROR: {jsonEx.Message}");
-                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Parse retry", cancellationToken);
-                }
                 catch (Exception ex)
                 {
-                    UpdateStatus($"UNEXPECTED ERROR: {ex.Message}");
-                    await DelayWithCountdown(TimeSpan.FromSeconds(30), "Error retry", cancellationToken);
+                    UpdateStatus($"Error in automation loop: {ex.Message}");
+                    await DelayWithCountdown(TimeSpan.FromMinutes(5), "Error retry", cancellationToken);
                 }
             }
+        }
+
+        // ADD this new method to find the next class needing attendance:
+        private dynamic GetNextClassNeedingAttendance(List<ScheduleItem> items)
+        {
+            var now = DateTime.Now;
+            
+            // Debug: Print all items for troubleshooting
+            UpdateStatus($"DEBUG: Checking {items.Count} schedule items at {now:HH:mm:ss}");
+            
+            foreach (var item in items)
+            {
+                if (DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                    TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var time))
+                {
+                    var classDateTime = date.Add(time);
+                    UpdateStatus($"DEBUG: {item.Fag} at {item.StartKl} - ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}, DateTime: {classDateTime}");
+                }
+            }
+            
+            return items
+                .Where(item => 
+                {
+                    // Parse date and time
+                    if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) ||
+                        !TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
+                    {
+                        return false;
+                    }
+
+                    var classDateTime = date.Add(startTime);
+                    
+                    // Check if class is today and in the future (or just started)
+                    var isToday = date.Date == now.Date;
+                    var isUpcoming = classDateTime >= now.AddMinutes(-15); // Allow 15 min after start
+                    
+                    // Check if attendance is needed - try different possible field names
+                    var needsAttendance = item.ElevForerTilstedevaerelse == 0 || 
+                                        item.ElevForerTilstedevaerelse == null ||
+                                        string.Equals(item.Typefravaer, "Nei", StringComparison.OrdinalIgnoreCase) ||
+                                        string.IsNullOrEmpty(item.Typefravaer);
+                    
+                    var shouldInclude = isToday && isUpcoming && needsAttendance;
+                    
+                    if (shouldInclude)
+                    {
+                        UpdateStatus($"DEBUG: MATCH FOUND - {item.Fag} at {item.StartKl}");
+                    }
+                    
+                    return shouldInclude;
+                })
+                .Select(item => new
+                {
+                    Item = item,
+                    DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null).Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
+                })
+                .OrderBy(x => x.DateTime)
+                .FirstOrDefault();
         }
 
         private async Task<ScheduleResponse> ProcessScheduleDataAsync(CancellationToken cancellationToken)
@@ -1347,27 +1440,82 @@ STEPS:
 
         private async Task MarkAttendanceAsync(ScheduleItem item, CancellationToken cancellationToken)
         {
-            var cookies = await LoadCookiesFromFileAsync();
-            if (cookies == null) throw new Exception("Failed to load cookies");
-
-            var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
-            var authCookie = cookies.GetValueOrDefault("_WL_AUTHCOOKIE_JSESSIONID", "");
-            var oracleRoute = cookies.GetValueOrDefault("X-Oracle-BMC-LBS-Route", "");
-
-            var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
-
-            var payload = await CreateAttendancePayload(item);
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/vnd.oracle.adf.action+json");
-
-            var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-            AddAttendanceHeaders(request, jsessionId, authCookie, oracleRoute);
-
-            var response = await _httpClient.SendAsync(request, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Failed to mark attendance. Status: {response.StatusCode}, Content: {errorContent}");
+                // Load cookies
+                var cookies = await LoadCookiesFromFileAsync();
+                if (cookies == null) throw new Exception("Failed to load cookies");
+
+                var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
+                var authCookie = cookies.GetValueOrDefault("_WL_AUTHCOOKIE_JSESSIONID", "");
+                var oracleRoute = cookies.GetValueOrDefault("X-Oracle-BMC-LBS-Route", "");
+
+                // Get public IP
+                var ip = await GetPublicIpAsync();
+
+                // Create payload exactly like Python script
+                var payload = new
+                {
+                    name = "lagre_oppmote",
+                    parameters = new object[]
+                    {
+                        new { fylkeid = "00" },
+                        new { skoleid = "312" },
+                        new { planperi = "2025-26" },
+                        new { ansidato = item.Dato },
+                        new { stkode = item.Stkode },
+                        new { kl_trinn = item.KlTrinn },
+                        new { kl_id = item.KlId },
+                        new { k_navn = item.KNavn },
+                        new { gruppe_nr = item.GruppeNr },
+                        new { timenr = item.Timenr },
+                        new { fravaerstype = "M" },
+                        new { ip = ip }
+                    }
+                };
+
+                // Build URL
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/vnd.oracle.adf.action+json");
+
+                // Create request
+                var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+                
+                // Add headers exactly like Python
+                var jsessionIdClean = jsessionId.Split('!')[0];
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Cookie", $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionIdClean}; _WL_AUTHCOOKIE_JSESSIONID={authCookie}");
+                request.Headers.Add("Sec-Ch-Ua-Platform", "\"macOS\"");
+                request.Headers.Add("Accept-Language", "nb-NO,nb;q=0.9");
+                request.Headers.Add("Sec-Ch-Ua", "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"");
+                request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
+                request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Origin", "https://iskole.net");
+                request.Headers.Add("Sec-Fetch-Site", "same-origin");
+                request.Headers.Add("Sec-Fetch-Mode", "cors");
+                request.Headers.Add("Sec-Fetch-Dest", "empty");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+                request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
+                request.Headers.Add("Priority", "u=4, i");
+                request.Headers.Add("Connection", "keep-alive");
+
+                // Send request
+                var response = await _httpClient.SendAsync(request, cancellationToken);
+                var responseText = await response.Content.ReadAsStringAsync();
+                
+                UpdateStatus($"Attendance response: {response.StatusCode} - {responseText}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Server returned {response.StatusCode}: {responseText}");
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Failed to mark attendance: {ex.Message}");
+                throw;
             }
         }
 
@@ -1514,7 +1662,12 @@ STEPS:
 
                 var classDateTime = itemDate.Add(startTime);
                 var timeDiff = classDateTime - DateTime.Now;
-                return timeDiff.TotalMinutes >= -45 && timeDiff.TotalMinutes <= 15;
+                
+                // Check if within attendance window AND attendance not already registered
+                var withinTimeWindow = timeDiff.TotalMinutes >= -45 && timeDiff.TotalMinutes <= 15;
+                var attendanceNeeded = item.ElevForerTilstedevaerelse == 0; // 0 = not registered
+                
+                return withinTimeWindow && attendanceNeeded;
             }
             catch
             {
@@ -1549,22 +1702,28 @@ STEPS:
     }
 
     public class ScheduleItem
-    {
-        public int Id { get; set; }
-        public string Fag { get; set; }
-        public string Stkode { get; set; }
-        public string KlTrinn { get; set; }
-        public string KlId { get; set; }
-        public string KNavn { get; set; }
-        public string GruppeNr { get; set; }
-        public string Dato { get; set; }
-        public string StartKl { get; set; }
-        public string SluttKl { get; set; }
-        public int UndervisningPaagaar { get; set; }
-        public string Typefravaer { get; set; }
-        public int ElevForerTilstedevaerelse { get; set; }
-        public int Kollisjon { get; set; }
-        public string TidsromTilstedevaerelse { get; set; }
-        public string Timenr { get; set; }
-    }
+{
+    public int Id { get; set; }
+    public string Fag { get; set; }
+    public string Stkode { get; set; }
+    public string KlTrinn { get; set; }
+    public string KlId { get; set; }
+    public string KNavn { get; set; }
+    public string GruppeNr { get; set; }
+    public string Dato { get; set; }
+    public string StartKl { get; set; }
+    public string SluttKl { get; set; }
+    public int UndervisningPaagaar { get; set; }
+    public string Typefravaer { get; set; }
+    public int ElevForerTilstedevaerelse { get; set; }
+    public int Kollisjon { get; set; }
+    public string TidsromTilstedevaerelse { get; set; }
+    
+    // Change this from string to int or use JsonConverter
+    public int Timenr { get; set; }  // Changed from string to int
+    
+    // Alternative approach using JsonConverter if you need it as string:
+    // [JsonConverter(typeof(JsonStringToIntConverter))]
+    // public string Timenr { get; set; }
+}
 }
