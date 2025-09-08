@@ -940,79 +940,85 @@ STEPS:
 
         private async Task RunAutomationLoop(CancellationToken cancellationToken)
         {
+            Debug.WriteLine("=== STUDIETID AUTOMATION STARTED ===", "AUTOMATION");
+            Debug.WriteLine($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "AUTOMATION");
+
             UpdateStatus("Starting studietid automation loop...");
-            Debug.WriteLine("[AUTOMATION] Starting studietid automation loop...");
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    UpdateStatus("Fetching schedule data...");
-                    Debug.WriteLine("[API] Fetching schedule data from server...");
+                    Debug.WriteLine("--- NEW AUTOMATION CYCLE ---", "CYCLE");
+                    Debug.WriteLine($"Cycle started at: {DateTime.Now:HH:mm:ss}", "CYCLE");
 
+                    UpdateStatus("Fetching schedule data...");
                     var scheduleData = await GetScheduleDataAsync(cancellationToken);
 
                     if (scheduleData?.Items?.Any() != true)
                     {
+                        Debug.WriteLine("No schedule data found in response", "SCHEDULE");
                         UpdateStatus("No schedule data found. Checking again in 30 minutes...");
-                        Debug.WriteLine("[SCHEDULE] No schedule data found - retrying in 30 minutes");
                         await DelayWithCountdown(TimeSpan.FromMinutes(30), "schedule refresh", cancellationToken);
                         continue;
                     }
 
-                    Debug.WriteLine($"[SCHEDULE] Found {scheduleData.Items.Count} total schedule items");
-                    UpdateStatus($"Found {scheduleData.Items.Count} total schedule items");
+                    Debug.WriteLine($"Total schedule items received: {scheduleData.Items.Count}", "SCHEDULE");
 
                     // Filter for studietid (STU) classes only
                     var studietidClasses = scheduleData.Items
                         .Where(item => item.Fag != null && item.Fag.Contains("STU"))
                         .ToList();
 
-                    Debug.WriteLine($"[FILTER] Found {studietidClasses.Count} STU (studietid) classes in schedule");
+                    Debug.WriteLine($"Filtered STU classes: {studietidClasses.Count}", "FILTER");
+
+                    foreach (var stuClass in studietidClasses)
+                    {
+                        Debug.WriteLine($"STU Class: {stuClass.Fag} at {stuClass.StartKl}, Registered: {stuClass.ElevForerTilstedevaerelse}, Type: {stuClass.Typefravaer}", "FILTER");
+                    }
 
                     if (!studietidClasses.Any())
                     {
+                        Debug.WriteLine("No STU classes found - stopping automation", "AUTOMATION");
                         UpdateStatus("No studietid (STU) classes found in today's schedule.");
-                        Debug.WriteLine("[STUDIETID] No STU classes found in schedule - stopping automation");
                         UpdateStatus("AUTOMATION COMPLETE: No studietid classes to register today.");
                         UpdateAutomationState(false);
-                        return; // Stop the automation completely
+                        return;
                     }
 
                     var now = DateTime.Now;
-                    Debug.WriteLine($"[TIME] Current time: {now:HH:mm:ss}");
+                    Debug.WriteLine($"Current time for analysis: {now:HH:mm:ss}", "ANALYSIS");
 
                     // Analyze studietid classes
                     var studietidAnalysis = AnalyzeStudietidClasses(studietidClasses, now);
 
-                    // Display analysis results
-                    Debug.WriteLine($"[ANALYSIS] STU classes analysis:");
-                    Debug.WriteLine($"  - Total STU classes: {studietidAnalysis.Total}");
-                    Debug.WriteLine($"  - Already registered: {studietidAnalysis.AlreadyRegistered}");
-                    Debug.WriteLine($"  - Upcoming (future): {studietidAnalysis.Upcoming}");
-                    Debug.WriteLine($"  - Current (ready to register): {studietidAnalysis.Current}");
-                    Debug.WriteLine($"  - Past (missed): {studietidAnalysis.Past}");
+                    Debug.WriteLine("=== STU CLASS ANALYSIS ===", "ANALYSIS");
+                    Debug.WriteLine($"Total STU classes: {studietidAnalysis.Total}", "ANALYSIS");
+                    Debug.WriteLine($"Already registered: {studietidAnalysis.AlreadyRegistered}", "ANALYSIS");
+                    Debug.WriteLine($"Upcoming (future): {studietidAnalysis.Upcoming}", "ANALYSIS");
+                    Debug.WriteLine($"Current (ready to register): {studietidAnalysis.Current}", "ANALYSIS");
+                    Debug.WriteLine($"Past (missed): {studietidAnalysis.Past}", "ANALYSIS");
 
                     UpdateStatus($"STU Analysis: {studietidAnalysis.AlreadyRegistered} registered, {studietidAnalysis.Current} ready, {studietidAnalysis.Upcoming} upcoming");
 
                     // Check if all studietid classes are already registered
                     if (studietidAnalysis.AlreadyRegistered == studietidAnalysis.Total)
                     {
+                        Debug.WriteLine("All STU classes are registered - automation complete!", "SUCCESS");
                         UpdateStatus("SUCCESS: All studietid classes for today have been registered!");
-                        Debug.WriteLine("[STUDIETID] All STU classes already registered - automation complete");
                         UpdateStatus("AUTOMATION COMPLETE: All studietid registrations done for today.");
                         UpdateAutomationState(false);
-                        return; // Stop the automation completely
+                        return;
                     }
 
                     // Check if there are any studietid classes that can still be registered
                     if (studietidAnalysis.Current == 0 && studietidAnalysis.Upcoming == 0)
                     {
+                        Debug.WriteLine("No more STU classes can be registered (all past deadline)", "AUTOMATION");
                         UpdateStatus("All remaining studietid classes have passed their registration window.");
-                        Debug.WriteLine("[STUDIETID] No more STU classes can be registered (all past deadline)");
                         UpdateStatus("AUTOMATION COMPLETE: No more studietid classes can be registered today.");
                         UpdateAutomationState(false);
-                        return; // Stop the automation completely
+                        return;
                     }
 
                     // Find the next studietid class that needs registration
@@ -1020,8 +1026,8 @@ STEPS:
 
                     if (nextStudietidClass == null)
                     {
+                        Debug.WriteLine("No STU classes currently need registration", "WAIT");
                         UpdateStatus("No studietid classes currently need registration. Checking again in 5 minutes...");
-                        Debug.WriteLine("[STUDIETID] No STU classes currently need registration - waiting 5 minutes");
                         await DelayWithCountdown(TimeSpan.FromMinutes(5), "next STU check", cancellationToken);
                         continue;
                     }
@@ -1030,8 +1036,8 @@ STEPS:
                         .Add(TimeSpan.ParseExact(nextStudietidClass.StartKl, "HHmm", null));
                     var timeDiff = classDateTime - now;
 
-                    Debug.WriteLine($"[NEXT CLASS] Next STU class: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl}");
-                    Debug.WriteLine($"[TIMING] Class starts in {timeDiff.TotalMinutes:F1} minutes");
+                    Debug.WriteLine($"Next STU class: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl}", "NEXT");
+                    Debug.WriteLine($"Class starts in {timeDiff.TotalMinutes:F1} minutes", "NEXT");
 
                     UpdateStatus($"Next studietid: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl} (in {timeDiff.TotalMinutes:F0} minutes)");
 
@@ -1039,57 +1045,54 @@ STEPS:
                     if (timeDiff.TotalMinutes > 15)
                     {
                         var waitTime = timeDiff.Subtract(TimeSpan.FromMinutes(15));
-                        Debug.WriteLine($"[WAIT] Class is {timeDiff.TotalMinutes:F0} minutes away - waiting {waitTime.TotalMinutes:F0} minutes until registration window");
+                        Debug.WriteLine($"Class is {timeDiff.TotalMinutes:F0} minutes away - waiting {waitTime.TotalMinutes:F0} minutes", "WAIT");
                         UpdateStatus($"Waiting {waitTime.TotalMinutes:F0} minutes until studietid registration window opens...");
                         await DelayWithCountdown(waitTime, $"STU registration window for {nextStudietidClass.Fag}", cancellationToken);
                     }
                     // If class is within registration window (-15 to +15 minutes from start time)
                     else if (timeDiff.TotalMinutes >= -15 && timeDiff.TotalMinutes <= 15)
                     {
-                        Debug.WriteLine($"[REGISTER] STU registration window is open for {nextStudietidClass.Fag}!");
+                        Debug.WriteLine($"STU registration window is OPEN for {nextStudietidClass.Fag}!", "REGISTER");
                         UpdateStatus($"Studietid registration window is open for {nextStudietidClass.Fag}!");
 
                         try
                         {
-                            Debug.WriteLine($"[REGISTER] Attempting to register attendance for {nextStudietidClass.Fag}...");
                             await MarkAttendanceAsync(nextStudietidClass, cancellationToken);
 
-                            Debug.WriteLine($"[SUCCESS] ✓ Studietid attendance registered successfully for {nextStudietidClass.Fag}");
+                            Debug.WriteLine($"SUCCESS: Studietid attendance registered for {nextStudietidClass.Fag}", "SUCCESS");
                             UpdateStatus($"✓ SUCCESS: Studietid attendance registered for {nextStudietidClass.Fag}");
 
-                            // Wait 2 minutes before checking again to let the system update
-                            Debug.WriteLine("[WAIT] Waiting 2 minutes for system to update...");
+                            Debug.WriteLine("Waiting 2 minutes for system to update...", "WAIT");
                             await DelayWithCountdown(TimeSpan.FromMinutes(2), "system update", cancellationToken);
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[ERROR] ✗ Failed to register studietid attendance for {nextStudietidClass.Fag}: {ex.Message}");
+                            Debug.WriteLine($"FAILED to register {nextStudietidClass.Fag}: {ex.Message}", "ERROR");
                             UpdateStatus($"✗ FAILED: Could not register studietid attendance for {nextStudietidClass.Fag}: {ex.Message}");
 
-                            // Wait 1 minute before retrying
-                            Debug.WriteLine("[RETRY] Waiting 1 minute before retry...");
+                            Debug.WriteLine("Waiting 1 minute before retry...", "WAIT");
                             await DelayWithCountdown(TimeSpan.FromMinutes(1), "retry", cancellationToken);
                         }
                     }
                     else
                     {
-                        // Class registration window has passed
-                        Debug.WriteLine($"[MISSED] STU class {nextStudietidClass.Fag} registration window has passed");
+                        Debug.WriteLine($"STU class {nextStudietidClass.Fag} registration window has passed", "MISSED");
                         UpdateStatus($"Registration window passed for {nextStudietidClass.Fag}, checking for next studietid class...");
                         await DelayWithCountdown(TimeSpan.FromMinutes(1), "next STU check", cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    Debug.WriteLine("[CANCELLED] Studietid automation cancelled by user");
+                    Debug.WriteLine("Studietid automation cancelled by user", "CANCELLED");
                     UpdateStatus("Studietid automation cancelled by user");
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[ERROR] Error in studietid automation loop: {ex.Message}");
+                    Debug.WriteLine($"ERROR in automation loop: {ex.Message}", "ERROR");
+                    Debug.WriteLine($"Stack trace: {ex.StackTrace}", "ERROR");
                     UpdateStatus($"Error in studietid automation: {ex.Message}");
-                    Debug.WriteLine("[RETRY] Waiting 5 minutes before retry...");
+                    Debug.WriteLine("Waiting 5 minutes before retry...", "WAIT");
                     await DelayWithCountdown(TimeSpan.FromMinutes(5), "error recovery", cancellationToken);
                 }
             }
@@ -1504,33 +1507,83 @@ STEPS:
 
         private async Task<ScheduleResponse> GetScheduleDataAsync(CancellationToken cancellationToken)
         {
+            Debug.WriteLine("=== STARTING API REQUEST ===", "API");
+
             try
             {
+                Debug.WriteLine("Loading cookies from file...", "API");
                 var cookies = await LoadCookiesFromFileAsync();
                 if (!cookies?.Any() == true)
                 {
+                    Debug.WriteLine("ERROR: No cookies available", "API");
                     throw new Exception("Failed to load cookies. Use 'Login & Extract' to get fresh cookies.");
                 }
 
+                Debug.WriteLine($"Loaded {cookies.Count} cookies:", "API");
+                foreach (var cookie in cookies)
+                {
+                    var truncatedValue = cookie.Value.Length > 20 ? cookie.Value.Substring(0, 20) + "..." : cookie.Value;
+                    Debug.WriteLine($"  {cookie.Key} = {truncatedValue}", "API");
+                }
+
                 var url = BuildApiUrl();
-                UpdateStatus($"API URL: {url}");
+                Debug.WriteLine($"API URL: {url}", "API");
 
                 using var httpClient = new HttpClient(new HttpClientHandler
                 {
                     AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
                 });
 
+                Debug.WriteLine("Creating HTTP request...", "API");
                 var request = CreateApiRequest(url, cookies);
+
+                // Log all request headers
+                Debug.WriteLine("REQUEST HEADERS:", "API");
+                foreach (var header in request.Headers)
+                {
+                    Debug.WriteLine($"  {header.Key}: {string.Join(", ", header.Value)}", "API");
+                }
+
+                Debug.WriteLine("Sending HTTP request to server...", "API");
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
                 var response = await httpClient.SendAsync(request, cancellationToken);
+
+                stopwatch.Stop();
+                Debug.WriteLine($"HTTP request completed in {stopwatch.ElapsedMilliseconds}ms", "API");
 
                 return await ProcessApiResponse(response);
             }
-            catch (Exception ex) when (!(ex is HttpRequestException || ex is TaskCanceledException || ex is JsonException))
+            catch (Exception ex)
             {
-                UpdateStatus($"Unexpected error in GetScheduleDataAsync: {ex.Message}");
-                throw new Exception($"Error in GetScheduleDataAsync: {ex.Message}", ex);
+                Debug.WriteLine($"CRITICAL ERROR in GetScheduleDataAsync: {ex.Message}", "ERROR");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}", "ERROR");
+                throw;
             }
         }
+
+        private void LogDebug(string message, string category = "DEBUG")
+        {
+            try
+            {
+                var logPath = "debug_log.txt";
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                var logEntry = $"[{timestamp}] [{category}] {message}\n";
+                File.AppendAllText(logPath, logEntry);
+
+                // Also show in status for important messages
+                if (category == "ERROR" || category == "SUCCESS" || category == "AUTOMATION")
+                {
+                    UpdateStatus($"[{category}] {message}");
+                }
+            }
+            catch
+            {
+                // Ignore logging errors
+            }
+        }
+
+
 
         private static string BuildApiUrl()
         {
@@ -1573,123 +1626,191 @@ STEPS:
 
         private async Task<ScheduleResponse> ProcessApiResponse(HttpResponseMessage response)
         {
-            UpdateStatus($"Server response: HTTP {(int)response.StatusCode} {response.StatusCode}");
+            Debug.WriteLine($"Server response: HTTP {(int)response.StatusCode} {response.StatusCode}", "API");
+
+            // Log response headers
+            Debug.WriteLine("RESPONSE HEADERS:", "API");
+            foreach (var header in response.Headers)
+            {
+                Debug.WriteLine($"  {header.Key}: {string.Join(", ", header.Value)}", "API");
+            }
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"ERROR RESPONSE BODY: {errorContent}", "ERROR");
+
                 var errorMessage = response.StatusCode switch
                 {
                     System.Net.HttpStatusCode.Unauthorized => "Authentication failed - cookies may be expired",
                     System.Net.HttpStatusCode.Forbidden => "Access forbidden - insufficient permissions or expired session",
                     _ => $"Server returned error {(int)response.StatusCode}: {response.StatusCode}"
                 };
+
+                Debug.WriteLine($"API ERROR: {errorMessage}", "ERROR");
                 throw new Exception($"{errorMessage}. Response: {errorContent}");
             }
 
             var jsonString = await response.Content.ReadAsStringAsync();
-            UpdateStatus($"Raw response length: {jsonString.Length} characters");
+            Debug.WriteLine($"Raw response length: {jsonString.Length} characters", "API");
+
+            // Log first 500 characters of response for debugging
+            var preview = jsonString.Length > 500 ? jsonString.Substring(0, 500) + "..." : jsonString;
+            Debug.WriteLine($"Response preview: {preview}", "API");
 
             if (string.IsNullOrWhiteSpace(jsonString))
             {
-                UpdateStatus("ERROR: Server returned empty response");
+                Debug.WriteLine("ERROR: Server returned empty response", "ERROR");
                 return new ScheduleResponse { Items = new List<ScheduleItem>() };
             }
 
             try
             {
+                Debug.WriteLine("Parsing JSON response...", "API");
                 var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(jsonString, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
-                UpdateStatus($"Parsed {scheduleResponse?.Items?.Count ?? 0} schedule items successfully");
+                var itemCount = scheduleResponse?.Items?.Count ?? 0;
+                Debug.WriteLine($"Successfully parsed {itemCount} schedule items", "API");
+
+                // Log each schedule item for debugging
+                if (scheduleResponse?.Items != null)
+                {
+                    Debug.WriteLine("SCHEDULE ITEMS DETAILS:", "SCHEDULE");
+                    foreach (var item in scheduleResponse.Items)
+                    {
+                        Debug.WriteLine($"  ID: {item.Id}, Fag: {item.Fag}, Date: {item.Dato}, Time: {item.StartKl}-{item.SluttKl}", "SCHEDULE");
+                        Debug.WriteLine($"    ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}, Typefravaer: {item.Typefravaer}", "SCHEDULE");
+                    }
+                }
+
                 return scheduleResponse ?? new ScheduleResponse { Items = new List<ScheduleItem>() };
             }
             catch (JsonException ex)
             {
-                UpdateStatus($"JSON parsing failed: {ex.Message}");
+                Debug.WriteLine($"JSON parsing failed: {ex.Message}", "ERROR");
+                Debug.WriteLine($"Raw JSON that failed: {jsonString}", "ERROR");
                 throw;
             }
         }
 
+
         private async Task MarkAttendanceAsync(ScheduleItem item, CancellationToken cancellationToken)
         {
+            Debug.WriteLine($"=== STARTING ATTENDANCE REGISTRATION FOR {item.Fag} ===", "ATTENDANCE");
+
             try
             {
-                // Load cookies
+                Debug.WriteLine("Loading cookies for attendance request...", "ATTENDANCE");
                 var cookies = await LoadCookiesFromFileAsync();
-                if (cookies == null) throw new Exception("Failed to load cookies");
+                if (cookies == null)
+                {
+                    Debug.WriteLine("ERROR: Failed to load cookies for attendance", "ERROR");
+                    throw new Exception("Failed to load cookies");
+                }
 
                 var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
                 var authCookie = cookies.GetValueOrDefault("_WL_AUTHCOOKIE_JSESSIONID", "");
                 var oracleRoute = cookies.GetValueOrDefault("X-Oracle-BMC-LBS-Route", "");
 
-                // Get public IP
+                Debug.WriteLine($"Using JSESSIONID: {(jsessionId.Length > 20 ? jsessionId.Substring(0, 20) + "..." : jsessionId)}", "ATTENDANCE");
+                Debug.WriteLine($"Using Auth Cookie: {(authCookie.Length > 20 ? authCookie.Substring(0, 20) + "..." : authCookie)}", "ATTENDANCE");
+
+                Debug.WriteLine("Getting public IP address...", "ATTENDANCE");
                 var ip = await GetPublicIpAsync();
+                Debug.WriteLine($"Public IP: {ip}", "ATTENDANCE");
 
                 // Create payload exactly like Python script
+                Debug.WriteLine("Creating attendance payload...", "ATTENDANCE");
                 var payload = new
                 {
                     name = "lagre_oppmote",
                     parameters = new object[]
                     {
-                        new { fylkeid = "00" },
-                        new { skoleid = "312" },
-                        new { planperi = "2025-26" },
-                        new { ansidato = item.Dato },
-                        new { stkode = item.Stkode },
-                        new { kl_trinn = item.KlTrinn },
-                        new { kl_id = item.KlId },
-                        new { k_navn = item.KNavn },
-                        new { gruppe_nr = item.GruppeNr },
-                        new { timenr = item.Timenr },
-                        new { fravaerstype = "M" },
-                        new { ip = ip }
+                new { fylkeid = "00" },
+                new { skoleid = "312" },
+                new { planperi = "2025-26" },
+                new { ansidato = item.Dato },
+                new { stkode = item.Stkode },
+                new { kl_trinn = item.KlTrinn },
+                new { kl_id = item.KlId },
+                new { k_navn = item.KNavn },
+                new { gruppe_nr = item.GruppeNr },
+                new { timenr = item.Timenr },
+                new { fravaerstype = "M" },
+                new { ip = ip }
                     }
                 };
 
+                var payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+                Debug.WriteLine($"Attendance payload: {payloadJson}", "ATTENDANCE");
+
                 // Build URL
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
+                Debug.WriteLine($"Attendance URL: {url}", "ATTENDANCE");
+
                 var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/vnd.oracle.adf.action+json");
 
                 // Create request
                 var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-                
+
                 // Add headers exactly like Python
                 var jsessionIdClean = jsessionId.Split('!')[0];
-                request.Headers.Add("Host", "iskole.net");
-                request.Headers.Add("Cookie", $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionIdClean}; _WL_AUTHCOOKIE_JSESSIONID={authCookie}");
-                request.Headers.Add("Sec-Ch-Ua-Platform", "\"macOS\"");
-                request.Headers.Add("Accept-Language", "nb-NO,nb;q=0.9");
-                request.Headers.Add("Sec-Ch-Ua", "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"");
-                request.Headers.Add("Sec-Ch-Ua-Mobile", "?0");
-                request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36");
-                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
-                request.Headers.Add("Origin", "https://iskole.net");
-                request.Headers.Add("Sec-Fetch-Site", "same-origin");
-                request.Headers.Add("Sec-Fetch-Mode", "cors");
-                request.Headers.Add("Sec-Fetch-Dest", "empty");
-                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
-                request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-                request.Headers.Add("Priority", "u=4, i");
-                request.Headers.Add("Connection", "keep-alive");
+                var headers = new Dictionary<string, string>
+                {
+                    ["Host"] = "iskole.net",
+                    ["Cookie"] = $"X-Oracle-BMC-LBS-Route={oracleRoute}; JSESSIONID={jsessionIdClean}; _WL_AUTHCOOKIE_JSESSIONID={authCookie}",
+                    ["Sec-Ch-Ua-Platform"] = "\"macOS\"",
+                    ["Accept-Language"] = "nb-NO,nb;q=0.9",
+                    ["Sec-Ch-Ua"] = "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
+                    ["Sec-Ch-Ua-Mobile"] = "?0",
+                    ["X-Requested-With"] = "XMLHttpRequest",
+                    ["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+                    ["Accept"] = "application/json, text/javascript, */*; q=0.01",
+                    ["Origin"] = "https://iskole.net",
+                    ["Sec-Fetch-Site"] = "same-origin",
+                    ["Sec-Fetch-Mode"] = "cors",
+                    ["Sec-Fetch-Dest"] = "empty",
+                    ["Referer"] = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar",
+                    ["Accept-Encoding"] = "gzip, deflate, br",
+                    ["Priority"] = "u=4, i",
+                    ["Connection"] = "keep-alive"
+                };
 
-                // Send request
+                Debug.WriteLine("ATTENDANCE REQUEST HEADERS:", "ATTENDANCE");
+                foreach (var header in headers)
+                {
+                    request.Headers.Add(header.Key, header.Value);
+                    Debug.WriteLine($"  {header.Key}: {header.Value}", "ATTENDANCE");
+                }
+
+                Debug.WriteLine("Sending attendance registration request...", "ATTENDANCE");
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
                 var response = await _httpClient.SendAsync(request, cancellationToken);
+
+                stopwatch.Stop();
+                Debug.WriteLine($"Attendance request completed in {stopwatch.ElapsedMilliseconds}ms", "ATTENDANCE");
+
                 var responseText = await response.Content.ReadAsStringAsync();
-                
-                UpdateStatus($"Attendance response: {response.StatusCode} - {responseText}");
-                
+
+                Debug.WriteLine($"Attendance response status: {response.StatusCode}", "ATTENDANCE");
+                Debug.WriteLine($"Attendance response body: {responseText}", "ATTENDANCE");
+
                 if (!response.IsSuccessStatusCode)
                 {
+                    Debug.WriteLine($"ATTENDANCE FAILED: HTTP {response.StatusCode}", "ERROR");
                     throw new Exception($"Server returned {response.StatusCode}: {responseText}");
                 }
+
+                Debug.WriteLine($"ATTENDANCE SUCCESS: {item.Fag} registered successfully!", "SUCCESS");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Failed to mark attendance: {ex.Message}");
+                Debug.WriteLine($"ATTENDANCE ERROR for {item.Fag}: {ex.Message}", "ERROR");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}", "ERROR");
                 throw;
             }
         }
