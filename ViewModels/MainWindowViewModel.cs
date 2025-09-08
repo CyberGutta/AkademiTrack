@@ -940,117 +940,230 @@ STEPS:
 
         private async Task RunAutomationLoop(CancellationToken cancellationToken)
         {
+            UpdateStatus("Starting studietid automation loop...");
+            Debug.WriteLine("[AUTOMATION] Starting studietid automation loop...");
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    UpdateStatus("Loading schedule data...");
+                    UpdateStatus("Fetching schedule data...");
+                    Debug.WriteLine("[API] Fetching schedule data from server...");
+
                     var scheduleData = await GetScheduleDataAsync(cancellationToken);
-                    
+
                     if (scheduleData?.Items?.Any() != true)
                     {
                         UpdateStatus("No schedule data found. Checking again in 30 minutes...");
+                        Debug.WriteLine("[SCHEDULE] No schedule data found - retrying in 30 minutes");
                         await DelayWithCountdown(TimeSpan.FromMinutes(30), "schedule refresh", cancellationToken);
                         continue;
                     }
 
-                    UpdateStatus($"Found {scheduleData.Items.Count} schedule items");
+                    Debug.WriteLine($"[SCHEDULE] Found {scheduleData.Items.Count} total schedule items");
+                    UpdateStatus($"Found {scheduleData.Items.Count} total schedule items");
 
-                    // Find ALL upcoming classes (like Python does)
-                    var now = DateTime.Now;
-                    var upcomingClasses = scheduleData.Items
-                        .Where(item => 
-                        {
-                            if (!DateTime.TryParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) ||
-                                !TimeSpan.TryParseExact(item.StartKl, "HHmm", null, out var startTime))
-                                return false;
-                            
-                            var classDateTime = date.Add(startTime);
-                            return classDateTime > now.AddMinutes(-15); // Classes not more than 15 minutes ago
-                        })
-                        .Select(item => new
-                        {
-                            Item = item,
-                            DateTime = DateTime.ParseExact(item.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None)
-                                .Add(TimeSpan.ParseExact(item.StartKl, "HHmm", null))
-                        })
-                        .OrderBy(x => x.DateTime)
+                    // Filter for studietid (STU) classes only
+                    var studietidClasses = scheduleData.Items
+                        .Where(item => item.Fag != null && item.Fag.Contains("STU"))
                         .ToList();
 
-                    if (!upcomingClasses.Any())
+                    Debug.WriteLine($"[FILTER] Found {studietidClasses.Count} STU (studietid) classes in schedule");
+
+                    if (!studietidClasses.Any())
                     {
-                        UpdateStatus("No upcoming classes found. Checking again in 30 minutes...");
-                        await DelayWithCountdown(TimeSpan.FromMinutes(30), "schedule refresh", cancellationToken);
+                        UpdateStatus("No studietid (STU) classes found in today's schedule.");
+                        Debug.WriteLine("[STUDIETID] No STU classes found in schedule - stopping automation");
+                        UpdateStatus("AUTOMATION COMPLETE: No studietid classes to register today.");
+                        UpdateAutomationState(false);
+                        return; // Stop the automation completely
+                    }
+
+                    var now = DateTime.Now;
+                    Debug.WriteLine($"[TIME] Current time: {now:HH:mm:ss}");
+
+                    // Analyze studietid classes
+                    var studietidAnalysis = AnalyzeStudietidClasses(studietidClasses, now);
+
+                    // Display analysis results
+                    Debug.WriteLine($"[ANALYSIS] STU classes analysis:");
+                    Debug.WriteLine($"  - Total STU classes: {studietidAnalysis.Total}");
+                    Debug.WriteLine($"  - Already registered: {studietidAnalysis.AlreadyRegistered}");
+                    Debug.WriteLine($"  - Upcoming (future): {studietidAnalysis.Upcoming}");
+                    Debug.WriteLine($"  - Current (ready to register): {studietidAnalysis.Current}");
+                    Debug.WriteLine($"  - Past (missed): {studietidAnalysis.Past}");
+
+                    UpdateStatus($"STU Analysis: {studietidAnalysis.AlreadyRegistered} registered, {studietidAnalysis.Current} ready, {studietidAnalysis.Upcoming} upcoming");
+
+                    // Check if all studietid classes are already registered
+                    if (studietidAnalysis.AlreadyRegistered == studietidAnalysis.Total)
+                    {
+                        UpdateStatus("SUCCESS: All studietid classes for today have been registered!");
+                        Debug.WriteLine("[STUDIETID] All STU classes already registered - automation complete");
+                        UpdateStatus("AUTOMATION COMPLETE: All studietid registrations done for today.");
+                        UpdateAutomationState(false);
+                        return; // Stop the automation completely
+                    }
+
+                    // Check if there are any studietid classes that can still be registered
+                    if (studietidAnalysis.Current == 0 && studietidAnalysis.Upcoming == 0)
+                    {
+                        UpdateStatus("All remaining studietid classes have passed their registration window.");
+                        Debug.WriteLine("[STUDIETID] No more STU classes can be registered (all past deadline)");
+                        UpdateStatus("AUTOMATION COMPLETE: No more studietid classes can be registered today.");
+                        UpdateAutomationState(false);
+                        return; // Stop the automation completely
+                    }
+
+                    // Find the next studietid class that needs registration
+                    var nextStudietidClass = FindNextStudietidClassToRegister(studietidClasses, now);
+
+                    if (nextStudietidClass == null)
+                    {
+                        UpdateStatus("No studietid classes currently need registration. Checking again in 5 minutes...");
+                        Debug.WriteLine("[STUDIETID] No STU classes currently need registration - waiting 5 minutes");
+                        await DelayWithCountdown(TimeSpan.FromMinutes(5), "next STU check", cancellationToken);
                         continue;
                     }
 
-                    // Find the next class that needs attendance
-                    var nextClassNeedingAttendance = upcomingClasses
-                        .FirstOrDefault(cls => cls.Item.ElevForerTilstedevaerelse == 0); // 0 = not registered
+                    var classDateTime = DateTime.ParseExact(nextStudietidClass.Dato, "yyyyMMdd", null)
+                        .Add(TimeSpan.ParseExact(nextStudietidClass.StartKl, "HHmm", null));
+                    var timeDiff = classDateTime - now;
 
-                    if (nextClassNeedingAttendance == null)
-                    {
-                        // No classes need attendance, wait until the next class starts then check again
-                        var nextClass = upcomingClasses.First();
-                        var waitUntilNextClass = nextClass.DateTime.AddMinutes(5) - now; // Wait until 5 min after next class starts
-                        
-                        if (waitUntilNextClass.TotalMinutes > 0)
-                        {
-                            UpdateStatus($"No classes need attendance. Next check after {nextClass.Item.Fag} ends...");
-                            await DelayWithCountdown(waitUntilNextClass, "next schedule check", cancellationToken);
-                        }
-                        continue;
-                    }
+                    Debug.WriteLine($"[NEXT CLASS] Next STU class: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl}");
+                    Debug.WriteLine($"[TIMING] Class starts in {timeDiff.TotalMinutes:F1} minutes");
 
-                    // We found a class that needs attendance
-                    var timeDiff = nextClassNeedingAttendance.DateTime - now;
-                    
-                    UpdateStatus($"Next class needing attendance: {nextClassNeedingAttendance.Item.Fag} at {nextClassNeedingAttendance.Item.StartKl}");
-                    UpdateStatus($"Class starts in {timeDiff.TotalMinutes:F0} minutes");
+                    UpdateStatus($"Next studietid: {nextStudietidClass.Fag} at {nextStudietidClass.StartKl} (in {timeDiff.TotalMinutes:F0} minutes)");
 
                     // If class is more than 15 minutes away, wait until 15 minutes before
                     if (timeDiff.TotalMinutes > 15)
                     {
                         var waitTime = timeDiff.Subtract(TimeSpan.FromMinutes(15));
-                        UpdateStatus($"Waiting {waitTime.TotalMinutes:F0} minutes until attendance window opens...");
-                        await DelayWithCountdown(waitTime, $"attendance window for {nextClassNeedingAttendance.Item.Fag}", cancellationToken);
+                        Debug.WriteLine($"[WAIT] Class is {timeDiff.TotalMinutes:F0} minutes away - waiting {waitTime.TotalMinutes:F0} minutes until registration window");
+                        UpdateStatus($"Waiting {waitTime.TotalMinutes:F0} minutes until studietid registration window opens...");
+                        await DelayWithCountdown(waitTime, $"STU registration window for {nextStudietidClass.Fag}", cancellationToken);
                     }
-                    // If class is starting soon or already started (within 15 minutes), mark attendance now
-                    else if (timeDiff.TotalMinutes > -15) // Not more than 15 minutes ago
+                    // If class is within registration window (-15 to +15 minutes from start time)
+                    else if (timeDiff.TotalMinutes >= -15 && timeDiff.TotalMinutes <= 15)
                     {
-                        UpdateStatus($"Attendance window is open for {nextClassNeedingAttendance.Item.Fag}!");
-                        
+                        Debug.WriteLine($"[REGISTER] STU registration window is open for {nextStudietidClass.Fag}!");
+                        UpdateStatus($"Studietid registration window is open for {nextStudietidClass.Fag}!");
+
                         try
                         {
-                            await MarkAttendanceAsync(nextClassNeedingAttendance.Item, cancellationToken);
-                            UpdateStatus($"✓ Attendance marked successfully for {nextClassNeedingAttendance.Item.Fag}");
+                            Debug.WriteLine($"[REGISTER] Attempting to register attendance for {nextStudietidClass.Fag}...");
+                            await MarkAttendanceAsync(nextStudietidClass, cancellationToken);
+
+                            Debug.WriteLine($"[SUCCESS] ✓ Studietid attendance registered successfully for {nextStudietidClass.Fag}");
+                            UpdateStatus($"✓ SUCCESS: Studietid attendance registered for {nextStudietidClass.Fag}");
+
+                            // Wait 2 minutes before checking again to let the system update
+                            Debug.WriteLine("[WAIT] Waiting 2 minutes for system to update...");
+                            await DelayWithCountdown(TimeSpan.FromMinutes(2), "system update", cancellationToken);
                         }
                         catch (Exception ex)
                         {
-                            UpdateStatus($"✗ Failed to mark attendance for {nextClassNeedingAttendance.Item.Fag}: {ex.Message}");
-                        }
+                            Debug.WriteLine($"[ERROR] ✗ Failed to register studietid attendance for {nextStudietidClass.Fag}: {ex.Message}");
+                            UpdateStatus($"✗ FAILED: Could not register studietid attendance for {nextStudietidClass.Fag}: {ex.Message}");
 
-                        // Wait 2 minutes before checking again
-                        await DelayWithCountdown(TimeSpan.FromMinutes(2), "next check", cancellationToken);
+                            // Wait 1 minute before retrying
+                            Debug.WriteLine("[RETRY] Waiting 1 minute before retry...");
+                            await DelayWithCountdown(TimeSpan.FromMinutes(1), "retry", cancellationToken);
+                        }
                     }
                     else
                     {
-                        // Class was too long ago, skip it and check again
-                        UpdateStatus($"Class {nextClassNeedingAttendance.Item.Fag} was too long ago, checking for next class...");
-                        await DelayWithCountdown(TimeSpan.FromMinutes(1), "next check", cancellationToken);
+                        // Class registration window has passed
+                        Debug.WriteLine($"[MISSED] STU class {nextStudietidClass.Fag} registration window has passed");
+                        UpdateStatus($"Registration window passed for {nextStudietidClass.Fag}, checking for next studietid class...");
+                        await DelayWithCountdown(TimeSpan.FromMinutes(1), "next STU check", cancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    UpdateStatus("Automation cancelled by user");
+                    Debug.WriteLine("[CANCELLED] Studietid automation cancelled by user");
+                    UpdateStatus("Studietid automation cancelled by user");
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    UpdateStatus($"Error in automation loop: {ex.Message}");
-                    await DelayWithCountdown(TimeSpan.FromMinutes(5), "error retry", cancellationToken);
+                    Debug.WriteLine($"[ERROR] Error in studietid automation loop: {ex.Message}");
+                    UpdateStatus($"Error in studietid automation: {ex.Message}");
+                    Debug.WriteLine("[RETRY] Waiting 5 minutes before retry...");
+                    await DelayWithCountdown(TimeSpan.FromMinutes(5), "error recovery", cancellationToken);
                 }
             }
+        }
+
+        private (int Total, int AlreadyRegistered, int Upcoming, int Current, int Past) AnalyzeStudietidClasses(List<ScheduleItem> studietidClasses, DateTime now)
+        {
+            var total = studietidClasses.Count;
+            var alreadyRegistered = 0;
+            var upcoming = 0;
+            var current = 0;
+            var past = 0;
+
+            foreach (var stuClass in studietidClasses)
+            {
+                // Check if already registered
+                if (IsStudietidAlreadyRegistered(stuClass))
+                {
+                    alreadyRegistered++;
+                    continue;
+                }
+
+                if (DateTime.TryParseExact(stuClass.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                    TimeSpan.TryParseExact(stuClass.StartKl, "HHmm", null, out var startTime))
+                {
+                    var classDateTime = date.Add(startTime);
+                    var timeDiff = classDateTime - now;
+
+                    if (timeDiff.TotalMinutes > 15)
+                        upcoming++;
+                    else if (timeDiff.TotalMinutes >= -15)
+                        current++;
+                    else
+                        past++;
+                }
+            }
+
+            return (total, alreadyRegistered, upcoming, current, past);
+        }
+
+        // Helper method to check if a studietid class is already registered
+        private bool IsStudietidAlreadyRegistered(ScheduleItem stuClass)
+        {
+            // A class is considered registered if:
+            // 1. ElevForerTilstedevaerelse is 1 (student has registered attendance)
+            // 2. OR Typefravaer is "M" (marked as present)
+            return stuClass.ElevForerTilstedevaerelse == 1 || stuClass.Typefravaer == "M";
+        }
+
+        private ScheduleItem FindNextStudietidClassToRegister(List<ScheduleItem> studietidClasses, DateTime now)
+        {
+            return studietidClasses
+                .Where(stuClass =>
+                {
+                    // Skip if already registered
+                    if (IsStudietidAlreadyRegistered(stuClass))
+                        return false;
+
+                    // Check if within registration window
+                    if (DateTime.TryParseExact(stuClass.Dato, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date) &&
+                        TimeSpan.TryParseExact(stuClass.StartKl, "HHmm", null, out var startTime))
+                    {
+                        var classDateTime = date.Add(startTime);
+                        var timeDiff = classDateTime - now;
+
+                        // Can register from 15 minutes before until 15 minutes after class starts
+                        return timeDiff.TotalMinutes >= -15;
+                    }
+
+                    return false;
+                })
+                .OrderBy(stuClass => DateTime.ParseExact(stuClass.Dato, "yyyyMMdd", null)
+                    .Add(TimeSpan.ParseExact(stuClass.StartKl, "HHmm", null)))
+                .FirstOrDefault();
         }
 
         // ADD this new method to find the next class needing attendance:
