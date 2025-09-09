@@ -966,6 +966,13 @@ STEPS:
 
                     Debug.WriteLine($"Total schedule items received: {scheduleData.Items.Count}", "SCHEDULE");
 
+                    // DEBUG: Log ALL items first
+                    Debug.WriteLine("=== ALL SCHEDULE ITEMS ===", "DEBUG");
+                    foreach (var item in scheduleData.Items)
+                    {
+                        Debug.WriteLine($"Item: {item.Fag} at {item.StartKl} - Typefravaer: '{item.Typefravaer ?? "null"}', ElevForerTilstedevaerelse: {item.ElevForerTilstedevaerelse}", "DEBUG");
+                    }
+
                     // Filter for studietid (STU) classes only
                     var studietidClasses = scheduleData.Items
                         .Where(item => item.Fag != null && item.Fag.Contains("STU"))
@@ -982,13 +989,32 @@ STEPS:
                         return;
                     }
 
+                    // ENHANCED DEBUG LOGGING
+                    Debug.WriteLine("=== FOUND STU CLASSES ===", "DEBUG");
+                    foreach (var stuClass in studietidClasses)
+                    {
+                        var isRegistered = IsStudietidAlreadyRegistered(stuClass);
+                        Debug.WriteLine($"STU: {stuClass.Fag} at {stuClass.StartKl}", "DEBUG");
+                        Debug.WriteLine($"  Typefravaer: '{stuClass.Typefravaer ?? "null"}'", "DEBUG");
+                        Debug.WriteLine($"  ElevForerTilstedevaerelse: {stuClass.ElevForerTilstedevaerelse}", "DEBUG");
+                        Debug.WriteLine($"  IsRegistered: {isRegistered}", "DEBUG");
+                        Debug.WriteLine($"  Date: {stuClass.Dato}", "DEBUG");
+                    }
+
                     var now = DateTime.Now;
 
-                    // Process studietid classes
+                    // COUNT UNREGISTERED BEFORE PROCESSING
+                    var unregisteredCount = studietidClasses.Count(s => !IsStudietidAlreadyRegistered(s));
+                    Debug.WriteLine($"UNREGISTERED STU COUNT: {unregisteredCount}/{studietidClasses.Count}", "COUNT");
+                    UpdateStatus($"Found {unregisteredCount} unregistered STU classes out of {studietidClasses.Count} total");
+
+                    // Process studietid classes with corrected logic
                     await ProcessStudietidClasses(studietidClasses, now, cancellationToken);
 
-                    // Check completion status
+                    // Check completion status AFTER processing
                     var completionStatus = CheckStudietidCompletion(studietidClasses, now);
+                    Debug.WriteLine($"COMPLETION CHECK: IsComplete={completionStatus.IsComplete}, Message={completionStatus.Message}", "COMPLETION");
+                    
                     if (completionStatus.IsComplete)
                     {
                         UpdateStatus(completionStatus.Message);
@@ -1086,23 +1112,43 @@ STEPS:
 
         private (bool IsComplete, string Message) CheckStudietidCompletion(List<ScheduleItem> studietidClasses, DateTime now)
         {
-            var analysis = AnalyzeStudietidClasses(studietidClasses, now);
+            // Simple count: how many are NOT registered
+            var unregisteredCount = studietidClasses.Count(s => !IsStudietidAlreadyRegistered(s));
+            var totalCount = studietidClasses.Count;
 
-            Debug.WriteLine($"STU Analysis - Total: {analysis.Total}, Registered: {analysis.AlreadyRegistered}, Current: {analysis.Current}, Upcoming: {analysis.Upcoming}, Missed: {analysis.Past}", "ANALYSIS");
-
-            // All classes are registered
-            if (analysis.AlreadyRegistered == analysis.Total)
+            Debug.WriteLine($"COMPLETION CHECK: {unregisteredCount} unregistered out of {totalCount} total STU classes", "COMPLETION");
+            
+            // Log each class individually for debugging
+            foreach (var stuClass in studietidClasses)
             {
-                return (true, "SUCCESS: All studietid classes for today have been registered!");
+                var isReg = IsStudietidAlreadyRegistered(stuClass);
+                Debug.WriteLine($"  {stuClass.Fag} at {stuClass.StartKl}: Registered={isReg} (Typefravaer='{stuClass.Typefravaer}', ElevForerTilstedevaerelse={stuClass.ElevForerTilstedevaerelse})", "COMPLETION");
             }
 
-            // No more classes can be registered (all are either registered or missed)
-            if (analysis.Current == 0 && analysis.Upcoming == 0)
+            if (unregisteredCount == 0)
             {
-                return (true, "AUTOMATION COMPLETE: No more studietid classes can be registered today.");
+                return (true, "SUCCESS: All studietid classes are registered!");
             }
+            else
+            {
+                return (false, $"Found {unregisteredCount} unregistered STU classes - continuing automation");
+            }
+        }
 
-            return (false, $"Continuing automation - {analysis.AlreadyRegistered}/{analysis.Total} registered, {analysis.Current} ready, {analysis.Upcoming} upcoming");
+        private void LogStudietidClassDetails(List<ScheduleItem> studietidClasses)
+        {
+            Debug.WriteLine("=== DETAILED STU CLASS ANALYSIS ===", "DEBUG");
+            
+            foreach (var stuClass in studietidClasses)
+            {
+                Debug.WriteLine($"Class: {stuClass.Fag} at {stuClass.StartKl}", "DEBUG");
+                Debug.WriteLine($"  ID: {stuClass.Id}", "DEBUG");
+                Debug.WriteLine($"  ElevForerTilstedevaerelse: {stuClass.ElevForerTilstedevaerelse}", "DEBUG");
+                Debug.WriteLine($"  Typefravaer: '{stuClass.Typefravaer ?? "null"}'", "DEBUG");
+                Debug.WriteLine($"  TidsromTilstedevaerelse: '{stuClass.TidsromTilstedevaerelse ?? "null"}'", "DEBUG");
+                Debug.WriteLine($"  IsRegistered: {IsStudietidAlreadyRegistered(stuClass)}", "DEBUG");
+                Debug.WriteLine("", "DEBUG");
+            }
         }
 
         private TimeSpan DetermineStudietidWaitTime(List<ScheduleItem> studietidClasses, DateTime now, out string reason)
@@ -1190,10 +1236,15 @@ STEPS:
         // Helper method to check if a studietid class is already registered
         private bool IsStudietidAlreadyRegistered(ScheduleItem stuClass)
         {
-            // A class is considered registered if:
+            // A studietid class is registered if:
             // 1. ElevForerTilstedevaerelse is 1 (student has registered attendance)
-            // 2. OR Typefravaer is "M" (marked as present)
-            return stuClass.ElevForerTilstedevaerelse == 1 || stuClass.Typefravaer == "M";
+            // 2. OR Typefravaer is "M" (marked as present/møtt)
+            // 3. If Typefravaer is null, it means NOT registered
+            
+            bool hasAttendanceMarked = stuClass.ElevForerTilstedevaerelse == 1;
+            bool isMarkedPresent = stuClass.Typefravaer == "M";
+            
+            return hasAttendanceMarked || isMarkedPresent;
         }
 
         private ScheduleItem FindNextStudietidClassToRegister(List<ScheduleItem> studietidClasses, DateTime now)
