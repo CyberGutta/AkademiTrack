@@ -1,108 +1,138 @@
-﻿using System;
+﻿using Avalonia.Data.Converters;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace AkademiTrack.ViewModels
 {
-    public class SettingsViewModel : ViewModelBase, INotifyPropertyChanged
+    // Converters
+    public class BoolToStringConverter : IValueConverter
     {
-        private string _applicationInfo;
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler CloseRequested;
-
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        public static readonly BoolToStringConverter Instance = new();
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (value is bool boolValue && parameter is string paramString)
+            {
+                var parts = paramString.Split('|');
+                if (parts.Length == 2)
+                {
+                    return boolValue ? parts[1] : parts[0];
+                }
+            }
+            return value?.ToString() ?? string.Empty;
         }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class StringEqualityConverter : IValueConverter
+    {
+        public static readonly StringEqualityConverter Instance = new();
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string stringValue && parameter is string paramString)
+            {
+                return string.Equals(stringValue, paramString, StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Simple Command implementation
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        private readonly Func<bool>? _canExecute;
+
+        public RelayCommand(Action execute, Func<bool>? canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler? CanExecuteChanged;
+
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+
+        public void Execute(object? parameter) => _execute();
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Application info class
+    public class ApplicationInfo
+    {
+        public string Name { get; }
+        public string Version { get; }
+        public string Description { get; }
+
+        public ApplicationInfo()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            Name = assembly.GetName().Name ?? "AkademiTrack";
+            Version = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
+            Description = "Academic tracking application";
+        }
+    }
+
+    // ViewModel
+    public class SettingsViewModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler? CloseRequested;
+
+        public ApplicationInfo ApplicationInfo { get; }
+        public ICommand CloseCommand { get; }
+        public ICommand OpenProgramFolderCommand { get; }
 
         public SettingsViewModel()
         {
-            OpenProgramFolderCommand = new SimpleCommand(OpenProgramFolderAsync);
-            CloseCommand = new SimpleCommand(CloseWindowAsync);
-
-            InitializeApplicationInfo();
+            ApplicationInfo = new ApplicationInfo();
+            CloseCommand = new RelayCommand(CloseWindow);
+            OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
         }
 
-        public string ApplicationInfo
-        {
-            get => _applicationInfo;
-            private set
-            {
-                if (_applicationInfo != value)
-                {
-                    _applicationInfo = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public ICommand OpenProgramFolderCommand { get; }
-        public ICommand CloseCommand { get; }
-
-        private void InitializeApplicationInfo()
-        {
-            try
-            {
-                var assembly = Assembly.GetExecutingAssembly();
-                var version = assembly.GetName().Version?.ToString() ?? "Unknown";
-                var location = Path.GetDirectoryName(assembly.Location) ?? "Unknown";
-                var buildDate = File.GetCreationTime(assembly.Location).ToString("yyyy-MM-dd HH:mm");
-
-                ApplicationInfo = $"AkademiTrack v{version}\n" +
-                               $"Location: {location}\n" +
-                               $"Build Date: {buildDate}\n" +
-                               $"Configuration files and cookies are stored in the program directory.";
-            }
-            catch (Exception ex)
-            {
-                ApplicationInfo = $"AkademiTrack\nError retrieving application info: {ex.Message}";
-            }
-        }
-
-        private async Task OpenProgramFolderAsync()
-        {
-            try
-            {
-                var programPath = AppDomain.CurrentDomain.BaseDirectory;
-                var fullPath = Path.GetFullPath(programPath);
-
-                if (OperatingSystem.IsWindows())
-                {
-                    Process.Start("explorer.exe", fullPath);
-                }
-                else if (OperatingSystem.IsMacOS())
-                {
-                    Process.Start("open", fullPath);
-                }
-                else if (OperatingSystem.IsLinux())
-                {
-                    Process.Start("xdg-open", fullPath);
-                }
-                else
-                {
-                    // Fallback: just show the path
-                    throw new PlatformNotSupportedException($"Cannot open folder on this platform. Path: {fullPath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                // You might want to show a message box or update a status property here
-                // For now, we'll just ignore the error
-                System.Diagnostics.Debug.WriteLine($"Failed to open program folder: {ex.Message}");
-            }
-
-            await Task.CompletedTask;
-        }
-
-        private async Task CloseWindowAsync()
+        private void CloseWindow()
         {
             CloseRequested?.Invoke(this, EventArgs.Empty);
-            await Task.CompletedTask;
+        }
+
+        private void OpenProgramFolder()
+        {
+            try
+            {
+                var programPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (!string.IsNullOrEmpty(programPath) && Directory.Exists(programPath))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = programPath,
+                        UseShellExecute = true,
+                        Verb = "open"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle error - you might want to show a message to the user
+                Debug.WriteLine($"Error opening program folder: {ex.Message}");
+            }
+        }
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }
