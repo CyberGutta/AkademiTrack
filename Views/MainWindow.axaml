@@ -34,10 +34,10 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="Padding" Value="18,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="160"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="140"/>
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
@@ -62,10 +62,10 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="Padding" Value="18,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="160"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="140"/>
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
@@ -89,10 +89,10 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="Padding" Value="14,8"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="120"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="MinWidth" Value="180"/>
 		</Style>
 
 		<Style Selector="Button.settings:pointerover">
@@ -100,38 +100,45 @@
 		</Style>
 
 		<Style Selector="TextBlock.title">
-			<Setter Property="FontSize" Value="32"/>
+			<Setter Property="FontSize" Value="28"/>
 			<Setter Property="FontWeight" Value="Light"/>
 			<Setter Property="Foreground" Value="#212529"/>
-			<Setter Property="Margin" Value="0,0,0,8"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
 		</Style>
 
 		<Style Selector="TextBlock.subtitle">
-			<Setter Property="FontSize" Value="16"/>
-			<Setter Property="FontWeight" Value="Normal"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
-			<Setter Property="Margin" Value="0,0,0,30"/>
-		</Style>
-
-		<Style Selector="TextBlock.info">
-			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="FontWeight" Value="Normal"/>
 			<Setter Property="Foreground" Value="#6C757D"/>
 			<Setter Property="Margin" Value="0,0,0,20"/>
+		</Style>
+
+		<Style Selector="TextBlock.info">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Margin" Value="0,0,0,16"/>
 			<Setter Property="TextAlignment" Value="Center"/>
 		</Style>
 
 		<Style Selector="TextBlock.status">
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Foreground" Value="#495057"/>
 			<Setter Property="TextAlignment" Value="Center"/>
-			<Setter Property="Margin" Value="0,20,0,0"/>
+			<Setter Property="Margin" Value="0,0,0,0"/>
+		</Style>
+
+		<Style Selector="TextBlock.status-label">
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
 	</Window.Styles>
 
-	<Grid Margin="40">
-		<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="30">
+	<Grid Margin="30,25">
+		<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
 
 			<!-- App Title -->
 			<TextBlock Text="AkademiTrack"
@@ -147,12 +154,12 @@
                       Classes="info"
                       HorizontalAlignment="Center"
                       TextWrapping="Wrap"
-                      MaxWidth="500"/>
+                      MaxWidth="450"/>
 
 			<!-- Main Control Buttons -->
 			<StackPanel Orientation="Horizontal"
                        HorizontalAlignment="Center"
-                       Spacing="16">
+                       Spacing="12">
 
 				<!-- Start button -->
 				<Button Content="Start Automation"
@@ -179,23 +186,22 @@
 
 			<!-- Current Status Display -->
 			<Border Background="White"
-                   CornerRadius="8"
-                   Padding="20"
+                   CornerRadius="6"
+                   Padding="16,12"
                    BorderThickness="1"
                    BorderBrush="#E9ECEF"
-                   MaxWidth="500">
+                   MaxWidth="420"
+                   MinWidth="300">
 
-				<StackPanel Spacing="8">
+				<StackPanel Spacing="6">
 					<TextBlock Text="Current Status:"
-                              FontWeight="SemiBold"
-                              FontSize="12"
-                              Foreground="#6C757D"
-                              HorizontalAlignment="Center"/>
+                              Classes="status-label"/>
 
 					<TextBlock Text="{Binding StatusMessage}"
                               Classes="status"
                               HorizontalAlignment="Center"
-                              TextWrapping="Wrap"/>
+                              TextWrapping="Wrap"
+                              MaxWidth="380"/>
 				</StackPanel>
 			</Border>
 
