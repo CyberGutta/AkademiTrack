@@ -1,5 +1,6 @@
 ﻿using Avalonia.Data.Converters;
 using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -84,23 +85,55 @@ namespace AkademiTrack.ViewModels
             Version = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
             Description = "Academic tracking application";
         }
+
+        public override string ToString()
+        {
+            return $"{Name} v{Version}\n{Description}";
+        }
     }
 
     // ViewModel
     public class SettingsViewModel : INotifyPropertyChanged
     {
+        private bool _showDetailedLogs = true;
+        private ObservableCollection<LogEntry> _logEntries = new ObservableCollection<LogEntry>();
+
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
 
         public ApplicationInfo ApplicationInfo { get; }
         public ICommand CloseCommand { get; }
         public ICommand OpenProgramFolderCommand { get; }
+        public ICommand ClearLogsCommand { get; }
+        public ICommand ToggleDetailedLogsCommand { get; }
+
+        public ObservableCollection<LogEntry> LogEntries
+        {
+            get => _logEntries;
+            set
+            {
+                _logEntries = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShowDetailedLogs
+        {
+            get => _showDetailedLogs;
+            set
+            {
+                _showDetailedLogs = value;
+                OnPropertyChanged();
+            }
+        }
 
         public SettingsViewModel()
         {
             ApplicationInfo = new ApplicationInfo();
             CloseCommand = new RelayCommand(CloseWindow);
             OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
+            ClearLogsCommand = new RelayCommand(ClearLogs);
+            ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
         }
 
         private void CloseWindow()
@@ -128,6 +161,16 @@ namespace AkademiTrack.ViewModels
                 // Handle error - you might want to show a message to the user
                 Debug.WriteLine($"Error opening program folder: {ex.Message}");
             }
+        }
+
+        private void ClearLogs()
+        {
+            LogEntries.Clear();
+        }
+
+        private void ToggleDetailedLogs()
+        {
+            ShowDetailedLogs = !ShowDetailedLogs;
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)

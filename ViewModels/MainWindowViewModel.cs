@@ -1,4 +1,5 @@
-﻿using Avalonia;
+﻿using AkademiTrack.Views;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using OpenQA.Selenium;
@@ -309,33 +310,42 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Open the folder containing cookies.json for manual editing
-                var currentDir = Directory.GetCurrentDirectory();
-                var cookiesPath = Path.Combine(currentDir, "cookies.json");
+                // Create and show the settings window
+                var settingsWindow = new SettingsWindow();
+                var settingsViewModel = new SettingsViewModel();
 
-                LogInfo($"Opening settings folder: {currentDir}");
+                // Pass the log entries to the settings view model
+                settingsViewModel.LogEntries = this.LogEntries;
+                settingsViewModel.ShowDetailedLogs = this.ShowDetailedLogs;
 
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                settingsWindow.DataContext = settingsViewModel;
+
+                // Handle events from settings view model
+                settingsViewModel.CloseRequested += (s, e) => settingsWindow.Close();
+                settingsViewModel.PropertyChanged += (s, e) =>
                 {
-                    Process.Start("explorer.exe", currentDir);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    if (e.PropertyName == nameof(SettingsViewModel.ShowDetailedLogs))
+                    {
+                        this.ShowDetailedLogs = settingsViewModel.ShowDetailedLogs;
+                    }
+                };
+
+                // Show as dialog if you want modal behavior, or Show() for non-modal
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
-                    Process.Start("open", currentDir);
+                    await settingsWindow.ShowDialog(desktop.MainWindow);
                 }
                 else
                 {
-                    Process.Start("xdg-open", currentDir);
+                    settingsWindow.Show();
                 }
 
-                LogSuccess("Settings folder opened");
+                LogSuccess("Settings window opened");
             }
             catch (Exception ex)
             {
-                LogError($"Could not open settings folder: {ex.Message}");
+                LogError($"Could not open settings window: {ex.Message}");
             }
-
-            await Task.CompletedTask;
         }
 
         private async Task<Dictionary<string, string>> LoadCookiesAsync()
