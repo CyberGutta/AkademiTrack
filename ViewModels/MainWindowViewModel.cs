@@ -96,6 +96,9 @@ namespace AkademiTrack.ViewModels
         _ => Brush.Parse("#0C5460") // INFO
     };
 
+    // Set window background to transparent
+    this.Background = Brushes.Transparent;
+    
     // Main container
     var mainBorder = new Border
     {
@@ -163,32 +166,39 @@ namespace AkademiTrack.ViewModels
     mainBorder.Child = contentGrid;
     this.Content = mainBorder;
 
-    // Add fade-in animation - FIXED VERSION
-    this.Opacity = 0;
-    var fadeIn = new Avalonia.Animation.Animation
-    {
-        Duration = TimeSpan.FromMilliseconds(300),
-        Children =
-        {
-            new Avalonia.Animation.KeyFrame
-            {
-                Cue = new Avalonia.Animation.Cue(0.0),
-                Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0.0) }
-            },
-            new Avalonia.Animation.KeyFrame
-            {
-                Cue = new Avalonia.Animation.Cue(1.0),
-                Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1.0) }
-            }
-        }
-    };
-
+    // Simplified fade-in without initial opacity manipulation
     Task.Run(async () =>
     {
-        await Task.Delay(50);
+        await Task.Delay(100);
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            fadeIn.RunAsync(this);
+            try
+            {
+                var fadeIn = new Avalonia.Animation.Animation
+                {
+                    Duration = TimeSpan.FromMilliseconds(250),
+                    Children =
+                    {
+                        new Avalonia.Animation.KeyFrame
+                        {
+                            Cue = new Avalonia.Animation.Cue(0.0),
+                            Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0.0) }
+                        },
+                        new Avalonia.Animation.KeyFrame
+                        {
+                            Cue = new Avalonia.Animation.Cue(1.0),
+                            Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1.0) }
+                        }
+                    }
+                };
+
+                fadeIn.RunAsync(this);
+            }
+            catch
+            {
+                // If animation fails, just ensure window is visible
+                this.Opacity = 1.0;
+            }
         });
     });
 }
