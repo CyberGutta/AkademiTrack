@@ -27,10 +27,22 @@
 		<!-- Force all buttons to always be visible -->
 		<Style Selector="Button">
 			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Focusable" Value="True"/>
 		</Style>
 
 		<Style Selector="Button:disabled">
 			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+
+		<!-- Remove focus outlines globally -->
+		<Style Selector="Button:focus /template/ Border">
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+
+		<Style Selector="Button:focus-visible /template/ Border">
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
 
 		<!-- Start Button Styles -->
@@ -41,24 +53,50 @@
 			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="Padding" Value="18,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="MinWidth" Value="140"/>
 			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}"
+							BorderThickness="0"
+							BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+										Content="{TemplateBinding Content}"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										TextBlock.Foreground="{TemplateBinding Foreground}"
+										TextBlock.FontWeight="{TemplateBinding FontWeight}"
+										TextBlock.FontSize="{TemplateBinding FontSize}"
+										TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 
-		<Style Selector="Button.start-button:pointerover /template/ ContentPresenter">
+		<Style Selector="Button.start-button:pointerover /template/ Border#PART_Border">
 			<Setter Property="Background" Value="#005A9E"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
-		<!-- Disabled Start Button Style -->
-		<Style Selector="Button.start-button:disabled /template/ ContentPresenter">
+		<Style Selector="Button.start-button:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.start-button:disabled /template/ Border#PART_Border">
 			<Setter Property="Background" Value="#CCCCCC"/>
-			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
-		<Style Selector="Button.start-button:disabled">
-			<Setter Property="IsVisible" Value="True"/>
-			<Setter Property="Opacity" Value="1.0"/>
+		<Style Selector="Button.start-button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="TextBlock.Foreground" Value="#888888"/>
 		</Style>
 
 		<!-- Stop Button Styles -->
@@ -69,24 +107,50 @@
 			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="Padding" Value="18,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="MinWidth" Value="140"/>
 			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}"
+							BorderThickness="0"
+							BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+										Content="{TemplateBinding Content}"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										TextBlock.Foreground="{TemplateBinding Foreground}"
+										TextBlock.FontWeight="{TemplateBinding FontWeight}"
+										TextBlock.FontSize="{TemplateBinding FontSize}"
+										TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 
-		<Style Selector="Button.stop-button:pointerover /template/ ContentPresenter">
+		<Style Selector="Button.stop-button:pointerover /template/ Border#PART_Border">
 			<Setter Property="Background" Value="#B02A37"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
-		<!-- Disabled Stop Button Style -->
-		<Style Selector="Button.stop-button:disabled /template/ ContentPresenter">
+		<Style Selector="Button.stop-button:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.stop-button:disabled /template/ Border#PART_Border">
 			<Setter Property="Background" Value="#CCCCCC"/>
-			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
-		<Style Selector="Button.stop-button:disabled">
-			<Setter Property="IsVisible" Value="True"/>
-			<Setter Property="Opacity" Value="1.0"/>
+		<Style Selector="Button.stop-button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="TextBlock.Foreground" Value="#888888"/>
 		</Style>
 
 		<Style Selector="Button.settings">
@@ -96,12 +160,39 @@
 			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="Padding" Value="14,8"/>
 			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="MinWidth" Value="180"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}"
+							BorderThickness="0"
+							BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+										Content="{TemplateBinding Content}"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										TextBlock.Foreground="{TemplateBinding Foreground}"
+										TextBlock.FontWeight="{TemplateBinding FontWeight}"
+										TextBlock.FontSize="{TemplateBinding FontSize}"
+										TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 
-		<Style Selector="Button.settings:pointerover">
+		<Style Selector="Button.settings:pointerover /template/ Border#PART_Border">
 			<Setter Property="Background" Value="#545B62"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.settings:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
 		<Style Selector="TextBlock.title">
