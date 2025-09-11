@@ -7,7 +7,7 @@
         x:Class="AkademiTrack.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="AkademiTrack"
+        Title="AkademiTrack - Akademiet Drammen Sundland"
         Background="#F8F9FA"
 		Height="500"
 		Width="700"
@@ -330,12 +330,12 @@
 	                      Classes="title"
 	                      HorizontalAlignment="Center"/>
 
-				<TextBlock Text="Automated Attendance System"
+				<TextBlock Text="Automatisk Oppmøte-system - Akademiet Drammen Sundland"
 	                      Classes="subtitle"
 	                      HorizontalAlignment="Center"/>
 
 				<!-- Info Text -->
-				<TextBlock Text="Click Start to begin automated attendance monitoring.&#x0a;The system will handle login and cookie management automatically."
+				<TextBlock Text="Klikk Start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging og cookie-behandling automatisk."
 	                      Classes="info"
 	                      HorizontalAlignment="Center"
 	                      TextWrapping="Wrap"
@@ -347,26 +347,26 @@
 	                       Spacing="12">
 
 					<!-- Start button -->
-					<Button Content="Start Automation"
+					<Button Content="Start Automatisering"
 	                       Classes="start-button"
 	                       Command="{Binding StartAutomationCommand}"
 	                       IsEnabled="{Binding !IsAutomationRunning}"
-	                       ToolTip.Tip="Starts automation with automatic login and cookie management"/>
+	                       ToolTip.Tip="Starter automatisering med automatisk innlogging og cookie-behandling"/>
 
 					<!-- Stop button -->
-					<Button Content="Stop Automation"
+					<Button Content="Stopp Automatisering"
 	                       Classes="stop-button"
 	                       Command="{Binding StopAutomationCommand}"
 	                       IsEnabled="{Binding IsAutomationRunning}"
-	                       ToolTip.Tip="Stops the automation process"/>
+	                       ToolTip.Tip="Stopper automatiseringsprosessen"/>
 				</StackPanel>
 
 				<!-- Settings Button -->
 				<StackPanel HorizontalAlignment="Center">
-					<Button Content="Settings and Activity Log"
+					<Button Content="Innstillinger og Aktivitetslogg"
 	                       Classes="settings"
 	                       Command="{Binding OpenSettingsCommand}"
-	                       ToolTip.Tip="Open settings and view activity logs"/>
+	                       ToolTip.Tip="Åpne innstillinger og vis aktivitetslogger"/>
 				</StackPanel>
 
 				<!-- Current Status Display -->
@@ -379,7 +379,7 @@
 	                   MinWidth="300">
 
 					<StackPanel Spacing="6">
-						<TextBlock Text="Current Status:"
+						<TextBlock Text="Gjeldende Status:"
 	                              Classes="status-label"/>
 
 						<TextBlock Text="{Binding StatusMessage}"

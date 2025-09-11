@@ -281,10 +281,10 @@ namespace AkademiTrack.ViewModels
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
 
-            LogInfo("Application ready");
+            LogInfo("Applikasjon er klar");
         }
 
-        public string Greeting => "AkademiTrack - STU Time Registration";
+        public string Greeting => "AkademiTrack - STU Tidsregistrering";
 
         public string StatusMessage
         {
@@ -370,8 +370,11 @@ namespace AkademiTrack.ViewModels
             var allowedNotifications = new[]
             {
                 "Automation Started",
-                "Automation Stopped", 
-                "Registration Success"
+                "Automation Stopped",
+                "Registration Success",
+                "Alle Studietimer Registrert",
+                "Ingen Flere Økter"
+
             };
 
             if (allowedNotifications.Contains(title))
@@ -504,13 +507,13 @@ namespace AkademiTrack.ViewModels
         private async Task ClearLogsAsync()
         {
             LogEntries.Clear();
-            LogInfo("Logs cleared");
+            LogInfo("Logger tømt");
         }
 
         private async Task ToggleDetailedLogsAsync()
         {
             ShowDetailedLogs = !ShowDetailedLogs;
-            LogInfo($"Detailed logging {(ShowDetailedLogs ? "enabled" : "disabled")}");
+            LogInfo($"Detaljert logging {(ShowDetailedLogs ? "aktivert" : "deaktivert")}");
         }
 
         private async Task StartAutomationAsync()
@@ -522,63 +525,63 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                LogInfo("Starting automation...");
-                ShowNotification("Automation Started", "STU time registration automation is now running", "SUCCESS");
+                LogInfo("Starter automatisering...");
+                ShowNotification("Automatisering Startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
                 // Step 1: Check if existing cookies work
-                LogDebug("Loading existing cookies from file...");
+                LogDebug("Laster eksisterende cookies fra fil...");
                 var cookies = await LoadCookiesAsync();
                 bool cookiesValid = false;
 
                 if (cookies != null)
                 {
-                    LogInfo($"Found {cookies.Count} existing cookies, testing validity...");
+                    LogInfo($"Fant {cookies.Count} eksisterende cookies, tester gyldighet...");
                     cookiesValid = await TestCookiesAsync(cookies);
 
                     if (cookiesValid)
                     {
-                        LogSuccess("Existing cookies are valid!");
+                        LogSuccess("Eksisterende cookies er gyldige!");
                     }
                     else
                     {
-                        LogInfo("Existing cookies are invalid or expired");
+                        LogInfo("Eksisterende cookies er ugyldige eller utløpt");
                     }
                 }
                 else
                 {
-                    LogInfo("No existing cookies found");
+                    LogInfo("Ingen eksisterende cookies funnet");
                 }
 
                 // Step 2: If cookies don't work, get new ones via browser login
                 if (!cookiesValid)
                 {
-                    LogInfo("Opening browser for fresh login...");
+                    LogInfo("Åpner nettleser for ny innlogging...");
                     // Removed notification spam here
 
                     cookies = await GetCookiesViaBrowserAsync();
 
                     if (cookies == null)
                     {
-                        LogError("Failed to get cookies from browser login");
+                        LogError("Kunne ikke få cookies fra nettleser innlogging");
                         return;
                     }
 
-                    LogSuccess($"Successfully obtained {cookies.Count} fresh cookies");
+                    LogSuccess($"Fikk {cookies.Count} nye cookies");
                 }
 
-                LogSuccess("Authentication complete - starting monitoring loop...");
+                LogSuccess("Autentisering fullført - starter overvåkingssløyfe...");
 
                 // Step 3: Start the monitoring loop
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
             }
             catch (OperationCanceledException)
             {
-                LogInfo("Automation stopped by user");
-                ShowNotification("Automation Stopped", "Monitoring has been stopped", "INFO");
+                LogInfo("Automatisering stoppet av bruker");
+                ShowNotification("Automatisering Stoppet", "Overvåking har blitt stoppet", "INFO");
             }
             catch (Exception ex)
             {
-                LogError($"Automation error: {ex.Message}");
+                LogError($"Automatisering feil: {ex.Message}");
                 if (ShowDetailedLogs)
                 {
                     LogDebug($"Stack trace: {ex.StackTrace}");
@@ -588,7 +591,7 @@ namespace AkademiTrack.ViewModels
             {
                 IsAutomationRunning = false;
                 _cancellationTokenSource?.Dispose();
-                LogInfo("Automation stopped");
+                LogInfo("Automatisering stoppet");
             }
         }
 
@@ -597,8 +600,8 @@ namespace AkademiTrack.ViewModels
             if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 _cancellationTokenSource.Cancel();
-                LogInfo("Stop requested - stopping automation...");
-                ShowNotification("Automation Stopped", "Automation has been stopped by user", "INFO");
+                LogInfo("Stopp forespurt - stopper automatisering...");
+                ShowNotification("Automatisering Stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
             }
         }
 
@@ -636,11 +639,11 @@ namespace AkademiTrack.ViewModels
                     settingsWindow.Show();
                 }
 
-                LogSuccess("Settings window opened");
+                LogSuccess("Innstillinger vindu åpnet");
             }
             catch (Exception ex)
             {
-                LogError($"Could not open settings window: {ex.Message}");
+                LogError($"Kunne ikke åpne innstillinger vindu: {ex.Message}");
             }
         }
 
@@ -711,58 +714,58 @@ namespace AkademiTrack.ViewModels
                     options.AddArgument("--disable-gpu");
                 }
 
-                LogInfo("Initializing Chrome browser...");
+                LogInfo("Initialiserer Chrome nettleser...");
                 _webDriver = new ChromeDriver(options);
 
                 // Navigate to login page
-                LogInfo("Navigating to login page: https://iskole.net/elev/?ojr=login");
+                LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
                 _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
-                LogInfo("Please complete the login process in the browser");
-                LogInfo("Waiting for navigation to: https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
+                LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
+                LogInfo("Venter på navigering til: https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
 
                 // Wait for user to reach the target URL
                 var targetReached = await WaitForTargetUrlAsync();
 
                 if (!targetReached)
                 {
-                    LogError("Timeout - login was not completed within 10 minutes");
+                    LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
                     return null;
                 }
 
-                LogSuccess("Login completed successfully!");
-                LogInfo("Extracting cookies from browser session...");
+                LogSuccess("Innlogging fullført!");
+                LogInfo("Ekstraherer cookies fra nettleser økten...");
 
                 // Extract cookies
                 var seleniumCookies = _webDriver.Manage().Cookies.AllCookies;
                 var cookieDict = seleniumCookies.ToDictionary(c => c.Name, c => c.Value);
 
-                LogDebug($"Extracted cookies: {string.Join(", ", cookieDict.Keys)}");
+                LogDebug($"Ekstraherte cookies: {string.Join(", ", cookieDict.Keys)}");
 
                 // Save cookies
                 await SaveCookiesAsync(seleniumCookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray());
 
-                LogSuccess($"Successfully extracted and saved {cookieDict.Count} cookies");
+                LogSuccess($"Ekstraherte og lagret {cookieDict.Count} cookies");
                 return cookieDict;
             }
             catch (Exception ex)
             {
-                LogError($"Browser login failed: {ex.Message}");
+                LogError($"Nettleser innlogging feilet: {ex.Message}");
                 return null;
             }
             finally
             {
                 try
                 {
-                    LogInfo("Closing browser...");
+                    LogInfo("Lukker nettleser...");
                     _webDriver?.Quit();
                     _webDriver?.Dispose();
                     _webDriver = null;
-                    LogDebug("Browser closed successfully");
+                    LogDebug("Nettleser lukket");
                 }
                 catch (Exception ex)
                 {
-                    LogDebug($"Error closing browser: {ex.Message}");
+                    LogDebug($"Feil ved lukking av nettleser: {ex.Message}");
                 }
             }
         }
@@ -826,20 +829,20 @@ namespace AkademiTrack.ViewModels
                 try
                 {
                     cycleCount++;
-                    LogInfo($"Monitoring cycle #{cycleCount} - checking for STU times...");
+                    LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker STU-timer...");
 
                     // Get today's schedule
-                    LogDebug("Fetching schedule data from server...");
+                    LogDebug("Henter timeplandata fra server...");
                     var scheduleData = await GetScheduleDataAsync(cookies);
 
                     if (scheduleData?.Items == null)
                     {
-                        LogError("Failed to get schedule data - cookies may be expired");
-                        LogInfo("Automation will stop - restart to re-authenticate");
+                        LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
+                        LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
                         break;
                     }
 
-                    LogDebug($"Retrieved {scheduleData.Items.Count} schedule items");
+                    LogDebug($"Hentet {scheduleData.Items.Count} timeplan elementer");
 
                     // Find STU times for today
                     var today = DateTime.Now.ToString("yyyyMMdd");
@@ -847,13 +850,13 @@ namespace AkademiTrack.ViewModels
                         .Where(item => item.Dato == today && item.KNavn == "STU")
                         .ToList();
 
-                    LogInfo($"Found {stuTimes.Count} STU sessions for today ({DateTime.Now:yyyy-MM-dd})");
+                    LogInfo($"Fant {stuTimes.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
 
                     if (stuTimes.Any())
                     {
                         foreach (var stuTime in stuTimes)
                         {
-                            LogDebug($"STU session: {stuTime.StartKl}-{stuTime.SluttKl}, Registration window: {stuTime.TidsromTilstedevaerelse}");
+                            LogDebug($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
                         }
                     }
 
@@ -872,34 +875,32 @@ namespace AkademiTrack.ViewModels
                             case RegistrationWindowStatus.Open:
                                 openWindows++;
                                 allSessionsComplete = false;
-                                LogInfo($"Registration window is OPEN for STU session {stuTime.StartKl}-{stuTime.SluttKl}");
-                                LogInfo("Attempting to register attendance...");
+                                LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuTime.StartKl}-{stuTime.SluttKl}");
+                                LogInfo("Forsøker å registrere oppmøte...");
 
                                 try
                                 {
                                     await RegisterAttendanceAsync(stuTime, cookies);
-                                    LogSuccess($"Successfully registered attendance for {stuTime.StartKl}-{stuTime.SluttKl}!");
-                                    // Only notification that shows - class registered
-                                    ShowNotification("Registration Success", 
-                                        $"Registered for STU {stuTime.StartKl}-{stuTime.SluttKl}", "SUCCESS");
+                                    LogSuccess($"Registrerte oppmøte for {stuTime.StartKl}-{stuTime.SluttKl}!");
+                                    ShowNotification("Registrering Vellykket",
+                                        $"Registrert for STU {stuTime.StartKl}-{stuTime.SluttKl}", "SUCCESS");
                                 }
                                 catch (Exception regEx)
                                 {
-                                    LogError($"Registration failed: {regEx.Message}");
-                                    // No notification spam for errors
+                                    LogError($"Registrering feilet: {regEx.Message}");
                                 }
                                 break;
 
                             case RegistrationWindowStatus.NotYetOpen:
                                 allSessionsComplete = false;
                                 var now = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registration window not open yet (current time: {now}, window: {stuTime.TidsromTilstedevaerelse})");
+                                LogDebug($"Registreringsvindu ikke åpnet ennå (nåværende tid: {now}, vindu: {stuTime.TidsromTilstedevaerelse})");
                                 break;
 
                             case RegistrationWindowStatus.Closed:
                                 closedWindows++;
                                 var currentTime = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registration window closed (current time: {currentTime}, window: {stuTime.TidsromTilstedevaerelse})");
+                                LogDebug($"Registreringsvindu lukket (nåværende tid: {currentTime}, vindu: {stuTime.TidsromTilstedevaerelse})");
                                 break;
                         }
                     }
@@ -907,9 +908,10 @@ namespace AkademiTrack.ViewModels
                     // Check if we should stop the automation
                     if (stuTimes.Any() && allSessionsComplete)
                     {
-                        LogSuccess($"All {stuTimes.Count} STU sessions are complete for today!");
-                        LogInfo("All registration windows have closed - stopping automation");
-                        // No notification spam here - automation will show stopped notification when it actually stops
+                        LogSuccess($"Alle {stuTimes.Count} STU-økter er fullført for i dag!");
+                        LogInfo("Alle registreringsvinduer er lukket - stopper automatisering");
+                        ShowNotification("Ingen Flere Økter",
+                                "Alle studietimer er fullført. Automatisering fullført.", "INFO");
                         break;
                     }
 
@@ -919,25 +921,26 @@ namespace AkademiTrack.ViewModels
                         var currentHour = DateTime.Now.Hour;
                         if (currentHour >= 16) // After 4 PM
                         {
-                            LogInfo("No STU sessions found for today and it's after 4 PM - likely no more sessions");
-                            LogInfo("Stopping automation for today");
-                            // No notification spam here
+                            LogInfo("Ingen STU-økter funnet for i dag og det er etter 16:00 - sannsynligvis ingen flere økter");
+                            LogInfo("Stopper automatisering for i dag");
+                            ShowNotification("Ingen Flere Økter",
+                                "Ingen STU-økter funnet for i dag. Automatisering fullført.", "INFO");
                             break;
                         }
                         else
                         {
-                            LogInfo("No STU sessions found yet - continuing to monitor");
+                            LogInfo("Ingen STU-økter funnet ennå - fortsetter å overvåke");
                         }
                     }
 
                     // Log summary of current state
                     if (stuTimes.Any())
                     {
-                        LogDebug($"Session status: {openWindows} open, {closedWindows} closed, {stuTimes.Count - openWindows - closedWindows} not yet open");
+                        LogDebug($"Øktstatus: {openWindows} åpne, {closedWindows} lukkede, {stuTimes.Count - openWindows - closedWindows} ikke åpnet ennå");
                     }
 
                     // Wait 2 minutes before next check
-                    LogInfo("Waiting 2 minutes before next check...");
+                    LogInfo("Venter 2 minutter før neste sjekk...");
                     await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
                 }
                 catch (OperationCanceledException)
@@ -946,8 +949,8 @@ namespace AkademiTrack.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Monitoring error: {ex.Message}");
-                    LogInfo("Waiting 1 minute before retry...");
+                    LogError($"Overvåkingsfeil: {ex.Message}");
+                    LogInfo("Venter 1 minutt før nytt forsøk...");
                     await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
                 }
             }
