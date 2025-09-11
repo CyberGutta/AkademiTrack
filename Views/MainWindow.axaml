@@ -18,6 +18,11 @@
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
+	<Window.Resources>
+		<!-- String Equality Converter -->
+		<vm:StringEqualityConverter x:Key="StringEqualityConverter"/>
+	</Window.Resources>
+
 	<Window.Styles>
 		<!-- Force all buttons to always be visible -->
 		<Style Selector="Button">
@@ -135,76 +140,207 @@
 			<Setter Property="Foreground" Value="#6C757D"/>
 			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
+
+		<!-- Notification Styles -->
+		<Style Selector="Border.notification">
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="16,12"/>
+			<Setter Property="Margin" Value="16"/>
+			<Setter Property="BoxShadow" Value="0 4 12 0 #00000020"/>
+			<Setter Property="MinWidth" Value="300"/>
+			<Setter Property="MaxWidth" Value="400"/>
+		</Style>
+
+		<Style Selector="Border.notification.info">
+			<Setter Property="Background" Value="#D1ECF1"/>
+			<Setter Property="BorderBrush" Value="#BEE5EB"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+
+		<Style Selector="Border.notification.success">
+			<Setter Property="Background" Value="#D4EDDA"/>
+			<Setter Property="BorderBrush" Value="#C3E6CB"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+
+		<Style Selector="Border.notification.warning">
+			<Setter Property="Background" Value="#FFF3CD"/>
+			<Setter Property="BorderBrush" Value="#FFEAA7"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+
+		<Style Selector="Border.notification.error">
+			<Setter Property="Background" Value="#F8D7DA"/>
+			<Setter Property="BorderBrush" Value="#F5C6CB"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-title">
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Margin" Value="0,0,0,4"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-title.info">
+			<Setter Property="Foreground" Value="#0C5460"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-title.success">
+			<Setter Property="Foreground" Value="#155724"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-title.warning">
+			<Setter Property="Foreground" Value="#856404"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-title.error">
+			<Setter Property="Foreground" Value="#721C24"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-message">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-message.info">
+			<Setter Property="Foreground" Value="#0C5460"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-message.success">
+			<Setter Property="Foreground" Value="#155724"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-message.warning">
+			<Setter Property="Foreground" Value="#856404"/>
+		</Style>
+
+		<Style Selector="TextBlock.notification-message.error">
+			<Setter Property="Foreground" Value="#721C24"/>
+		</Style>
+
+		<Style Selector="Button.notification-close">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="4"/>
+			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Width" Value="24"/>
+			<Setter Property="Height" Value="24"/>
+		</Style>
 	</Window.Styles>
 
-	<Grid Margin="30,25">
-		<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+	<Grid>
+		<!-- Main Content -->
+		<Grid Margin="30,25">
+			<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
 
-			<!-- App Title -->
-			<TextBlock Text="AkademiTrack"
-                      Classes="title"
-                      HorizontalAlignment="Center"/>
+				<!-- App Title -->
+				<TextBlock Text="AkademiTrack"
+	                      Classes="title"
+	                      HorizontalAlignment="Center"/>
 
-			<TextBlock Text="Automated Attendance System"
-                      Classes="subtitle"
-                      HorizontalAlignment="Center"/>
+				<TextBlock Text="Automated Attendance System"
+	                      Classes="subtitle"
+	                      HorizontalAlignment="Center"/>
 
-			<!-- Info Text -->
-			<TextBlock Text="Click Start to begin automated attendance monitoring.&#x0a;The system will handle login and cookie management automatically."
-                      Classes="info"
-                      HorizontalAlignment="Center"
-                      TextWrapping="Wrap"
-                      MaxWidth="450"/>
+				<!-- Info Text -->
+				<TextBlock Text="Click Start to begin automated attendance monitoring.&#x0a;The system will handle login and cookie management automatically."
+	                      Classes="info"
+	                      HorizontalAlignment="Center"
+	                      TextWrapping="Wrap"
+	                      MaxWidth="450"/>
 
-			<!-- Main Control Buttons -->
-			<StackPanel Orientation="Horizontal"
-                       HorizontalAlignment="Center"
-                       Spacing="12">
+				<!-- Main Control Buttons -->
+				<StackPanel Orientation="Horizontal"
+	                       HorizontalAlignment="Center"
+	                       Spacing="12">
 
-				<!-- Start button -->
-				<Button Content="Start Automation"
-                       Classes="start-button"
-                       Command="{Binding StartAutomationCommand}"
-                       IsEnabled="{Binding !IsAutomationRunning}"
-                       ToolTip.Tip="Starts automation with automatic login and cookie management"/>
+					<!-- Start button -->
+					<Button Content="Start Automation"
+	                       Classes="start-button"
+	                       Command="{Binding StartAutomationCommand}"
+	                       IsEnabled="{Binding !IsAutomationRunning}"
+	                       ToolTip.Tip="Starts automation with automatic login and cookie management"/>
 
-				<!-- Stop button -->
-				<Button Content="Stop Automation"
-                       Classes="stop-button"
-                       Command="{Binding StopAutomationCommand}"
-                       IsEnabled="{Binding IsAutomationRunning}"
-                       ToolTip.Tip="Stops the automation process"/>
-			</StackPanel>
-
-			<!-- Settings Button -->
-			<StackPanel HorizontalAlignment="Center">
-				<Button Content="Settings and Activity Log"
-                       Classes="settings"
-                       Command="{Binding OpenSettingsCommand}"
-                       ToolTip.Tip="Open settings and view activity logs"/>
-			</StackPanel>
-
-			<!-- Current Status Display -->
-			<Border Background="White"
-                   CornerRadius="6"
-                   Padding="16,12"
-                   BorderThickness="1"
-                   BorderBrush="#E9ECEF"
-                   MaxWidth="420"
-                   MinWidth="300">
-
-				<StackPanel Spacing="6">
-					<TextBlock Text="Current Status:"
-                              Classes="status-label"/>
-
-					<TextBlock Text="{Binding StatusMessage}"
-                              Classes="status"
-                              HorizontalAlignment="Center"
-                              TextWrapping="Wrap"
-                              MaxWidth="380"/>
+					<!-- Stop button -->
+					<Button Content="Stop Automation"
+	                       Classes="stop-button"
+	                       Command="{Binding StopAutomationCommand}"
+	                       IsEnabled="{Binding IsAutomationRunning}"
+	                       ToolTip.Tip="Stops the automation process"/>
 				</StackPanel>
-			</Border>
 
-		</StackPanel>
+				<!-- Settings Button -->
+				<StackPanel HorizontalAlignment="Center">
+					<Button Content="Settings and Activity Log"
+	                       Classes="settings"
+	                       Command="{Binding OpenSettingsCommand}"
+	                       ToolTip.Tip="Open settings and view activity logs"/>
+				</StackPanel>
+
+				<!-- Current Status Display -->
+				<Border Background="White"
+	                   CornerRadius="6"
+	                   Padding="16,12"
+	                   BorderThickness="1"
+	                   BorderBrush="#E9ECEF"
+	                   MaxWidth="420"
+	                   MinWidth="300">
+
+					<StackPanel Spacing="6">
+						<TextBlock Text="Current Status:"
+	                              Classes="status-label"/>
+
+						<TextBlock Text="{Binding StatusMessage}"
+	                              Classes="status"
+	                              HorizontalAlignment="Center"
+	                              TextWrapping="Wrap"
+	                              MaxWidth="380"/>
+					</StackPanel>
+				</Border>
+
+			</StackPanel>
+		</Grid>
+
+		<!-- Notification Popup (Top-Right Corner) -->
+		<Border IsVisible="{Binding HasCurrentNotification}"
+		        HorizontalAlignment="Right"
+		        VerticalAlignment="Top"
+		        Classes="notification"
+		        Classes.info="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=INFO}"
+		        Classes.success="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=SUCCESS}"
+		        Classes.warning="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=WARNING}"
+		        Classes.error="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=ERROR}">
+
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
+
+				<StackPanel Grid.Column="0" Spacing="4">
+					<TextBlock Text="{Binding CurrentNotification.Title}"
+					           Classes="notification-title"
+					           Classes.info="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=INFO}"
+					           Classes.success="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=SUCCESS}"
+					           Classes.warning="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=WARNING}"
+					           Classes.error="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=ERROR}"/>
+
+					<TextBlock Text="{Binding CurrentNotification.Message}"
+					           Classes="notification-message"
+					           Classes.info="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=INFO}"
+					           Classes.success="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=SUCCESS}"
+					           Classes.warning="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=WARNING}"
+					           Classes.error="{Binding CurrentNotification.Level, Converter={StaticResource StringEqualityConverter}, ConverterParameter=ERROR}"/>
+				</StackPanel>
+
+				<Button Grid.Column="1"
+				        Content="×"
+				        Classes="notification-close"
+				        Command="{Binding DismissNotificationCommand}"
+				        VerticalAlignment="Top"
+				        HorizontalAlignment="Right"/>
+			</Grid>
+		</Border>
 	</Grid>
 </Window>

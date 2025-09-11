@@ -1,6 +1,8 @@
 ﻿using AkademiTrack.Views;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
 using Avalonia.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -21,12 +23,215 @@ using System.Windows.Input;
 
 namespace AkademiTrack.ViewModels
 {
+    // Overlay notification window class
+    public class NotificationOverlayWindow : Window
+    {
+        private Timer? _autoCloseTimer;
+        private readonly string _level;
+
+        public NotificationOverlayWindow(string title, string message, string level = "INFO")
+        {
+            _level = level;
+
+            // Window properties for overlay
+            this.WindowState = WindowState.Normal;
+            this.CanResize = false;
+            this.ShowInTaskbar = false;
+            this.Topmost = true;
+            this.SystemDecorations = SystemDecorations.None;
+            this.Width = 350;
+            this.Height = 120;
+
+            // Position at top-right of screen
+            PositionWindow();
+
+            // Create content
+            CreateContent(title, message, level);
+
+            // Auto-close timer for non-error notifications
+            if (level != "ERROR")
+            {
+                _autoCloseTimer = new Timer(AutoClose, null, 5000, Timeout.Infinite);
+            }
+        }
+
+        private void PositionWindow()
+        {
+            // Get primary screen bounds
+            var screen = this.Screens.Primary;
+            if (screen != null)
+            {
+                var workingArea = screen.WorkingArea;
+                this.Position = new PixelPoint(
+                    (int)(workingArea.Right - this.Width - 20), // 20px from right edge
+                    (int)(workingArea.Y + 20) // 20px from top edge - FIXED: Changed Top to Y
+                );
+            }
+        }
+
+        private void CreateContent(string title, string message, string level)
+{
+    // Create gradient background based on notification level
+    var backgroundColor = level switch
+    {
+        "SUCCESS" => Brush.Parse("#D4EDDA"),
+        "WARNING" => Brush.Parse("#FFF3CD"),
+        "ERROR" => Brush.Parse("#F8D7DA"),
+        _ => Brush.Parse("#D1ECF1") // INFO
+    };
+
+    var borderColor = level switch
+    {
+        "SUCCESS" => Brush.Parse("#C3E6CB"),
+        "WARNING" => Brush.Parse("#FFEAA7"),
+        "ERROR" => Brush.Parse("#F5C6CB"),
+        _ => Brush.Parse("#BEE5EB") // INFO
+    };
+
+    var textColor = level switch
+    {
+        "SUCCESS" => Brush.Parse("#155724"),
+        "WARNING" => Brush.Parse("#856404"),
+        "ERROR" => Brush.Parse("#721C24"),
+        _ => Brush.Parse("#0C5460") // INFO
+    };
+
+    // Main container
+    var mainBorder = new Border
+    {
+        Background = backgroundColor,
+        BorderBrush = borderColor,
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(8),
+        Padding = new Thickness(16, 12),
+        BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
+    };
+
+    // Content grid
+    var contentGrid = new Grid();
+    contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+    contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+    contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+    contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+
+    // Title
+    var titleBlock = new TextBlock
+    {
+        Text = title,
+        FontWeight = FontWeight.SemiBold,
+        FontSize = 14,
+        Foreground = textColor,
+        Margin = new Thickness(0, 0, 0, 4)
+    };
+    Grid.SetColumn(titleBlock, 0);
+    Grid.SetRow(titleBlock, 0);
+    contentGrid.Children.Add(titleBlock);
+
+    // Message
+    var messageBlock = new TextBlock
+    {
+        Text = message,
+        FontSize = 12,
+        Foreground = textColor,
+        TextWrapping = TextWrapping.Wrap,
+        MaxWidth = 280
+    };
+    Grid.SetColumn(messageBlock, 0);
+    Grid.SetRow(messageBlock, 1);
+    contentGrid.Children.Add(messageBlock);
+
+    // Close button
+    var closeButton = new Button
+    {
+        Content = "×",
+        Background = Brushes.Transparent,
+        BorderThickness = new Thickness(0),
+        Padding = new Thickness(4),
+        FontSize = 16,
+        FontWeight = FontWeight.Bold,
+        Width = 24,
+        Height = 24,
+        Foreground = textColor,
+        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+    };
+    closeButton.Click += (s, e) => Close();
+    Grid.SetColumn(closeButton, 1);
+    Grid.SetRow(closeButton, 0);
+    contentGrid.Children.Add(closeButton);
+
+    mainBorder.Child = contentGrid;
+    this.Content = mainBorder;
+
+    // Add fade-in animation - FIXED VERSION
+    this.Opacity = 0;
+    var fadeIn = new Avalonia.Animation.Animation
+    {
+        Duration = TimeSpan.FromMilliseconds(300),
+        Children =
+        {
+            new Avalonia.Animation.KeyFrame
+            {
+                Cue = new Avalonia.Animation.Cue(0.0),
+                Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0.0) }
+            },
+            new Avalonia.Animation.KeyFrame
+            {
+                Cue = new Avalonia.Animation.Cue(1.0),
+                Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1.0) }
+            }
+        }
+    };
+
+    Task.Run(async () =>
+    {
+        await Task.Delay(50);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            fadeIn.RunAsync(this);
+        });
+    });
+}
+
+        private void AutoClose(object state)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    // Simple close without animation
+                    Close();
+                }
+                catch
+                {
+                    Close();
+                }
+            });
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _autoCloseTimer?.Dispose();
+            base.OnClosed(e);
+        }
+    }
+
     public class LogEntry
     {
         public DateTime Timestamp { get; set; }
         public string Message { get; set; }
         public string Level { get; set; } // INFO, SUCCESS, ERROR, DEBUG
         public string FormattedMessage => $"[{Timestamp:HH:mm:ss}] [{Level}] {Message}";
+    }
+
+    public class NotificationEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Title { get; set; }
+        public string Message { get; set; }
+        public string Level { get; set; } // INFO, SUCCESS, ERROR, WARNING
+        public bool IsVisible { get; set; } = true;
+        public int Id { get; set; }
     }
 
     public class SimpleCommand : ICommand
@@ -74,7 +279,11 @@ namespace AkademiTrack.ViewModels
         private string _statusMessage = "Ready";
         private IWebDriver _webDriver;
         private ObservableCollection<LogEntry> _logEntries;
+        private ObservableCollection<NotificationEntry> _notifications;
         private bool _showDetailedLogs = true;
+        private NotificationEntry _currentNotification;
+        private int _notificationIdCounter = 0;
+        private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -87,11 +296,13 @@ namespace AkademiTrack.ViewModels
         {
             _httpClient = new HttpClient();
             _logEntries = new ObservableCollection<LogEntry>();
+            _notifications = new ObservableCollection<NotificationEntry>();
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
             ClearLogsCommand = new SimpleCommand(ClearLogsAsync);
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
+            DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
 
             LogInfo("Application ready");
         }
@@ -136,6 +347,29 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        public ObservableCollection<NotificationEntry> Notifications
+        {
+            get => _notifications;
+            private set
+            {
+                _notifications = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public NotificationEntry CurrentNotification
+        {
+            get => _currentNotification;
+            private set
+            {
+                _currentNotification = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasCurrentNotification));
+            }
+        }
+
+        public bool HasCurrentNotification => _currentNotification != null;
+
         public bool ShowDetailedLogs
         {
             get => _showDetailedLogs;
@@ -151,6 +385,86 @@ namespace AkademiTrack.ViewModels
         public ICommand OpenSettingsCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
+        public ICommand DismissNotificationCommand { get; }
+
+        private void ShowNotification(string title, string message, string level = "INFO")
+        {
+            // Only show overlay notifications for these specific cases
+            var allowedNotifications = new[]
+            {
+                "Automation Started",
+                "Automation Stopped", 
+                "Registration Success"
+            };
+
+            if (allowedNotifications.Contains(title))
+            {
+                ShowSystemOverlayNotification(title, message, level);
+            }
+            
+            // No in-app notifications - removed all the in-app notification logic
+        }
+
+        private void ShowSystemOverlayNotification(string title, string message, string level)
+        {
+            try
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                {
+                    CreateOverlayWindow(title, message, level);
+                }
+                else
+                {
+                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level));
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to show system overlay notification: {ex.Message}");
+            }
+        }
+
+        private void CreateOverlayWindow(string title, string message, string level)
+        {
+            try
+            {
+                // Clean up any closed windows first
+                for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
+                {
+                    if (!_activeOverlayWindows[i].IsVisible)
+                    {
+                        _activeOverlayWindows.RemoveAt(i);
+                    }
+                }
+
+                // Only allow 1 notification at a time to prevent stacking/greying
+                if (_activeOverlayWindows.Count > 0)
+                {
+                    var existingWindow = _activeOverlayWindows[0];
+                    existingWindow.Close();
+                    _activeOverlayWindows.Clear();
+                }
+
+                var overlayWindow = new NotificationOverlayWindow(title, message, level);
+
+                overlayWindow.Closed += (s, e) =>
+                {
+                    _activeOverlayWindows.Remove(overlayWindow);
+                };
+
+                _activeOverlayWindows.Add(overlayWindow);
+                overlayWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Error creating overlay window: {ex.Message}");
+            }
+        }
+
+        private async Task DismissCurrentNotificationAsync()
+        {
+            CurrentNotification = null;
+        }
 
         private void LogInfo(string message)
         {
@@ -232,6 +546,7 @@ namespace AkademiTrack.ViewModels
             try
             {
                 LogInfo("Starting automation...");
+                ShowNotification("Automation Started", "STU time registration automation is now running", "SUCCESS");
 
                 // Step 1: Check if existing cookies work
                 LogDebug("Loading existing cookies from file...");
@@ -261,6 +576,8 @@ namespace AkademiTrack.ViewModels
                 if (!cookiesValid)
                 {
                     LogInfo("Opening browser for fresh login...");
+                    // Removed notification spam here
+
                     cookies = await GetCookiesViaBrowserAsync();
 
                     if (cookies == null)
@@ -280,6 +597,7 @@ namespace AkademiTrack.ViewModels
             catch (OperationCanceledException)
             {
                 LogInfo("Automation stopped by user");
+                ShowNotification("Automation Stopped", "Monitoring has been stopped", "INFO");
             }
             catch (Exception ex)
             {
@@ -303,6 +621,7 @@ namespace AkademiTrack.ViewModels
             {
                 _cancellationTokenSource.Cancel();
                 LogInfo("Stop requested - stopping automation...");
+                ShowNotification("Automation Stopped", "Automation has been stopped by user", "INFO");
             }
         }
 
@@ -576,17 +895,21 @@ namespace AkademiTrack.ViewModels
                             case RegistrationWindowStatus.Open:
                                 openWindows++;
                                 allSessionsComplete = false;
-                                LogInfo($"⏰ Registration window is OPEN for STU session {stuTime.StartKl}-{stuTime.SluttKl}");
+                                LogInfo($"Registration window is OPEN for STU session {stuTime.StartKl}-{stuTime.SluttKl}");
                                 LogInfo("Attempting to register attendance...");
 
                                 try
                                 {
                                     await RegisterAttendanceAsync(stuTime, cookies);
-                                    LogSuccess($"✅ Successfully registered attendance for {stuTime.StartKl}-{stuTime.SluttKl}!");
+                                    LogSuccess($"Successfully registered attendance for {stuTime.StartKl}-{stuTime.SluttKl}!");
+                                    // Only notification that shows - class registered
+                                    ShowNotification("Registration Success", 
+                                        $"Registered for STU {stuTime.StartKl}-{stuTime.SluttKl}", "SUCCESS");
                                 }
                                 catch (Exception regEx)
                                 {
-                                    LogError($"❌ Registration failed: {regEx.Message}");
+                                    LogError($"Registration failed: {regEx.Message}");
+                                    // No notification spam for errors
                                 }
                                 break;
 
@@ -599,7 +922,7 @@ namespace AkademiTrack.ViewModels
                             case RegistrationWindowStatus.Closed:
                                 closedWindows++;
                                 var currentTime = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registration window not open yet (current time: {currentTime}, window: {stuTime.TidsromTilstedevaerelse} = CLOSED)");
+                                LogDebug($"Registration window closed (current time: {currentTime}, window: {stuTime.TidsromTilstedevaerelse})");
                                 break;
                         }
                     }
@@ -607,8 +930,9 @@ namespace AkademiTrack.ViewModels
                     // Check if we should stop the automation
                     if (stuTimes.Any() && allSessionsComplete)
                     {
-                        LogSuccess($"🎉 All {stuTimes.Count} STU sessions are complete for today!");
+                        LogSuccess($"All {stuTimes.Count} STU sessions are complete for today!");
                         LogInfo("All registration windows have closed - stopping automation");
+                        // No notification spam here - automation will show stopped notification when it actually stops
                         break;
                     }
 
@@ -620,6 +944,7 @@ namespace AkademiTrack.ViewModels
                         {
                             LogInfo("No STU sessions found for today and it's after 4 PM - likely no more sessions");
                             LogInfo("Stopping automation for today");
+                            // No notification spam here
                             break;
                         }
                         else
@@ -881,6 +1206,17 @@ namespace AkademiTrack.ViewModels
             _webDriver?.Quit();
             _webDriver?.Dispose();
             _httpClient?.Dispose();
+
+            // Close all active overlay windows
+            foreach (var window in _activeOverlayWindows.ToList())
+            {
+                try
+                {
+                    window.Close();
+                }
+                catch { }
+            }
+            _activeOverlayWindows.Clear();
         }
     }
 
