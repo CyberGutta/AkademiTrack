@@ -7,7 +7,7 @@
         x:Class="AkademiTrack.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Settings - AkademiTrack"
+        Title="Innstillinger - AkademiTrack"
         Background="#F8F9FA"
         Width="800"
         Height="600"
@@ -209,11 +209,11 @@
 		</Grid.ColumnDefinitions>
 		<!-- Header -->
 		<StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="8" Margin="0,0,0,20">
-			<TextBlock Text="Settings"
+			<TextBlock Text="Innstillinger"
                        FontSize="28"
                        FontWeight="Light"
                        Foreground="#212529"/>
-			<TextBlock Text="Configure AkademiTrack preferences and view activity logs"
+			<TextBlock Text="Konfigurer AkademiTrack-preferanser og vis aktivitetslogger"
                        FontSize="14"
                        Foreground="#6C757D"/>
 		</StackPanel>
@@ -221,24 +221,24 @@
 		<ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
 			<StackPanel Spacing="16">
 				<!-- File Management Section -->
-				<TextBlock Text="File Management" Classes="section-header"/>
+				<TextBlock Text="Filbehandling" Classes="section-header"/>
 				<!-- Open Program Folder Setting -->
 				<Border Classes="setting-item">
 					<StackPanel Spacing="8">
-						<TextBlock Text="Program Files" Classes="setting-title"/>
-						<TextBlock Text="Access the program directory where cookies and configuration files are stored."
-                                   Classes="setting-description"/>
-						<Button Content="Open Program Folder"
+						<TextBlock Text="Programfiler" Classes="setting-title"/>
+						<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
+								Classes="setting-description"/>
+						<Button Content="Vis Programmappe"
                                 Classes="settings-action"
                                 Command="{Binding OpenProgramFolderCommand}"
-                                ToolTip.Tip="Opens the folder where AkademiTrack stores its files"/>
+                                ToolTip.Tip="Viser mappen der AkademiTrack lagrer filene sine"/>
 					</StackPanel>
 				</Border>
 				<!-- Application Info Section -->
-				<TextBlock Text="Application Information" Classes="section-header"/>
+				<TextBlock Text="Applikasjonsinformasjon" Classes="section-header"/>
 				<Border Classes="info-panel">
 					<StackPanel Spacing="6">
-						<TextBlock Text="Application Details"
+						<TextBlock Text="Applikasjonsdetaljer"
                                    FontWeight="SemiBold"
                                    FontSize="13"
                                    Foreground="#007ACC"/>
@@ -270,7 +270,7 @@
 						<ColumnDefinition Width="Auto"/>
 					</Grid.ColumnDefinitions>
 					<TextBlock Grid.Column="0"
-                               Text="Activity Log"
+                               Text="Aktivitetslogg"
                                FontWeight="SemiBold"
                                FontSize="16"
                                Foreground="#495057"
@@ -278,14 +278,13 @@
 					<StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 Spacing="8">
-						<Button Content="{Binding ShowDetailedLogs, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Hide Debug|Show Debug'}"
+						<Button Content="{Binding ShowDetailedLogs, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Skjul Debug|Vis Debug'}"
                                 Classes="log-control"
                                 Command="{Binding ToggleDetailedLogsCommand}"
-                                ToolTip.Tip="Toggle detailed debug logging"/>
-						<Button Content="Clear Logs"
-                                Classes="log-control"
+                                ToolTip.Tip="Skjul eller vis detaljert debug-logging"/>
+						<Button Content="Fjern Logger"                                Classes="log-control"
                                 Command="{Binding ClearLogsCommand}"
-                                ToolTip.Tip="Clear all log entries"/>
+                                ToolTip.Tip="Fjerner alle loggregistreringer"/>
 					</StackPanel>
 				</Grid>
 				<!-- Log Entries -->
@@ -314,7 +313,7 @@
                     HorizontalAlignment="Right"
                     Spacing="12"
                     Margin="0,20,0,0">
-			<Button Content="Close"
+			<Button Content="Lukk"
                     Classes="cancel"
                     Command="{Binding CloseCommand}"
                     IsDefault="True"/>

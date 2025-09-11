@@ -83,7 +83,7 @@ namespace AkademiTrack.ViewModels
             var assembly = Assembly.GetExecutingAssembly();
             Name = assembly.GetName().Name ?? "AkademiTrack";
             Version = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
-            Description = "Academic tracking application";
+            Description = "Akademiet automatisk fremmøte registerings program";
         }
 
         public override string ToString()
