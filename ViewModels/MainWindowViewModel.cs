@@ -166,41 +166,8 @@ namespace AkademiTrack.ViewModels
     mainBorder.Child = contentGrid;
     this.Content = mainBorder;
 
-    // Simplified fade-in without initial opacity manipulation
-    Task.Run(async () =>
-    {
-        await Task.Delay(100);
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            try
-            {
-                var fadeIn = new Avalonia.Animation.Animation
-                {
-                    Duration = TimeSpan.FromMilliseconds(250),
-                    Children =
-                    {
-                        new Avalonia.Animation.KeyFrame
-                        {
-                            Cue = new Avalonia.Animation.Cue(0.0),
-                            Setters = { new Avalonia.Styling.Setter(OpacityProperty, 0.0) }
-                        },
-                        new Avalonia.Animation.KeyFrame
-                        {
-                            Cue = new Avalonia.Animation.Cue(1.0),
-                            Setters = { new Avalonia.Styling.Setter(OpacityProperty, 1.0) }
-                        }
-                    }
-                };
-
-                fadeIn.RunAsync(this);
-            }
-            catch
-            {
-                // If animation fails, just ensure window is visible
-                this.Opacity = 1.0;
-            }
-        });
-    });
+    // No animation - just show immediately to prevent any grey flicker
+    this.Opacity = 1.0;
 }
 
         private void AutoClose(object state)
