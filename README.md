@@ -79,6 +79,8 @@ Gjeldende versjon: 1.0.0.0
 
 ## 🇺🇸 English
 
+<img width="867" height="648" alt="AkademiTrack Interface" src="https://github.com/user-attachments/assets/89e77581-89fb-4b20-b315-0e45f2845cfa" />
+
 ### About the Program
 
 AkademiTrack is an automation tool that helps students at Akademiet (a Norwegian school) automatically register attendance for STU (Independent Term Projects) sessions. The program monitors schedule data and registers attendance when registration windows open.
