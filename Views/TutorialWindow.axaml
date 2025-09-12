@@ -97,7 +97,7 @@
 			<Setter Property="TextBlock.Foreground" Value="White"/>
 		</Style>
 
-		<!-- CheckBox styling to fix hover issues -->
+		<!-- CheckBox styling with fixed text visibility -->
 		<Style Selector="CheckBox">
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="Foreground" Value="#495057"/>
@@ -129,7 +129,7 @@
                                         Grid.Column="1"
                                         Content="{TemplateBinding Content}"
                                         VerticalAlignment="Center"
-                                        TextBlock.Foreground="{TemplateBinding Foreground}"
+                                        Foreground="#495057"
                                         TextBlock.FontSize="{TemplateBinding FontSize}"/>
 					</Grid>
 				</ControlTemplate>
@@ -200,11 +200,6 @@
 			<Setter Property="Margin" Value="0,0,0,16"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
-
-		<Style Selector="CheckBox">
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Foreground" Value="#495057"/>
-		</Style>
 	</Window.Styles>
 
 	<Grid Margin="40,30">
@@ -265,7 +260,7 @@
 
 						<TextBlock Text="3. Ferdigmelding:"
                                   Classes="step-title"/>
-						<TextBlock Text="Du får beskjed når alle dagens STU-timer er registrert, og programmet stopper automatisk."
+						<TextBlock Text="Programmet får beskjed når alle dagens STU-timer er registrert, og programmet stopper automatisk."
                                   Classes="step-content"/>
 					</StackPanel>
 				</Border>
