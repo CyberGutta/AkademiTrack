@@ -70,105 +70,105 @@ namespace AkademiTrack.ViewModels
         }
 
         private void CreateContent(string title, string message, string level)
-{
-    // Create gradient background based on notification level
-    var backgroundColor = level switch
-    {
-        "SUCCESS" => Brush.Parse("#D4EDDA"),
-        "WARNING" => Brush.Parse("#FFF3CD"),
-        "ERROR" => Brush.Parse("#F8D7DA"),
-        _ => Brush.Parse("#D1ECF1") // INFO
-    };
+        {
+            // Create gradient background based on notification level
+            var backgroundColor = level switch
+            {
+                "SUCCESS" => Brush.Parse("#D4EDDA"),
+                "WARNING" => Brush.Parse("#FFF3CD"),
+                "ERROR" => Brush.Parse("#F8D7DA"),
+                _ => Brush.Parse("#D1ECF1") // INFO
+            };
 
-    var borderColor = level switch
-    {
-        "SUCCESS" => Brush.Parse("#C3E6CB"),
-        "WARNING" => Brush.Parse("#FFEAA7"),
-        "ERROR" => Brush.Parse("#F5C6CB"),
-        _ => Brush.Parse("#BEE5EB") // INFO
-    };
+            var borderColor = level switch
+            {
+                "SUCCESS" => Brush.Parse("#C3E6CB"),
+                "WARNING" => Brush.Parse("#FFEAA7"),
+                "ERROR" => Brush.Parse("#F5C6CB"),
+                _ => Brush.Parse("#BEE5EB") // INFO
+            };
 
-    var textColor = level switch
-    {
-        "SUCCESS" => Brush.Parse("#155724"),
-        "WARNING" => Brush.Parse("#856404"),
-        "ERROR" => Brush.Parse("#721C24"),
-        _ => Brush.Parse("#0C5460") // INFO
-    };
+            var textColor = level switch
+            {
+                "SUCCESS" => Brush.Parse("#155724"),
+                "WARNING" => Brush.Parse("#856404"),
+                "ERROR" => Brush.Parse("#721C24"),
+                _ => Brush.Parse("#0C5460") // INFO
+            };
 
-    // Set window background to transparent
-    this.Background = Brushes.Transparent;
-    
-    // Main container
-    var mainBorder = new Border
-    {
-        Background = backgroundColor,
-        BorderBrush = borderColor,
-        BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(8),
-        Padding = new Thickness(16, 12),
-        BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
-    };
+            // Set window background to transparent
+            this.Background = Brushes.Transparent;
+            
+            // Main container
+            var mainBorder = new Border
+            {
+                Background = backgroundColor,
+                BorderBrush = borderColor,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 12),
+                BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
+            };
 
-    // Content grid
-    var contentGrid = new Grid();
-    contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-    contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-    contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-    contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+            // Content grid
+            var contentGrid = new Grid();
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
 
-    // Title
-    var titleBlock = new TextBlock
-    {
-        Text = title,
-        FontWeight = FontWeight.SemiBold,
-        FontSize = 14,
-        Foreground = textColor,
-        Margin = new Thickness(0, 0, 0, 4)
-    };
-    Grid.SetColumn(titleBlock, 0);
-    Grid.SetRow(titleBlock, 0);
-    contentGrid.Children.Add(titleBlock);
+            // Title
+            var titleBlock = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 14,
+                Foreground = textColor,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            Grid.SetColumn(titleBlock, 0);
+            Grid.SetRow(titleBlock, 0);
+            contentGrid.Children.Add(titleBlock);
 
-    // Message
-    var messageBlock = new TextBlock
-    {
-        Text = message,
-        FontSize = 12,
-        Foreground = textColor,
-        TextWrapping = TextWrapping.Wrap,
-        MaxWidth = 280
-    };
-    Grid.SetColumn(messageBlock, 0);
-    Grid.SetRow(messageBlock, 1);
-    contentGrid.Children.Add(messageBlock);
+            // Message
+            var messageBlock = new TextBlock
+            {
+                Text = message,
+                FontSize = 12,
+                Foreground = textColor,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 280
+            };
+            Grid.SetColumn(messageBlock, 0);
+            Grid.SetRow(messageBlock, 1);
+            contentGrid.Children.Add(messageBlock);
 
-    // Close button
-    var closeButton = new Button
-    {
-        Content = "×",
-        Background = Brushes.Transparent,
-        BorderThickness = new Thickness(0),
-        Padding = new Thickness(4),
-        FontSize = 16,
-        FontWeight = FontWeight.Bold,
-        Width = 24,
-        Height = 24,
-        Foreground = textColor,
-        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
-    };
-    closeButton.Click += (s, e) => Close();
-    Grid.SetColumn(closeButton, 1);
-    Grid.SetRow(closeButton, 0);
-    contentGrid.Children.Add(closeButton);
+            // Close button
+            var closeButton = new Button
+            {
+                Content = "×",
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(4),
+                FontSize = 16,
+                FontWeight = FontWeight.Bold,
+                Width = 24,
+                Height = 24,
+                Foreground = textColor,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+            closeButton.Click += (s, e) => Close();
+            Grid.SetColumn(closeButton, 1);
+            Grid.SetRow(closeButton, 0);
+            contentGrid.Children.Add(closeButton);
 
-    mainBorder.Child = contentGrid;
-    this.Content = mainBorder;
+            mainBorder.Child = contentGrid;
+            this.Content = mainBorder;
 
-    // No animation - just show immediately to prevent any grey flicker
-    this.Opacity = 1.0;
-}
+            // No animation - just show immediately to prevent any grey flicker
+            this.Opacity = 1.0;
+        }
 
         private void AutoClose(object state)
         {
@@ -261,6 +261,10 @@ namespace AkademiTrack.ViewModels
         private NotificationEntry _currentNotification;
         private int _notificationIdCounter = 0;
         private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
+
+        // New fields for cached schedule data
+        private List<ScheduleItem> _cachedScheduleData;
+        private DateTime _scheduleDataFetchTime;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -374,7 +378,6 @@ namespace AkademiTrack.ViewModels
                 "Registration Success",
                 "Alle Studietimer Registrert",
                 "Ingen Flere Økter"
-
             };
 
             if (allowedNotifications.Contains(title))
@@ -526,7 +529,7 @@ namespace AkademiTrack.ViewModels
             try
             {
                 LogInfo("Starter automatisering...");
-                ShowNotification("Automatisering Startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
+                ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
                 // Step 1: Check if existing cookies work
                 LogDebug("Laster eksisterende cookies fra fil...");
@@ -556,7 +559,6 @@ namespace AkademiTrack.ViewModels
                 if (!cookiesValid)
                 {
                     LogInfo("Åpner nettleser for ny innlogging...");
-                    // Removed notification spam here
 
                     cookies = await GetCookiesViaBrowserAsync();
 
@@ -571,13 +573,13 @@ namespace AkademiTrack.ViewModels
 
                 LogSuccess("Autentisering fullført - starter overvåkingssløyfe...");
 
-                // Step 3: Start the monitoring loop
+                // Step 3: Start the monitoring loop with cached data
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
             }
             catch (OperationCanceledException)
             {
                 LogInfo("Automatisering stoppet av bruker");
-                ShowNotification("Automatisering Stoppet", "Overvåking har blitt stoppet", "INFO");
+                ShowNotification("Automation Stopped", "Overvåking har blitt stoppet", "INFO");
             }
             catch (Exception ex)
             {
@@ -601,7 +603,7 @@ namespace AkademiTrack.ViewModels
             {
                 _cancellationTokenSource.Cancel();
                 LogInfo("Stopp forespurt - stopper automatisering...");
-                ShowNotification("Automatisering Stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
+                ShowNotification("Automation Stopped", "Automatisering har blitt stoppet av bruker", "INFO");
             }
         }
 
@@ -838,70 +840,94 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
         private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
         {
             int cycleCount = 0;
+            
+            // Initial fetch of schedule data at startup - ONLY API CALL FOR THE DAY
+            LogInfo("Henter timeplandata for hele dagen...");
+            _cachedScheduleData = await GetFullDayScheduleDataAsync(cookies);
+            _scheduleDataFetchTime = DateTime.Now;
+            
+            if (_cachedScheduleData == null)
+            {
+                LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
+                LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
+                return;
+            }
+            
+            LogSuccess($"Hentet {_cachedScheduleData.Count} timeplan elementer for hele dagen");
+
+            // Find all STU sessions for today using cached data
+            var today = DateTime.Now.ToString("yyyyMMdd");
+            var todaysStuSessions = _cachedScheduleData
+                .Where(item => item.Dato == today && item.KNavn == "STU")
+                .ToList();
+
+            LogInfo($"Fant {todaysStuSessions.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
+            
+            if (todaysStuSessions.Any())
+            {
+                foreach (var stuTime in todaysStuSessions)
+                {
+                    LogInfo($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
+                }
+            }
+            else
+            {
+                LogInfo("Ingen STU-økter funnet for i dag - stopper automatisering");
+                ShowNotification("Ingen Flere Økter", "Ingen STU-økter funnet for i dag", "INFO");
+                return;
+            }
+
+            // Track which sessions have been successfully registered
+            var registeredSessions = new HashSet<string>();
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
                     cycleCount++;
-                    LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker STU-timer...");
+                    LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker registreringsvinduer...");
 
-                    // Get today's schedule
-                    LogDebug("Henter timeplandata fra server...");
-                    var scheduleData = await GetScheduleDataAsync(cookies);
-
-                    if (scheduleData?.Items == null)
-                    {
-                        LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
-                        LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
-                        break;
-                    }
-
-                    LogDebug($"Hentet {scheduleData.Items.Count} timeplan elementer");
-
-                    // Find STU times for today
-                    var today = DateTime.Now.ToString("yyyyMMdd");
-                    var stuTimes = scheduleData.Items
-                        .Where(item => item.Dato == today && item.KNavn == "STU")
-                        .ToList();
-
-                    LogInfo($"Fant {stuTimes.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
-
-                    if (stuTimes.Any())
-                    {
-                        foreach (var stuTime in stuTimes)
-                        {
-                            LogDebug($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
-                        }
-                    }
-
-                    // Check if all sessions are complete
                     bool allSessionsComplete = true;
                     int openWindows = 0;
                     int closedWindows = 0;
+                    int notYetOpenWindows = 0;
 
-                    // Check each STU time
-                    foreach (var stuTime in stuTimes)
+                    // Check each STU session using cached data and current time - NO API CALLS
+                    foreach (var stuSession in todaysStuSessions)
                     {
-                        var registrationStatus = GetRegistrationWindowStatus(stuTime);
+                        var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
+                        
+                        // Skip if already registered
+                        if (registeredSessions.Contains(sessionKey))
+                        {
+                            closedWindows++;
+                            continue;
+                        }
+
+                        var registrationStatus = GetRegistrationWindowStatus(stuSession);
 
                         switch (registrationStatus)
                         {
                             case RegistrationWindowStatus.Open:
                                 openWindows++;
                                 allSessionsComplete = false;
-                                LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuTime.StartKl}-{stuTime.SluttKl}");
+                                LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuSession.StartKl}-{stuSession.SluttKl}");
                                 LogInfo("Forsøker å registrere oppmøte...");
 
                                 try
                                 {
-                                    await RegisterAttendanceAsync(stuTime, cookies);
-                                    LogSuccess($"Registrerte oppmøte for {stuTime.StartKl}-{stuTime.SluttKl}!");
-                                    ShowNotification("Registrering Vellykket",
-                                        $"Registrert for STU {stuTime.StartKl}-{stuTime.SluttKl}", "SUCCESS");
+                                    // ONLY API CALL DURING MONITORING - POST request for registration
+                                    await RegisterAttendanceAsync(stuSession, cookies);
+                                    LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
+                                    ShowNotification("Registration Success",
+                                        $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
+                                    
+                                    // Mark as registered
+                                    registeredSessions.Add(sessionKey);
                                 }
                                 catch (Exception regEx)
                                 {
@@ -910,55 +936,35 @@ namespace AkademiTrack.ViewModels
                                 break;
 
                             case RegistrationWindowStatus.NotYetOpen:
+                                notYetOpenWindows++;
                                 allSessionsComplete = false;
                                 var now = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registreringsvindu ikke åpnet ennå (nåværende tid: {now}, vindu: {stuTime.TidsromTilstedevaerelse})");
+                                LogDebug($"Registreringsvindu ikke åpnet ennå for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {now}, vindu: {stuSession.TidsromTilstedevaerelse})");
                                 break;
 
                             case RegistrationWindowStatus.Closed:
                                 closedWindows++;
                                 var currentTime = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registreringsvindu lukket (nåværende tid: {currentTime}, vindu: {stuTime.TidsromTilstedevaerelse})");
+                                LogDebug($"Registreringsvindu lukket for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {currentTime}, vindu: {stuSession.TidsromTilstedevaerelse})");
                                 break;
                         }
                     }
 
-                    // Check if we should stop the automation
-                    if (stuTimes.Any() && allSessionsComplete)
+                    // Check if all sessions are complete (either registered or windows closed)
+                    if (allSessionsComplete || registeredSessions.Count == todaysStuSessions.Count)
                     {
-                        LogSuccess($"Alle {stuTimes.Count} STU-økter er fullført for i dag!");
-                        LogInfo("Alle registreringsvinduer er lukket - stopper automatisering");
-                        ShowNotification("Ingen Flere Økter",
-                                "Alle studietimer er fullført. Automatisering fullført.", "INFO");
+                        LogSuccess($"Alle {todaysStuSessions.Count} STU-økter er håndtert for i dag!");
+                        LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt: {todaysStuSessions.Count}");
+                        ShowNotification("Alle Studietimer Registrert",
+                            $"Alle {todaysStuSessions.Count} STU-økter er fullført.", "SUCCESS");
                         break;
                     }
 
-                    // If no STU sessions found for today, check if it's late in the day
-                    if (!stuTimes.Any())
-                    {
-                        var currentHour = DateTime.Now.Hour;
-                        if (currentHour >= 16) // After 4 PM
-                        {
-                            LogInfo("Ingen STU-økter funnet for i dag og det er etter 16:00 - sannsynligvis ingen flere økter");
-                            LogInfo("Stopper automatisering for i dag");
-                            ShowNotification("Ingen Flere Økter",
-                                "Ingen STU-økter funnet for i dag. Automatisering fullført.", "INFO");
-                            break;
-                        }
-                        else
-                        {
-                            LogInfo("Ingen STU-økter funnet ennå - fortsetter å overvåke");
-                        }
-                    }
-
                     // Log summary of current state
-                    if (stuTimes.Any())
-                    {
-                        LogDebug($"Øktstatus: {openWindows} åpne, {closedWindows} lukkede, {stuTimes.Count - openWindows - closedWindows} ikke åpnet ennå");
-                    }
+                    LogInfo($"Øktstatus: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
 
-                    // Wait 2 minutes before next check
-                    LogInfo("Venter 2 minutter før neste sjekk...");
+                    // Wait 2 minutes before next time check (NO API CALL NEEDED)
+                    LogInfo("Venter 2 minutter før neste tidssjekk...");
                     await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
                 }
                 catch (OperationCanceledException)
@@ -974,7 +980,42 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Add this enum and method to support the enhanced logic
+        // New method to get full day schedule data (called only once)
+        private async Task<List<ScheduleItem>> GetFullDayScheduleDataAsync(Dictionary<string, string> cookies)
+        {
+            try
+            {
+                var scheduleResponse = await GetScheduleDataAsync(cookies);
+                return scheduleResponse?.Items ?? new List<ScheduleItem>();
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error getting full day schedule data: {ex.Message}");
+                return null;
+            }
+        }
+
+        // Optional: Method to refresh schedule data if needed (for edge cases)
+        private async Task RefreshScheduleDataIfNeeded(Dictionary<string, string> cookies)
+        {
+            // Only refresh if data is very old (e.g., more than 6 hours) or if it's a new day
+            var dataAge = DateTime.Now - _scheduleDataFetchTime;
+            var isNewDay = _scheduleDataFetchTime.Date != DateTime.Now.Date;
+            
+            if (dataAge.TotalHours > 6 || isNewDay)
+            {
+                LogInfo("Oppdaterer timeplandata...");
+                var newData = await GetFullDayScheduleDataAsync(cookies);
+                if (newData != null)
+                {
+                    _cachedScheduleData = newData;
+                    _scheduleDataFetchTime = DateTime.Now;
+                    LogSuccess("Timeplandata oppdatert");
+                }
+            }
+        }
+
+        // Add this enum for registration window status
         private enum RegistrationWindowStatus
         {
             NotYetOpen,
@@ -1021,39 +1062,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private bool ShouldRegisterNow(ScheduleItem stuTime)
-        {
-            if (stuTime.TidsromTilstedevaerelse == null)
-            {
-                LogDebug($"No registration time window defined for session {stuTime.StartKl}-{stuTime.SluttKl}");
-                return false;
-            }
-
-            // Parse the registration time window (e.g., "08:15 - 08:30")
-            var parts = stuTime.TidsromTilstedevaerelse.Split(" - ");
-            if (parts.Length != 2)
-            {
-                LogDebug($"Invalid time window format: {stuTime.TidsromTilstedevaerelse}");
-                return false;
-            }
-
-            if (!TimeSpan.TryParse(parts[0], out var startTime) ||
-                !TimeSpan.TryParse(parts[1], out var endTime))
-            {
-                LogDebug($"Could not parse time window: {stuTime.TidsromTilstedevaerelse}");
-                return false;
-            }
-
-            var now = DateTime.Now.TimeOfDay;
-            bool isInWindow = now >= startTime && now <= endTime;
-
-            if (ShowDetailedLogs)
-            {
-                LogDebug($"Time check: {now:hh\\:mm} vs window {startTime:hh\\:mm}-{endTime:hh\\:mm} = {(isInWindow ? "OPEN" : "CLOSED")}");
-            }
-
-            return isInWindow;
-        }
+        // REMOVED: ShouldRegisterNow method (no longer needed as it's replaced by GetRegistrationWindowStatus)
 
         private async Task<ScheduleResponse> GetScheduleDataAsync(Dictionary<string, string> cookies)
         {
