@@ -159,7 +159,7 @@
 		</Style>
 
 		<Style Selector="CheckBox:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="TextBlock.Foreground" Value="#495057"/>
+			<Setter Property="Foreground" Value="#343A40"/>
 		</Style>
 
 		<Style Selector="TextBlock.title">
@@ -281,9 +281,6 @@
                                       Classes="step-content"
                                       Foreground="#856404"/>
 							<TextBlock Text="• Du må ha en aktiv internettforbindelse"
-                                      Classes="step-content"
-                                      Foreground="#856404"/>
-							<TextBlock Text="• Chrome nettleser må være installert på systemet"
                                       Classes="step-content"
                                       Foreground="#856404"/>
 							<TextBlock Text="• Programmet fungerer kun med Akademiet Drammen Sundland sin iskole.net løsning"
