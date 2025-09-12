@@ -31,8 +31,7 @@ AkademiTrack er et automatiseringsverktøy som hjelper studenter ved Akademiet m
 
 ### Systemkrav
 
-- **Operativsystem**: Windows, macOS, eller Linux
-- **Nettleser**: Google Chrome (må være installert)
+- **Operativsystem**: Windows, macOS
 - **Internett**: Stabil internettforbindelse
 - **Tilgang**: Gyldig iSkole konto ved Akademiet
 
@@ -56,8 +55,6 @@ AkademiTrack er et automatiseringsverktøy som hjelper studenter ved Akademiet m
 **Problem: Automatisering stopper uventet**
 - Løsning: Start på nytt for å få nye autentisering-cookies
 
-**Problem: Nettleser åpner ikke**
-- Løsning: Kontroller at Google Chrome er installert og oppdatert
 
 **Problem: Ingen STU-økter funnet**
 - Løsning: Kontroller at du har STU-økter i timeplanen din for i dag
@@ -107,8 +104,7 @@ AkademiTrack is an automation tool that helps students at Akademiet (a Norwegian
 
 ### System Requirements
 
-- **Operating System**: Windows, macOS, or Linux
-- **Browser**: Google Chrome (must be installed)
+- **Operating System**: Windows, macOS
 - **Internet**: Stable internet connection
 - **Access**: Valid iSkole account at Akademiet
 
@@ -131,9 +127,6 @@ AkademiTrack is an automation tool that helps students at Akademiet (a Norwegian
 
 **Problem: Automation stops unexpectedly**
 - Solution: Restart to get new authentication cookies
-
-**Problem: Browser doesn't open**
-- Solution: Check that Google Chrome is installed and updated
 
 **Problem: No STU sessions found**
 - Solution: Check that you have STU sessions in your schedule for today
