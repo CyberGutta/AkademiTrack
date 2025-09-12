@@ -666,14 +666,16 @@ namespace AkademiTrack.ViewModels
                 var settingsWindow = new SettingsWindow();
                 var settingsViewModel = new SettingsViewModel();
 
-                // Pass the log entries to the settings view model
-                settingsViewModel.LogEntries = this.LogEntries;
+                // Pass the log entries and current settings
+                settingsViewModel.SetLogEntries(this.LogEntries);
                 settingsViewModel.ShowDetailedLogs = this.ShowDetailedLogs;
 
                 settingsWindow.DataContext = settingsViewModel;
 
                 // Handle events from settings view model
                 settingsViewModel.CloseRequested += (s, e) => settingsWindow.Close();
+
+                // Sync the ShowDetailedLogs setting back to the main view model
                 settingsViewModel.PropertyChanged += (s, e) =>
                 {
                     if (e.PropertyName == nameof(SettingsViewModel.ShowDetailedLogs))
@@ -682,7 +684,7 @@ namespace AkademiTrack.ViewModels
                     }
                 };
 
-                // Show as dialog if you want modal behavior, or Show() for non-modal
+                // Show as dialog
                 if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     await settingsWindow.ShowDialog(desktop.MainWindow);

@@ -5,9 +5,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia.Threading;
 
 namespace AkademiTrack.ViewModels
 {
@@ -96,7 +98,8 @@ namespace AkademiTrack.ViewModels
     public class SettingsViewModel : INotifyPropertyChanged
     {
         private bool _showDetailedLogs = true;
-        private ObservableCollection<LogEntry> _logEntries = new ObservableCollection<LogEntry>();
+        private ObservableCollection<LogEntry> _allLogEntries = new();
+        private ObservableCollection<LogEntry> _displayedLogEntries = new();
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
@@ -107,23 +110,20 @@ namespace AkademiTrack.ViewModels
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
 
-        public ObservableCollection<LogEntry> LogEntries
-        {
-            get => _logEntries;
-            set
-            {
-                _logEntries = value;
-                OnPropertyChanged();
-            }
-        }
+        // This is what the UI binds to
+        public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
 
         public bool ShowDetailedLogs
         {
             get => _showDetailedLogs;
             set
             {
-                _showDetailedLogs = value;
-                OnPropertyChanged();
+                if (_showDetailedLogs != value)
+                {
+                    _showDetailedLogs = value;
+                    OnPropertyChanged();
+                    RefreshDisplayedLogs();
+                }
             }
         }
 
@@ -134,6 +134,44 @@ namespace AkademiTrack.ViewModels
             OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
+        }
+
+        // Method to set the log entries from the main view model
+        public void SetLogEntries(ObservableCollection<LogEntry> logEntries)
+        {
+            // Disconnect from old collection
+            if (_allLogEntries != null)
+            {
+                _allLogEntries.CollectionChanged -= OnAllLogEntriesChanged;
+            }
+
+            _allLogEntries = logEntries ?? new ObservableCollection<LogEntry>();
+
+            // Connect to new collection
+            _allLogEntries.CollectionChanged += OnAllLogEntriesChanged;
+
+            // Refresh display
+            RefreshDisplayedLogs();
+        }
+
+        private void OnAllLogEntriesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            // When the main log collection changes, refresh our display
+            Dispatcher.UIThread.Post(RefreshDisplayedLogs);
+        }
+
+        private void RefreshDisplayedLogs()
+        {
+            _displayedLogEntries.Clear();
+
+            var logsToShow = _showDetailedLogs
+                ? _allLogEntries
+                : _allLogEntries.Where(log => log.Level != "DEBUG");
+
+            foreach (var log in logsToShow)
+            {
+                _displayedLogEntries.Add(log);
+            }
         }
 
         private void CloseWindow()
@@ -158,14 +196,14 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
-                // Handle error - you might want to show a message to the user
                 Debug.WriteLine($"Error opening program folder: {ex.Message}");
             }
         }
 
         private void ClearLogs()
         {
-            LogEntries.Clear();
+            _allLogEntries?.Clear();
+            _displayedLogEntries.Clear();
         }
 
         private void ToggleDetailedLogs()
