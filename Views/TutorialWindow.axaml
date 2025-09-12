@@ -280,7 +280,7 @@
 							<TextBlock Text="• Programmet husker at du er logget inn så du slipper å logge inn hver gang"
                                       Classes="step-content"
                                       Foreground="#856404"/>
-							<TextBlock Text="• Du må være koblet til internett"
+							<TextBlock Text="• Du må være koblet til Akademiets internett"
                                       Classes="step-content"
                                       Foreground="#856404"/>
 							<TextBlock Text="• Programmet fungerer kun med Akademiet Drammen Sundland sitt system"
