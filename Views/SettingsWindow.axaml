@@ -6,7 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
         x:Class="AkademiTrack.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Icon="/Assets/AT-Transparrent72.png"
+        Icon="/Assets/AT-Transparrent.png"
         Title="Innstillinger - AkademiTrack"
         Background="#F8F9FA"
         Width="800"
