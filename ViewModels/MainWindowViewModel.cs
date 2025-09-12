@@ -769,6 +769,8 @@ namespace AkademiTrack.ViewModels
 
         private async Task<Dictionary<string, string>> GetCookiesViaBrowserAsync()
         {
+            IWebDriver localWebDriver = null;
+
             try
             {
                 // Setup Chrome options
@@ -783,7 +785,8 @@ namespace AkademiTrack.ViewModels
                 }
 
                 LogInfo("Initialiserer Chrome nettleser...");
-                _webDriver = new ChromeDriver(options);
+                localWebDriver = new ChromeDriver(options);
+                _webDriver = localWebDriver; // Set the class field for disposal
 
                 // Navigate to login page
                 LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
@@ -804,7 +807,13 @@ namespace AkademiTrack.ViewModels
                 LogSuccess("Innlogging fullført!");
                 LogInfo("Ekstraherer cookies fra nettleser økten...");
 
-                // Extract cookies
+                // Extract cookies - check if driver is still valid
+                if (!IsWebDriverValid(_webDriver))
+                {
+                    LogError("Nettleser ble lukket under innlogging - kan ikke ekstraktere cookies");
+                    return null;
+                }
+
                 var seleniumCookies = _webDriver.Manage().Cookies.AllCookies;
                 var cookieDict = seleniumCookies.ToDictionary(c => c.Name, c => c.Value);
 
@@ -816,27 +825,45 @@ namespace AkademiTrack.ViewModels
                 LogSuccess($"Ekstraherte og lagret {cookieDict.Count} cookies");
                 return cookieDict;
             }
+            catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
+                                                  webEx.Message.Contains("target window already closed") ||
+                                                  webEx.Message.Contains("Session info: chrome") ||
+                                                  webEx.Message.Contains("disconnected"))
+            {
+                LogError("Nettleser vindu ble lukket under innlogging - stopper automatisering");
+                LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
+
+                // Force stop the automation cleanly
+                await ForceStopAutomationAsync();
+                return null;
+            }
+            catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
+                                                         invEx.Message.Contains("no such session"))
+            {
+                LogError("Nettleser sesjon ble avbrutt under innlogging");
+                LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
+
+                // Force stop the automation cleanly
+                await ForceStopAutomationAsync();
+                return null;
+            }
             catch (Exception ex)
             {
                 LogError($"Nettleser innlogging feilet: {ex.Message}");
+                LogDebug($"Exception type: {ex.GetType().Name}");
+
+                // Force stop automation for any other browser-related errors
+                await ForceStopAutomationAsync();
                 return null;
             }
             finally
             {
-                try
-                {
-                    LogInfo("Lukker nettleser...");
-                    _webDriver?.Quit();
-                    _webDriver?.Dispose();
-                    _webDriver = null;
-                    LogDebug("Nettleser lukket");
-                }
-                catch (Exception ex)
-                {
-                    LogDebug($"Feil ved lukking av nettleser: {ex.Message}");
-                }
+                // Always clean up the web driver, regardless of what happened
+                await CleanupWebDriverAsync(localWebDriver);
             }
         }
+
+
 
         private async Task<bool> WaitForTargetUrlAsync()
         {
@@ -844,10 +871,24 @@ namespace AkademiTrack.ViewModels
             var targetUrl = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan";
             int checkCount = 0;
 
-            while (DateTime.Now < timeout)
+            while (DateTime.Now < timeout && !_cancellationTokenSource?.Token.IsCancellationRequested == true)
             {
                 try
                 {
+                    // Check if automation was cancelled
+                    if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                    {
+                        LogInfo("Automatisering ble stoppet under venting på innlogging");
+                        return false;
+                    }
+
+                    // Check if web driver is still valid
+                    if (!IsWebDriverValid(_webDriver))
+                    {
+                        LogError("Nettleser vindu ble lukket under venting på innlogging");
+                        return false;
+                    }
+
                     checkCount++;
                     var currentUrl = _webDriver.Url;
 
@@ -862,15 +903,136 @@ namespace AkademiTrack.ViewModels
                         return true;
                     }
                 }
+                catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
+                                                      webEx.Message.Contains("target window already closed") ||
+                                                      webEx.Message.Contains("disconnected"))
+                {
+                    LogError("Nettleser vindu ble lukket under venting");
+                    return false;
+                }
+                catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
+                                                             invEx.Message.Contains("no such session"))
+                {
+                    LogError("Nettleser sesjon ble avbrutt under venting");
+                    return false;
+                }
                 catch (Exception ex)
                 {
                     LogDebug($"Error checking URL: {ex.Message}");
+
+                    // If we can't check the URL, the browser might be closed
+                    if (!IsWebDriverValid(_webDriver))
+                    {
+                        LogError("Nettleser ikke lenger tilgjengelig");
+                        return false;
+                    }
                 }
 
                 await Task.Delay(2000);
             }
 
+            LogError("Tidsavbrudd nådd under venting på innlogging");
             return false;
+        }
+
+        private bool IsWebDriverValid(IWebDriver driver)
+        {
+            if (driver == null) return false;
+
+            try
+            {
+                // Try to access a simple property to test if the driver is still connected
+                var _ = driver.CurrentWindowHandle;
+                return true;
+            }
+            catch (WebDriverException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private async Task CleanupWebDriverAsync(IWebDriver driverToCleanup)
+        {
+            try
+            {
+                LogInfo("Rydder opp nettleser ressurser...");
+
+                if (driverToCleanup != null)
+                {
+                    try
+                    {
+                        if (IsWebDriverValid(driverToCleanup))
+                        {
+                            LogDebug("Lukker nettleser...");
+                            driverToCleanup.Quit();
+                        }
+                        else
+                        {
+                            LogDebug("Nettleser allerede lukket av bruker");
+                        }
+                    }
+                    catch (Exception quitEx)
+                    {
+                        LogDebug($"Feil ved lukking av nettleser: {quitEx.Message}");
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            driverToCleanup.Dispose();
+                        }
+                        catch (Exception disposeEx)
+                        {
+                            LogDebug($"Feil ved dispose av nettleser: {disposeEx.Message}");
+                        }
+                    }
+                }
+
+                // Clear the class field
+                _webDriver = null;
+                LogDebug("Nettleser opprydding fullført");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Feil under opprydding av nettleser: {ex.Message}");
+                // Always ensure the field is cleared
+                _webDriver = null;
+            }
+
+            // Small delay to let cleanup complete
+            await Task.Delay(500);
+        }
+
+        private async Task ForceStopAutomationAsync()
+        {
+            try
+            {
+                LogInfo("Stopper automatisering på grunn av nettleser problem...");
+
+                // Cancel the automation token if it exists
+                if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+
+                // Update the UI state
+                IsAutomationRunning = false;
+                StatusMessage = "Automatisering stoppet - nettleser ble lukket";
+
+                LogInfo("Automatisering stoppet - klar for ny start");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Feil ved tvungen stopp av automatisering: {ex.Message}");
+            }
         }
 
         private async Task SaveCookiesAsync(Cookie[] cookies)
