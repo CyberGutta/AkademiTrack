@@ -57,15 +57,66 @@ namespace AkademiTrack.ViewModels
 
         private void PositionWindow()
         {
-            // Get primary screen bounds
-            var screen = this.Screens.Primary;
-            if (screen != null)
+            try
             {
-                var workingArea = screen.WorkingArea;
-                this.Position = new PixelPoint(
-                    (int)(workingArea.Right - this.Width - 20), // 20px from right edge
-                    (int)(workingArea.Y + 20) // 20px from top edge - FIXED: Changed Top to Y
-                );
+                // Get primary screen bounds
+                var screen = this.Screens.Primary;
+                if (screen != null)
+                {
+                    var workingArea = screen.WorkingArea;
+                    var scaling = screen.Scaling;
+
+                    // Use larger margin and account for DPI scaling
+                    var margin = (int)(30 * scaling); // Scale margin with DPI
+                    var windowWidth = (int)(this.Width * scaling); // Account for DPI scaling
+                    var windowHeight = (int)(this.Height * scaling);
+
+                    // More conservative positioning - ensure we're well within bounds
+                    var availableWidth = workingArea.Width - (margin * 2);
+                    var availableHeight = workingArea.Height - (margin * 2);
+
+                    // If window is larger than available space, adjust
+                    if (windowWidth > availableWidth)
+                    {
+                        windowWidth = (int)availableWidth;
+                    }
+                    if (windowHeight > availableHeight)
+                    {
+                        windowHeight = (int)availableHeight;
+                    }
+
+                    // Calculate position from right edge with extra safety margin
+                    var x = (int)(workingArea.Right - windowWidth - margin);
+                    var y = (int)(workingArea.Y + margin);
+
+                    // Triple-check bounds to ensure notification is fully visible
+                    if (x < workingArea.X)
+                    {
+                        x = (int)(workingArea.X + margin);
+                    }
+                    if (x + windowWidth > workingArea.Right)
+                    {
+                        x = (int)(workingArea.Right - windowWidth - margin);
+                    }
+                    if (y + windowHeight > workingArea.Bottom)
+                    {
+                        y = (int)(workingArea.Bottom - windowHeight - margin);
+                    }
+
+                    this.Position = new PixelPoint(x, y);
+                    
+                }
+                else
+                {
+                    // Fallback position if screen detection fails
+                    this.Position = new PixelPoint(100, 50);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error positioning notification: {ex.Message}");
+                // Safe fallback position that should work on any screen
+                this.Position = new PixelPoint(200, 50);
             }
         }
 
