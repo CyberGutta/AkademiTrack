@@ -210,7 +210,7 @@
 					<TextBlock Text="Velkommen til AkademiTrack!"
                               Classes="title"/>
 
-					<TextBlock Text="Automatisk oppmøteregistrering for Akademiet Drammen Sundland"
+					<TextBlock Text="Din personlige assistent for oppmøteregistrering"
                               Classes="subtitle"/>
 				</StackPanel>
 
@@ -221,17 +221,17 @@
                        BorderThickness="1"
                        BorderBrush="#E9ECEF">
 					<StackPanel>
-						<TextBlock Text="Dette programmet automatiserer oppmøteregistrering for STU-timer ved å:"
+						<TextBlock Text="Dette programmet gjør oppmøteregistrering enkelt ved å:"
                                   Classes="content"/>
 
 						<StackPanel Margin="16,12,0,0">
-							<TextBlock Text="• Overvåke din timeplan automatisk"
+							<TextBlock Text="• Holde øye med timeplanen din hele tiden"
                                       Classes="content"/>
-							<TextBlock Text="• Registrere oppmøte når registreringsvinduet åpner"
+							<TextBlock Text="• Registrere deg automatisk når det blir mulig"
                                       Classes="content"/>
-							<TextBlock Text="• Håndtere innlogging og cookie-behandling automatisk"
+							<TextBlock Text="• Huske påloggingsinformasjonen din"
                                       Classes="content"/>
-							<TextBlock Text="• Gi deg beskjed når registreringer er fullført"
+							<TextBlock Text="• Gi deg beskjed når alt er ferdig"
                                       Classes="content"/>
 						</StackPanel>
 					</StackPanel>
@@ -247,20 +247,20 @@
 						<TextBlock Text="Slik fungerer det:"
                                   Classes="step-title"/>
 
-						<TextBlock Text="1. Første gang:"
+						<TextBlock Text="1. Første gang du bruker programmet:"
                                   Classes="step-title"
                                   Margin="0,12,0,4"/>
-						<TextBlock Text="Programmet åpner en nettleser hvor du logger inn manuelt på iskole.net med dine vanlige påloggingsopplysninger. Dette skjer kun første gang eller hvis cookies utløper."
+						<TextBlock Text="Programmet åpner en nettleserside hvor du logger inn med ditt vanlige brukernavn og passord på iskole.net - akkurat som du pleier. Programmet husker at du er logget inn, så du trenger bare å gjøre dette en gang i blant."
                                   Classes="step-content"/>
 
 						<TextBlock Text="2. Automatisk overvåking:"
                                   Classes="step-title"/>
-						<TextBlock Text="Programmet sjekker kontinuerlig din timeplan for STU-timer og registrerer oppmøte automatisk når registreringsvinduet åpner."
+						<TextBlock Text="Programmet sjekker timeplanen din hele tiden og venter på at registreringsvinduet skal åpne for STU-timene dine. Når det skjer, registrerer programmet oppmøtet ditt med en gang."
                                   Classes="step-content"/>
 
-						<TextBlock Text="3. Ferdigmelding:"
+						<TextBlock Text="3. Du får beskjed:"
                                   Classes="step-title"/>
-						<TextBlock Text="Programmet får beskjed når alle dagens STU-timer er registrert, og programmet stopper automatisk."
+						<TextBlock Text="Når alle dagens STU-timer er registrert, får du beskjed om at alt er ferdig. Da stopper programmet av seg selv."
                                   Classes="step-content"/>
 					</StackPanel>
 				</Border>
@@ -272,18 +272,21 @@
                        BorderThickness="1"
                        BorderBrush="#FFEAA7">
 					<StackPanel>
-						<TextBlock Text="Viktig informasjon:"
+						<TextBlock Text="Viktig å vite:"
                                   Classes="step-title"
                                   Foreground="#856404"/>
 
 						<StackPanel Margin="0,8,0,0">
-							<TextBlock Text="• Programmet lagrer cookies lokalt for å unngå gjentatte innlogginger"
+							<TextBlock Text="• Programmet husker at du er logget inn så du slipper å logge inn hver gang"
                                       Classes="step-content"
                                       Foreground="#856404"/>
-							<TextBlock Text="• Du må ha en aktiv internettforbindelse"
+							<TextBlock Text="• Du må være koblet til internett"
                                       Classes="step-content"
                                       Foreground="#856404"/>
-							<TextBlock Text="• Programmet fungerer kun med Akademiet Drammen Sundland sin iskole.net løsning"
+							<TextBlock Text="• Programmet fungerer kun med Akademiet Drammen Sundland sitt system"
+                                      Classes="step-content"
+                                      Foreground="#856404"/>
+							<TextBlock Text="• La programmet være åpent mens det jobber - du kan minimere vinduet"
                                       Classes="step-content"
                                       Foreground="#856404"/>
 						</StackPanel>
@@ -293,7 +296,7 @@
 				<!-- Checkbox -->
 				<StackPanel HorizontalAlignment="Center" Margin="0,12,0,0">
 					<CheckBox IsChecked="{Binding DontShowAgain}"
-                             Content="Ikke vis denne meldingen igjen"
+                             Content="Ikke vis denne informasjonen igjen"
                              HorizontalAlignment="Center"
                              Margin="0,0,0,16"/>
 				</StackPanel>
