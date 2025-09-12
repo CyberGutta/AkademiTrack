@@ -647,23 +647,38 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private string GetCookiesFilePath()
+        {
+            // Get the user's Application Support directory (best practice for macOS)
+            string appSupportPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appDataDir = Path.Combine(appSupportPath, "AkademiTrack");
+            
+            // Create directory if it doesn't exist
+            Directory.CreateDirectory(appDataDir);
+            
+            // Return full path to cookies file
+            return Path.Combine(appDataDir, "cookies.json");
+        }
+
         private async Task<Dictionary<string, string>> LoadCookiesAsync()
         {
             try
             {
-                if (!File.Exists("cookies.json"))
+                string cookiesPath = GetCookiesFilePath();
+                
+                if (!File.Exists(cookiesPath))
                 {
-                    LogDebug("No cookies.json file found");
+                    LogDebug($"No cookies.json file found at: {cookiesPath}");
                     return null;
                 }
 
-                var json = await File.ReadAllTextAsync("cookies.json");
+                var json = await File.ReadAllTextAsync(cookiesPath);
                 var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
-                LogDebug($"Loaded {cookieArray?.Length ?? 0} cookies from file");
+                LogDebug($"Loaded {cookieArray?.Length ?? 0} cookies from file: {cookiesPath}");
                 return cookieArray?.ToDictionary(c => c.Name, c => c.Value);
             }
             catch (Exception ex)
@@ -809,9 +824,12 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                string cookiesPath = GetCookiesFilePath();
+                
                 var json = JsonSerializer.Serialize(cookies, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync("cookies.json", json);
-                LogDebug("Cookies saved to cookies.json file");
+                await File.WriteAllTextAsync(cookiesPath, json);
+                
+                LogDebug($"Cookies saved to: {cookiesPath}");
             }
             catch (Exception ex)
             {
