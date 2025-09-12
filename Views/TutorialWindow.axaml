@@ -6,7 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
         x:Class="AkademiTrack.Views.TutorialWindow"
         x:DataType="vm:TutorialWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/AT-Transparrent72.png"
         Title="Velkommen til AkademiTrack"
         Background="#F8F9FA"
         Height="500"
