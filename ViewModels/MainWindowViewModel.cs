@@ -319,6 +319,11 @@ namespace AkademiTrack.ViewModels
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+        private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; // Replace with your actual URL
+        private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
+        private string _userEmail = "TESTGMAIL"; // Replace with actual user email
+        private string _userPassword = "TESTPASSWORD";
+
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -335,6 +340,9 @@ namespace AkademiTrack.ViewModels
             ClearLogsCommand = new SimpleCommand(ClearLogsAsync);
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
+
+            TestSupabaseCommand = new SimpleCommand(TestSupabaseRequestAsync);
+
 
             LogInfo("Applikasjon er klar");
         }
@@ -419,23 +427,33 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
 
+        public ICommand TestSupabaseCommand { get; }
+
+
         private void ShowNotification(string title, string message, string level = "INFO")
         {
             // Only show overlay notifications for these specific cases
             var allowedNotifications = new[]
             {
-                "Automation Started",
-                "Automation Stopped",
-                "Registration Success",
-                "Alle Studietimer Registrert",
-                "Ingen Flere Økter"
+        "Automation Started",
+        "Automation Stopped",
+        "Registration Success",     // Make sure this is here
+        "Alle Studietimer Registrert",
+        "Ingen Flere Økter"
             };
 
             if (allowedNotifications.Contains(title))
             {
+                // Add debug logging to see if this path is being hit
+                LogDebug($"Showing system overlay notification: {title} - {message}");
                 ShowSystemOverlayNotification(title, message, level);
             }
-            
+            else
+            {
+                // Debug log for filtered notifications
+                LogDebug($"Notification filtered out: {title}");
+            }
+
             // No in-app notifications - removed all the in-app notification logic
         }
 
@@ -471,23 +489,40 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // Only allow 1 notification at a time to prevent stacking/greying
-                if (_activeOverlayWindows.Count > 0)
+                // For registration success, give it priority over other notifications
+                if (title == "Registration Success")
                 {
-                    var existingWindow = _activeOverlayWindows[0];
-                    existingWindow.Close();
-                    _activeOverlayWindows.Clear();
+                    // Close any existing notification to make room for the important registration notification
+                    if (_activeOverlayWindows.Count > 0)
+                    {
+                        LogDebug("Closing existing notification to show registration success");
+                        var existingWindow = _activeOverlayWindows[0];
+                        existingWindow.Close();
+                        _activeOverlayWindows.Clear();
+                    }
+                }
+                else
+                {
+                    // For other notifications, only show if no registration notification is active
+                    if (_activeOverlayWindows.Count > 0)
+                    {
+                        LogDebug($"Skipping notification '{title}' - another notification is already showing");
+                        return;
+                    }
                 }
 
+                LogDebug($"Creating overlay window for: {title}");
                 var overlayWindow = new NotificationOverlayWindow(title, message, level);
 
                 overlayWindow.Closed += (s, e) =>
                 {
                     _activeOverlayWindows.Remove(overlayWindow);
+                    LogDebug($"Notification window closed: {title}");
                 };
 
                 _activeOverlayWindows.Add(overlayWindow);
                 overlayWindow.Show();
+                LogDebug($"Notification window shown: {title}");
             }
             catch (Exception ex)
             {
@@ -1333,6 +1368,72 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime)
+        {
+            try
+            {
+                LogInfo("Sending STU registration to Supabase...");
+
+                var payload = new
+                {
+                    user_email = _userEmail,
+                    session_date = DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd"),
+                    session_start = stuSession.StartKl,
+                    session_end = stuSession.SluttKl,
+                    course_name = stuSession.KNavn,
+                    registration_time = registrationTime,
+                    registration_window = stuSession.TidsromTilstedevaerelse,
+                    created_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/stu_registrations")
+                {
+                    Content = content
+                };
+
+                // Add Supabase headers
+                request.Headers.Add("apikey", _supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
+                request.Headers.Add("Prefer", "return=minimal");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    LogSuccess("STU registration sent to Supabase successfully");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogError($"Failed to send to Supabase: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Supabase request failed: {ex.Message}");
+            }
+        }
+
+        // Test method for the test button
+        private async Task TestSupabaseRequestAsync()
+        {
+            LogInfo("Testing Supabase connection...");
+
+            // Create a fake STU session for testing
+            var testSession = new ScheduleItem
+            {
+                Dato = DateTime.Now.ToString("yyyyMMdd"),
+                StartKl = "08:15",
+                SluttKl = "09:00",
+                KNavn = "STU",
+                TidsromTilstedevaerelse = "08:15 - 08:30"
+            };
+
+            await SendStuRegistrationToSupabaseAsync(testSession, DateTime.Now.ToString("HH:mm:ss"));
+        }
         private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
             try
@@ -1348,18 +1449,18 @@ namespace AkademiTrack.ViewModels
                     name = "lagre_oppmote",
                     parameters = new object[]
                     {
-                        new { fylkeid = "00" },
-                        new { skoleid = "312" },
-                        new { planperi = "2025-26" },
-                        new { ansidato = stuTime.Dato },
-                        new { stkode = stuTime.Stkode },
-                        new { kl_trinn = stuTime.KlTrinn },
-                        new { kl_id = stuTime.KlId },
-                        new { k_navn = stuTime.KNavn },
-                        new { gruppe_nr = stuTime.GruppeNr },
-                        new { timenr = stuTime.Timenr },
-                        new { fravaerstype = "M" },
-                        new { ip = publicIp }
+                new { fylkeid = "00" },
+                new { skoleid = "312" },
+                new { planperi = "2025-26" },
+                new { ansidato = stuTime.Dato },
+                new { stkode = stuTime.Stkode },
+                new { kl_trinn = stuTime.KlTrinn },
+                new { kl_id = stuTime.KlId },
+                new { k_navn = stuTime.KNavn },
+                new { gruppe_nr = stuTime.GruppeNr },
+                new { timenr = stuTime.Timenr },
+                new { fravaerstype = "M" },
+                new { ip = publicIp }
                     }
                 };
 
@@ -1390,6 +1491,10 @@ namespace AkademiTrack.ViewModels
                 if (response.IsSuccessStatusCode)
                 {
                     LogDebug($"Registration response: {responseContent}");
+
+                    // SEND TO SUPABASE AFTER SUCCESSFUL REGISTRATION
+                    var registrationTime = DateTime.Now.ToString("HH:mm:ss");
+                    await SendStuRegistrationToSupabaseAsync(stuTime, registrationTime);
                 }
                 else
                 {
