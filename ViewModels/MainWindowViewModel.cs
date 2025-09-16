@@ -1475,10 +1475,54 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+
+        private async Task<string> GetUserEmailFromActivationAsync()
+        {
+            try
+            {
+                string appDataDir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                string activationPath = System.IO.Path.Combine(appDataDir, "activation.json");
+
+                if (!System.IO.File.Exists(activationPath))
+                {
+                    LogError("Activation file not found. Please log in first.");
+                    return null;
+                }
+
+                string json = await System.IO.File.ReadAllTextAsync(activationPath);
+                var activationData = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (activationData.TryGetProperty("Email", out JsonElement emailElement))
+                {
+                    return emailElement.GetString();
+                }
+
+                LogError("Email not found in activation file.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to load email from activation file: {ex.Message}");
+                return null;
+            }
+        }
+
         // Test method for the test button
         private async Task TestSupabaseRequestAsync()
         {
             LogInfo("Testing Supabase connection...");
+
+            // Get email from activation file
+            string userEmail = await GetUserEmailFromActivationAsync();
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                LogError("Cannot test Supabase - no email found in activation file");
+                return;
+            }
 
             // Create a fake STU session for testing
             var testSession = new ScheduleItem
@@ -1490,8 +1534,69 @@ namespace AkademiTrack.ViewModels
                 TidsromTilstedevaerelse = "08:15 - 08:30"
             };
 
-            await SendStuRegistrationToSupabaseAsync(testSession, DateTime.Now.ToString("HH:mm:ss"));
+            await SendStuRegistrationToSupabaseAsync(testSession, DateTime.Now.ToString("HH:mm:ss"), userEmail);
         }
+
+        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
+        {
+            try
+            {
+                LogInfo("Sending STU registration to Supabase...");
+
+                // Get email from activation file if not provided
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    userEmail = await GetUserEmailFromActivationAsync();
+                    if (string.IsNullOrEmpty(userEmail))
+                    {
+                        LogError("Cannot send STU registration - no email found");
+                        return;
+                    }
+                }
+
+                var payload = new
+                {
+                    user_email = userEmail,
+                    session_date = DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd"),
+                    session_start = stuSession.StartKl,
+                    session_end = stuSession.SluttKl,
+                    course_name = stuSession.KNavn,
+                    registration_time = registrationTime,
+                    registration_window = stuSession.TidsromTilstedevaerelse,
+                    created_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/stu_registrations")
+                {
+                    Content = content
+                };
+
+                // Add Supabase headers
+                request.Headers.Add("apikey", _supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
+                request.Headers.Add("Prefer", "return=minimal");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    LogSuccess($"STU registration sent to Supabase successfully for {userEmail}");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogError($"Failed to send to Supabase: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Supabase request failed: {ex.Message}");
+            }
+        }
+
         private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
             try
