@@ -9,6 +9,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
+using System;
 
 namespace AkademiTrack
 {
@@ -27,34 +28,109 @@ namespace AkademiTrack
                 // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
                 DisableAvaloniaDataAnnotationValidation();
 
-                // Check if tutorial should be shown
-                var shouldShowTutorial = ShouldShowTutorial();
+                // Check activation status first
+                var isActivated = CheckActivationStatus();
 
-                if (shouldShowTutorial)
+                if (!isActivated)
                 {
-                    var tutorialWindow = new TutorialWindow();
-                    tutorialWindow.Closed += (s, e) =>
-                    {
-                        // Show main window after tutorial closes
-                        desktop.MainWindow = new MainWindow
-                        {
-                            DataContext = new MainWindowViewModel(),
-                        };
-                        desktop.MainWindow.Show();
-                    };
-                    desktop.MainWindow = tutorialWindow;
+                    // Show login window if not activated
+                    ShowLoginWindow(desktop);
                 }
                 else
                 {
-                    // Skip tutorial, go directly to main window
-                    desktop.MainWindow = new MainWindow
+                    // Check if tutorial should be shown
+                    var shouldShowTutorial = ShouldShowTutorial();
+
+                    if (shouldShowTutorial)
                     {
-                        DataContext = new MainWindowViewModel(),
-                    };
+                        ShowTutorialWindow(desktop);
+                    }
+                    else
+                    {
+                        // Skip tutorial, go directly to main window
+                        ShowMainWindow(desktop);
+                    }
                 }
             }
-
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private bool CheckActivationStatus()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                string activationPath = Path.Combine(appDataDir, "activation.json");
+
+                if (!File.Exists(activationPath))
+                    return false;
+
+                var json = File.ReadAllText(activationPath);
+                var activationData = JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return activationData?.IsActivated == true;
+            }
+            catch
+            {
+                // If we can't read activation status, assume not activated
+                return false;
+            }
+        }
+
+        private void ShowLoginWindow(IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var loginWindow = new LoginWindow();
+            var loginViewModel = (LoginWindowViewModel)loginWindow.DataContext;
+
+            // Handle login completion
+            loginViewModel.LoginCompleted += (s, success) =>
+            {
+                if (success)
+                {
+                    loginWindow.Close();
+
+                    // After successful login, check if tutorial should be shown
+                    var shouldShowTutorial = ShouldShowTutorial();
+
+                    if (shouldShowTutorial)
+                    {
+                        ShowTutorialWindow(desktop);
+                    }
+                    else
+                    {
+                        ShowMainWindow(desktop);
+                    }
+                }
+            };
+
+            desktop.MainWindow = loginWindow;
+        }
+
+        private void ShowTutorialWindow(IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var tutorialWindow = new TutorialWindow();
+            tutorialWindow.Closed += (s, e) =>
+            {
+                // Show main window after tutorial closes
+                ShowMainWindow(desktop);
+            };
+            desktop.MainWindow = tutorialWindow;
+        }
+
+        private void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.MainWindow = new MainWindow
+            {
+                DataContext = new MainWindowViewModel(),
+            };
+            desktop.MainWindow.Show();
         }
 
         private bool ShouldShowTutorial()
@@ -84,6 +160,7 @@ namespace AkademiTrack
             // Get an array of plugins to remove
             var dataValidationPluginsToRemove =
                 BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
+
             // remove each entry found
             foreach (var plugin in dataValidationPluginsToRemove)
             {
@@ -95,6 +172,13 @@ namespace AkademiTrack
     public class TutorialSettings
     {
         public bool DontShowTutorial { get; set; }
-        public System.DateTime LastUpdated { get; set; }
+        public DateTime LastUpdated { get; set; }
+    }
+
+    public class ActivationData
+    {
+        public bool IsActivated { get; set; }
+        public DateTime ActivatedAt { get; set; }
+        public string Email { get; set; }
     }
 }

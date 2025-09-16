@@ -437,10 +437,10 @@ namespace AkademiTrack.ViewModels
             {
         "Automation Started",
         "Automation Stopped",
-        "Registration Success",     // Make sure this is here
+        "Registration Success",        // This was already here but the logic below was wrong
         "Alle Studietimer Registrert",
         "Ingen Flere Økter"
-            };
+    };
 
             if (allowedNotifications.Contains(title))
             {
@@ -467,12 +467,36 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level));
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        try
+                        {
+                            CreateOverlayWindow(title, message, level);
+                        }
+                        catch (Exception innerEx)
+                        {
+                            LogDebug($"Failed to create overlay window on UI thread: {innerEx.Message}");
+                            // Fallback: try again after a delay
+                            Task.Delay(1000).ContinueWith(_ =>
+                            {
+                                try
+                                {
+                                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level));
+                                }
+                                catch
+                                {
+                                    LogError($"Complete failure to show notification: {title}");
+                                }
+                            });
+                        }
+                    });
                 }
             }
             catch (Exception ex)
             {
-                LogDebug($"Failed to show system overlay notification: {ex.Message}");
+                LogError($"Failed to show system overlay notification: {ex.Message}");
+                // Last resort fallback
+                LogInfo($"NOTIFICATION (fallback): {title} - {message}");
             }
         }
 
@@ -480,53 +504,87 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Clean up any closed windows first
-                for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
+                // Clean up any closed windows first (safe cleanup)
+                try
                 {
-                    if (!_activeOverlayWindows[i].IsVisible)
+                    for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
                     {
-                        _activeOverlayWindows.RemoveAt(i);
+                        if (!_activeOverlayWindows[i].IsVisible)
+                        {
+                            _activeOverlayWindows.RemoveAt(i);
+                        }
                     }
+                }
+                catch (Exception cleanupEx)
+                {
+                    LogDebug($"Error during window cleanup: {cleanupEx.Message}");
+                    // If cleanup fails, just clear the list
+                    _activeOverlayWindows.Clear();
                 }
 
-                // For registration success, give it priority over other notifications
-                if (title == "Registration Success")
+                // ALWAYS show registration success notifications - no matter what
+                bool isRegistrationSuccess = title == "Registration Success";
+
+                if (!isRegistrationSuccess && _activeOverlayWindows.Count > 0)
                 {
-                    // Close any existing notification to make room for the important registration notification
-                    if (_activeOverlayWindows.Count > 0)
-                    {
-                        LogDebug("Closing existing notification to show registration success");
-                        var existingWindow = _activeOverlayWindows[0];
-                        existingWindow.Close();
-                        _activeOverlayWindows.Clear();
-                    }
-                }
-                else
-                {
-                    // For other notifications, only show if no registration notification is active
-                    if (_activeOverlayWindows.Count > 0)
-                    {
-                        LogDebug($"Skipping notification '{title}' - another notification is already showing");
-                        return;
-                    }
+                    // For other notifications, only show if no notification is currently showing
+                    LogDebug($"Skipping notification '{title}' - another notification is already showing");
+                    return;
                 }
 
                 LogDebug($"Creating overlay window for: {title}");
-                var overlayWindow = new NotificationOverlayWindow(title, message, level);
 
+                // Create notification with extra error handling
+                NotificationOverlayWindow overlayWindow = null;
+                try
+                {
+                    overlayWindow = new NotificationOverlayWindow(title, message, level);
+                }
+                catch (Exception createEx)
+                {
+                    LogError($"Failed to create notification window: {createEx.Message}");
+                    // Fallback to log notification
+                    LogInfo($"NOTIFICATION (fallback): {title} - {message}");
+                    return;
+                }
+
+                // Set up event handler with safety
                 overlayWindow.Closed += (s, e) =>
                 {
-                    _activeOverlayWindows.Remove(overlayWindow);
-                    LogDebug($"Notification window closed: {title}");
+                    try
+                    {
+                        _activeOverlayWindows.Remove(overlayWindow);
+                        LogDebug($"Notification window closed: {title}");
+                    }
+                    catch (Exception removeEx)
+                    {
+                        LogDebug($"Error removing closed window: {removeEx.Message}");
+                    }
                 };
 
+                // Add to tracking list
                 _activeOverlayWindows.Add(overlayWindow);
-                overlayWindow.Show();
-                LogDebug($"Notification window shown: {title}");
+
+                // Show the window with error handling
+                try
+                {
+                    overlayWindow.Show();
+                    LogDebug($"✓ Notification window shown successfully: {title}");
+                }
+                catch (Exception showEx)
+                {
+                    LogError($"Failed to show notification window: {showEx.Message}");
+                    // Remove from tracking list if show failed
+                    _activeOverlayWindows.Remove(overlayWindow);
+                    // Fallback to log notification
+                    LogInfo($"NOTIFICATION (fallback): {title} - {message}");
+                }
             }
             catch (Exception ex)
             {
-                LogDebug($"Error creating overlay window: {ex.Message}");
+                LogError($"Complete failure in CreateOverlayWindow: {ex.Message}");
+                // Last resort - at least log the notification
+                LogInfo($"NOTIFICATION (emergency fallback): {title} - {message}");
             }
         }
 
