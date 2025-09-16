@@ -35,7 +35,10 @@ namespace AkademiTrack.ViewModels
         public LoginWindowViewModel()
         {
             _httpClient = new HttpClient();
-            LoginCommand = new SimpleCommand(LoginAsync, () => CanLogin);
+            // Set a reasonable timeout to prevent hanging
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+            LoginCommand = new SimpleCommand(async () => await LoginAsync(), () => CanLogin);
             ExitCommand = new SimpleCommand(ExitAsync);
         }
 

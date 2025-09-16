@@ -1,15 +1,11 @@
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Threading.Tasks;
-using AkademiTrack.ViewModels;
-using AkademiTrack.Views;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
+using AkademiTrack.ViewModels;
+using AkademiTrack.Views;
 using System;
+using System.IO;
+using System.Text.Json;
 
 namespace AkademiTrack
 {
@@ -24,34 +20,21 @@ namespace AkademiTrack
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
-                // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
-                DisableAvaloniaDataAnnotationValidation();
+                // Check if user is already activated synchronously to avoid binding issues
+                bool isActivated = CheckActivationStatus();
 
-                // Check activation status first
-                var isActivated = CheckActivationStatus();
-
-                if (!isActivated)
+                if (isActivated)
                 {
-                    // Show login window if not activated
-                    ShowLoginWindow(desktop);
+                    // User is already activated, show main window
+                    desktop.MainWindow = new MainWindow();
                 }
                 else
                 {
-                    // Check if tutorial should be shown
-                    var shouldShowTutorial = ShouldShowTutorial();
-
-                    if (shouldShowTutorial)
-                    {
-                        ShowTutorialWindow(desktop);
-                    }
-                    else
-                    {
-                        // Skip tutorial, go directly to main window
-                        ShowMainWindow(desktop);
-                    }
+                    // User needs to login, show login window
+                    desktop.MainWindow = new LoginWindow();
                 }
             }
+
             base.OnFrameworkInitializationCompleted();
         }
 
@@ -66,113 +49,25 @@ namespace AkademiTrack
 
                 string activationPath = Path.Combine(appDataDir, "activation.json");
 
-                if (!File.Exists(activationPath))
-                    return false;
-
-                var json = File.ReadAllText(activationPath);
-                var activationData = JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                if (File.Exists(activationPath))
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    string json = File.ReadAllText(activationPath);
+                    var activationData = JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
-                return activationData?.IsActivated == true;
+                    return activationData?.IsActivated == true;
+                }
+
+                return false;
             }
-            catch
+            catch (Exception ex)
             {
-                // If we can't read activation status, assume not activated
+                System.Diagnostics.Debug.WriteLine($"Error checking activation status: {ex.Message}");
                 return false;
             }
         }
-
-        private void ShowLoginWindow(IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var loginWindow = new LoginWindow();
-            var loginViewModel = (LoginWindowViewModel)loginWindow.DataContext;
-
-            // Handle login completion
-            loginViewModel.LoginCompleted += (s, success) =>
-            {
-                if (success)
-                {
-                    loginWindow.Close();
-
-                    // After successful login, check if tutorial should be shown
-                    var shouldShowTutorial = ShouldShowTutorial();
-
-                    if (shouldShowTutorial)
-                    {
-                        ShowTutorialWindow(desktop);
-                    }
-                    else
-                    {
-                        ShowMainWindow(desktop);
-                    }
-                }
-            };
-
-            desktop.MainWindow = loginWindow;
-        }
-
-        private void ShowTutorialWindow(IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var tutorialWindow = new TutorialWindow();
-            tutorialWindow.Closed += (s, e) =>
-            {
-                // Show main window after tutorial closes
-                ShowMainWindow(desktop);
-            };
-            desktop.MainWindow = tutorialWindow;
-        }
-
-        private void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = new MainWindowViewModel(),
-            };
-            desktop.MainWindow.Show();
-        }
-
-        private bool ShouldShowTutorial()
-        {
-            try
-            {
-                if (!File.Exists("tutorial_settings.json"))
-                    return true;
-
-                var json = File.ReadAllText("tutorial_settings.json");
-                var settings = JsonSerializer.Deserialize<TutorialSettings>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                return !settings.DontShowTutorial;
-            }
-            catch
-            {
-                // If we can't read settings, show tutorial
-                return true;
-            }
-        }
-
-        private void DisableAvaloniaDataAnnotationValidation()
-        {
-            // Get an array of plugins to remove
-            var dataValidationPluginsToRemove =
-                BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-            // remove each entry found
-            foreach (var plugin in dataValidationPluginsToRemove)
-            {
-                BindingPlugins.DataValidators.Remove(plugin);
-            }
-        }
-    }
-
-    public class TutorialSettings
-    {
-        public bool DontShowTutorial { get; set; }
-        public DateTime LastUpdated { get; set; }
     }
 
     public class ActivationData
