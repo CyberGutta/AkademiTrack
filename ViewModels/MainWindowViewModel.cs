@@ -341,7 +341,6 @@ namespace AkademiTrack.ViewModels
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
 
-            TestSupabaseCommand = new SimpleCommand(TestSupabaseRequestAsync);
 
 
             LogInfo("Applikasjon er klar");
@@ -1511,31 +1510,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Test method for the test button
-        private async Task TestSupabaseRequestAsync()
-        {
-            LogInfo("Testing Supabase connection...");
-
-            // Get email from activation file
-            string userEmail = await GetUserEmailFromActivationAsync();
-            if (string.IsNullOrEmpty(userEmail))
-            {
-                LogError("Cannot test Supabase - no email found in activation file");
-                return;
-            }
-
-            // Create a fake STU session for testing
-            var testSession = new ScheduleItem
-            {
-                Dato = DateTime.Now.ToString("yyyyMMdd"),
-                StartKl = "08:15",
-                SluttKl = "09:00",
-                KNavn = "STU",
-                TidsromTilstedevaerelse = "08:15 - 08:30"
-            };
-
-            await SendStuRegistrationToSupabaseAsync(testSession, DateTime.Now.ToString("HH:mm:ss"), userEmail);
-        }
+       
 
         private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
         {

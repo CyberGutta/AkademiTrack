@@ -360,10 +360,7 @@
 	                       IsEnabled="{Binding IsAutomationRunning}"
 	                       ToolTip.Tip="Stopper automatiseringsprosessen"/>
 
-					<Button Content="Test Supabase Connection"
-							Classes="settings"
-							Command="{Binding TestSupabaseCommand}"
-							ToolTip.Tip="Test sending STU registration data to Supabase database"/>
+					
 				</StackPanel>
 				
 				
