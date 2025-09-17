@@ -3,16 +3,16 @@
         xmlns:vm="using:AkademiTrack.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="550"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="600"
         x:Class="AkademiTrack.Views.LoginWindow"
         x:DataType="vm:LoginWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="Aktiver AkademiTrack"
         Background="#F8F9FA"
-        Height="550"
+        Height="600"
         Width="450"
         MinWidth="400"
-        MinHeight="500"
+        MinHeight="550"
         WindowStartupLocation="CenterScreen"
         CanResize="false">
 
@@ -61,6 +61,29 @@
 
 		<Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+		</Style>
+
+		<Style Selector="Button.google">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="Foreground" Value="#3C4043"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,12"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="BorderBrush" Value="#DADCE0"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinWidth" Value="140"/>
+		</Style>
+
+		<Style Selector="Button.google:pointerover">
+			<Setter Property="Background" Value="#F8F9FA"/>
+			<Setter Property="BorderBrush" Value="#C5C7CA"/>
+		</Style>
+
+		<Style Selector="Button.google:disabled">
+			<Setter Property="Background" Value="#F5F5F5"/>
+			<Setter Property="Foreground" Value="#9AA0A6"/>
+			<Setter Property="BorderBrush" Value="#E8EAED"/>
 		</Style>
 
 		<Style Selector="Button.secondary">
@@ -141,6 +164,14 @@
 		<Style Selector="TextBlock.link:pointerover">
 			<Setter Property="TextDecorations" Value="Underline"/>
 		</Style>
+
+		<Style Selector="TextBlock.divider">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,8"/>
+		</Style>
 	</Window.Styles>
 
 	<Grid Margin="40,30">
@@ -153,7 +184,52 @@
                           Classes="subtitle"/>
 			</StackPanel>
 
-			<!-- Login Form -->
+			<!-- Google Login Button -->
+			<Border Background="White"
+                   CornerRadius="8"
+                   Padding="24,20"
+                   BorderThickness="1"
+                   BorderBrush="#E9ECEF">
+				<StackPanel Spacing="16">
+					<Button Classes="google"
+                           Command="{Binding GoogleLoginCommand}"
+                           IsEnabled="{Binding !IsLoading}"
+                           HorizontalAlignment="Stretch">
+						<StackPanel Orientation="Horizontal"
+                                   Spacing="12"
+                                   HorizontalAlignment="Center">
+							<!-- Google Icon (using a simple G for now) -->
+							<Border Background="#4285F4"
+                                   CornerRadius="2"
+                                   Width="18"
+                                   Height="18">
+								<TextBlock Text="G"
+                                          Foreground="White"
+                                          FontWeight="Bold"
+                                          FontSize="12"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+							</Border>
+							<TextBlock Text="Logg inn med Google"/>
+						</StackPanel>
+					</Button>
+
+					<!-- Divider -->
+					<Grid>
+						<Border Height="1"
+                               Background="#E9ECEF"
+                               VerticalAlignment="Center"/>
+						<Border Background="#F8F9FA"
+                               Padding="16,0"
+                               HorizontalAlignment="Center">
+							<TextBlock Text="eller"
+                                      Classes="divider"/>
+						</Border>
+					</Grid>
+				</StackPanel>
+			</Border>
+
+			<!-- Traditional Login Form -->
 			<Border Background="White"
                    CornerRadius="8"
                    Padding="24"
