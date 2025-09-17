@@ -1375,11 +1375,30 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                // Ensure we have user parameters
+                if (_userParameters == null || !_userParameters.IsComplete)
+                {
+                    LogInfo("Henter brukerparametere...");
+                    _userParameters = await ExtractUserParametersAsync(cookies);
+                    
+                    if (_userParameters == null || !_userParameters.IsComplete)
+                    {
+                        LogError("Kunne ikke få brukerparametere - bruker fallback verdier");
+                        _userParameters = new UserParameters
+                        {
+                            FylkeId = "00",
+                            PlanPeri = "2025-26", 
+                            SkoleId = "312" // Your original value as fallback
+                        };
+                    }
+                }
+                
                 var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
-                url += "?finder=RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312&onlyData=true&limit=99&offset=0&totalResults=true";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId}&onlyData=true&limit=99&offset=0&totalResults=true";
 
-                LogDebug($"Making request to: {url}");
+                LogDebug($"Making request with parameters: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                LogDebug($"Request URL: {url}");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
 
@@ -1463,7 +1482,319 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-       
+       public class UserParameters
+        {
+            public string FylkeId { get; set; }
+            public string PlanPeri { get; set; }
+            public string SkoleId { get; set; }
+            
+            public bool IsComplete => !string.IsNullOrEmpty(FylkeId) && 
+                                    !string.IsNullOrEmpty(PlanPeri) && 
+                                    !string.IsNullOrEmpty(SkoleId);
+        }
+
+        // Add these fields to your MainWindowViewModel class
+        private UserParameters _userParameters;
+
+        // Add this method to extract parameters dynamically
+        private async Task<UserParameters> ExtractUserParametersAsync(Dictionary<string, string> cookies)
+        {
+            try
+            {
+                LogInfo("Ekstraherer brukerparametere...");
+                
+                // First, try to extract parameters from browser if available
+                if (IsWebDriverValid(_webDriver))
+                {
+                    var browserParams = await ExtractParametersFromBrowserAsync();
+                    if (browserParams != null && browserParams.IsComplete)
+                    {
+                        LogSuccess("Fant parametere fra nettleser!");
+                        await SaveUserParametersAsync(browserParams);
+                        return browserParams;
+                    }
+                }
+                
+                // If that fails, check if we have saved parameters from before
+                var savedParams = await LoadSavedParametersAsync();
+                if (savedParams != null && savedParams.IsComplete)
+                {
+                    LogInfo("Bruker lagrede parametere fra tidligere økt");
+                    return savedParams;
+                }
+                
+                // If all else fails, try to make educated guesses
+                LogInfo("Estimerer parametere basert på vanlige mønstre");
+                return EstimateUserParameters();
+            }
+            catch (Exception ex)
+            {
+                LogError($"Kunne ikke ekstraktere brukerparametere: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<UserParameters> ExtractParametersFromBrowserAsync()
+        {
+            try
+            {
+                if (!IsWebDriverValid(_webDriver))
+                {
+                    return null;
+                }
+                
+                LogInfo("VIKTIG: Gå til 'Fravær' siden i nettleseren for å la programmet finne dine skoleparametere");
+                LogInfo("Nettleseren vil lukke automatisk når du er på Fravær siden og parametere er funnet");
+                LogInfo("Venter på at du navigerer til Fravær siden...");
+                
+                var timeout = DateTime.Now.AddMinutes(5); // Give user more time
+                
+                while (DateTime.Now < timeout && IsWebDriverValid(_webDriver))
+                {
+                    try
+                    {
+                        var currentUrl = _webDriver.Url;
+                        
+                        // Only proceed when user is specifically on the Fravær page
+                        if (currentUrl.Contains("ojr=fravar"))
+                        {
+                            LogInfo("Bruker er på Fravær siden - ekstraherer parametere...");
+                            
+                            // Wait for the page to fully load and make its API calls
+                            await Task.Delay(4000);
+                            
+                            // Try multiple extraction methods
+                            var parameters = await ExtractParametersFromPage();
+                            
+                            if (parameters != null && parameters.IsComplete)
+                            {
+                                LogSuccess($"Fant parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+                                LogInfo("Lukker nettleser automatisk...");
+                                
+                                // Auto-close browser since we found the parameters
+                                await Task.Delay(1000); // Brief pause to let user see the success message
+                                return parameters;
+                            }
+                            else
+                            {
+                                LogInfo("Kunne ikke finne parametere på denne siden - oppdater siden eller prøv igjen");
+                                await Task.Delay(3000);
+                            }
+                        }
+                        else if (currentUrl.Contains("ojr=timeplan"))
+                        {
+                            LogInfo("Du er på Timeplan siden - gå til Fravær siden i stedet for best resultat");
+                            await Task.Delay(3000);
+                        }
+                        else
+                        {
+                            // User is somewhere else, just wait
+                            await Task.Delay(2000);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogDebug($"Feil ved søking i nettleser: {ex.Message}");
+                        await Task.Delay(2000);
+                    }
+                }
+                
+                LogInfo("Tidsavbrudd - kunne ikke finne parametere automatisk");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Feil ved parametersøking: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<UserParameters> ExtractParametersFromPage()
+        {
+            try
+            {
+                var jsExecutor = (IJavaScriptExecutor)_webDriver;
+                
+                // Enhanced JavaScript to search for parameters in multiple ways
+                var script = @"
+                    try {
+                        var parameters = {};
+                        
+                        // Method 1: Search in page HTML content
+                        var pageHtml = document.documentElement.outerHTML;
+                        var fylkeMatch = pageHtml.match(/fylkeid[=:]['\""\s]*([0-9]+)/i);
+                        var planMatch = pageHtml.match(/planperi[=:]['\""\s]*([0-9-]+)/i);
+                        var skoleMatch = pageHtml.match(/skoleid[=:]['\""\s]*([0-9]+)/i);
+                        
+                        if (fylkeMatch && planMatch && skoleMatch) {
+                            parameters.fylkeid = fylkeMatch[1];
+                            parameters.planperi = planMatch[1];
+                            parameters.skoleid = skoleMatch[1];
+                            return parameters;
+                        }
+                        
+                        // Method 2: Look for RESTFilter patterns
+                        var restFilterMatch = pageHtml.match(/RESTFilter[^;]*;fylkeid=([0-9]+)[^,]*,planperi=([0-9-]+)[^,]*,skoleid=([0-9]+)/i);
+                        if (restFilterMatch && restFilterMatch.length >= 4) {
+                            parameters.fylkeid = restFilterMatch[1];
+                            parameters.planperi = restFilterMatch[2];
+                            parameters.skoleid = restFilterMatch[3];
+                            return parameters;
+                        }
+                        
+                        // Method 3: Check all script elements for these values
+                        var scripts = document.querySelectorAll('script');
+                        for (var i = 0; i < scripts.length; i++) {
+                            var scriptContent = scripts[i].textContent || scripts[i].innerHTML;
+                            var match = scriptContent.match(/fylkeid[=:]['\""\s]*([0-9]+).*?planperi[=:]['\""\s]*([0-9-]+).*?skoleid[=:]['\""\s]*([0-9]+)/i);
+                            if (match && match.length >= 4) {
+                                parameters.fylkeid = match[1];
+                                parameters.planperi = match[2];
+                                parameters.skoleid = match[3];
+                                return parameters;
+                            }
+                        }
+                        
+                        // Method 4: Check for individual parameters separately
+                        var fylkeFound = pageHtml.match(/fylkeid[=:]['\""\s]*([0-9]+)/i);
+                        var planFound = pageHtml.match(/planperi[=:]['\""\s]*([0-9-]+)/i);
+                        var skoleFound = pageHtml.match(/skoleid[=:]['\""\s]*([0-9]+)/i);
+                        
+                        if (fylkeFound) parameters.fylkeid = fylkeFound[1];
+                        if (planFound) parameters.planperi = planFound[1];
+                        if (skoleFound) parameters.skoleid = skoleFound[1];
+                        
+                        return Object.keys(parameters).length > 0 ? parameters : null;
+                        
+                    } catch (e) {
+                        console.error('Parameter extraction error:', e);
+                        return null;
+                    }
+                ";
+                
+                var result = jsExecutor.ExecuteScript(script);
+                
+                if (result is Dictionary<string, object> resultDict && resultDict.Count > 0)
+                {
+                    LogDebug($"Fant data i siden: {string.Join(", ", resultDict.Select(kv => $"{kv.Key}={kv.Value}"))}");
+                    
+                    var parameters = new UserParameters();
+                    
+                    if (resultDict.ContainsKey("fylkeid"))
+                        parameters.FylkeId = resultDict["fylkeid"].ToString();
+                    if (resultDict.ContainsKey("planperi"))
+                        parameters.PlanPeri = resultDict["planperi"].ToString();
+                    if (resultDict.ContainsKey("skoleid"))
+                        parameters.SkoleId = resultDict["skoleid"].ToString();
+                    
+                    // Return even if not complete - we'll use fallbacks for missing values
+                    if (!string.IsNullOrEmpty(parameters.SkoleId) || !string.IsNullOrEmpty(parameters.PlanPeri))
+                    {
+                        // Fill in missing values with educated guesses
+                        if (string.IsNullOrEmpty(parameters.FylkeId))
+                            parameters.FylkeId = "00";
+                        
+                        if (string.IsNullOrEmpty(parameters.PlanPeri))
+                        {
+                            var currentYear = DateTime.Now.Year;
+                            var schoolYearStart = DateTime.Now.Month >= 8 ? currentYear : currentYear - 1;
+                            parameters.PlanPeri = $"{schoolYearStart}-{(schoolYearStart + 1).ToString().Substring(2)}";
+                        }
+                        
+                        return parameters;
+                    }
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Feil ved utvinning av parametere: {ex.Message}");
+                return null;
+            }
+        }
+
+        private string GetUserParametersFilePath()
+        {
+            string appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "user_parameters.json");
+        }
+
+        private async Task SaveUserParametersAsync(UserParameters parameters)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(parameters, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(GetUserParametersFilePath(), json);
+                LogDebug("Brukerparametere lagret for fremtidig bruk");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Kunne ikke lagre brukerparametere: {ex.Message}");
+            }
+        }
+
+        private async Task<UserParameters> LoadSavedParametersAsync()
+        {
+            try
+            {
+                var filePath = GetUserParametersFilePath();
+                if (!File.Exists(filePath))
+                {
+                    return null;
+                }
+                
+                var json = await File.ReadAllTextAsync(filePath);
+                var parameters = JsonSerializer.Deserialize<UserParameters>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                if (parameters != null && parameters.IsComplete)
+                {
+                    LogDebug($"Lastet lagrede parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+                    return parameters;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Kunne ikke laste lagrede parametere: {ex.Message}");
+            }
+            
+            return null;
+        }
+
+        private UserParameters EstimateUserParameters()
+        {
+            // Estimate current school year
+            var currentYear = DateTime.Now.Year;
+            var currentMonth = DateTime.Now.Month;
+            
+            // School year typically starts in August/September
+            var schoolYearStart = currentMonth >= 8 ? currentYear : currentYear - 1;
+            var schoolYearEnd = schoolYearStart + 1;
+            
+            var parameters = new UserParameters
+            {
+                FylkeId = "00", // Most common for Norwegian schools
+                PlanPeri = $"{schoolYearStart}-{schoolYearEnd.ToString().Substring(2)}", // e.g., "2024-25"
+                SkoleId = "312" // Use your original value as fallback
+            };
+            
+            LogInfo($"Estimerte parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+            LogInfo("Bruker estimerte verdier. Hvis programmet ikke fungerer, kan du finne dine parametere manuelt:");
+            LogInfo("1. Gå til timeplan siden i nettleseren");  
+            LogInfo("2. Åpne Developer Tools (F12)");
+            LogInfo("3. Gå til Network tab");
+            LogInfo("4. Oppdater siden");
+            LogInfo("5. Se etter en request som inneholder 'fylkeid=XX&planperi=XXXX-XX&skoleid=XXX'");
+            
+            return parameters;
+        }
 
         private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
         {
@@ -1525,7 +1856,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
+       private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
             try
             {
@@ -1540,9 +1871,9 @@ namespace AkademiTrack.ViewModels
                     name = "lagre_oppmote",
                     parameters = new object[]
                     {
-                        new { fylkeid = "00" },
-                        new { skoleid = "312" },
-                        new { planperi = "2025-26" },
+                        new { fylkeid = _userParameters?.FylkeId ?? "00" },
+                        new { skoleid = _userParameters?.SkoleId ?? "312" },
+                        new { planperi = _userParameters?.PlanPeri ?? "2025-26" },
                         new { ansidato = stuTime.Dato },
                         new { stkode = stuTime.Stkode },
                         new { kl_trinn = stuTime.KlTrinn },
@@ -1583,10 +1914,8 @@ namespace AkademiTrack.ViewModels
                 {
                     LogDebug($"Registration response: {responseContent}");
 
-                    // SEND TO SUPABASE AFTER SUCCESSFUL REGISTRATION - FIXED METHOD CALL
+                    // Send to Supabase after successful registration
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
-                    
-                    // Get email from activation file
                     var userEmail = await GetUserEmailFromActivationAsync();
                     
                     if (!string.IsNullOrEmpty(userEmail))
