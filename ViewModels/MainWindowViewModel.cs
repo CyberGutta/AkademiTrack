@@ -1425,54 +1425,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime)
-        {
-            try
-            {
-                LogInfo("Sending STU registration to Supabase...");
-
-                var payload = new
-                {
-                    user_email = _userEmail,
-                    session_date = DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd"),
-                    session_start = stuSession.StartKl,
-                    session_end = stuSession.SluttKl,
-                    course_name = stuSession.KNavn,
-                    registration_time = registrationTime,
-                    registration_window = stuSession.TidsromTilstedevaerelse,
-                    created_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-                };
-
-                var json = JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/stu_registrations")
-                {
-                    Content = content
-                };
-
-                // Add Supabase headers
-                request.Headers.Add("apikey", _supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-                request.Headers.Add("Prefer", "return=minimal");
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    LogSuccess("STU registration sent to Supabase successfully");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    LogError($"Failed to send to Supabase: {response.StatusCode} - {errorContent}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Supabase request failed: {ex.Message}");
-            }
-        }
+        
 
 
         private async Task<string> GetUserEmailFromActivationAsync()
@@ -1587,18 +1540,18 @@ namespace AkademiTrack.ViewModels
                     name = "lagre_oppmote",
                     parameters = new object[]
                     {
-                new { fylkeid = "00" },
-                new { skoleid = "312" },
-                new { planperi = "2025-26" },
-                new { ansidato = stuTime.Dato },
-                new { stkode = stuTime.Stkode },
-                new { kl_trinn = stuTime.KlTrinn },
-                new { kl_id = stuTime.KlId },
-                new { k_navn = stuTime.KNavn },
-                new { gruppe_nr = stuTime.GruppeNr },
-                new { timenr = stuTime.Timenr },
-                new { fravaerstype = "M" },
-                new { ip = publicIp }
+                        new { fylkeid = "00" },
+                        new { skoleid = "312" },
+                        new { planperi = "2025-26" },
+                        new { ansidato = stuTime.Dato },
+                        new { stkode = stuTime.Stkode },
+                        new { kl_trinn = stuTime.KlTrinn },
+                        new { kl_id = stuTime.KlId },
+                        new { k_navn = stuTime.KNavn },
+                        new { gruppe_nr = stuTime.GruppeNr },
+                        new { timenr = stuTime.Timenr },
+                        new { fravaerstype = "M" },
+                        new { ip = publicIp }
                     }
                 };
 
@@ -1630,9 +1583,21 @@ namespace AkademiTrack.ViewModels
                 {
                     LogDebug($"Registration response: {responseContent}");
 
-                    // SEND TO SUPABASE AFTER SUCCESSFUL REGISTRATION
+                    // SEND TO SUPABASE AFTER SUCCESSFUL REGISTRATION - FIXED METHOD CALL
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
-                    await SendStuRegistrationToSupabaseAsync(stuTime, registrationTime);
+                    
+                    // Get email from activation file
+                    var userEmail = await GetUserEmailFromActivationAsync();
+                    
+                    if (!string.IsNullOrEmpty(userEmail))
+                    {
+                        LogDebug($"Sending Supabase registration for email: {userEmail}");
+                        await SendStuRegistrationToSupabaseAsync(stuTime, registrationTime, userEmail);
+                    }
+                    else
+                    {
+                        LogError("Could not send to Supabase - no user email found");
+                    }
                 }
                 else
                 {
