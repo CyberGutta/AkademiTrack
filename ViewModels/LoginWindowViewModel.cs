@@ -15,8 +15,7 @@ namespace AkademiTrack.ViewModels
     public class LoginWindowViewModel : ViewModelBase, INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
-        private string _email = string.Empty;
-        private string _password = string.Empty;
+        private string _activationKey = string.Empty;
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
 
@@ -42,24 +41,12 @@ namespace AkademiTrack.ViewModels
             ExitCommand = new SimpleCommand(ExitAsync);
         }
 
-        public string Email
+        public string ActivationKey
         {
-            get => _email;
+            get => _activationKey;
             set
             {
-                _email = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CanLogin));
-                ((SimpleCommand)LoginCommand).RaiseCanExecuteChanged();
-            }
-        }
-
-        public string Password
-        {
-            get => _password;
-            set
-            {
-                _password = value;
+                _activationKey = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanLogin));
                 ((SimpleCommand)LoginCommand).RaiseCanExecuteChanged();
@@ -92,9 +79,9 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        public bool CanLogin => !IsLoading && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Password);
+        public bool CanLogin => !IsLoading && !string.IsNullOrWhiteSpace(ActivationKey);
 
-        public string LoginButtonText => IsLoading ? "Logger inn..." : "Logg inn";
+        public string LoginButtonText => IsLoading ? "Aktiverer..." : "Aktiver";
 
         public ICommand LoginCommand { get; }
         public ICommand ExitCommand { get; }
@@ -108,26 +95,24 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Attempt to authenticate with Supabase
-                bool isAuthenticated = await AuthenticateWithSupabaseAsync(Email, Password);
+                // Step by step validation with detailed feedback
+                var result = await ValidateActivationKeyAsync(ActivationKey);
 
-                if (isAuthenticated)
+                if (result.IsValid)
                 {
-                    // Save activation status locally
-                    await SaveActivationStatusAsync();
+                    // Mark the key as used and save activation status locally
+                    await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
+                    await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
 
                     // Notify success and close window
                     LoginCompleted?.Invoke(this, true);
                 }
-                else
-                {
-                    ErrorMessage = "Ugyldig e-post eller passord. Sjekk at du har en gyldig konto.";
-                }
+                // ErrorMessage is already set in ValidateActivationKeyAsync
             }
             catch (Exception ex)
             {
-                ErrorMessage = $"Innlogging feilet: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Login error: {ex}");
+                ErrorMessage = $"Feil: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Activation error: {ex}");
             }
             finally
             {
@@ -135,126 +120,141 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<bool> AuthenticateWithSupabaseAsync(string email, string password)
+        private async Task<ValidationResult> ValidateActivationKeyAsync(string activationKey)
         {
             try
             {
-                // Use the correct Supabase Auth API endpoint and format
-                var payload = new
-                {
-                    email = email,
-                    password = password
-                };
+                string cleanKey = activationKey?.Trim();
 
-                var json = JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                System.Diagnostics.Debug.WriteLine($"=== ACTIVATION VALIDATION START ===");
+                System.Diagnostics.Debug.WriteLine($"Input Key: '{cleanKey}'");
 
-                // Use the correct token endpoint with grant_type=password
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/auth/v1/token?grant_type=password")
-                {
-                    Content = content
-                };
-
-                // Add required headers - these must be exactly right
+                var url = $"{_supabaseUrl}/rest/v1/activation_keys?select=*";
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("apikey", _supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-
-                // Add additional headers that the JavaScript client includes
-                request.Headers.Add("X-Client-Info", "supabase-csharp/0.0.1");
-
-                // Make sure Content-Type is set correctly
-                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-
-                System.Diagnostics.Debug.WriteLine($"Making request to: {request.RequestUri}");
-                System.Diagnostics.Debug.WriteLine($"Request payload: {json}");
+                request.Headers.Add("Accept", "application/json");
 
                 var response = await _httpClient.SendAsync(request);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                System.Diagnostics.Debug.WriteLine($"Auth Response Status: {response.StatusCode}");
-                System.Diagnostics.Debug.WriteLine($"Auth Response Content: {responseContent}");
+                System.Diagnostics.Debug.WriteLine($"Database Response Status: {response.StatusCode}");
 
-                if (response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
-                    var authResponse = JsonSerializer.Deserialize<SupabaseAuthResponse>(responseContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    // Check if we got a valid access token
-                    bool success = !string.IsNullOrEmpty(authResponse?.AccessToken);
-                    System.Diagnostics.Debug.WriteLine($"Authentication success: {success}");
-                    System.Diagnostics.Debug.WriteLine($"Access token received: {!string.IsNullOrEmpty(authResponse?.AccessToken)}");
-                    return success;
+                    System.Diagnostics.Debug.WriteLine($"Database Error: {responseContent}");
+                    ErrorMessage = "Kunne ikke koble til database";
+                    return new ValidationResult { IsValid = false };
                 }
-                else
+
+                var allRecords = JsonSerializer.Deserialize<ActivationKeyRecord[]>(responseContent, new JsonSerializerOptions
                 {
-                    // Parse error response
-                    System.Diagnostics.Debug.WriteLine($"Authentication failed with status: {response.StatusCode}");
-                    System.Diagnostics.Debug.WriteLine($"Response headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                });
 
-                    try
-                    {
-                        var errorResponse = JsonSerializer.Deserialize<SupabaseErrorResponse>(responseContent, new JsonSerializerOptions
-                        {
-                            PropertyNameCaseInsensitive = true
-                        });
+                System.Diagnostics.Debug.WriteLine($"Total records in database: {allRecords?.Length ?? 0}");
 
-                        string errorMsg = errorResponse?.ErrorDescription ?? errorResponse?.Message ?? errorResponse?.Error ?? "Authentication failed";
-                        System.Diagnostics.Debug.WriteLine($"Parsed error message: {errorMsg}");
-                        ErrorMessage = ConvertErrorMessage(errorMsg);
-                    }
-                    catch (Exception parseEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to parse error response: {parseEx.Message}");
-                        System.Diagnostics.Debug.WriteLine($"Raw error response: {responseContent}");
-                        ErrorMessage = "Autentisering feilet - sjekk innloggingsdetaljene dine";
-                    }
-
-                    return false;
+                if (allRecords == null || allRecords.Length == 0)
+                {
+                    ErrorMessage = "Ingen aktiveringsnøkler funnet i systemet";
+                    return new ValidationResult { IsValid = false };
                 }
-            }
-            catch (HttpRequestException httpEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"HTTP error during authentication: {httpEx.Message}");
-                ErrorMessage = "Nettverksfeil - sjekk internettforbindelsen din";
-                return false;
-            }
-            catch (TaskCanceledException timeoutEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"Request timeout during authentication: {timeoutEx.Message}");
-                ErrorMessage = "Forespørsel tidsavbrudd - prøv igjen";
-                return false;
+
+                // Log all records for debugging
+                System.Diagnostics.Debug.WriteLine("=== ALL DATABASE RECORDS ===");
+                foreach (var record in allRecords)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ID: {record.Id}, Email: '{record.UserEmail}', Key: '{record.ActivationKey}', IsActivated: {record.IsActivated}");
+                }
+
+                // Find exact key match
+                var exactMatch = allRecords.FirstOrDefault(r =>
+                    string.Equals(r.ActivationKey?.Trim(), cleanKey, StringComparison.OrdinalIgnoreCase));
+
+                if (exactMatch == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"No activation key match found for: '{cleanKey}'");
+                    ErrorMessage = "Aktiveringsnøkkelen finnes ikke i systemet";
+                    return new ValidationResult { IsValid = false };
+                }
+
+                // Check if already activated
+                if (exactMatch.IsActivated)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Key already activated at: {exactMatch.ActivatedAt}");
+                    ErrorMessage = "Denne aktiveringsnøkkelen er allerede brukt";
+                    return new ValidationResult { IsValid = false };
+                }
+
+                System.Diagnostics.Debug.WriteLine($"SUCCESS: Valid unused activation key found!");
+                System.Diagnostics.Debug.WriteLine($"Associated email: {exactMatch.UserEmail}");
+                System.Diagnostics.Debug.WriteLine($"=== ACTIVATION VALIDATION END ===");
+
+                return new ValidationResult { IsValid = true, FoundRecord = exactMatch };
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Unexpected error during authentication: {ex}");
-                ErrorMessage = "Innlogging feilet - prøv igjen senere";
-                return false;
+                System.Diagnostics.Debug.WriteLine($"VALIDATION ERROR: {ex}");
+                ErrorMessage = $"Valideringsfeil: {ex.Message}";
+                return new ValidationResult { IsValid = false };
             }
         }
 
-        private string ConvertErrorMessage(string errorMessage)
+        private async Task MarkActivationKeyAsUsedAsync(string activationKey)
         {
-            if (string.IsNullOrEmpty(errorMessage))
-                return "Innlogging feilet - sjekk e-post og passord";
-
-            // Convert common Supabase error messages to Norwegian
-            return errorMessage.ToLower() switch
+            try
             {
-                var msg when msg.Contains("invalid login credentials") || msg.Contains("invalid_grant") => "Ugyldig e-post eller passord",
-                var msg when msg.Contains("email not confirmed") => "E-post ikke bekreftet - sjekk e-posten din",
-                var msg when msg.Contains("user not found") => "Bruker ikke funnet",
-                var msg when msg.Contains("invalid email") => "Ugyldig e-postadresse",
-                var msg when msg.Contains("password") && msg.Contains("wrong") => "Passord er feil",
-                var msg when msg.Contains("too many requests") || msg.Contains("rate") => "For mange forsøk - vent litt før du prøver igjen",
-                var msg when msg.Contains("network") => "Nettverksfeil - sjekk internettforbindelsen",
-                var msg when msg.Contains("timeout") => "Tidsavbrudd - prøv igjen",
-                _ => $"Innlogging feilet: {errorMessage}"
-            };
+                // Update the activation key to mark it as used - using the exact key match
+                var updateData = new
+                {
+                    is_activated = true,
+                    activated_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                };
+
+                var json = JsonSerializer.Serialize(updateData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Use exact match for the key from the database
+                var url = $"{_supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}";
+
+                var request = new HttpRequestMessage(HttpMethod.Patch, url)
+                {
+                    Content = content
+                };
+
+                request.Headers.Add("apikey", _supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
+                request.Headers.Add("Prefer", "return=minimal");
+
+                System.Diagnostics.Debug.WriteLine($"Marking activation key as used: {url}");
+                System.Diagnostics.Debug.WriteLine($"Update payload: {json}");
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                System.Diagnostics.Debug.WriteLine($"Mark as used Response Status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"Mark as used Response Content: {responseContent}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Successfully marked activation key as used");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to mark activation key as used: {response.StatusCode}");
+                    // Don't throw here - the validation was successful, we just couldn't update the status
+                    // This prevents double usage but doesn't block the user if there's a temporary issue
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error marking activation key as used: {ex.Message}");
+                // Don't throw - validation was successful, just updating failed
+            }
         }
 
-        private async Task SaveActivationStatusAsync()
+        private async Task SaveActivationStatusAsync(string associatedEmail)
         {
             try
             {
@@ -262,7 +262,8 @@ namespace AkademiTrack.ViewModels
                 {
                     IsActivated = true,
                     ActivatedAt = DateTime.UtcNow,
-                    Email = Email // Store email for reference, but not password
+                    Email = associatedEmail, // Use the email from the database record
+                    ActivationKey = ActivationKey // Store for reference
                 };
 
                 var json = JsonSerializer.Serialize(activationData, new JsonSerializerOptions { WriteIndented = true });
@@ -301,43 +302,30 @@ namespace AkademiTrack.ViewModels
         }
     }
 
-    public class SupabaseAuthResponse
+    public class ValidationResult
     {
-        [JsonPropertyName("access_token")]
-        public string AccessToken { get; set; }
-
-        [JsonPropertyName("refresh_token")]
-        public string RefreshToken { get; set; }
-
-        [JsonPropertyName("expires_in")]
-        public int ExpiresIn { get; set; }
-
-        [JsonPropertyName("token_type")]
-        public string TokenType { get; set; }
-
-        [JsonPropertyName("user")]
-        public SupabaseUser User { get; set; }
+        public bool IsValid { get; set; }
+        public ActivationKeyRecord FoundRecord { get; set; }
     }
 
-    public class SupabaseUser
+    public class ActivationKeyRecord
     {
-        public string Id { get; set; }
-        public string Email { get; set; }
-        public string Phone { get; set; }
+        public int Id { get; set; }
+
+        [JsonPropertyName("user_email")]
+        public string UserEmail { get; set; }
+
+        [JsonPropertyName("activation_key")]
+        public string ActivationKey { get; set; }
+
+        [JsonPropertyName("is_activated")]
+        public bool IsActivated { get; set; }
+
+        [JsonPropertyName("created_at")]
         public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public DateTime? LastSignInAt { get; set; }
-        public DateTime? EmailConfirmedAt { get; set; }
-        public DateTime? PhoneConfirmedAt { get; set; }
-        public SupabaseUserMetadata UserMetadata { get; set; }
-        public SupabaseUserMetadata AppMetadata { get; set; }
-    }
 
-    public class SupabaseUserMetadata
-    {
-        // This can contain custom user data
-        // For basic usage, you might not need specific properties
-        // or you can add properties based on your needs
+        [JsonPropertyName("activated_at")]
+        public DateTime? ActivatedAt { get; set; }
     }
 
     public class SupabaseErrorResponse
@@ -345,5 +333,8 @@ namespace AkademiTrack.ViewModels
         public string Error { get; set; }
         public string ErrorDescription { get; set; }
         public string Message { get; set; }
+        public string Code { get; set; }
+        public string Details { get; set; }
+        public string Hint { get; set; }
     }
 }

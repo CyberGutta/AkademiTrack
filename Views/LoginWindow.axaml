@@ -3,16 +3,16 @@
         xmlns:vm="using:AkademiTrack.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="550"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="500"
         x:Class="AkademiTrack.Views.LoginWindow"
         x:DataType="vm:LoginWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="Aktiver AkademiTrack"
         Background="#F8F9FA"
-        Height="550"
+        Height="500"
         Width="450"
         MinWidth="400"
-        MinHeight="500"
+        MinHeight="450"
         WindowStartupLocation="CenterScreen"
         CanResize="false">
 
@@ -149,7 +149,7 @@
 			<StackPanel>
 				<TextBlock Text="Aktiver AkademiTrack"
                           Classes="title"/>
-				<TextBlock Text="Logg inn med din konto for å aktivere programmet"
+				<TextBlock Text="Skriv inn din aktiveringsnøkkel for å aktivere programmet"
                           Classes="subtitle"/>
 			</StackPanel>
 
@@ -160,22 +160,12 @@
                    BorderThickness="1"
                    BorderBrush="#E9ECEF">
 				<StackPanel Spacing="16">
-					<!-- Email Field -->
+					<!-- Activation Key Field -->
 					<StackPanel>
-						<TextBlock Text="E-post"
+						<TextBlock Text="Aktiveringsnøkkel"
                                   Classes="label"/>
-						<TextBox Text="{Binding Email}"
-                                Watermark="din@epost.no"
-                                IsEnabled="{Binding !IsLoading}"/>
-					</StackPanel>
-
-					<!-- Password Field -->
-					<StackPanel>
-						<TextBlock Text="Passord"
-                                  Classes="label"/>
-						<TextBox Text="{Binding Password}"
-                                PasswordChar="•"
-                                Watermark="Ditt passord"
+						<TextBox Text="{Binding ActivationKey}"
+                                Watermark="XXXXX-XXXXX-XXXXX-XXXXX"
                                 IsEnabled="{Binding !IsLoading}"/>
 					</StackPanel>
 
@@ -196,12 +186,12 @@
 
 			<!-- Create Account Link -->
 			<StackPanel>
-				<TextBlock Text="Har du ikke konto ennå?"
+				<TextBlock Text="Trenger du en aktiveringsnøkkel?"
                           FontSize="12"
                           Foreground="#6C757D"
                           TextAlignment="Center"
                           Margin="0,0,0,4"/>
-				<TextBlock Text="Opprett konto på vår nettside"
+				<TextBlock Text="Få aktiveringsnøkkel på vår nettside"
                           Classes="link"
                           Tapped="OnCreateAccountTapped"/>
 			</StackPanel>
