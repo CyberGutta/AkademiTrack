@@ -3,16 +3,16 @@
         xmlns:vm="using:AkademiTrack.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="400"
         x:Class="AkademiTrack.Views.LoginWindow"
         x:DataType="vm:LoginWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="Aktiver AkademiTrack"
         Background="#F8F9FA"
-        Height="600"
+        Height="400"
         Width="450"
         MinWidth="400"
-        MinHeight="550"
+        MinHeight="350"
         WindowStartupLocation="CenterScreen"
         CanResize="false">
 
@@ -61,29 +61,6 @@
 
 		<Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="TextBlock.Foreground" Value="#888888"/>
-		</Style>
-
-		<Style Selector="Button.google">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="Foreground" Value="#3C4043"/>
-			<Setter Property="FontWeight" Value="Medium"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="16,12"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="#DADCE0"/>
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="140"/>
-		</Style>
-
-		<Style Selector="Button.google:pointerover">
-			<Setter Property="Background" Value="#F8F9FA"/>
-			<Setter Property="BorderBrush" Value="#C5C7CA"/>
-		</Style>
-
-		<Style Selector="Button.google:disabled">
-			<Setter Property="Background" Value="#F5F5F5"/>
-			<Setter Property="Foreground" Value="#9AA0A6"/>
-			<Setter Property="BorderBrush" Value="#E8EAED"/>
 		</Style>
 
 		<Style Selector="Button.secondary">
@@ -164,14 +141,6 @@
 		<Style Selector="TextBlock.link:pointerover">
 			<Setter Property="TextDecorations" Value="Underline"/>
 		</Style>
-
-		<Style Selector="TextBlock.divider">
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="FontWeight" Value="Normal"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
-			<Setter Property="TextAlignment" Value="Center"/>
-			<Setter Property="Margin" Value="0,8"/>
-		</Style>
 	</Window.Styles>
 
 	<Grid Margin="40,30">
@@ -180,78 +149,23 @@
 			<StackPanel>
 				<TextBlock Text="Aktiver AkademiTrack"
                           Classes="title"/>
-				<TextBlock Text="Logg inn med din konto for å aktivere programmet"
+				<TextBlock Text="Skriv inn din aktiveringsnøkkel for å aktivere programmet"
                           Classes="subtitle"/>
 			</StackPanel>
 
-			<!-- Google Login Button -->
-			<Border Background="White"
-                   CornerRadius="8"
-                   Padding="24,20"
-                   BorderThickness="1"
-                   BorderBrush="#E9ECEF">
-				<StackPanel Spacing="16">
-					<Button Classes="google"
-                           Command="{Binding GoogleLoginCommand}"
-                           IsEnabled="{Binding !IsLoading}"
-                           HorizontalAlignment="Stretch">
-						<StackPanel Orientation="Horizontal"
-                                   Spacing="12"
-                                   HorizontalAlignment="Center">
-							<!-- Google Icon (using a simple G for now) -->
-							<Border Background="#4285F4"
-                                   CornerRadius="2"
-                                   Width="18"
-                                   Height="18">
-								<TextBlock Text="G"
-                                          Foreground="White"
-                                          FontWeight="Bold"
-                                          FontSize="12"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
-							</Border>
-							<TextBlock Text="Logg inn med Google"/>
-						</StackPanel>
-					</Button>
-
-					<!-- Divider -->
-					<Grid>
-						<Border Height="1"
-                               Background="#E9ECEF"
-                               VerticalAlignment="Center"/>
-						<Border Background="#F8F9FA"
-                               Padding="16,0"
-                               HorizontalAlignment="Center">
-							<TextBlock Text="eller"
-                                      Classes="divider"/>
-						</Border>
-					</Grid>
-				</StackPanel>
-			</Border>
-
-			<!-- Traditional Login Form -->
+			<!-- Activation Key Form -->
 			<Border Background="White"
                    CornerRadius="8"
                    Padding="24"
                    BorderThickness="1"
                    BorderBrush="#E9ECEF">
 				<StackPanel Spacing="16">
-					<!-- Email Field -->
+					<!-- Activation Key Field -->
 					<StackPanel>
-						<TextBlock Text="E-post"
+						<TextBlock Text="Aktiveringsnøkkel"
                                   Classes="label"/>
-						<TextBox Text="{Binding Email}"
-                                Watermark="din@epost.no"
-                                IsEnabled="{Binding !IsLoading}"/>
-					</StackPanel>
-
-					<!-- Password Field -->
-					<StackPanel>
-						<TextBlock Text="Passord"
-                                  Classes="label"/>
-						<TextBox Text="{Binding Password}"
-                                PasswordChar="•"
-                                Watermark="Ditt passord"
+						<TextBox Text="{Binding ActivationKey}"
+                                Watermark="XXXXX-XXXXX-XXXXX-XXXXX"
                                 IsEnabled="{Binding !IsLoading}"/>
 					</StackPanel>
 
@@ -272,12 +186,12 @@
 
 			<!-- Create Account Link -->
 			<StackPanel>
-				<TextBlock Text="Har du ikke konto ennå?"
+				<TextBlock Text="Trenger du en aktiveringsnøkkel?"
                           FontSize="12"
                           Foreground="#6C757D"
                           TextAlignment="Center"
                           Margin="0,0,0,4"/>
-				<TextBlock Text="Opprett konto på vår nettside"
+				<TextBlock Text="Få aktiveringsnøkkel på vår nettside"
                           Classes="link"
                           Tapped="OnCreateAccountTapped"/>
 			</StackPanel>
