@@ -769,7 +769,7 @@ namespace AkademiTrack.ViewModels
                 "Automation Stopped",
                 "Registration Success",
                 "Alle Studietimer Registrert",
-                "Ingen STU-økter funnet for i dag", // Add this new title
+                "Ingen STUDIE-økter funnet for i dag", // Add this new title
                 "Ingen Flere Økter"     // Alternative title
             };
 
@@ -849,7 +849,7 @@ namespace AkademiTrack.ViewModels
                 }
 
                 bool isRegistrationSuccess = title == "Registration Success";
-                bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STU-økter");
+                bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STUDIE-økter");
 
                 if (!isRegistrationSuccess && !isPriorityNotification && _activeOverlayWindows.Count > 0)
                 {
@@ -1508,8 +1508,8 @@ namespace AkademiTrack.ViewModels
             }
             else
             {
-                LogInfo("Ingen STU-økter funnet for i dag - stopper automatisering");
-                ShowNotification("Ingen Flere Økter", "Ingen STU-økter funnet for i dag", "INFO");
+                LogInfo("Ingen STUDIE-økter funnet for i dag - stopper automatisering");
+                ShowNotification("Ingen Flere Økter", "Ingen STUDIE-økter funnet for i dag", "INFO");
                 return;
             }
 

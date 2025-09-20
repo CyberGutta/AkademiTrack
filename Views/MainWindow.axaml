@@ -10,7 +10,7 @@
         Title="AkademiTrack - Akademiet Drammen Sundland"
         Background="#F8F9FA"
 		Height="500"
-		Width="700"
+		Width="600"
         MinWidth="600"
         MinHeight="400">
 
@@ -335,7 +335,7 @@
 	                      HorizontalAlignment="Center"/>
 
 				<!-- Info Text -->
-				<TextBlock Text="Klikk Start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging og cookie-behandling automatisk."
+				<TextBlock Text="Klikk Start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging automatisk."
 	                      Classes="info"
 	                      HorizontalAlignment="Center"
 	                      TextWrapping="Wrap"
@@ -351,7 +351,7 @@
 	                       Classes="start-button"
 	                       Command="{Binding StartAutomationCommand}"
 	                       IsEnabled="{Binding !IsAutomationRunning}"
-	                       ToolTip.Tip="Starter automatisering med automatisk innlogging og cookie-behandling"/>
+	                       ToolTip.Tip="Starter automatisering med automatisk innlogging"/>
 
 					<!-- Stop button -->
 					<Button Content="Stopp Automatisering"
@@ -374,7 +374,7 @@
 				</StackPanel>
 
 				<!-- Current Status Display -->
-				<Border Background="White"
+			<!--	<Border Background="White"
 	                   CornerRadius="6"
 	                   Padding="16,12"
 	                   BorderThickness="1"
@@ -392,7 +392,7 @@
 	                              TextWrapping="Wrap"
 	                              MaxWidth="380"/>
 					</StackPanel>
-				</Border>
+				</Border> -->
 
 			</StackPanel>
 		</Grid>
