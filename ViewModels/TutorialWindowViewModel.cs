@@ -57,6 +57,16 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                // Get the AppData\Roaming folder path
+                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+
+                // Create the directory if it doesn't exist
+                Directory.CreateDirectory(appFolderPath);
+
+                // Create the full file path
+                var filePath = Path.Combine(appFolderPath, "tutorial_settings.json");
+
                 var settings = new TutorialSettings
                 {
                     DontShowTutorial = true,
@@ -64,7 +74,7 @@ namespace AkademiTrack.ViewModels
                 };
 
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync("tutorial_settings.json", json);
+                await File.WriteAllTextAsync(filePath, json);
             }
             catch (Exception ex)
             {
