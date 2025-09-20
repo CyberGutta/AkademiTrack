@@ -574,6 +574,7 @@ namespace AkademiTrack.ViewModels
                 }
 
                 var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                // Updated URL to handle RLS properly
                 var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -610,10 +611,8 @@ namespace AkademiTrack.ViewModels
                                     _ => "INFO"
                                 };
 
-                                // Fixed: Use proper admin title format
                                 var adminTitle = $"[ADMIN]{notification.Title}";
 
-                                // Show notification with enhanced features
                                 ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
                                     notification.Image_Url, notification.Custom_Color);
 
@@ -637,6 +636,53 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Error in CheckForNewAdminNotificationsAsync: {ex.Message}");
+            }
+        }
+
+        private async Task SendAdminNotificationAsync(string title, string message, string targetEmail = "all", string priority = "INFO")
+        {
+            try
+            {
+                LogInfo($"Sending admin notification via secure function: {title}");
+
+                var payload = new
+                {
+                    p_title = title,
+                    p_message = message,
+                    p_target_email = targetEmail,
+                    p_priority = priority
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/rpc/send_admin_notification")
+                {
+                    Content = content
+                };
+
+                // Add Supabase headers
+                request.Headers.Add("apikey", _supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
+                request.Headers.Add("Prefer", "return=representation");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    LogSuccess($"Admin notification sent successfully: {title}");
+                    LogDebug($"Response: {responseContent}");
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogError($"Failed to send admin notification: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Admin notification request failed: {ex.Message}");
             }
         }
 
