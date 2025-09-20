@@ -143,9 +143,11 @@ namespace AkademiTrack.ViewModels
                 var badgeText = new TextBlock
                 {
                     Text = "ADMIN",
-                    FontSize = 13,
+                    FontSize = 8,
                     FontWeight = FontWeight.Bold,
-                    Foreground = new SolidColorBrush(Colors.White)
+                    Foreground = new SolidColorBrush(Colors.White),
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                 };
 
                 adminBadge.Child = badgeText;
@@ -158,7 +160,9 @@ namespace AkademiTrack.ViewModels
                 FontWeight = FontWeight.SemiBold,
                 FontSize = 15,
                 Foreground = textColor,
-                TextTrimming = TextTrimming.CharacterEllipsis
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
             };
 
             titlePanel.Children.Add(titleBlock);
@@ -175,7 +179,7 @@ namespace AkademiTrack.ViewModels
                 Opacity = 0.85,
                 LineHeight = 15.0,
                 Margin = new Thickness(0, 4, 0, 0), // BIGGER MARGIN TO PUSH TEXT DOWN
-                MaxWidth = 2280
+                MaxWidth = 280
             };
 
             Grid.SetColumn(messageBlock, 1);
