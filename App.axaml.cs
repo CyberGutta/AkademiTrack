@@ -44,9 +44,12 @@ namespace AkademiTrack
                                     DeleteActivationFile();
                                     await Dispatcher.UIThread.InvokeAsync(() =>
                                     {
-                                        desktop.MainWindow?.Close();
-                                        desktop.MainWindow = new LoginWindow();
-                                        desktop.MainWindow.Show();
+                                        // Close current window and create new login window
+                                        var currentWindow = desktop.MainWindow;
+                                        var loginWindow = new LoginWindow();
+                                        desktop.MainWindow = loginWindow;
+                                        loginWindow.Show();
+                                        currentWindow?.Close();
                                     });
                                     return;
                                 }

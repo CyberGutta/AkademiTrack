@@ -8,6 +8,8 @@ using Avalonia.Interactivity;
 using AkademiTrack.ViewModels;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia;
+using System.IO;
+using System.Text.Json;
 
 namespace AkademiTrack.Views
 {
@@ -32,26 +34,83 @@ namespace AkademiTrack.Views
                 {
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        // Create and show the main window
-                        var mainWindow = new MainWindow();
-
-                        // Update the application's main window reference
                         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                         {
-                            desktop.MainWindow = mainWindow;
+                            // Check if tutorial should be shown
+                            bool shouldShowTutorial = ShouldShowTutorial();
+
+                            if (shouldShowTutorial)
+                            {
+                                // Show tutorial first
+                                var tutorialWindow = new TutorialWindow();
+                                var tutorialViewModel = new TutorialWindowViewModel();
+
+                                // Handle tutorial completion - show main window after tutorial
+                                tutorialViewModel.ContinueRequested += (s, e) =>
+                                {
+                                    var mainWindow = new MainWindow();
+                                    mainWindow.Show();
+                                    tutorialWindow.Close();
+                                    desktop.MainWindow = mainWindow;
+                                };
+
+                                // Handle tutorial exit - close application
+                                tutorialViewModel.ExitRequested += (s, e) =>
+                                {
+                                    desktop.Shutdown();
+                                };
+
+                                tutorialWindow.DataContext = tutorialViewModel;
+                                desktop.MainWindow = tutorialWindow;
+                                tutorialWindow.Show();
+                                this.Close();
+                            }
+                            else
+                            {
+                                // Tutorial already seen, show main window directly
+                                var mainWindow = new MainWindow();
+                                desktop.MainWindow = mainWindow;
+                                mainWindow.Show();
+                                this.Close();
+                            }
                         }
-
-                        // Show the main window first
-                        mainWindow.Show();
-
-                        // Then close this login window
-                        this.Close();
                     });
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error transitioning to main window: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error transitioning after login: {ex.Message}");
                 }
+            }
+        }
+
+        private bool ShouldShowTutorial()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string tutorialPath = Path.Combine(appDataDir, "tutorial_settings.json");
+
+                if (File.Exists(tutorialPath))
+                {
+                    string json = File.ReadAllText(tutorialPath);
+                    var tutorialSettings = JsonSerializer.Deserialize<TutorialSettings>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return tutorialSettings?.DontShowTutorial != true;
+                }
+
+                // If file doesn't exist, show tutorial
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking tutorial settings: {ex.Message}");
+                // If there's an error, show tutorial to be safe
+                return true;
             }
         }
 
@@ -90,5 +149,11 @@ namespace AkademiTrack.Views
                 System.Diagnostics.Debug.WriteLine($"Failed to open website: {ex.Message}");
             }
         }
+    }
+
+    public class TutorialSettings
+    {
+        public bool DontShowTutorial { get; set; }
+        public DateTime LastUpdated { get; set; }
     }
 }
