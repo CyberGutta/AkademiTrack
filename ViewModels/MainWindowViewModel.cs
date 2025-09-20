@@ -29,30 +29,181 @@ namespace AkademiTrack.ViewModels
         private Timer? _autoCloseTimer;
         private readonly string _level;
 
-        public NotificationOverlayWindow(string title, string message, string level = "INFO")
+        public NotificationOverlayWindow(string title, string message, string level = "INFO", string imageUrl = null, string customColor = null)
         {
             _level = level;
 
-            // Window properties for overlay
             this.WindowState = WindowState.Normal;
             this.CanResize = false;
             this.ShowInTaskbar = false;
             this.Topmost = true;
             this.SystemDecorations = SystemDecorations.None;
             this.Width = 350;
-            this.Height = 120;
+            this.Height = !string.IsNullOrEmpty(imageUrl) ? 140 : 120;
 
-            // Position at top-right of screen
             PositionWindow();
+            CreateEnhancedContent(title, message, level, imageUrl, customColor);
 
-            // Create content
-            CreateContent(title, message, level);
+            // Admin notifications auto-close after 10 seconds, others after 5 seconds
+            int autoCloseSeconds = title.Contains("Admin") ? 10 : 5;
+            _autoCloseTimer = new Timer(AutoClose, null, autoCloseSeconds * 1000, Timeout.Infinite);
+        }
 
-            // Auto-close timer for non-error notifications
-            if (level != "ERROR")
+        private void CreateEnhancedContent(string title, string message, string level, string imageUrl = null, string customColor = null)
+        {
+            // Use custom color if provided, otherwise use default colors
+            IBrush backgroundColor, borderColor, textColor;
+
+            if (!string.IsNullOrEmpty(customColor))
             {
-                _autoCloseTimer = new Timer(AutoClose, null, 5000, Timeout.Infinite);
+                try
+                {
+                    var customBrush = Brush.Parse(customColor);
+                    backgroundColor = customBrush;
+                    borderColor = customBrush;
+                    textColor = Brushes.White;
+                }
+                catch
+                {
+                    // Fallback to default if custom color parsing fails
+                    backgroundColor = level switch
+                    {
+                        "SUCCESS" => Brush.Parse("#D4EDDA"),
+                        "WARNING" => Brush.Parse("#FFF3CD"),
+                        "ERROR" => Brush.Parse("#F8D7DA"),
+                        _ => Brush.Parse("#D1ECF1")
+                    };
+                    borderColor = level switch
+                    {
+                        "SUCCESS" => Brush.Parse("#C3E6CB"),
+                        "WARNING" => Brush.Parse("#FFEAA7"),
+                        "ERROR" => Brush.Parse("#F5C6CB"),
+                        _ => Brush.Parse("#BEE5EB")
+                    };
+                    textColor = level switch
+                    {
+                        "SUCCESS" => Brush.Parse("#155724"),
+                        "WARNING" => Brush.Parse("#856404"),
+                        "ERROR" => Brush.Parse("#721C24"),
+                        _ => Brush.Parse("#0C5460")
+                    };
+                }
             }
+            else
+            {
+                backgroundColor = level switch
+                {
+                    "SUCCESS" => Brush.Parse("#D4EDDA"),
+                    "WARNING" => Brush.Parse("#FFF3CD"),
+                    "ERROR" => Brush.Parse("#F8D7DA"),
+                    _ => Brush.Parse("#D1ECF1")
+                };
+                borderColor = level switch
+                {
+                    "SUCCESS" => Brush.Parse("#C3E6CB"),
+                    "WARNING" => Brush.Parse("#FFEAA7"),
+                    "ERROR" => Brush.Parse("#F5C6CB"),
+                    _ => Brush.Parse("#BEE5EB")
+                };
+                textColor = level switch
+                {
+                    "SUCCESS" => Brush.Parse("#155724"),
+                    "WARNING" => Brush.Parse("#856404"),
+                    "ERROR" => Brush.Parse("#721C24"),
+                    _ => Brush.Parse("#0C5460")
+                };
+            }
+
+            this.Background = Brushes.Transparent;
+
+            var mainBorder = new Border
+            {
+                Background = backgroundColor,
+                BorderBrush = borderColor,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 12),
+                BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
+            };
+
+            var contentGrid = new Grid();
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto)); // Image column
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); // Text column  
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto)); // Close button column
+            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Title row
+            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star)); // Message row
+
+            // Add image if provided
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                try
+                {
+                    var image = new Avalonia.Controls.Image
+                    {
+                        Source = new Avalonia.Media.Imaging.Bitmap(imageUrl),
+                        Width = 32,
+                        Height = 32,
+                        Margin = new Thickness(0, 0, 12, 0)
+                    };
+                    Grid.SetColumn(image, 0);
+                    Grid.SetRowSpan(image, 2);
+                    contentGrid.Children.Add(image);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to load notification image: {ex.Message}");
+                }
+            }
+
+            // Title
+            var titleBlock = new TextBlock
+            {
+                Text = title,
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 14,
+                Foreground = textColor,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            Grid.SetColumn(titleBlock, 1);
+            Grid.SetRow(titleBlock, 0);
+            contentGrid.Children.Add(titleBlock);
+
+            // Message
+            var messageBlock = new TextBlock
+            {
+                Text = message,
+                FontSize = 12,
+                Foreground = textColor,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = !string.IsNullOrEmpty(imageUrl) ? 240 : 280
+            };
+            Grid.SetColumn(messageBlock, 1);
+            Grid.SetRow(messageBlock, 1);
+            contentGrid.Children.Add(messageBlock);
+
+            // Close button
+            var closeButton = new Button
+            {
+                Content = "×",
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(4),
+                FontSize = 16,
+                FontWeight = FontWeight.Bold,
+                Width = 24,
+                Height = 24,
+                Foreground = textColor,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+            closeButton.Click += (s, e) => Close();
+            Grid.SetColumn(closeButton, 2);
+            Grid.SetRow(closeButton, 0);
+            contentGrid.Children.Add(closeButton);
+
+            mainBorder.Child = contentGrid;
+            this.Content = mainBorder;
+            this.Opacity = 1.0;
         }
 
         private void PositionWindow()
@@ -120,106 +271,9 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private void CreateContent(string title, string message, string level)
-        {
-            // Create gradient background based on notification level
-            var backgroundColor = level switch
-            {
-                "SUCCESS" => Brush.Parse("#D4EDDA"),
-                "WARNING" => Brush.Parse("#FFF3CD"),
-                "ERROR" => Brush.Parse("#F8D7DA"),
-                _ => Brush.Parse("#D1ECF1") // INFO
-            };
+        
 
-            var borderColor = level switch
-            {
-                "SUCCESS" => Brush.Parse("#C3E6CB"),
-                "WARNING" => Brush.Parse("#FFEAA7"),
-                "ERROR" => Brush.Parse("#F5C6CB"),
-                _ => Brush.Parse("#BEE5EB") // INFO
-            };
 
-            var textColor = level switch
-            {
-                "SUCCESS" => Brush.Parse("#155724"),
-                "WARNING" => Brush.Parse("#856404"),
-                "ERROR" => Brush.Parse("#721C24"),
-                _ => Brush.Parse("#0C5460") // INFO
-            };
-
-            // Set window background to transparent
-            this.Background = Brushes.Transparent;
-            
-            // Main container
-            var mainBorder = new Border
-            {
-                Background = backgroundColor,
-                BorderBrush = borderColor,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(16, 12),
-                BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
-            };
-
-            // Content grid
-            var contentGrid = new Grid();
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
-
-            // Title
-            var titleBlock = new TextBlock
-            {
-                Text = title,
-                FontWeight = FontWeight.SemiBold,
-                FontSize = 14,
-                Foreground = textColor,
-                Margin = new Thickness(0, 0, 0, 4)
-            };
-            Grid.SetColumn(titleBlock, 0);
-            Grid.SetRow(titleBlock, 0);
-            contentGrid.Children.Add(titleBlock);
-
-            // Message
-            var messageBlock = new TextBlock
-            {
-                Text = message,
-                FontSize = 12,
-                Foreground = textColor,
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 280
-            };
-            Grid.SetColumn(messageBlock, 0);
-            Grid.SetRow(messageBlock, 1);
-            contentGrid.Children.Add(messageBlock);
-
-            // Close button
-            var closeButton = new Button
-            {
-                Content = "×",
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(4),
-                FontSize = 16,
-                FontWeight = FontWeight.Bold,
-                Width = 24,
-                Height = 24,
-                Foreground = textColor,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
-            };
-            closeButton.Click += (s, e) => Close();
-            Grid.SetColumn(closeButton, 1);
-            Grid.SetRow(closeButton, 0);
-            contentGrid.Children.Add(closeButton);
-
-            mainBorder.Child = contentGrid;
-            this.Content = mainBorder;
-
-            // No animation - just show immediately to prevent any grey flicker
-            this.Opacity = 1.0;
-        }
 
         private void AutoClose(object state)
         {
@@ -317,6 +371,10 @@ namespace AkademiTrack.ViewModels
         private List<ScheduleItem> _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
+        private Timer _adminNotificationTimer;
+        private HashSet<string> _processedNotificationIds = new HashSet<string>();
+        private string _processedNotificationsFile;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; // Replace with your actual URL
@@ -342,8 +400,195 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
 
 
-
             LogInfo("Applikasjon er klar");
+
+            _processedNotificationsFile = Path.Combine(
+            Path.GetDirectoryName(GetCookiesFilePath()),
+            "processed_notifications.json"
+            );
+
+            // Load previously processed notifications
+            _ = Task.Run(LoadProcessedNotificationIdsAsync);
+
+            // Start checking for admin notifications every 30 seconds
+            _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
+
+            LogInfo("Admin notification system initialized");
+        }
+
+        private string GetProcessedNotificationsFilePath()
+        {
+            string appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "processed_notifications.json");
+        }
+
+        private async Task LoadProcessedNotificationIdsAsync()
+        {
+            try
+            {
+                var filePath = GetProcessedNotificationsFilePath();
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+                    var ids = JsonSerializer.Deserialize<string[]>(json);
+                    if (ids != null)
+                    {
+                        _processedNotificationIds = new HashSet<string>(ids);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        private async Task SaveProcessedNotificationIdsAsync()
+        {
+            try
+            {
+                var filePath = GetProcessedNotificationsFilePath();
+                var json = JsonSerializer.Serialize(_processedNotificationIds.ToArray());
+                await File.WriteAllTextAsync(filePath, json);
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        
+
+        private async void CheckForAdminNotifications(object state)
+        {
+            try
+            {
+                await CheckForNewAdminNotificationsAsync();
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        // Method to fetch and display new admin notifications
+        private async Task CheckForNewAdminNotificationsAsync()
+        {
+            try
+            {
+                var userEmail = await GetUserEmailFromActivationAsync();
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    LogDebug("No user email found for admin notifications");
+                    return;
+                }
+
+                // Get notifications for this specific user OR broadcast messages from last 7 days
+                var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("apikey", _supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+
+                    var notifications = JsonSerializer.Deserialize<EnhancedAdminNotification[]>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+
+                    if (notifications != null)
+                    {
+                        bool hasNewNotifications = false;
+
+                        foreach (var notification in notifications)
+                        {
+                            // Only show notifications we haven't processed yet
+                            if (!_processedNotificationIds.Contains(notification.Id))
+                            {
+                                _processedNotificationIds.Add(notification.Id);
+                                hasNewNotifications = true;
+
+                                var notificationLevel = notification.Priority?.ToUpper() switch
+                                {
+                                    "HIGH" => "ERROR",
+                                    "MEDIUM" => "WARNING",
+                                    "LOW" => "SUCCESS",
+                                    _ => "INFO"
+                                };
+
+                                var adminTitle = $"[ADMIN]{notification.Title}";
+
+                                // Show notification with enhanced features
+                                ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
+                                    notification.Image_Url, notification.Custom_Color);
+
+                                LogInfo($"Admin notification displayed: {notification.Title}");
+                            }
+                        }
+
+                        // Save processed IDs to file if we have new notifications
+                        if (hasNewNotifications)
+                        {
+                            await SaveProcessedNotificationIdsAsync();
+                        }
+                    }
+                }
+                else
+                {
+                    LogDebug($"Failed to fetch admin notifications: {response.StatusCode}");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogDebug($"Error response: {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in CheckForNewAdminNotificationsAsync: {ex.Message}");
+            }
+        }
+
+        public class EnhancedAdminNotification
+        {
+            public string Id { get; set; }
+            public string Title { get; set; }
+            public string Message { get; set; }
+            public string Priority { get; set; }
+            public string Target_Email { get; set; }
+            public string Image_Url { get; set; }    // New: URL to image
+            public string Custom_Color { get; set; }  // New: Custom hex color
+            public DateTime Created_At { get; set; }
+        }
+
+        // Method to mark notification as delivered
+        
+
+        public class AdminNotification
+        {
+            public string Id { get; set; }
+            public string Title { get; set; }
+            public string Message { get; set; }
+            public string Priority { get; set; }
+            public string Target_Email { get; set; }
+            public DateTime Created_At { get; set; }
+        }
+
+        public class AdminNotificationWithDelivery : AdminNotification
+        {
+            public List<NotificationDelivery> Notification_Deliveries { get; set; }
+        }
+
+        public class NotificationDelivery
+        {
+            public string User_Email { get; set; }
+            public string Status { get; set; }
+            public DateTime Delivered_At { get; set; }
         }
 
         public string Greeting => "AkademiTrack - STU Tidsregistrering";
@@ -431,38 +676,40 @@ namespace AkademiTrack.ViewModels
 
         private void ShowNotification(string title, string message, string level = "INFO")
         {
-            // Only show overlay notifications for these specific cases
+            // Allow these specific system notifications OR any notification marked as admin
             var allowedNotifications = new[]
             {
         "Automation Started",
         "Automation Stopped",
-        "Registration Success",        // This was already here but the logic below was wrong
+        "Registration Success",
         "Alle Studietimer Registrert",
         "Ingen Flere Økter"
     };
 
-            if (allowedNotifications.Contains(title))
+            // Check if this is an admin notification (we'll pass a special marker)
+            bool isAdminNotification = title.StartsWith("[ADMIN]");
+
+            if (allowedNotifications.Contains(title) || isAdminNotification)
             {
-                // Add debug logging to see if this path is being hit
-                LogDebug($"Showing system overlay notification: {title} - {message}");
-                ShowSystemOverlayNotification(title, message, level);
+                // Remove the [ADMIN] marker before displaying
+                string displayTitle = isAdminNotification ? title.Substring(7) : title;
+
+                LogDebug($"Showing system overlay notification: {displayTitle} - {message}");
+                ShowSystemOverlayNotification(displayTitle, message, level);
             }
             else
             {
-                // Debug log for filtered notifications
                 LogDebug($"Notification filtered out: {title}");
             }
-
-            // No in-app notifications - removed all the in-app notification logic
         }
 
-        private void ShowSystemOverlayNotification(string title, string message, string level)
+        private void ShowSystemOverlayNotification(string title, string message, string level, string imageUrl = null, string customColor = null)
         {
             try
             {
                 if (Dispatcher.UIThread.CheckAccess())
                 {
-                    CreateOverlayWindow(title, message, level);
+                    CreateOverlayWindow(title, message, level, imageUrl, customColor);
                 }
                 else
                 {
@@ -470,17 +717,16 @@ namespace AkademiTrack.ViewModels
                     {
                         try
                         {
-                            CreateOverlayWindow(title, message, level);
+                            CreateOverlayWindow(title, message, level, imageUrl, customColor);
                         }
                         catch (Exception innerEx)
                         {
                             LogDebug($"Failed to create overlay window on UI thread: {innerEx.Message}");
-                            // Fallback: try again after a delay
                             Task.Delay(1000).ContinueWith(_ =>
                             {
                                 try
                                 {
-                                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level));
+                                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level, imageUrl, customColor));
                                 }
                                 catch
                                 {
@@ -494,16 +740,14 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Failed to show system overlay notification: {ex.Message}");
-                // Last resort fallback
                 LogInfo($"NOTIFICATION (fallback): {title} - {message}");
             }
         }
 
-        private void CreateOverlayWindow(string title, string message, string level)
+        private void CreateOverlayWindow(string title, string message, string level, string imageUrl = null, string customColor = null)
         {
             try
             {
-                // Clean up any closed windows first (safe cleanup)
                 try
                 {
                     for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
@@ -517,37 +761,38 @@ namespace AkademiTrack.ViewModels
                 catch (Exception cleanupEx)
                 {
                     LogDebug($"Error during window cleanup: {cleanupEx.Message}");
-                    // If cleanup fails, just clear the list
                     _activeOverlayWindows.Clear();
                 }
 
-                // ALWAYS show registration success notifications - no matter what
                 bool isRegistrationSuccess = title == "Registration Success";
 
                 if (!isRegistrationSuccess && _activeOverlayWindows.Count > 0)
                 {
-                    // For other notifications, only show if no notification is currently showing
                     LogDebug($"Skipping notification '{title}' - another notification is already showing");
                     return;
                 }
 
                 LogDebug($"Creating overlay window for: {title}");
 
-                // Create notification with extra error handling
                 NotificationOverlayWindow overlayWindow = null;
                 try
                 {
-                    overlayWindow = new NotificationOverlayWindow(title, message, level);
+                    if (!string.IsNullOrEmpty(imageUrl) || !string.IsNullOrEmpty(customColor))
+                    {
+                        overlayWindow = new NotificationOverlayWindow(title, message, level, imageUrl, customColor);
+                    }
+                    else
+                    {
+                        overlayWindow = new NotificationOverlayWindow(title, message, level);
+                    }
                 }
                 catch (Exception createEx)
                 {
                     LogError($"Failed to create notification window: {createEx.Message}");
-                    // Fallback to log notification
                     LogInfo($"NOTIFICATION (fallback): {title} - {message}");
                     return;
                 }
 
-                // Set up event handler with safety
                 overlayWindow.Closed += (s, e) =>
                 {
                     try
@@ -561,10 +806,8 @@ namespace AkademiTrack.ViewModels
                     }
                 };
 
-                // Add to tracking list
                 _activeOverlayWindows.Add(overlayWindow);
 
-                // Show the window with error handling
                 try
                 {
                     overlayWindow.Show();
@@ -573,16 +816,13 @@ namespace AkademiTrack.ViewModels
                 catch (Exception showEx)
                 {
                     LogError($"Failed to show notification window: {showEx.Message}");
-                    // Remove from tracking list if show failed
                     _activeOverlayWindows.Remove(overlayWindow);
-                    // Fallback to log notification
                     LogInfo($"NOTIFICATION (fallback): {title} - {message}");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Complete failure in CreateOverlayWindow: {ex.Message}");
-                // Last resort - at least log the notification
                 LogInfo($"NOTIFICATION (emergency fallback): {title} - {message}");
             }
         }
