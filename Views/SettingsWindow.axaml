@@ -9,10 +9,10 @@
         Icon="/Assets/AT-Transparrent.png"
         Title="Innstillinger - AkademiTrack"
         Background="#F8F9FA"
-        Width="800"
-        Height="600"
-        MinWidth="700"
-        MinHeight="500"
+        Width="{Binding ShowActivityLog, Converter={x:Static vm:BoolToIntConverter.Instance}, ConverterParameter='600|1000'}"
+        Height="700"
+        MinWidth="{Binding ShowActivityLog, Converter={x:Static vm:BoolToIntConverter.Instance}, ConverterParameter='500|900'}"
+        MinHeight="600"
         CanResize="True"
         WindowStartupLocation="CenterOwner">
 	<Design.DataContext>
@@ -205,7 +205,7 @@
 		</Grid.RowDefinitions>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="*"/>
-			<ColumnDefinition Width="*"/>
+			<ColumnDefinition Width="{Binding ShowActivityLog, Converter={x:Static vm:BoolToGridLengthConverter.Instance}, ConverterParameter='0|3*'}"/>
 		</Grid.ColumnDefinitions>
 		<!-- Header -->
 		<StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="8" Margin="0,0,0,20">
@@ -218,7 +218,7 @@
                        Foreground="#6C757D"/>
 		</StackPanel>
 		<!-- Left Column - Settings -->
-		<ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
+		<ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,20,0">
 			<StackPanel Spacing="16">
 				<!-- File Management Section -->
 				<TextBlock Text="Filbehandling" Classes="section-header"/>
@@ -234,6 +234,24 @@
                                 ToolTip.Tip="Viser mappen der AkademiTrack lagrer filene sine"/>
 					</StackPanel>
 				</Border>
+
+				<!-- Nerdeknapp Section -->
+				<TextBlock Text="Nerde ting" Classes="section-header"/>
+				<Border Classes="setting-item">
+					<StackPanel Spacing="12">
+						<TextBlock Text="Vis Nerde ting" Classes="setting-title"/>
+						<TextBlock Text="Aktiver for a vise aktivitetslogger i panelet. Loggene viser applikasjonsstatus og feilmeldinger."
+								Classes="setting-description"/>
+						<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis Nerdeknapp|Skjul Nerdeknapp'}"
+					Classes="settings-action"
+					Command="{Binding ToggleActivityLogCommand}"
+					ToolTip.Tip="Viser eller skjuler aktivitetsloggen"
+					FontSize="14"
+					MinWidth="160"
+					Padding="20,12"/>
+					</StackPanel>
+				</Border>
+
 				<!-- Application Info Section -->
 				<TextBlock Text="Applikasjonsinformasjon" Classes="section-header"/>
 				<Border Classes="info-panel">
@@ -250,14 +268,16 @@
 				</Border>
 			</StackPanel>
 		</ScrollViewer>
-		<!-- Right Column - Activity Log -->
+
+		<!-- Right Column - Activity Log (Conditionally Visible) -->
 		<Border Grid.Row="1" Grid.Column="1"
                 Background="White"
                 CornerRadius="8"
-                Padding="16"
-                Margin="10,0,0,0"
+                Padding="20"
+                Margin="20,0,0,0"
                 BorderThickness="1"
-                BorderBrush="#E9ECEF">
+                BorderBrush="#E9ECEF"
+                IsVisible="{Binding ShowActivityLog}">
 			<Grid>
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
@@ -278,11 +298,9 @@
 					<StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 Spacing="8">
-						<Button Content="{Binding ShowDetailedLogs, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis Debug|Skjul Debug'}"
-								Classes="log-control"
-								Command="{Binding ToggleDetailedLogsCommand}"
-								ToolTip.Tip="Skjul eller vis detaljert debug-logging"/>
-						<Button Content="Fjern Logger"                                Classes="log-control"
+						
+						<Button Content="Fjern Logger"
+                                Classes="log-control"
                                 Command="{Binding ClearLogsCommand}"
                                 ToolTip.Tip="Fjerner alle loggregistreringer"/>
 					</StackPanel>
@@ -307,6 +325,7 @@
 				</ScrollViewer>
 			</Grid>
 		</Border>
+
 		<!-- Footer Buttons -->
 		<StackPanel Grid.Row="2" Grid.ColumnSpan="2"
                     Orientation="Horizontal"

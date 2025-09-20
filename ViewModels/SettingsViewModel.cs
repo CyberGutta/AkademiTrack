@@ -8,11 +8,21 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
 
 namespace AkademiTrack.ViewModels
 {
+    // Settings data class
+    public class AppSettings
+    {
+        public bool ShowActivityLog { get; set; } = false; // Hidden by default
+        public bool ShowDetailedLogs { get; set; } = true;
+        public DateTime LastUpdated { get; set; } = DateTime.Now;
+    }
+
     // Converters
     public class BoolToStringConverter : IValueConverter
     {
@@ -45,6 +55,60 @@ namespace AkademiTrack.ViewModels
                 return string.Equals(stringValue, paramString, StringComparison.OrdinalIgnoreCase);
             }
             return false;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BoolToIntConverter : IValueConverter
+    {
+        public static readonly BoolToIntConverter Instance = new();
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool boolValue && parameter is string paramString)
+            {
+                var parts = paramString.Split('|');
+                if (parts.Length == 2 && int.TryParse(parts[0], out int falseValue) && int.TryParse(parts[1], out int trueValue))
+                {
+                    return boolValue ? trueValue : falseValue;
+                }
+            }
+            return 600; // Default width
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BoolToGridLengthConverter : IValueConverter
+    {
+        public static readonly BoolToGridLengthConverter Instance = new();
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool boolValue && parameter is string paramString)
+            {
+                var parts = paramString.Split('|');
+                if (parts.Length == 2)
+                {
+                    var lengthStr = boolValue ? parts[1] : parts[0];
+                    if (lengthStr == "0")
+                        return new Avalonia.Controls.GridLength(0);
+                    if (lengthStr.EndsWith("*"))
+                    {
+                        var multiplier = lengthStr.TrimEnd('*');
+                        if (string.IsNullOrEmpty(multiplier) || multiplier == "1")
+                            return new Avalonia.Controls.GridLength(1, Avalonia.Controls.GridUnitType.Star);
+                        if (double.TryParse(multiplier, out double mult))
+                            return new Avalonia.Controls.GridLength(mult, Avalonia.Controls.GridUnitType.Star);
+                    }
+                    if (double.TryParse(lengthStr, out double pixels))
+                        return new Avalonia.Controls.GridLength(pixels, Avalonia.Controls.GridUnitType.Pixel);
+                }
+            }
+            return new Avalonia.Controls.GridLength(1, Avalonia.Controls.GridUnitType.Star);
         }
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -97,6 +161,7 @@ namespace AkademiTrack.ViewModels
     // ViewModel
     public class SettingsViewModel : INotifyPropertyChanged
     {
+        private bool _showActivityLog = false; // Hidden by default
         private bool _showDetailedLogs = true;
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
@@ -109,9 +174,24 @@ namespace AkademiTrack.ViewModels
         public ICommand OpenProgramFolderCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
+        public ICommand ToggleActivityLogCommand { get; }
 
         // This is what the UI binds to
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
+
+        public bool ShowActivityLog
+        {
+            get => _showActivityLog;
+            set
+            {
+                if (_showActivityLog != value)
+                {
+                    _showActivityLog = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync(); // Save settings when changed
+                }
+            }
+        }
 
         public bool ShowDetailedLogs
         {
@@ -123,6 +203,7 @@ namespace AkademiTrack.ViewModels
                     _showDetailedLogs = value;
                     OnPropertyChanged();
                     RefreshDisplayedLogs();
+                    _ = SaveSettingsAsync(); // Save settings when changed
                 }
             }
         }
@@ -134,6 +215,10 @@ namespace AkademiTrack.ViewModels
             OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
+            ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
+
+            // Load settings on initialization
+            _ = LoadSettingsAsync();
         }
 
         // Method to set the log entries from the main view model
@@ -174,6 +259,11 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private void ToggleActivityLog()
+        {
+            ShowActivityLog = !ShowActivityLog;
+        }
+
         private void CloseWindow()
         {
             CloseRequested?.Invoke(this, EventArgs.Empty);
@@ -209,6 +299,73 @@ namespace AkademiTrack.ViewModels
         private void ToggleDetailedLogs()
         {
             ShowDetailedLogs = !ShowDetailedLogs;
+        }
+
+        private string GetSettingsFilePath()
+        {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+            return Path.Combine(appFolderPath, "settings.json");
+        }
+
+        private async Task LoadSettingsAsync()
+        {
+            try
+            {
+                var filePath = GetSettingsFilePath();
+
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
+
+                    if (settings != null)
+                    {
+                        _showActivityLog = settings.ShowActivityLog;
+                        _showDetailedLogs = settings.ShowDetailedLogs;
+
+                        // Notify UI of changes
+                        OnPropertyChanged(nameof(ShowActivityLog));
+                        OnPropertyChanged(nameof(ShowDetailedLogs));
+
+                        RefreshDisplayedLogs();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently fail - not critical
+                Debug.WriteLine($"Failed to load settings: {ex.Message}");
+            }
+        }
+
+        private async Task SaveSettingsAsync()
+        {
+            try
+            {
+                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+
+                // Create the directory if it doesn't exist
+                Directory.CreateDirectory(appFolderPath);
+
+                var filePath = GetSettingsFilePath();
+
+                var settings = new AppSettings
+                {
+                    ShowActivityLog = _showActivityLog,
+                    ShowDetailedLogs = _showDetailedLogs,
+                    LastUpdated = DateTime.Now
+                };
+
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                // Silently fail - not critical
+                Debug.WriteLine($"Failed to save settings: {ex.Message}");
+            }
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
