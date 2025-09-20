@@ -2,6 +2,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
 using OpenQA.Selenium;
@@ -38,81 +39,42 @@ namespace AkademiTrack.ViewModels
             this.ShowInTaskbar = false;
             this.Topmost = true;
             this.SystemDecorations = SystemDecorations.None;
-            this.Width = 350;
-            this.Height = !string.IsNullOrEmpty(imageUrl) ? 140 : 120;
+            this.Width = 400;
+            this.Height = 120;
 
             PositionWindow();
-            CreateEnhancedContent(title, message, level, imageUrl, customColor);
+            CreateModernContent(title, message, level, imageUrl, customColor);
 
-            // Admin notifications auto-close after 10 seconds, others after 5 seconds
-            int autoCloseSeconds = title.Contains("Admin") ? 10 : 5;
+            int autoCloseSeconds = title.Contains("Admin") || title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[") ? 12 : 6;
             _autoCloseTimer = new Timer(AutoClose, null, autoCloseSeconds * 1000, Timeout.Infinite);
         }
 
-        private void CreateEnhancedContent(string title, string message, string level, string imageUrl = null, string customColor = null)
+        private void CreateModernContent(string title, string message, string level, string imageUrl = null, string customColor = null)
         {
-            // Use custom color if provided, otherwise use default colors
-            IBrush backgroundColor, borderColor, textColor;
+            string displayTitle = title;
+            bool isAdminNotification = false;
 
-            if (!string.IsNullOrEmpty(customColor))
+            if (title.StartsWith("[ADMIN]"))
             {
-                try
-                {
-                    var customBrush = Brush.Parse(customColor);
-                    backgroundColor = customBrush;
-                    borderColor = customBrush;
-                    textColor = Brushes.White;
-                }
-                catch
-                {
-                    // Fallback to default if custom color parsing fails
-                    backgroundColor = level switch
-                    {
-                        "SUCCESS" => Brush.Parse("#D4EDDA"),
-                        "WARNING" => Brush.Parse("#FFF3CD"),
-                        "ERROR" => Brush.Parse("#F8D7DA"),
-                        _ => Brush.Parse("#D1ECF1")
-                    };
-                    borderColor = level switch
-                    {
-                        "SUCCESS" => Brush.Parse("#C3E6CB"),
-                        "WARNING" => Brush.Parse("#FFEAA7"),
-                        "ERROR" => Brush.Parse("#F5C6CB"),
-                        _ => Brush.Parse("#BEE5EB")
-                    };
-                    textColor = level switch
-                    {
-                        "SUCCESS" => Brush.Parse("#155724"),
-                        "WARNING" => Brush.Parse("#856404"),
-                        "ERROR" => Brush.Parse("#721C24"),
-                        _ => Brush.Parse("#0C5460")
-                    };
-                }
+                displayTitle = title.Substring(7);
+                isAdminNotification = true;
             }
-            else
+            else if (title.StartsWith("[ADMIN["))
             {
-                backgroundColor = level switch
+                var endIndex = title.IndexOf(']', 7);
+                if (endIndex > 0)
                 {
-                    "SUCCESS" => Brush.Parse("#D4EDDA"),
-                    "WARNING" => Brush.Parse("#FFF3CD"),
-                    "ERROR" => Brush.Parse("#F8D7DA"),
-                    _ => Brush.Parse("#D1ECF1")
-                };
-                borderColor = level switch
+                    displayTitle = title.Substring(7, endIndex - 7);
+                }
+                else
                 {
-                    "SUCCESS" => Brush.Parse("#C3E6CB"),
-                    "WARNING" => Brush.Parse("#FFEAA7"),
-                    "ERROR" => Brush.Parse("#F5C6CB"),
-                    _ => Brush.Parse("#BEE5EB")
-                };
-                textColor = level switch
-                {
-                    "SUCCESS" => Brush.Parse("#155724"),
-                    "WARNING" => Brush.Parse("#856404"),
-                    "ERROR" => Brush.Parse("#721C24"),
-                    _ => Brush.Parse("#0C5460")
-                };
+                    displayTitle = title.Substring(7);
+                }
+                isAdminNotification = true;
             }
+
+            IBrush backgroundColor, borderColor, textColor, accentColor;
+            SetModernColors(level, isAdminNotification, customColor, out backgroundColor, out borderColor, out textColor, out accentColor);
 
             this.Background = Brushes.Transparent;
 
@@ -121,19 +83,212 @@ namespace AkademiTrack.ViewModels
                 Background = backgroundColor,
                 BorderBrush = borderColor,
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(16, 12),
-                BoxShadow = BoxShadows.Parse("0 4 12 0 #00000030")
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(0),
+                BoxShadow = BoxShadows.Parse("0 4 20 0 #00000020, 0 1 3 0 #00000030")
             };
 
-            var contentGrid = new Grid();
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto)); // Image column
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); // Text column  
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto)); // Close button column
-            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Title row
-            contentGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star)); // Message row
+            var outerGrid = new Grid();
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(4, GridUnitType.Pixel)));
+            outerGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
 
-            // Add image if provided
+            var accentStrip = new Border
+            {
+                Background = accentColor,
+                CornerRadius = new CornerRadius(10, 0, 0, 10)
+            };
+            Grid.SetColumn(accentStrip, 0);
+            outerGrid.Children.Add(accentStrip);
+
+            var contentArea = new Border
+            {
+                Padding = new Thickness(20, 16)
+            };
+            Grid.SetColumn(contentArea, 1);
+
+            // BACK TO YOUR ORIGINAL GRID - NO CHANGES
+            var layoutGrid = new Grid();
+            layoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            layoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            layoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            layoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            layoutGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+            var notificationIcon = CreateModernIcon(level, isAdminNotification, accentColor, textColor, imageUrl);
+            if (notificationIcon != null)
+            {
+                Grid.SetColumn(notificationIcon, 0);
+                Grid.SetRowSpan(notificationIcon, 2);
+                notificationIcon.Margin = new Thickness(0, 0, 12, 0);
+                notificationIcon.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
+                layoutGrid.Children.Add(notificationIcon);
+            }
+
+            var titlePanel = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                Spacing = 6
+            };
+
+            if (isAdminNotification)
+            {
+                var adminBadge = new Border
+                {
+                    Background = new SolidColorBrush(Color.Parse("#FF3B30")),
+                    CornerRadius = new CornerRadius(3),
+                    Padding = new Thickness(4, 1),
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                };
+
+                var badgeText = new TextBlock
+                {
+                    Text = "ADMIN",
+                    FontSize = 13,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = new SolidColorBrush(Colors.White)
+                };
+
+                adminBadge.Child = badgeText;
+                titlePanel.Children.Add(adminBadge);
+            }
+
+            var titleBlock = new TextBlock
+            {
+                Text = displayTitle,
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 15,
+                Foreground = textColor,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+
+            titlePanel.Children.Add(titleBlock);
+            Grid.SetColumn(titlePanel, 1);
+            Grid.SetRow(titlePanel, 0);
+            layoutGrid.Children.Add(titlePanel);
+
+            var messageBlock = new TextBlock
+            {
+                Text = message,
+                FontSize = 13.5,
+                Foreground = textColor,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.85,
+                LineHeight = 15.0,
+                Margin = new Thickness(0, 4, 0, 0), // BIGGER MARGIN TO PUSH TEXT DOWN
+                MaxWidth = 2280
+            };
+
+            Grid.SetColumn(messageBlock, 1);
+            Grid.SetRow(messageBlock, 1);
+            layoutGrid.Children.Add(messageBlock);
+
+            var closeButton = new Button
+            {
+                Content = "✕",
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(8),
+                FontSize = 14,
+                Width = 32,
+                Height = 32,
+                Foreground = textColor,
+                CornerRadius = new CornerRadius(16),
+                Opacity = 0.6,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+            };
+
+            closeButton.PointerEntered += (s, e) =>
+            {
+                closeButton.Opacity = 1.0;
+                closeButton.Background = new SolidColorBrush(Colors.Black) { Opacity = 0.1 };
+            };
+            closeButton.PointerExited += (s, e) =>
+            {
+                closeButton.Opacity = 0.6;
+                closeButton.Background = Brushes.Transparent;
+            };
+            closeButton.Click += (s, e) => Close();
+
+            Grid.SetColumn(closeButton, 2);
+            Grid.SetRow(closeButton, 0);
+            layoutGrid.Children.Add(closeButton);
+
+            contentArea.Child = layoutGrid;
+            outerGrid.Children.Add(contentArea);
+            mainBorder.Child = outerGrid;
+            this.Content = mainBorder;
+        }
+
+        private void SetModernColors(string level, bool isAdmin, string customColor, out IBrush backgroundColor, out IBrush borderColor, out IBrush textColor, out IBrush accentColor)
+        {
+            if (!string.IsNullOrEmpty(customColor))
+            {
+                try
+                {
+                    var customColorParsed = Color.Parse(customColor);
+                    backgroundColor = new SolidColorBrush(Colors.White);
+                    borderColor = new SolidColorBrush(customColorParsed) { Opacity = 0.3 };
+                    textColor = new SolidColorBrush(Color.Parse("#1A1A1A"));
+                    accentColor = new SolidColorBrush(customColorParsed);
+                    return;
+                }
+                catch { }
+            }
+
+            if (isAdmin)
+            {
+                backgroundColor = new SolidColorBrush(Color.Parse("#FAFAFA"));
+                borderColor = new SolidColorBrush(Color.Parse("#FF3B30"));
+                textColor = new SolidColorBrush(Color.Parse("#1A1A1A"));
+                accentColor = new SolidColorBrush(Color.Parse("#FF3B30"));
+            }
+            else
+            {
+                backgroundColor = new SolidColorBrush(Colors.White);
+                textColor = new SolidColorBrush(Color.Parse("#1A1A1A"));
+
+                switch (level)
+                {
+                    case "SUCCESS":
+                        borderColor = new SolidColorBrush(Color.Parse("#34C759"));
+                        accentColor = new SolidColorBrush(Color.Parse("#34C759"));
+                        break;
+                    case "WARNING":
+                        borderColor = new SolidColorBrush(Color.Parse("#FF9500"));
+                        accentColor = new SolidColorBrush(Color.Parse("#FF9500"));
+                        break;
+                    case "ERROR":
+                        borderColor = new SolidColorBrush(Color.Parse("#FF3B30"));
+                        accentColor = new SolidColorBrush(Color.Parse("#FF3B30"));
+                        break;
+                    default:
+                        borderColor = new SolidColorBrush(Color.Parse("#007AFF"));
+                        accentColor = new SolidColorBrush(Color.Parse("#007AFF"));
+                        break;
+                }
+            }
+        }
+
+        private Border CreateModernIcon(string level, bool isAdmin, IBrush accentColor, IBrush textColor, string imageUrl)
+        {
+            var iconBorder = new Border
+            {
+                Width = 36,
+                Height = 36,
+                CornerRadius = new CornerRadius(18),
+                Background = new SolidColorBrush(Colors.LightGray) { Opacity = 0.15 },
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            };
+
+            try
+            {
+                if (accentColor is SolidColorBrush solidBrush)
+                {
+                    iconBorder.Background = new SolidColorBrush(solidBrush.Color) { Opacity = 0.15 };
+                }
+            }
+            catch { }
+
             if (!string.IsNullOrEmpty(imageUrl))
             {
                 try
@@ -141,153 +296,83 @@ namespace AkademiTrack.ViewModels
                     var image = new Avalonia.Controls.Image
                     {
                         Source = new Avalonia.Media.Imaging.Bitmap(imageUrl),
-                        Width = 32,
-                        Height = 32,
-                        Margin = new Thickness(0, 0, 12, 0)
+                        Width = 20,
+                        Height = 20,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                     };
-                    Grid.SetColumn(image, 0);
-                    Grid.SetRowSpan(image, 2);
-                    contentGrid.Children.Add(image);
+                    iconBorder.Child = image;
+                    return iconBorder;
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to load notification image: {ex.Message}");
-                }
+                catch { }
             }
 
-            // Title
-            var titleBlock = new TextBlock
+            string iconText = level switch
             {
-                Text = title,
-                FontWeight = FontWeight.SemiBold,
-                FontSize = 14,
-                Foreground = textColor,
-                Margin = new Thickness(0, 0, 0, 4)
+                "SUCCESS" => "✓",
+                "WARNING" => "⚠",
+                "ERROR" => "✕",
+                _ when isAdmin => "★",
+                _ => "ⓘ"
             };
-            Grid.SetColumn(titleBlock, 1);
-            Grid.SetRow(titleBlock, 0);
-            contentGrid.Children.Add(titleBlock);
 
-            // Message
-            var messageBlock = new TextBlock
+            var iconTextBlock = new TextBlock
             {
-                Text = message,
-                FontSize = 12,
-                Foreground = textColor,
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = !string.IsNullOrEmpty(imageUrl) ? 240 : 280
-            };
-            Grid.SetColumn(messageBlock, 1);
-            Grid.SetRow(messageBlock, 1);
-            contentGrid.Children.Add(messageBlock);
-
-            // Close button
-            var closeButton = new Button
-            {
-                Content = "×",
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(4),
-                FontSize = 16,
+                Text = iconText,
+                FontSize = 18,
                 FontWeight = FontWeight.Bold,
-                Width = 24,
-                Height = 24,
-                Foreground = textColor,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
+                Foreground = accentColor,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
             };
-            closeButton.Click += (s, e) => Close();
-            Grid.SetColumn(closeButton, 2);
-            Grid.SetRow(closeButton, 0);
-            contentGrid.Children.Add(closeButton);
 
-            mainBorder.Child = contentGrid;
-            this.Content = mainBorder;
-            this.Opacity = 1.0;
+            iconBorder.Child = iconTextBlock;
+            return iconBorder;
         }
+
+
 
         private void PositionWindow()
         {
             try
             {
-                // Get primary screen bounds
                 var screen = this.Screens.Primary;
                 if (screen != null)
                 {
                     var workingArea = screen.WorkingArea;
                     var scaling = screen.Scaling;
 
-                    // Use larger margin and account for DPI scaling
-                    var margin = (int)(30 * scaling); // Scale margin with DPI
-                    var windowWidth = (int)(this.Width * scaling); // Account for DPI scaling
+                    var margin = (int)(20 * scaling);
+                    var windowWidth = (int)(this.Width * scaling);
                     var windowHeight = (int)(this.Height * scaling);
 
-                    // More conservative positioning - ensure we're well within bounds
-                    var availableWidth = workingArea.Width - (margin * 2);
-                    var availableHeight = workingArea.Height - (margin * 2);
-
-                    // If window is larger than available space, adjust
-                    if (windowWidth > availableWidth)
-                    {
-                        windowWidth = (int)availableWidth;
-                    }
-                    if (windowHeight > availableHeight)
-                    {
-                        windowHeight = (int)availableHeight;
-                    }
-
-                    // Calculate position from right edge with extra safety margin
+                    // Position from top-right
                     var x = (int)(workingArea.Right - windowWidth - margin);
                     var y = (int)(workingArea.Y + margin);
 
-                    // Triple-check bounds to ensure notification is fully visible
-                    if (x < workingArea.X)
-                    {
-                        x = (int)(workingArea.X + margin);
-                    }
-                    if (x + windowWidth > workingArea.Right)
-                    {
-                        x = (int)(workingArea.Right - windowWidth - margin);
-                    }
-                    if (y + windowHeight > workingArea.Bottom)
-                    {
-                        y = (int)(workingArea.Bottom - windowHeight - margin);
-                    }
+                    // Ensure bounds
+                    if (x < workingArea.X) x = (int)(workingArea.X + margin);
+                    if (y + windowHeight > workingArea.Bottom) y = (int)(workingArea.Bottom - windowHeight - margin);
 
                     this.Position = new PixelPoint(x, y);
-                    
                 }
                 else
                 {
-                    // Fallback position if screen detection fails
                     this.Position = new PixelPoint(100, 50);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Error positioning notification: {ex.Message}");
-                // Safe fallback position that should work on any screen
                 this.Position = new PixelPoint(200, 50);
             }
         }
-
-        
-
-
 
         private void AutoClose(object state)
         {
             Dispatcher.UIThread.Post(() =>
             {
-                try
-                {
-                    // Simple close without animation
-                    Close();
-                }
-                catch
-                {
-                    Close();
-                }
+                try { Close(); }
+                catch { Close(); }
             });
         }
 
@@ -484,7 +569,6 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                // Get notifications for this specific user OR broadcast messages from last 7 days
                 var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
 
@@ -503,14 +587,12 @@ namespace AkademiTrack.ViewModels
                         PropertyNameCaseInsensitive = true
                     });
 
-
                     if (notifications != null)
                     {
                         bool hasNewNotifications = false;
 
                         foreach (var notification in notifications)
                         {
-                            // Only show notifications we haven't processed yet
                             if (!_processedNotificationIds.Contains(notification.Id))
                             {
                                 _processedNotificationIds.Add(notification.Id);
@@ -524,17 +606,17 @@ namespace AkademiTrack.ViewModels
                                     _ => "INFO"
                                 };
 
+                                // Fixed: Use proper admin title format
                                 var adminTitle = $"[ADMIN]{notification.Title}";
 
                                 // Show notification with enhanced features
                                 ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
                                     notification.Image_Url, notification.Custom_Color);
 
-                                LogInfo($"Admin notification displayed: {notification.Title}");
+                                LogInfo($"Enhanced admin notification displayed: {notification.Title}");
                             }
                         }
 
-                        // Save processed IDs to file if we have new notifications
                         if (hasNewNotifications)
                         {
                             await SaveProcessedNotificationIdsAsync();
@@ -686,16 +768,13 @@ namespace AkademiTrack.ViewModels
         "Ingen Flere Økter"
     };
 
-            // Check if this is an admin notification (we'll pass a special marker)
-            bool isAdminNotification = title.StartsWith("[ADMIN]");
+            // Check if this is an admin notification - handle both correct and malformed formats
+            bool isAdminNotification = title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[");
 
             if (allowedNotifications.Contains(title) || isAdminNotification)
             {
-                // Remove the [ADMIN] marker before displaying
-                string displayTitle = isAdminNotification ? title.Substring(7) : title;
-
-                LogDebug($"Showing system overlay notification: {displayTitle} - {message}");
-                ShowSystemOverlayNotification(displayTitle, message, level);
+                LogDebug($"Showing enhanced system overlay notification: {title} - {message}");
+                ShowSystemOverlayNotification(title, message, level);
             }
             else
             {
