@@ -765,12 +765,13 @@ namespace AkademiTrack.ViewModels
             // Allow these specific system notifications OR any notification marked as admin
             var allowedNotifications = new[]
             {
-        "Automation Started",
-        "Automation Stopped",
-        "Registration Success",
-        "Alle Studietimer Registrert",
-        "Ingen Flere Økter"
-    };
+                "Automation Started",
+                "Automation Stopped",
+                "Registration Success",
+                "Alle Studietimer Registrert",
+                "Ingen STU-økter funnet for i dag", // Add this new title
+                "Ingen Flere Økter"     // Alternative title
+            };
 
             // Check if this is an admin notification - handle both correct and malformed formats
             bool isAdminNotification = title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[");
@@ -848,8 +849,9 @@ namespace AkademiTrack.ViewModels
                 }
 
                 bool isRegistrationSuccess = title == "Registration Success";
+                bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STU-økter");
 
-                if (!isRegistrationSuccess && _activeOverlayWindows.Count > 0)
+                if (!isRegistrationSuccess && !isPriorityNotification && _activeOverlayWindows.Count > 0)
                 {
                     LogDebug($"Skipping notification '{title}' - another notification is already showing");
                     return;
