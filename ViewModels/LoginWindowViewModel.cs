@@ -266,7 +266,7 @@ namespace AkademiTrack.ViewModels
                     IsActivated = true,
                     ActivatedAt = DateTime.UtcNow,
                     Email = associatedEmail, // Use the email from the database record
-                    ActivationKey = ActivationKey // Store for reference
+                    ActivationKey = ActivationKey // Store for remote verification
                 };
 
                 var json = JsonSerializer.Serialize(activationData, new JsonSerializerOptions { WriteIndented = true });

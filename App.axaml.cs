@@ -1,11 +1,16 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using AkademiTrack.ViewModels;
 using AkademiTrack.Views;
 using System;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace AkademiTrack
 {
@@ -20,11 +25,41 @@ namespace AkademiTrack
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Check if user is already activated synchronously to avoid binding issues
+                // Check if user is already activated synchronously first
                 bool isActivated = CheckActivationStatus();
                 if (isActivated)
                 {
-                    // User is activated, now check if tutorial should be shown
+                    // Start async verification without blocking
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var activationData = GetLocalActivationData();
+                            if (activationData != null && !string.IsNullOrEmpty(activationData.ActivationKey))
+                            {
+                                bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
+                                if (!keyStillExists)
+                                {
+                                    // Key doesn't exist anymore - delete local file and show login
+                                    DeleteActivationFile();
+                                    await Dispatcher.UIThread.InvokeAsync(() =>
+                                    {
+                                        desktop.MainWindow?.Close();
+                                        desktop.MainWindow = new LoginWindow();
+                                        desktop.MainWindow.Show();
+                                    });
+                                    return;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Remote verification error: {ex.Message}");
+                            // Continue with normal flow on error
+                        }
+                    });
+
+                    // Continue with normal activated flow
                     bool shouldShowTutorial = ShouldShowTutorial();
                     if (shouldShowTutorial)
                     {
@@ -92,6 +127,105 @@ namespace AkademiTrack
             }
         }
 
+        private ActivationData GetLocalActivationData()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string activationPath = Path.Combine(appDataDir, "activation.json");
+                if (File.Exists(activationPath))
+                {
+                    string json = File.ReadAllText(activationPath);
+                    return JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error reading activation data: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<bool> VerifyActivationKeyExists(string activationKey)
+        {
+            if (string.IsNullOrEmpty(activationKey))
+                return false;
+
+            HttpClient httpClient = null;
+            try
+            {
+                httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+
+                string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
+                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
+
+                var url = $"{supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}&select=id,is_activated";
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("apikey", supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
+                request.Headers.Add("Accept", "application/json");
+
+                System.Diagnostics.Debug.WriteLine($"Checking if activation key still exists: {activationKey}");
+
+                var response = await httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to check activation key - HTTP {response.StatusCode}");
+                    return true; // Assume valid on network errors
+                }
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var records = JsonSerializer.Deserialize<RemoteKeyRecord[]>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                });
+
+                bool exists = records?.Any(r => r.IsActivated) == true;
+                System.Diagnostics.Debug.WriteLine($"Key exists and is activated: {exists}");
+                return exists;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking activation key: {ex.Message}");
+                return true; // Assume valid on errors
+            }
+            finally
+            {
+                httpClient?.Dispose();
+            }
+        }
+
+        private void DeleteActivationFile()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string activationPath = Path.Combine(appDataDir, "activation.json");
+
+                if (File.Exists(activationPath))
+                {
+                    File.Delete(activationPath);
+                    System.Diagnostics.Debug.WriteLine("Activation file deleted - key no longer exists remotely");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error deleting activation file: {ex.Message}");
+            }
+        }
+
         private bool ShouldShowTutorial()
         {
             try
@@ -129,6 +263,15 @@ namespace AkademiTrack
         public bool IsActivated { get; set; }
         public DateTime ActivatedAt { get; set; }
         public string Email { get; set; }
+        public string ActivationKey { get; set; }
+    }
+
+    public class RemoteKeyRecord
+    {
+        public int Id { get; set; }
+
+        [JsonPropertyName("is_activated")]
+        public bool IsActivated { get; set; }
     }
 
     public class TutorialSettings
