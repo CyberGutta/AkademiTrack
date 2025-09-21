@@ -1058,6 +1058,20 @@ namespace AkademiTrack.ViewModels
                     if (cookiesValid)
                     {
                         LogSuccess("Eksisterende cookies er gyldige!");
+
+                        // Load parameters for valid cookies (cached or estimated)
+                        LogInfo("Laster parametere for gyldig cookie-økt...");
+                        _userParameters = await LoadValidParametersAsync();
+
+                        if (_userParameters == null || !_userParameters.IsComplete)
+                        {
+                            LogInfo("Ingen gyldige cached parametere - bruker estimerte verdier");
+                            _userParameters = EstimateUserParameters();
+                        }
+                        else
+                        {
+                            LogInfo($"Bruker cached parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                        }
                     }
                     else
                     {
@@ -1083,9 +1097,18 @@ namespace AkademiTrack.ViewModels
                     }
 
                     LogSuccess($"Fikk {cookies.Count} nye cookies");
+                    // Parameters are set in GetCookiesViaBrowserAsync via QuickParameterCapture
+                }
+
+                // Ensure we have parameters
+                if (_userParameters == null || !_userParameters.IsComplete)
+                {
+                    LogInfo("Mangler parametere - bruker fallback");
+                    _userParameters = EstimateUserParameters();
                 }
 
                 LogSuccess("Autentisering fullført - starter overvåkingssløyfe...");
+                LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
 
                 // Step 3: Start the monitoring loop with cached data
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
@@ -1326,11 +1349,11 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task QuickParameterCapture()
+        private async Task<UserParameters> QuickParameterCapture()
         {
             try
             {
-                if (!IsWebDriverValid(_webDriver)) return;
+                if (!IsWebDriverValid(_webDriver)) return null;
 
                 LogDebug("Fanger parametere fra nettverkstrafikk...");
 
@@ -1410,32 +1433,33 @@ namespace AkademiTrack.ViewModels
                     resultDict.ContainsKey("planperi") &&
                     resultDict.ContainsKey("skoleid"))
                 {
-                    _userParameters = new UserParameters
+                    var parameters = new UserParameters
                     {
                         FylkeId = resultDict["fylkeid"]?.ToString(),
                         PlanPeri = resultDict["planperi"]?.ToString(),
                         SkoleId = resultDict["skoleid"]?.ToString()
                     };
 
-                    LogSuccess($"Fanget parametere fra nettverkstrafikk: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                    LogSuccess($"Fanget parametere fra nettverkstrafikk: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+
+                    // Save the captured parameters
+                    await SaveParametersAsync(parameters);
+
+                    // Set the class field
+                    _userParameters = parameters;
+
+                    return parameters;
                 }
                 else
                 {
-                    LogDebug("Ingen nettverkstrafikk funnet med parametere - bruker fallback");
-                    _userParameters = new UserParameters
-                    {
-                        FylkeId = "00",
-                        PlanPeri = GetCurrentSchoolYear(),
-                        SkoleId = "312"
-                    };
-                    LogInfo($"Bruker fallback parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                    LogDebug("Ingen nettverkstrafikk funnet med parametere");
+                    return null;
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Parameter capture feilet: {ex.Message}");
-                _userParameters = new UserParameters { FylkeId = "00", PlanPeri = GetCurrentSchoolYear(), SkoleId = "312" };
-                LogInfo($"Bruker emergency fallback parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                return null;
             }
         }
 
@@ -1447,187 +1471,6 @@ namespace AkademiTrack.ViewModels
             var schoolYearStart = now.Month >= 8 ? currentYear : currentYear - 1;
             return $"{schoolYearStart}-{(schoolYearStart + 1).ToString().Substring(2)}";
         }
-
-        private async Task<UserParameters> CaptureParametersInBackground()
-        {
-            try
-            {
-                if (!IsWebDriverValid(_webDriver))
-                {
-                    return null;
-                }
-
-                LogDebug("Venter på at siden laster API-kall...");
-
-                // Wait a bit for the page to settle after login
-                await Task.Delay(3000);
-
-                var jsExecutor = (IJavaScriptExecutor)_webDriver;
-
-                // Enhanced JavaScript that monitors network activity and page content
-                var script = @"
-            return new Promise((resolve) => {
-                try {
-                    let parameters = null;
-                    let attempts = 0;
-                    const maxAttempts = 10;
-                    
-                    function searchForParameters() {
-                        attempts++;
-                        
-                        // Method 1: Check performance entries for actual network requests
-                        if (window.performance && window.performance.getEntries) {
-                            const entries = window.performance.getEntries();
-                            for (let entry of entries) {
-                                if (entry.name && entry.name.includes('RESTFilter') && entry.name.includes('fylkeid')) {
-                                    const match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                                    if (match && match.length >= 4) {
-                                        parameters = {
-                                            fylkeid: match[1],
-                                            planperi: match[2],
-                                            skoleid: match[3]
-                                        };
-                                        resolve(parameters);
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Method 2: Search in page HTML and scripts
-                        const pageHtml = document.documentElement.outerHTML;
-                        let match = pageHtml.match(/RESTFilter[^;]*;fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                        if (match && match.length >= 4) {
-                            parameters = {
-                                fylkeid: match[1],
-                                planperi: match[2],
-                                skoleid: match[3]
-                            };
-                            resolve(parameters);
-                            return;
-                        }
-                        
-                        // Method 3: Look for individual parameter patterns
-                        const fylkeMatch = pageHtml.match(/[\'""]?fylkeid[\'""]?\s*[:=]\s*[\'""]?([0-9]+)/i);
-                        const planMatch = pageHtml.match(/[\'""]?planperi[\'""]?\s*[:=]\s*[\'""]?([0-9-]+)/i);
-                        const skoleMatch = pageHtml.match(/[\'""]?skoleid[\'""]?\s*[:=]\s*[\'""]?([0-9]+)/i);
-                        
-                        if (fylkeMatch && planMatch && skoleMatch) {
-                            parameters = {
-                                fylkeid: fylkeMatch[1],
-                                planperi: planMatch[1],
-                                skoleid: skoleMatch[1]
-                            };
-                            resolve(parameters);
-                            return;
-                        }
-                        
-                        // If not found and we haven't exceeded attempts, try again
-                        if (attempts < maxAttempts) {
-                            setTimeout(searchForParameters, 1000);
-                        } else {
-                            resolve(null);
-                        }
-                    }
-                    
-                    // Start searching immediately
-                    searchForParameters();
-                    
-                } catch (e) {
-                    console.error('Parameter capture error:', e);
-                    resolve(null);
-                }
-            });
-        ";
-
-                // Execute the script with timeout
-                var task = Task.Run(async () =>
-                {
-                    try
-                    {
-                        return jsExecutor.ExecuteAsyncScript(script);
-                    }
-                    catch
-                    {
-                        // Fallback to synchronous version
-                        return jsExecutor.ExecuteScript(@"
-                    try {
-                        var pageHtml = document.documentElement.outerHTML;
-                        var match = pageHtml.match(/RESTFilter[^;]*;fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                        if (match && match.length >= 4) {
-                            return {
-                                fylkeid: match[1],
-                                planperi: match[2],
-                                skoleid: match[3]
-                            };
-                        }
-                        return null;
-                    } catch (e) {
-                        return null;
-                    }
-                ");
-                    }
-                });
-
-                var result = await Task.WhenAny(task, Task.Delay(15000)); // 15 second timeout
-
-                if (result == task && task.Result is Dictionary<string, object> resultDict && resultDict.Count >= 3)
-                {
-                    var parameters = new UserParameters
-                    {
-                        FylkeId = resultDict["fylkeid"]?.ToString(),
-                        PlanPeri = resultDict["planperi"]?.ToString(),
-                        SkoleId = resultDict["skoleid"]?.ToString()
-                    };
-
-                    if (parameters.IsComplete)
-                    {
-                        LogDebug($"Fanget parametere fra nettverkstrafikk: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-                        return parameters;
-                    }
-                }
-
-                // If the above didn't work, try a simple refresh and check again
-                LogDebug("Oppdaterer side for å utløse flere API-kall...");
-                _webDriver.Navigate().Refresh();
-                await Task.Delay(3000);
-
-                // Simple synchronous check after refresh
-                var fallbackResult = jsExecutor.ExecuteScript(@"
-            try {
-                var html = document.documentElement.outerHTML;
-                var match = html.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                if (match) {
-                    return { fylkeid: match[1], planperi: match[2], skoleid: match[3] };
-                }
-                return null;
-            } catch (e) { return null; }
-        ");
-
-                if (fallbackResult is Dictionary<string, object> fallbackDict && fallbackDict.Count >= 3)
-                {
-                    var parameters = new UserParameters
-                    {
-                        FylkeId = fallbackDict["fylkeid"]?.ToString(),
-                        PlanPeri = fallbackDict["planperi"]?.ToString(),
-                        SkoleId = fallbackDict["skoleid"]?.ToString()
-                    };
-
-                    LogDebug($"Fanget parametere etter refresh: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-                    return parameters;
-                }
-
-                LogDebug("Kunne ikke fange parametere automatisk");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil ved automatisk parameter-fangst: {ex.Message}");
-                return null;
-            }
-        }
-
-
 
         private async Task<bool> WaitForTargetUrlAsync()
         {
@@ -2171,36 +2014,38 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                LogInfo("Ekstraherer brukerparametere...");
-                
-                // First, try to extract parameters from browser if available
+                LogDebug("Sjekker cached parametere...");
+
+                // First, try to load valid cached parameters
+                var cachedParams = await LoadValidParametersAsync();
+                if (cachedParams != null && cachedParams.IsComplete)
+                {
+                    LogInfo("Bruker gyldige cached parametere (mindre enn 24 timer gamle)");
+                    return cachedParams;
+                }
+
+                // If no valid cache, check if we have a browser session to extract from
                 if (IsWebDriverValid(_webDriver))
                 {
-                    var browserParams = await ExtractParametersFromBrowserAsync();
-                    if (browserParams != null && browserParams.IsComplete)
+                    LogInfo("Ingen gyldige cached parametere - utvinne fra nettleser...");
+                    var extractedParams = await QuickParameterCapture();
+
+                    if (extractedParams != null && extractedParams.IsComplete)
                     {
-                        LogSuccess("Fant parametere fra nettleser!");
-                        await SaveUserParametersAsync(browserParams);
-                        return browserParams;
+                        LogSuccess("Fant nye parametere fra nettleser - lagrer for fremtidig bruk");
+                        await SaveParametersAsync(extractedParams);
+                        return extractedParams;
                     }
                 }
-                
-                // If that fails, check if we have saved parameters from before
-                var savedParams = await LoadSavedParametersAsync();
-                if (savedParams != null && savedParams.IsComplete)
-                {
-                    LogInfo("Bruker lagrede parametere fra tidligere økt");
-                    return savedParams;
-                }
-                
-                // If all else fails, try to make educated guesses
-                LogInfo("Estimerer parametere basert på vanlige mønstre");
+
+                // If all else fails, use fallback but try to use cached school year
+                LogInfo("Bruker estimerte parametere");
                 return EstimateUserParameters();
             }
             catch (Exception ex)
             {
-                LogError($"Kunne ikke ekstraktere brukerparametere: {ex.Message}");
-                return null;
+                LogError($"Feil ved parameterhåndtering: {ex.Message}");
+                return EstimateUserParameters();
             }
         }
 
@@ -2394,19 +2239,84 @@ namespace AkademiTrack.ViewModels
             return Path.Combine(appDataDir, "user_parameters.json");
         }
 
-        private async Task SaveUserParametersAsync(UserParameters parameters)
+        private async Task<UserParameters> LoadValidParametersAsync()
         {
             try
             {
-                var json = JsonSerializer.Serialize(parameters, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(GetUserParametersFilePath(), json);
-                LogDebug("Brukerparametere lagret for fremtidig bruk");
+                var filePath = GetUserParametersFilePath();
+                if (!File.Exists(filePath))
+                {
+                    LogDebug("Ingen lagrede parametere funnet");
+                    return null;
+                }
+
+                var json = await File.ReadAllTextAsync(filePath);
+                var savedData = JsonSerializer.Deserialize<SavedParameterData>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (savedData?.Parameters == null)
+                {
+                    LogDebug("Ugyldig parameterdata");
+                    return null;
+                }
+
+                // Check if parameters are still valid (less than 24 hours old)
+                var age = DateTime.Now - savedData.SavedAt;
+                if (age.TotalHours > 24)
+                {
+                    LogInfo($"Lagrede parametere er {age.TotalHours:F1} timer gamle - for gamle å bruke");
+                    File.Delete(filePath); // Clean up old file
+                    return null;
+                }
+
+                LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalHours:F1} timer)");
+                LogDebug($"Parametere: fylkeid={savedData.Parameters.FylkeId}, planperi={savedData.Parameters.PlanPeri}, skoleid={savedData.Parameters.SkoleId}");
+
+                return savedData.Parameters;
             }
             catch (Exception ex)
             {
-                LogDebug($"Kunne ikke lagre brukerparametere: {ex.Message}");
+                LogDebug($"Feil ved lasting av parametere: {ex.Message}");
+                return null;
             }
         }
+
+        private async Task SaveParametersAsync(UserParameters parameters)
+        {
+            try
+            {
+                if (parameters == null || !parameters.IsComplete)
+                {
+                    LogDebug("Kan ikke lagre ufullstendige parametere");
+                    return;
+                }
+
+                var saveData = new SavedParameterData
+                {
+                    Parameters = parameters,
+                    SavedAt = DateTime.Now
+                };
+
+                var json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(GetUserParametersFilePath(), json);
+
+                LogDebug($"Lagret parametere med timestamp: {saveData.SavedAt}");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Kunne ikke lagre parametere: {ex.Message}");
+            }
+        }
+
+        public class SavedParameterData
+        {
+            public UserParameters Parameters { get; set; }
+            public DateTime SavedAt { get; set; }
+        }
+
+
 
         private async Task<UserParameters> LoadSavedParametersAsync()
         {
