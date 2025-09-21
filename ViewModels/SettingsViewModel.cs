@@ -8,10 +8,12 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Win32;
 
 namespace AkademiTrack.ViewModels
 {
@@ -20,7 +22,320 @@ namespace AkademiTrack.ViewModels
     {
         public bool ShowActivityLog { get; set; } = false; // Hidden by default
         public bool ShowDetailedLogs { get; set; } = true;
+        public bool StartWithSystem { get; set; } = true; // Default on
         public DateTime LastUpdated { get; set; } = DateTime.Now;
+    }
+
+    // Auto-start manager for cross-platform support
+    public static class AutoStartManager
+    {
+        private static readonly string AppName = "AkademiTrack";
+
+        public static bool IsAutoStartEnabled()
+        {
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return IsAutoStartEnabledWindows();
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    return IsAutoStartEnabledMacOS();
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    return IsAutoStartEnabledLinux();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking auto-start status: {ex.Message}");
+            }
+            return false;
+        }
+
+        public static bool SetAutoStart(bool enable)
+        {
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return SetAutoStartWindows(enable);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    return SetAutoStartMacOS(enable);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    return SetAutoStartLinux(enable);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error setting auto-start: {ex.Message}");
+            }
+            return false;
+        }
+
+        // Windows implementation
+        private static bool IsAutoStartEnabledWindows()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
+                var value = key?.GetValue(AppName)?.ToString();
+                Debug.WriteLine($"Registry value for {AppName}: {value}");
+                return !string.IsNullOrEmpty(value);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking Windows auto-start: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool SetAutoStartWindows(bool enable)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
+                if (key == null)
+                {
+                    Debug.WriteLine("Could not open registry key for writing");
+                    return false;
+                }
+
+                if (enable)
+                {
+                    var exePath = GetExecutablePath();
+                    Debug.WriteLine($"Setting auto-start with path: {exePath}");
+
+                    if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                    {
+                        Debug.WriteLine($"Executable not found at: {exePath}");
+                        return false;
+                    }
+
+                    key.SetValue(AppName, $"\"{exePath}\"", RegistryValueKind.String);
+                    Debug.WriteLine($"Registry entry created: {AppName} = \"{exePath}\"");
+                }
+                else
+                {
+                    key.DeleteValue(AppName, false);
+                    Debug.WriteLine($"Registry entry deleted: {AppName}");
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error setting Windows auto-start: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static string GetExecutablePath()
+        {
+            try
+            {
+                // Get the current process executable path
+                var processPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath))
+                {
+                    Debug.WriteLine($"Using process path: {processPath}");
+                    return processPath;
+                }
+
+                // Fallback to assembly location
+                var assemblyLocation = Assembly.GetExecutingAssembly().Location;
+                Debug.WriteLine($"Assembly location: {assemblyLocation}");
+
+                if (assemblyLocation.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to find the executable in the same directory
+                    var directory = Path.GetDirectoryName(assemblyLocation);
+                    var fileName = Path.GetFileNameWithoutExtension(assemblyLocation);
+                    var exePath = Path.Combine(directory!, $"{fileName}.exe");
+
+                    if (File.Exists(exePath))
+                    {
+                        Debug.WriteLine($"Found executable: {exePath}");
+                        return exePath;
+                    }
+
+                    // Try common executable names
+                    var commonNames = new[] { "AkademiTrack.exe", "AkademiTrack", $"{fileName}.exe" };
+                    foreach (var name in commonNames)
+                    {
+                        var testPath = Path.Combine(directory!, name);
+                        if (File.Exists(testPath))
+                        {
+                            Debug.WriteLine($"Found executable with common name: {testPath}");
+                            return testPath;
+                        }
+                    }
+                }
+
+                return assemblyLocation;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting executable path: {ex.Message}");
+                return Assembly.GetExecutingAssembly().Location;
+            }
+        }
+
+        // macOS implementation
+        private static bool IsAutoStartEnabledMacOS()
+        {
+            var plistPath = GetMacOSPlistPath();
+            return File.Exists(plistPath);
+        }
+
+        private static bool SetAutoStartMacOS(bool enable)
+        {
+            var plistPath = GetMacOSPlistPath();
+            var launchAgentsDir = Path.GetDirectoryName(plistPath);
+
+            if (enable)
+            {
+                // Create LaunchAgents directory if it doesn't exist
+                if (!Directory.Exists(launchAgentsDir))
+                {
+                    Directory.CreateDirectory(launchAgentsDir!);
+                }
+
+                var exePath = Assembly.GetExecutingAssembly().Location;
+                if (exePath.EndsWith(".dll"))
+                {
+                    // For .NET applications on macOS
+                    var appDir = Path.GetDirectoryName(exePath);
+                    var appName = Path.GetFileNameWithoutExtension(exePath);
+                    exePath = Path.Combine(appDir!, appName);
+                }
+
+                var plistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+    <key>Label</key>
+    <string>com.akademitrack.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{exePath}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>";
+
+                File.WriteAllText(plistPath, plistContent);
+
+                // Load the plist
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "launchctl",
+                    Arguments = $"load \"{plistPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
+            else
+            {
+                if (File.Exists(plistPath))
+                {
+                    // Unload the plist
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "launchctl",
+                        Arguments = $"unload \"{plistPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+
+                    File.Delete(plistPath);
+                }
+            }
+            return true;
+        }
+
+        private static string GetMacOSPlistPath()
+        {
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(homeDir, "Library", "LaunchAgents", "com.akademitrack.app.plist");
+        }
+
+        // Linux implementation
+        private static bool IsAutoStartEnabledLinux()
+        {
+            var desktopFilePath = GetLinuxDesktopFilePath();
+            return File.Exists(desktopFilePath);
+        }
+
+        private static bool SetAutoStartLinux(bool enable)
+        {
+            var desktopFilePath = GetLinuxDesktopFilePath();
+            var autostartDir = Path.GetDirectoryName(desktopFilePath);
+
+            if (enable)
+            {
+                // Create autostart directory if it doesn't exist
+                if (!Directory.Exists(autostartDir))
+                {
+                    Directory.CreateDirectory(autostartDir!);
+                }
+
+                var exePath = Assembly.GetExecutingAssembly().Location;
+                if (exePath.EndsWith(".dll"))
+                {
+                    // For .NET applications on Linux, use dotnet to run
+                    exePath = $"dotnet \"{exePath}\"";
+                }
+                else
+                {
+                    exePath = $"\"{exePath}\"";
+                }
+
+                var desktopContent = $@"[Desktop Entry]
+Type=Application
+Name={AppName}
+Exec={exePath}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Comment=AkademiTrack automatisk fremmøte registerings program
+";
+
+                File.WriteAllText(desktopFilePath, desktopContent);
+
+                // Make the file executable
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{desktopFilePath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
+            else
+            {
+                if (File.Exists(desktopFilePath))
+                {
+                    File.Delete(desktopFilePath);
+                }
+            }
+            return true;
+        }
+
+        private static string GetLinuxDesktopFilePath()
+        {
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var configDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") ?? Path.Combine(homeDir, ".config");
+            return Path.Combine(configDir, "autostart", $"{AppName}.desktop");
+        }
     }
 
     // Converters
@@ -163,6 +478,7 @@ namespace AkademiTrack.ViewModels
     {
         private bool _showActivityLog = false; // Hidden by default
         private bool _showDetailedLogs = true;
+        private bool _startWithSystem = true; // Default on
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
 
@@ -175,6 +491,7 @@ namespace AkademiTrack.ViewModels
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand ToggleActivityLogCommand { get; }
+        public ICommand ToggleAutoStartCommand { get; }
 
         // This is what the UI binds to
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
@@ -208,6 +525,42 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        public bool StartWithSystem
+        {
+            get => _startWithSystem;
+            set
+            {
+                if (_startWithSystem != value)
+                {
+                    Debug.WriteLine($"StartWithSystem changing from {_startWithSystem} to {value}");
+                    _startWithSystem = value;
+                    OnPropertyChanged();
+
+                    // Apply the auto-start setting immediately
+                    var success = AutoStartManager.SetAutoStart(value);
+                    Debug.WriteLine($"Auto-start setting result: {success}");
+
+                    if (!success)
+                    {
+                        // If setting auto-start failed, revert the UI
+                        Debug.WriteLine("Auto-start setting failed, reverting UI");
+                        _startWithSystem = !value;
+                        OnPropertyChanged();
+
+                        // You might want to show an error message to the user here
+                        Debug.WriteLine("Failed to update auto-start setting");
+                        return;
+                    }
+
+                    // Verify the setting was applied
+                    var actualState = AutoStartManager.IsAutoStartEnabled();
+                    Debug.WriteLine($"Verified auto-start state: {actualState}");
+
+                    _ = SaveSettingsAsync(); // Save settings when changed
+                }
+            }
+        }
+
         public SettingsViewModel()
         {
             ApplicationInfo = new ApplicationInfo();
@@ -216,6 +569,7 @@ namespace AkademiTrack.ViewModels
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
+            ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
 
             // Load settings on initialization
             _ = LoadSettingsAsync();
@@ -262,6 +616,11 @@ namespace AkademiTrack.ViewModels
         private void ToggleActivityLog()
         {
             ShowActivityLog = !ShowActivityLog;
+        }
+
+        private void ToggleAutoStart()
+        {
+            StartWithSystem = !StartWithSystem;
         }
 
         private void CloseWindow()
@@ -323,12 +682,26 @@ namespace AkademiTrack.ViewModels
                     {
                         _showActivityLog = settings.ShowActivityLog;
                         _showDetailedLogs = settings.ShowDetailedLogs;
+                        _startWithSystem = settings.StartWithSystem;
 
                         // Notify UI of changes
                         OnPropertyChanged(nameof(ShowActivityLog));
                         OnPropertyChanged(nameof(ShowDetailedLogs));
+                        OnPropertyChanged(nameof(StartWithSystem));
 
                         RefreshDisplayedLogs();
+
+                        // Sync the auto-start setting with the system on load
+                        // This ensures the system setting matches our saved preference
+                        _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
+                    }
+                }
+                else
+                {
+                    // First time running - set up auto-start if enabled by default
+                    if (_startWithSystem)
+                    {
+                        _ = Task.Run(() => AutoStartManager.SetAutoStart(true));
                     }
                 }
             }
@@ -355,6 +728,7 @@ namespace AkademiTrack.ViewModels
                 {
                     ShowActivityLog = _showActivityLog,
                     ShowDetailedLogs = _showDetailedLogs,
+                    StartWithSystem = _startWithSystem,
                     LastUpdated = DateTime.Now
                 };
 

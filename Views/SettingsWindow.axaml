@@ -59,6 +59,62 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
+
+		<!-- Auto Start Toggle Button Style -->
+		<Style Selector="Button.autostart-toggle">
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="MinWidth" Value="160"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}"
+                            BorderThickness="0"
+                            BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+                                         Content="{TemplateBinding Content}"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         TextBlock.Foreground="{TemplateBinding Foreground}"
+                                         TextBlock.FontWeight="{TemplateBinding FontWeight}"
+                                         TextBlock.FontSize="{TemplateBinding FontSize}"
+                                         TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="Button.autostart-toggle:pointerover /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+		<Style Selector="Button.autostart-toggle:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<!-- Auto Start Enabled -->
+		<Style Selector="Button.autostart-toggle.enabled">
+			<Setter Property="Background" Value="#28A745"/>
+		</Style>
+		<Style Selector="Button.autostart-toggle.enabled:pointerover /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#218838"/>
+		</Style>
+
+		<!-- Auto Start Disabled -->
+		<Style Selector="Button.autostart-toggle.disabled">
+			<Setter Property="Background" Value="#DC3545"/>
+		</Style>
+		<Style Selector="Button.autostart-toggle.disabled:pointerover /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#C82333"/>
+		</Style>
+
 		<!-- Cancel/Close Button Style -->
 		<Style Selector="Button.cancel">
 			<Setter Property="Background" Value="#6C757D"/>
@@ -220,6 +276,27 @@
 		<!-- Left Column - Settings -->
 		<ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,20,0">
 			<StackPanel Spacing="16">
+				<!-- System Integration Section -->
+				<TextBlock Text="Systemintegrasjon" Classes="section-header"/>
+
+				<!-- Auto-Start Setting -->
+				<Border Classes="setting-item">
+					<StackPanel Spacing="8">
+						<TextBlock Text="Start med PC" Classes="setting-title"/>
+						<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp. Anbefalt for kontinuerlig fremmøteregistrering."
+								Classes="setting-description"/>
+						<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Slå På|Slå Av'}"
+								Classes="autostart-toggle"
+								Classes.enabled="{Binding StartWithSystem}"
+								Classes.disabled="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='True|False'}"
+								Command="{Binding ToggleAutoStartCommand}"
+								ToolTip.Tip="Slår på/av automatisk oppstart med systemet"
+								FontSize="14"
+								MinWidth="160"
+								Padding="20,12"/>
+					</StackPanel>
+				</Border>
+
 				<!-- File Management Section -->
 				<TextBlock Text="Filbehandling" Classes="section-header"/>
 				<!-- Open Program Folder Setting -->
@@ -298,7 +375,7 @@
 					<StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 Spacing="8">
-						
+
 						<Button Content="Fjern Logger"
                                 Classes="log-control"
                                 Command="{Binding ClearLogsCommand}"
