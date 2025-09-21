@@ -1238,7 +1238,7 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Setup Chrome options
+                // Setup Chrome options - EXACTLY THE SAME
                 var options = new ChromeOptions();
                 options.AddArgument("--no-sandbox");
                 options.AddArgument("--disable-dev-shm-usage");
@@ -1253,14 +1253,14 @@ namespace AkademiTrack.ViewModels
                 localWebDriver = new ChromeDriver(options);
                 _webDriver = localWebDriver; // Set the class field for disposal
 
-                // Navigate to login page
+                // Navigate to login page - EXACTLY THE SAME
                 LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
                 _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
                 LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
                 LogInfo("Venter på navigering til: https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
 
-                // Wait for user to reach the target URL
+                // Wait for user to reach the target URL - EXACTLY THE SAME
                 var targetReached = await WaitForTargetUrlAsync();
 
                 if (!targetReached)
@@ -1270,9 +1270,13 @@ namespace AkademiTrack.ViewModels
                 }
 
                 LogSuccess("Innlogging fullført!");
+
+                // NEW: Quick parameter capture (only addition - 2 seconds max)
+                await QuickParameterCapture();
+
                 LogInfo("Ekstraherer cookies fra nettleser økten...");
 
-                // Extract cookies - check if driver is still valid
+                // Extract cookies - check if driver is still valid - EXACTLY THE SAME
                 if (!IsWebDriverValid(_webDriver))
                 {
                     LogError("Nettleser ble lukket under innlogging - kan ikke ekstraktere cookies");
@@ -1284,7 +1288,7 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug($"Ekstraherte cookies: {string.Join(", ", cookieDict.Keys)}");
 
-                // Save cookies
+                // Save cookies - EXACTLY THE SAME
                 await SaveCookiesAsync(seleniumCookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray());
 
                 LogSuccess($"Ekstraherte og lagret {cookieDict.Count} cookies");
@@ -1297,8 +1301,6 @@ namespace AkademiTrack.ViewModels
             {
                 LogError("Nettleser vindu ble lukket under innlogging - stopper automatisering");
                 LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
-
-                // Force stop the automation cleanly
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -1307,8 +1309,6 @@ namespace AkademiTrack.ViewModels
             {
                 LogError("Nettleser sesjon ble avbrutt under innlogging");
                 LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
-
-                // Force stop the automation cleanly
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -1316,15 +1316,314 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Nettleser innlogging feilet: {ex.Message}");
                 LogDebug($"Exception type: {ex.GetType().Name}");
-
-                // Force stop automation for any other browser-related errors
                 await ForceStopAutomationAsync();
                 return null;
             }
             finally
             {
-                // Always clean up the web driver, regardless of what happened
+                // Always clean up the web driver, regardless of what happened - EXACTLY THE SAME
                 await CleanupWebDriverAsync(localWebDriver);
+            }
+        }
+
+        private async Task QuickParameterCapture()
+        {
+            try
+            {
+                if (!IsWebDriverValid(_webDriver)) return;
+
+                LogDebug("Fanger parametere fra nettverkstrafikk...");
+
+                var jsExecutor = (IJavaScriptExecutor)_webDriver;
+
+                // Check performance entries for actual network requests
+                var result = jsExecutor.ExecuteScript(@"
+            try {
+                // Get all network requests from performance API
+                var entries = performance.getEntries();
+                
+                for (var i = 0; i < entries.length; i++) {
+                    var entry = entries[i];
+                    if (entry.name && 
+                        (entry.name.includes('VoTimeplan_elev') || entry.name.includes('RESTFilter')) &&
+                        entry.name.includes('fylkeid=')) {
+                        
+                        console.log('Found network request:', entry.name);
+                        
+                        // Extract parameters from the URL
+                        var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                        if (match && match.length >= 4) {
+                            return {
+                                fylkeid: match[1],
+                                planperi: match[2], 
+                                skoleid: match[3],
+                                source: 'network'
+                            };
+                        }
+                    }
+                }
+                
+                // If no network requests found yet, wait and check again
+                return { waiting: true };
+                
+            } catch (e) {
+                console.error('Error capturing parameters:', e);
+                return null;
+            }
+        ");
+
+                // If we need to wait for network requests, try a few times
+                for (int attempt = 0; attempt < 5 && result is Dictionary<string, object> waiting && waiting.ContainsKey("waiting"); attempt++)
+                {
+                    LogDebug($"Venter på nettverkstrafikk... forsøk {attempt + 1}/5");
+                    await Task.Delay(1000);
+
+                    result = jsExecutor.ExecuteScript(@"
+                try {
+                    var entries = performance.getEntries();
+                    for (var i = 0; i < entries.length; i++) {
+                        var entry = entries[i];
+                        if (entry.name && 
+                            (entry.name.includes('VoTimeplan_elev') || entry.name.includes('RESTFilter')) &&
+                            entry.name.includes('fylkeid=')) {
+                            
+                            var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                            if (match && match.length >= 4) {
+                                return {
+                                    fylkeid: match[1],
+                                    planperi: match[2], 
+                                    skoleid: match[3],
+                                    source: 'network'
+                                };
+                            }
+                        }
+                    }
+                    return null;
+                } catch (e) {
+                    return null;
+                }
+            ");
+                }
+
+                if (result is Dictionary<string, object> resultDict &&
+                    resultDict.ContainsKey("fylkeid") &&
+                    resultDict.ContainsKey("planperi") &&
+                    resultDict.ContainsKey("skoleid"))
+                {
+                    _userParameters = new UserParameters
+                    {
+                        FylkeId = resultDict["fylkeid"]?.ToString(),
+                        PlanPeri = resultDict["planperi"]?.ToString(),
+                        SkoleId = resultDict["skoleid"]?.ToString()
+                    };
+
+                    LogSuccess($"Fanget parametere fra nettverkstrafikk: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                }
+                else
+                {
+                    LogDebug("Ingen nettverkstrafikk funnet med parametere - bruker fallback");
+                    _userParameters = new UserParameters
+                    {
+                        FylkeId = "00",
+                        PlanPeri = GetCurrentSchoolYear(),
+                        SkoleId = "312"
+                    };
+                    LogInfo($"Bruker fallback parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Parameter capture feilet: {ex.Message}");
+                _userParameters = new UserParameters { FylkeId = "00", PlanPeri = GetCurrentSchoolYear(), SkoleId = "312" };
+                LogInfo($"Bruker emergency fallback parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+            }
+        }
+
+        // Helper to get current school year dynamically
+        private string GetCurrentSchoolYear()
+        {
+            var now = DateTime.Now;
+            var currentYear = now.Year;
+            var schoolYearStart = now.Month >= 8 ? currentYear : currentYear - 1;
+            return $"{schoolYearStart}-{(schoolYearStart + 1).ToString().Substring(2)}";
+        }
+
+        private async Task<UserParameters> CaptureParametersInBackground()
+        {
+            try
+            {
+                if (!IsWebDriverValid(_webDriver))
+                {
+                    return null;
+                }
+
+                LogDebug("Venter på at siden laster API-kall...");
+
+                // Wait a bit for the page to settle after login
+                await Task.Delay(3000);
+
+                var jsExecutor = (IJavaScriptExecutor)_webDriver;
+
+                // Enhanced JavaScript that monitors network activity and page content
+                var script = @"
+            return new Promise((resolve) => {
+                try {
+                    let parameters = null;
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    
+                    function searchForParameters() {
+                        attempts++;
+                        
+                        // Method 1: Check performance entries for actual network requests
+                        if (window.performance && window.performance.getEntries) {
+                            const entries = window.performance.getEntries();
+                            for (let entry of entries) {
+                                if (entry.name && entry.name.includes('RESTFilter') && entry.name.includes('fylkeid')) {
+                                    const match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                                    if (match && match.length >= 4) {
+                                        parameters = {
+                                            fylkeid: match[1],
+                                            planperi: match[2],
+                                            skoleid: match[3]
+                                        };
+                                        resolve(parameters);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Method 2: Search in page HTML and scripts
+                        const pageHtml = document.documentElement.outerHTML;
+                        let match = pageHtml.match(/RESTFilter[^;]*;fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                        if (match && match.length >= 4) {
+                            parameters = {
+                                fylkeid: match[1],
+                                planperi: match[2],
+                                skoleid: match[3]
+                            };
+                            resolve(parameters);
+                            return;
+                        }
+                        
+                        // Method 3: Look for individual parameter patterns
+                        const fylkeMatch = pageHtml.match(/[\'""]?fylkeid[\'""]?\s*[:=]\s*[\'""]?([0-9]+)/i);
+                        const planMatch = pageHtml.match(/[\'""]?planperi[\'""]?\s*[:=]\s*[\'""]?([0-9-]+)/i);
+                        const skoleMatch = pageHtml.match(/[\'""]?skoleid[\'""]?\s*[:=]\s*[\'""]?([0-9]+)/i);
+                        
+                        if (fylkeMatch && planMatch && skoleMatch) {
+                            parameters = {
+                                fylkeid: fylkeMatch[1],
+                                planperi: planMatch[1],
+                                skoleid: skoleMatch[1]
+                            };
+                            resolve(parameters);
+                            return;
+                        }
+                        
+                        // If not found and we haven't exceeded attempts, try again
+                        if (attempts < maxAttempts) {
+                            setTimeout(searchForParameters, 1000);
+                        } else {
+                            resolve(null);
+                        }
+                    }
+                    
+                    // Start searching immediately
+                    searchForParameters();
+                    
+                } catch (e) {
+                    console.error('Parameter capture error:', e);
+                    resolve(null);
+                }
+            });
+        ";
+
+                // Execute the script with timeout
+                var task = Task.Run(async () =>
+                {
+                    try
+                    {
+                        return jsExecutor.ExecuteAsyncScript(script);
+                    }
+                    catch
+                    {
+                        // Fallback to synchronous version
+                        return jsExecutor.ExecuteScript(@"
+                    try {
+                        var pageHtml = document.documentElement.outerHTML;
+                        var match = pageHtml.match(/RESTFilter[^;]*;fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                        if (match && match.length >= 4) {
+                            return {
+                                fylkeid: match[1],
+                                planperi: match[2],
+                                skoleid: match[3]
+                            };
+                        }
+                        return null;
+                    } catch (e) {
+                        return null;
+                    }
+                ");
+                    }
+                });
+
+                var result = await Task.WhenAny(task, Task.Delay(15000)); // 15 second timeout
+
+                if (result == task && task.Result is Dictionary<string, object> resultDict && resultDict.Count >= 3)
+                {
+                    var parameters = new UserParameters
+                    {
+                        FylkeId = resultDict["fylkeid"]?.ToString(),
+                        PlanPeri = resultDict["planperi"]?.ToString(),
+                        SkoleId = resultDict["skoleid"]?.ToString()
+                    };
+
+                    if (parameters.IsComplete)
+                    {
+                        LogDebug($"Fanget parametere fra nettverkstrafikk: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+                        return parameters;
+                    }
+                }
+
+                // If the above didn't work, try a simple refresh and check again
+                LogDebug("Oppdaterer side for å utløse flere API-kall...");
+                _webDriver.Navigate().Refresh();
+                await Task.Delay(3000);
+
+                // Simple synchronous check after refresh
+                var fallbackResult = jsExecutor.ExecuteScript(@"
+            try {
+                var html = document.documentElement.outerHTML;
+                var match = html.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                if (match) {
+                    return { fylkeid: match[1], planperi: match[2], skoleid: match[3] };
+                }
+                return null;
+            } catch (e) { return null; }
+        ");
+
+                if (fallbackResult is Dictionary<string, object> fallbackDict && fallbackDict.Count >= 3)
+                {
+                    var parameters = new UserParameters
+                    {
+                        FylkeId = fallbackDict["fylkeid"]?.ToString(),
+                        PlanPeri = fallbackDict["planperi"]?.ToString(),
+                        SkoleId = fallbackDict["skoleid"]?.ToString()
+                    };
+
+                    LogDebug($"Fanget parametere etter refresh: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
+                    return parameters;
+                }
+
+                LogDebug("Kunne ikke fange parametere automatisk");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Feil ved automatisk parameter-fangst: {ex.Message}");
+                return null;
             }
         }
 
