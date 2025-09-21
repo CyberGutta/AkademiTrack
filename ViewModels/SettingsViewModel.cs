@@ -275,10 +275,14 @@ namespace AkademiTrack.ViewModels
             return File.Exists(desktopFilePath);
         }
 
+        // Improved Linux implementation with better debugging and path handling
         private static bool SetAutoStartLinux(bool enable)
         {
             var desktopFilePath = GetLinuxDesktopFilePath();
             var autostartDir = Path.GetDirectoryName(desktopFilePath);
+
+            Debug.WriteLine($"Desktop file path: {desktopFilePath}");
+            Debug.WriteLine($"Autostart directory: {autostartDir}");
 
             if (enable)
             {
@@ -286,18 +290,11 @@ namespace AkademiTrack.ViewModels
                 if (!Directory.Exists(autostartDir))
                 {
                     Directory.CreateDirectory(autostartDir!);
+                    Debug.WriteLine($"Created autostart directory: {autostartDir}");
                 }
 
-                var exePath = Assembly.GetExecutingAssembly().Location;
-                if (exePath.EndsWith(".dll"))
-                {
-                    // For .NET applications on Linux, use dotnet to run
-                    exePath = $"dotnet \"{exePath}\"";
-                }
-                else
-                {
-                    exePath = $"\"{exePath}\"";
-                }
+                var exePath = GetLinuxExecutablePath();
+                Debug.WriteLine($"Executable path determined: {exePath}");
 
                 var desktopContent = $@"[Desktop Entry]
 Type=Application
@@ -306,28 +303,161 @@ Exec={exePath}
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
+StartupNotify=false
+Terminal=false
 Comment=AkademiTrack automatisk fremmøte registerings program
+Categories=Utility;
 ";
 
                 File.WriteAllText(desktopFilePath, desktopContent);
+                Debug.WriteLine($"Desktop file created with content:\n{desktopContent}");
 
                 // Make the file executable
-                Process.Start(new ProcessStartInfo
+                try
                 {
-                    FileName = "chmod",
-                    Arguments = $"+x \"{desktopFilePath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                });
+                    var chmodProcess = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "chmod",
+                        Arguments = $"+x \"{desktopFilePath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    });
+
+                    if (chmodProcess != null)
+                    {
+                        chmodProcess.WaitForExit();
+                        Debug.WriteLine($"chmod exit code: {chmodProcess.ExitCode}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error making desktop file executable: {ex.Message}");
+                }
+
+                // Verify the file was created and is readable
+                if (File.Exists(desktopFilePath))
+                {
+                    var fileInfo = new FileInfo(desktopFilePath);
+                    Debug.WriteLine($"Desktop file size: {fileInfo.Length} bytes");
+                    Debug.WriteLine($"Desktop file permissions: {GetFilePermissions(desktopFilePath)}");
+                }
             }
             else
             {
                 if (File.Exists(desktopFilePath))
                 {
                     File.Delete(desktopFilePath);
+                    Debug.WriteLine($"Desktop file deleted: {desktopFilePath}");
                 }
             }
             return true;
+        }
+
+        private static string GetLinuxExecutablePath()
+        {
+            try
+            {
+                // First try to get the actual process path
+                var processPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath))
+                {
+                    Debug.WriteLine($"Using process path: {processPath}");
+                    return $"\"{processPath}\"";
+                }
+
+                // Get assembly location
+                var assemblyLocation = Assembly.GetExecutingAssembly().Location;
+                Debug.WriteLine($"Assembly location: {assemblyLocation}");
+
+                if (assemblyLocation.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    // For .NET applications on Linux, we need to use dotnet
+                    var dotnetPath = GetDotnetPath();
+                    if (!string.IsNullOrEmpty(dotnetPath))
+                    {
+                        Debug.WriteLine($"Using dotnet: {dotnetPath}");
+                        return $"\"{dotnetPath}\" \"{assemblyLocation}\"";
+                    }
+                    else
+                    {
+                        Debug.WriteLine("dotnet not found in PATH, using default");
+                        return $"dotnet \"{assemblyLocation}\"";
+                    }
+                }
+                else
+                {
+                    // Direct executable
+                    return $"\"{assemblyLocation}\"";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting Linux executable path: {ex.Message}");
+                return $"dotnet \"{Assembly.GetExecutingAssembly().Location}\"";
+            }
+        }
+
+        private static string GetDotnetPath()
+        {
+            try
+            {
+                var whichProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "which",
+                    Arguments = "dotnet",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                });
+
+                if (whichProcess != null)
+                {
+                    whichProcess.WaitForExit();
+                    if (whichProcess.ExitCode == 0)
+                    {
+                        var output = whichProcess.StandardOutput.ReadToEnd().Trim();
+                        Debug.WriteLine($"Found dotnet at: {output}");
+                        return output;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error finding dotnet path: {ex.Message}");
+            }
+            return "";
+        }
+
+        private static string GetFilePermissions(string filePath)
+        {
+            try
+            {
+                var statProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "stat",
+                    Arguments = $"-c %a \"{filePath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                });
+
+                if (statProcess != null)
+                {
+                    statProcess.WaitForExit();
+                    if (statProcess.ExitCode == 0)
+                    {
+                        return statProcess.StandardOutput.ReadToEnd().Trim();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting file permissions: {ex.Message}");
+            }
+            return "unknown";
         }
 
         private static string GetLinuxDesktopFilePath()
