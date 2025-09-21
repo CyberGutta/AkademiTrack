@@ -1045,48 +1045,56 @@ namespace AkademiTrack.ViewModels
                 LogInfo("Starter automatisering...");
                 ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
-                // Step 1: Check if existing cookies work
+                Dictionary<string, string> cookies = null;
+                bool needsFreshLogin = false;
+
+                // Step 1: Check if existing cookies work and try to get parameters
                 LogDebug("Laster eksisterende cookies fra fil...");
-                var cookies = await LoadCookiesAsync();
-                bool cookiesValid = false;
+                cookies = await LoadCookiesAsync();
 
                 if (cookies != null)
                 {
                     LogInfo($"Fant {cookies.Count} eksisterende cookies, tester gyldighet...");
-                    cookiesValid = await TestCookiesAsync(cookies);
+                    bool cookiesValid = await TestCookiesAsync(cookies);
 
                     if (cookiesValid)
                     {
                         LogSuccess("Eksisterende cookies er gyldige!");
 
-                        // Load parameters for valid cookies (cached or estimated)
-                        LogInfo("Laster parametere for gyldig cookie-økt...");
-                        _userParameters = await LoadValidParametersAsync();
+                        try
+                        {
+                            // Try to get parameters for valid cookies
+                            LogInfo("Forsøker å laste parametere for gyldig cookie-økt...");
+                            _userParameters = await ExtractUserParametersAsync(cookies);
 
-                        if (_userParameters == null || !_userParameters.IsComplete)
-                        {
-                            LogInfo("Ingen gyldige cached parametere - bruker estimerte verdier");
-                            _userParameters = EstimateUserParameters();
+                            if (_userParameters != null && _userParameters.IsComplete)
+                            {
+                                LogSuccess($"Parametere lastet: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                            }
                         }
-                        else
+                        catch (InvalidOperationException)
                         {
-                            LogInfo($"Bruker cached parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
+                            LogInfo("Parametere krever ny innlogging - cookies slettet");
+                            needsFreshLogin = true;
+                            cookies = null;
                         }
                     }
                     else
                     {
                         LogInfo("Eksisterende cookies er ugyldige eller utløpt");
+                        needsFreshLogin = true;
                     }
                 }
                 else
                 {
                     LogInfo("Ingen eksisterende cookies funnet");
+                    needsFreshLogin = true;
                 }
 
-                // Step 2: If cookies don't work, get new ones via browser login
-                if (!cookiesValid)
+                // Step 2: Fresh login if needed (either no cookies or no valid parameters)
+                if (needsFreshLogin || cookies == null)
                 {
-                    LogInfo("Åpner nettleser for ny innlogging...");
+                    LogInfo("Åpner nettleser for ny innlogging og parameterinnhenting...");
 
                     cookies = await GetCookiesViaBrowserAsync();
 
@@ -1096,21 +1104,21 @@ namespace AkademiTrack.ViewModels
                         return;
                     }
 
-                    LogSuccess($"Fikk {cookies.Count} nye cookies");
-                    // Parameters are set in GetCookiesViaBrowserAsync via QuickParameterCapture
+                    LogSuccess($"Fikk {cookies.Count} nye cookies og oppdaterte parametere");
                 }
 
-                // Ensure we have parameters
+                // Ensure we have valid parameters
                 if (_userParameters == null || !_userParameters.IsComplete)
                 {
-                    LogInfo("Mangler parametere - bruker fallback");
-                    _userParameters = EstimateUserParameters();
+                    LogError("KRITISK: Mangler gyldige parametere etter innlogging");
+                    LogError("Dette bør ikke skje - sjekk parameter-capture logikk");
+                    return;
                 }
 
-                LogSuccess("Autentisering fullført - starter overvåkingssløyfe...");
+                LogSuccess("Autentisering og parametere fullført - starter overvåkingssløyfe...");
                 LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
 
-                // Step 3: Start the monitoring loop with cached data
+                // Step 3: Start monitoring with confirmed valid parameters
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
             }
             catch (OperationCanceledException)
@@ -1468,8 +1476,12 @@ namespace AkademiTrack.ViewModels
         {
             var now = DateTime.Now;
             var currentYear = now.Year;
+
+            
             var schoolYearStart = now.Month >= 8 ? currentYear : currentYear - 1;
-            return $"{schoolYearStart}-{(schoolYearStart + 1).ToString().Substring(2)}";
+            var schoolYearEnd = schoolYearStart + 1;
+
+            return $"{schoolYearStart}-{schoolYearEnd.ToString().Substring(2)}";
         }
 
         private async Task<bool> WaitForTargetUrlAsync()
@@ -2020,32 +2032,60 @@ namespace AkademiTrack.ViewModels
                 var cachedParams = await LoadValidParametersAsync();
                 if (cachedParams != null && cachedParams.IsComplete)
                 {
-                    LogInfo("Bruker gyldige cached parametere (mindre enn 24 timer gamle)");
+                    LogInfo($"Bruker gyldige cached parametere for skoleår {cachedParams.PlanPeri}");
                     return cachedParams;
                 }
 
-                // If no valid cache, check if we have a browser session to extract from
+                // If no valid cache and we have browser, extract from network
                 if (IsWebDriverValid(_webDriver))
                 {
-                    LogInfo("Ingen gyldige cached parametere - utvinne fra nettleser...");
+                    LogInfo("Ingen gyldige cached parametere - utvinner fra nettleser...");
                     var extractedParams = await QuickParameterCapture();
 
                     if (extractedParams != null && extractedParams.IsComplete)
                     {
-                        LogSuccess("Fant nye parametere fra nettleser - lagrer for fremtidig bruk");
+                        LogSuccess($"Fant nye parametere fra nettleser for skoleår {extractedParams.PlanPeri} - lagrer");
                         await SaveParametersAsync(extractedParams);
                         return extractedParams;
                     }
                 }
 
-                // If all else fails, use fallback but try to use cached school year
-                LogInfo("Bruker estimerte parametere");
-                return EstimateUserParameters();
+                // CRITICAL: If we reach here, we would need fallbacks - instead force fresh login
+                LogError("Kunne ikke finne gyldige parametere - fallback ikke tillatt");
+                LogError("Sletter cookies for å tvinge ny innlogging med parameterinnhenting");
+
+                // Delete cookies to force fresh browser login
+                await DeleteCookiesAsync();
+
+                throw new InvalidOperationException("Parameters required - forcing fresh login");
+            }
+            catch (InvalidOperationException)
+            {
+                throw; // Re-throw to trigger fresh login
             }
             catch (Exception ex)
             {
-                LogError($"Feil ved parameterhåndtering: {ex.Message}");
-                return EstimateUserParameters();
+                LogError($"Kritisk feil ved parameterhåndtering: {ex.Message}");
+                LogError("Tvinger ny innlogging for å sikre korrekte parametere");
+                await DeleteCookiesAsync();
+                throw new InvalidOperationException("Parameters required - forcing fresh login");
+            }
+        }
+
+        private async Task DeleteCookiesAsync()
+        {
+            try
+            {
+                var cookiesPath = GetCookiesFilePath();
+                if (File.Exists(cookiesPath))
+                {
+                    File.Delete(cookiesPath);
+                    LogDebug("Slettet cookies for å tvinge ny innlogging");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Kunne ikke slette cookies: {ex.Message}");
             }
         }
 
@@ -2262,24 +2302,37 @@ namespace AkademiTrack.ViewModels
                     return null;
                 }
 
-                // Check if parameters are still valid (less than 24 hours old)
                 var age = DateTime.Now - savedData.SavedAt;
-                if (age.TotalHours > 24)
+
+                // Check if parameters are still valid for current school year
+                if (!IsCurrentSchoolYear(savedData.Parameters.PlanPeri))
                 {
-                    LogInfo($"Lagrede parametere er {age.TotalHours:F1} timer gamle - for gamle å bruke");
+                    LogInfo($"Lagrede parametere er for gammelt skoleår ({savedData.Parameters.PlanPeri}) - trenger oppdatering");
                     File.Delete(filePath); // Clean up old file
                     return null;
                 }
 
-                LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalHours:F1} timer)");
+                LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalDays:F0} dager, skoleår: {savedData.Parameters.PlanPeri})");
                 LogDebug($"Parametere: fylkeid={savedData.Parameters.FylkeId}, planperi={savedData.Parameters.PlanPeri}, skoleid={savedData.Parameters.SkoleId}");
-
                 return savedData.Parameters;
             }
             catch (Exception ex)
             {
                 LogDebug($"Feil ved lasting av parametere: {ex.Message}");
                 return null;
+            }
+        }
+
+        private bool IsCurrentSchoolYear(string planPeri)
+        {
+            try
+            {
+                var currentSchoolYear = GetCurrentSchoolYear();
+                return planPeri == currentSchoolYear;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -2293,16 +2346,25 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
+                // Validate that we're saving parameters for current school year
+                var currentSchoolYear = GetCurrentSchoolYear();
+                if (parameters.PlanPeri != currentSchoolYear)
+                {
+                    LogInfo($"ADVARSEL: Lagrer parametere for skoleår {parameters.PlanPeri}, men nåværende skoleår er {currentSchoolYear}");
+                    LogInfo("Dette kan være normalt hvis du tester på slutten/begynnelsen av skoleåret");
+                }
+
                 var saveData = new SavedParameterData
                 {
                     Parameters = parameters,
-                    SavedAt = DateTime.Now
+                    SavedAt = DateTime.Now,
+                    SchoolYear = parameters.PlanPeri
                 };
 
                 var json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(GetUserParametersFilePath(), json);
 
-                LogDebug($"Lagret parametere med timestamp: {saveData.SavedAt}");
+                LogSuccess($"Lagret parametere for skoleår {parameters.PlanPeri} med timestamp: {saveData.SavedAt}");
             }
             catch (Exception ex)
             {
@@ -2314,6 +2376,7 @@ namespace AkademiTrack.ViewModels
         {
             public UserParameters Parameters { get; set; }
             public DateTime SavedAt { get; set; }
+            public string SchoolYear { get; set; } // Track which school year these parameters are for
         }
 
 
