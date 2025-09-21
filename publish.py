@@ -10,8 +10,9 @@ def create_avalonia_macos_bundle():
     PROJECT_PATH = "./AkademiTrack.csproj"
     BUILD_DIR = "./build"
     APP_NAME = "AkademiTrack"
-    BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"  # Change this to your actual identifier
-    ICON_PATH = "./Assets/AT-Transparrent72.png"  # Your logo
+    BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
+    # Fixed: Use the high-resolution .icns file
+    ICON_PATH = "./Assets/AT-1024.icns"
     
     print("Building AkademiTrack app for macOS Apple Silicon...")
     
@@ -98,26 +99,33 @@ def create_avalonia_macos_bundle():
         except Exception as e:
             print(f"  ❌ Failed to copy {item.name}: {e}")
     
-    # Add app icon if it exists
+    # Fixed: Properly handle the .icns icon file
+    icon_filename = "AppIcon.icns"
     if os.path.exists(ICON_PATH):
         try:
-            # For .png files, we'll copy as is (macOS can handle PNG icons)
-            icon_dest = resources_dir / "AppIcon.png"
+            icon_dest = resources_dir / icon_filename
             shutil.copy2(ICON_PATH, icon_dest)
             print(f"✅ Added app icon: {icon_dest}")
             
-            # Also check if there's an .icns version
-            icns_path = "./Assets/AT-Transparrent72.icns"
-            if os.path.exists(icns_path):
-                icon_dest_icns = resources_dir / "AppIcon.icns"
-                shutil.copy2(icns_path, icon_dest_icns)
-                print(f"✅ Added .icns app icon: {icon_dest_icns}")
+            # Verify the icon file was copied correctly
+            if icon_dest.exists():
+                file_size = icon_dest.stat().st_size
+                print(f"  Icon file size: {file_size} bytes")
+            else:
+                print(f"❌ Icon file was not copied properly")
         except Exception as e:
-            print(f"⚠️  Failed to add icon: {e}")
+            print(f"❌ Failed to add icon: {e}")
+            return False
     else:
-        print(f"⚠️  Icon not found: {ICON_PATH}")
+        print(f"❌ Icon not found: {ICON_PATH}")
+        print("Available files in Assets directory:")
+        assets_dir = Path("./Assets")
+        if assets_dir.exists():
+            for item in assets_dir.iterdir():
+                print(f"  - {item.name}")
+        return False
     
-    # Create Info.plist
+    # Create Info.plist with proper icon reference
     info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -138,6 +146,8 @@ def create_avalonia_macos_bundle():
     <string>APPL</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>
@@ -154,6 +164,10 @@ def create_avalonia_macos_bundle():
     <array>
         <string>arm64</string>
     </array>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>LSUIElement</key>
+    <false/>
 </dict>
 </plist>"""
     
@@ -184,21 +198,37 @@ def create_avalonia_macos_bundle():
     
     print(f"✅ Set permissions for {dylib_count} .dylib and {so_count} .so files")
     
-    # Remove quarantine attributes
+    # Remove quarantine attributes and clear icon cache
     try:
         subprocess.run(["xattr", "-cr", str(bundle_dir)], check=True, capture_output=True)
         print("✅ Removed quarantine attributes")
+        
+        # Clear icon cache to ensure the new icon is picked up
+        print("🔄 Clearing icon cache...")
+        subprocess.run(["sudo", "rm", "-rf", "/Library/Caches/com.apple.iconservices.store"],
+                      capture_output=True, errors='ignore')
+        subprocess.run(["killall", "-HUP", "Finder"], capture_output=True, errors='ignore')
+        subprocess.run(["killall", "-HUP", "Dock"], capture_output=True, errors='ignore')
+        print("✅ Icon cache cleared")
+        
     except subprocess.CalledProcessError as e:
         print(f"⚠️  Could not remove quarantine attributes: {e}")
     except FileNotFoundError:
         print("⚠️  xattr command not found (not running on macOS?)")
     
-    # Verify bundle structure
+    # Verify bundle structure and icon
     print(f"\nBundle structure:")
+    icon_found = False
     for item in bundle_dir.rglob('*'):
         if item.is_file():
             rel_path = item.relative_to(bundle_dir)
             print(f"  {rel_path}")
+            if item.name == "AppIcon.icns":
+                icon_found = True
+                print(f"    ✅ Icon file found: {item.stat().st_size} bytes")
+    
+    if not icon_found:
+        print("❌ Warning: Icon file not found in bundle!")
     
     # Create zip file
     zip_path = Path("AkademiTrack-macOS.zip").absolute()
@@ -223,6 +253,17 @@ def create_avalonia_macos_bundle():
     
     print(f"✅ App bundle created: {bundle_dir}")
     print(f"✅ Zip archive created: {zip_path} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+    
+    # Final verification steps
+    print(f"\n🔍 Final verification:")
+    info_plist = contents_dir / "Info.plist"
+    icon_file = resources_dir / "AppIcon.icns"
+    
+    print(f"  Info.plist exists: {'✅' if info_plist.exists() else '❌'}")
+    print(f"  Icon file exists: {'✅' if icon_file.exists() else '❌'}")
+    if icon_file.exists():
+        print(f"  Icon file size: {icon_file.stat().st_size} bytes")
+    
     return True
  
 if __name__ == "__main__":
@@ -234,10 +275,14 @@ if __name__ == "__main__":
             print("📦 You can now distribute the AkademiTrack-macOS.zip file")
             print("🔍 Check the ./build/ directory for the .app bundle")
             print("🍎 Compatible with macOS Apple Silicon (M1/M2/M3/M4)")
-            print("\nTo test locally:")
+            print("\n📋 Post-build steps:")
             print("  1. Navigate to ./build/")
-            print("  2. Double-click AkademiTrack.app")
+            print("  2. Double-click AkademiTrack.app to test")
             print("  3. If blocked by Gatekeeper, right-click → Open")
+            print("  4. Test Command+Tab to verify high-resolution icon")
+            print("\n💡 If the icon still appears low-res:")
+            print("  - Restart your Mac to fully clear icon cache")
+            print("  - Or run: sudo rm -rf /Library/Caches/com.apple.iconservices.store && killall Finder Dock")
         else:
             print("❌ Failed to create app bundle")
     except KeyboardInterrupt:
