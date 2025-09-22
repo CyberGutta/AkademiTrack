@@ -464,12 +464,26 @@ namespace AkademiTrack.ViewModels
         private HashSet<string> _processedNotificationIds = new HashSet<string>();
         private string _processedNotificationsFile;
 
+        private readonly Queue<NotificationQueueItem> _notificationQueue = new Queue<NotificationQueueItem>();
+        private bool _isShowingNotification = false;
+        private readonly object _notificationLock = new object();
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; // Replace with your actual URL
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
         private string _userEmail = "TESTGMAIL"; // Replace with actual user email
         private string _userPassword = "TESTPASSWORD";
+
+        public class NotificationQueueItem
+        {
+            public string Title { get; set; }
+            public string Message { get; set; }
+            public string Level { get; set; }
+            public string ImageUrl { get; set; }
+            public string CustomColor { get; set; }
+            public bool IsHighPriority { get; set; }
+        }
 
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
@@ -886,26 +900,35 @@ namespace AkademiTrack.ViewModels
         public ICommand TestSupabaseCommand { get; }
 
 
+
+        // Replace your existing ShowNotification method with this enhanced version
         private void ShowNotification(string title, string message, string level = "INFO")
         {
             // Allow these specific system notifications OR any notification marked as admin
             var allowedNotifications = new[]
             {
-                "Automation Started",
-                "Automation Stopped",
-                "Registration Success",
-                "Alle Studietimer Registrert",
-                "Ingen STUDIE-økter funnet for i dag", // Add this new title
-                "Ingen Flere Økter"     // Alternative title
-            };
+        "Automation Started",
+        "Automation Stopped",
+        "Registration Success",
+        "Alle Studietimer Registrert",
+        "Ingen STUDIE-økter funnet for i dag",
+        "Ingen Flere Økter"
+    };
 
-            // Check if this is an admin notification - handle both correct and malformed formats
+            // Check if this is an admin notification
             bool isAdminNotification = title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[");
 
             if (allowedNotifications.Contains(title) || isAdminNotification)
             {
-                LogDebug($"Showing enhanced system overlay notification: {title} - {message}");
-                ShowSystemOverlayNotification(title, message, level);
+                LogDebug($"Queueing enhanced system overlay notification: {title} - {message}");
+
+                // Determine if this is a high priority notification
+                bool isHighPriority = title == "Registration Success" ||
+                                     title == "Ingen Flere Økter" ||
+                                     title.Contains("Ingen STUDIE-økter") ||
+                                     isAdminNotification;
+
+                QueueNotification(title, message, level, null, null, isHighPriority);
             }
             else
             {
@@ -915,42 +938,221 @@ namespace AkademiTrack.ViewModels
 
         private void ShowSystemOverlayNotification(string title, string message, string level, string imageUrl = null, string customColor = null)
         {
+            // Determine priority
+            bool isRegistrationSuccess = title == "Registration Success";
+            bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STUDIE-økter");
+            bool isAdminNotification = title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[");
+            bool isHighPriority = isRegistrationSuccess || isPriorityNotification || isAdminNotification;
+
+            QueueNotification(title, message, level, imageUrl, customColor, isHighPriority);
+        }
+
+        private void QueueNotification(string title, string message, string level, string imageUrl = null, string customColor = null, bool isHighPriority = false)
+        {
+            var queueItem = new NotificationQueueItem
+            {
+                Title = title,
+                Message = message,
+                Level = level,
+                ImageUrl = imageUrl,
+                CustomColor = customColor,
+                IsHighPriority = isHighPriority
+            };
+
+            lock (_notificationLock)
+            {
+                if (isHighPriority)
+                {
+                    // High priority notifications go to the front of the queue
+                    var tempQueue = new Queue<NotificationQueueItem>();
+                    tempQueue.Enqueue(queueItem);
+
+                    while (_notificationQueue.Count > 0)
+                    {
+                        tempQueue.Enqueue(_notificationQueue.Dequeue());
+                    }
+
+                    while (tempQueue.Count > 0)
+                    {
+                        _notificationQueue.Enqueue(tempQueue.Dequeue());
+                    }
+
+                    LogDebug($"High priority notification queued at front: {title}");
+                }
+                else
+                {
+                    _notificationQueue.Enqueue(queueItem);
+                    LogDebug($"Notification queued: {title} (Queue size: {_notificationQueue.Count})");
+                }
+
+                // Start processing queue if not already showing a notification
+                if (!_isShowingNotification)
+                {
+                    ProcessNotificationQueue();
+                }
+            }
+        }
+
+        private async void ProcessNotificationQueue()
+        {
+            while (true)
+            {
+                NotificationQueueItem nextNotification = null;
+
+                lock (_notificationLock)
+                {
+                    if (_notificationQueue.Count == 0)
+                    {
+                        _isShowingNotification = false;
+                        LogDebug("Notification queue empty - stopping processing");
+                        return;
+                    }
+
+                    nextNotification = _notificationQueue.Dequeue();
+                    _isShowingNotification = true;
+                }
+
+                LogDebug($"Processing queued notification: {nextNotification.Title} (Remaining in queue: {_notificationQueue.Count})");
+
+                try
+                {
+                    // Show the notification and wait for it to complete
+                    await ShowNotificationAndWaitAsync(nextNotification);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to show queued notification: {ex.Message}");
+                }
+
+                // Add a small delay between notifications for better UX
+                await Task.Delay(500);
+            }
+        }
+
+        // New method to show notification and wait for completion
+        private async Task ShowNotificationAndWaitAsync(NotificationQueueItem item)
+        {
+            TaskCompletionSource<bool> notificationComplete = new TaskCompletionSource<bool>();
+
             try
             {
                 if (Dispatcher.UIThread.CheckAccess())
                 {
-                    CreateOverlayWindow(title, message, level, imageUrl, customColor);
+                    await CreateOverlayWindowAndWaitAsync(item, notificationComplete);
                 }
                 else
                 {
-                    Dispatcher.UIThread.Post(() =>
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
                     {
-                        try
+                        await CreateOverlayWindowAndWaitAsync(item, notificationComplete);
+                    });
+                }
+
+                // Wait for the notification to complete
+                await notificationComplete.Task;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to show notification window: {ex.Message}");
+                LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
+                notificationComplete.SetResult(true); // Complete even on failure
+            }
+        }
+
+        private async Task CreateOverlayWindowAndWaitAsync(NotificationQueueItem item, TaskCompletionSource<bool> completionSource)
+        {
+            try
+            {
+                // Clean up old windows
+                try
+                {
+                    for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
+                    {
+                        if (!_activeOverlayWindows[i].IsVisible)
                         {
-                            CreateOverlayWindow(title, message, level, imageUrl, customColor);
+                            _activeOverlayWindows.RemoveAt(i);
                         }
-                        catch (Exception innerEx)
+                    }
+                }
+                catch (Exception cleanupEx)
+                {
+                    LogDebug($"Error during window cleanup: {cleanupEx.Message}");
+                    _activeOverlayWindows.Clear();
+                }
+
+                LogDebug($"Creating overlay window for: {item.Title}");
+
+                NotificationOverlayWindow overlayWindow = null;
+                try
+                {
+                    if (!string.IsNullOrEmpty(item.ImageUrl) || !string.IsNullOrEmpty(item.CustomColor))
+                    {
+                        overlayWindow = new NotificationOverlayWindow(item.Title, item.Message, item.Level, item.ImageUrl, item.CustomColor);
+                    }
+                    else
+                    {
+                        overlayWindow = new NotificationOverlayWindow(item.Title, item.Message, item.Level);
+                    }
+                }
+                catch (Exception createEx)
+                {
+                    LogError($"Failed to create notification window: {createEx.Message}");
+                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
+                    completionSource.SetResult(true);
+                    return;
+                }
+
+                bool windowClosed = false;
+                overlayWindow.Closed += (s, e) =>
+                {
+                    try
+                    {
+                        if (!windowClosed)
                         {
-                            LogDebug($"Failed to create overlay window on UI thread: {innerEx.Message}");
-                            Task.Delay(1000).ContinueWith(_ =>
-                            {
-                                try
-                                {
-                                    Dispatcher.UIThread.Post(() => CreateOverlayWindow(title, message, level, imageUrl, customColor));
-                                }
-                                catch
-                                {
-                                    LogError($"Complete failure to show notification: {title}");
-                                }
-                            });
+                            windowClosed = true;
+                            _activeOverlayWindows.Remove(overlayWindow);
+                            LogDebug($"Notification window closed: {item.Title}");
+                            completionSource.SetResult(true);
+                        }
+                    }
+                    catch (Exception removeEx)
+                    {
+                        LogDebug($"Error removing closed window: {removeEx.Message}");
+                        completionSource.SetResult(true);
+                    }
+                };
+
+                _activeOverlayWindows.Add(overlayWindow);
+
+                try
+                {
+                    overlayWindow.Show();
+                    LogDebug($"✓ Notification window shown successfully: {item.Title}");
+
+                    // Set a backup timeout in case the window doesn't close properly
+                    _ = Task.Delay(15000).ContinueWith(_ =>
+                    {
+                        if (!windowClosed)
+                        {
+                            LogDebug($"Notification timeout reached for: {item.Title}");
+                            windowClosed = true;
+                            completionSource.TrySetResult(true);
                         }
                     });
+                }
+                catch (Exception showEx)
+                {
+                    LogError($"Failed to show notification window: {showEx.Message}");
+                    _activeOverlayWindows.Remove(overlayWindow);
+                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
+                    completionSource.SetResult(true);
                 }
             }
             catch (Exception ex)
             {
-                LogError($"Failed to show system overlay notification: {ex.Message}");
-                LogInfo($"NOTIFICATION (fallback): {title} - {message}");
+                LogError($"Complete failure in CreateOverlayWindowAndWaitAsync: {ex.Message}");
+                LogInfo($"NOTIFICATION (emergency fallback): {item.Title} - {item.Message}");
+                completionSource.SetResult(true);
             }
         }
 
