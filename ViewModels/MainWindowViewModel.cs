@@ -2806,7 +2806,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-       private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
+        private async Task RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
             try
             {
@@ -2821,18 +2821,18 @@ namespace AkademiTrack.ViewModels
                     name = "lagre_oppmote",
                     parameters = new object[]
                     {
-                        new { fylkeid = _userParameters?.FylkeId ?? "00" },
-                        new { skoleid = _userParameters?.SkoleId ?? "312" },
-                        new { planperi = _userParameters?.PlanPeri ?? "2025-26" },
-                        new { ansidato = stuTime.Dato },
-                        new { stkode = stuTime.Stkode },
-                        new { kl_trinn = stuTime.KlTrinn },
-                        new { kl_id = stuTime.KlId },
-                        new { k_navn = stuTime.KNavn },
-                        new { gruppe_nr = stuTime.GruppeNr },
-                        new { timenr = stuTime.Timenr },
-                        new { fravaerstype = "M" },
-                        new { ip = publicIp }
+                new { fylkeid = _userParameters?.FylkeId ?? "00" },
+                new { skoleid = _userParameters?.SkoleId ?? "312" },
+                new { planperi = _userParameters?.PlanPeri ?? "2025-26" },
+                new { ansidato = stuTime.Dato },
+                new { stkode = stuTime.Stkode },
+                new { kl_trinn = stuTime.KlTrinn },
+                new { kl_id = stuTime.KlId },
+                new { k_navn = stuTime.KNavn },
+                new { gruppe_nr = stuTime.GruppeNr },
+                new { timenr = stuTime.Timenr },
+                new { fravaerstype = "M" },
+                new { ip = publicIp }
                     }
                 };
 
@@ -2859,15 +2859,20 @@ namespace AkademiTrack.ViewModels
                 var response = await _httpClient.SendAsync(request);
 
                 var responseContent = await response.Content.ReadAsStringAsync();
+                LogDebug($"Registration response: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
-                    LogDebug($"Registration response: {responseContent}");
+                    // Check for network requirement error in successful response
+                    if (await CheckForNetworkErrorInResponse(responseContent, stuTime))
+                    {
+                        return; // Error was handled, don't proceed with success flow
+                    }
 
                     // Send to Supabase after successful registration
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
                     var userEmail = await GetUserEmailFromActivationAsync();
-                    
+
                     if (!string.IsNullOrEmpty(userEmail))
                     {
                         LogDebug($"Sending Supabase registration for email: {userEmail}");
@@ -2882,6 +2887,10 @@ namespace AkademiTrack.ViewModels
                 {
                     LogError($"Registration failed with status {response.StatusCode}");
                     LogDebug($"Error response: {responseContent}");
+
+                    // Check for network requirement error in error response too
+                    await CheckForNetworkErrorInResponse(responseContent, stuTime);
+
                     throw new Exception($"Registration failed: {response.StatusCode} - {responseContent}");
                 }
             }
@@ -2889,6 +2898,36 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Registration error: {ex.Message}");
                 throw;
+            }
+        }
+
+
+        private async Task<bool> CheckForNetworkErrorInResponse(string responseContent, ScheduleItem stuTime)
+        {
+            try
+            {
+                // Check for the specific network requirement error
+                if (responseContent.Contains("Du må være koblet på skolens nettverk for å kunne registrere fremmøte") ||
+                    responseContent.Contains("retval\":50") ||
+                    responseContent.Contains("må være koblet på skolens nettverk"))
+                {
+                    LogError($"NETTVERKSFEIL: Må være tilkoblet skolens nettverk for å registrere STU-økt {stuTime.StartKl}-{stuTime.SluttKl}");
+                    LogError("Du er ikke tilkoblet skolens WiFi/nettverk som kreves for registrering");
+
+                    // Show prominent notification to user about network requirement
+                    ShowNotification("Feil Nettverk - Kan Ikke Registrere",
+                        $"Du må være tilkoblet skolens nettverk (WiFi) for å registrere STU-tid {stuTime.StartKl}-{stuTime.SluttKl}. " +
+                        $"Koble til skolens WiFi - programmet fortsetter å kjøre og prøver igjen automatisk.", "ERROR");
+
+                    return true; // Error was handled
+                }
+
+                return false; // No network error found
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Error checking for network error in response: {ex.Message}");
+                return false;
             }
         }
 
