@@ -1078,7 +1078,12 @@ namespace AkademiTrack.ViewModels
             if (Dispatcher.UIThread.CheckAccess())
             {
                 LogEntries.Add(logEntry);
-                StatusMessage = logEntry.FormattedMessage;
+
+                // Only update status message for important messages
+                if (ShouldShowInStatus(message, level))
+                {
+                    StatusMessage = logEntry.FormattedMessage;
+                }
 
                 // Keep only last 100 entries to prevent memory issues
                 while (LogEntries.Count > 100)
@@ -1091,7 +1096,12 @@ namespace AkademiTrack.ViewModels
                 Dispatcher.UIThread.Post(() =>
                 {
                     LogEntries.Add(logEntry);
-                    StatusMessage = logEntry.FormattedMessage;
+
+                    // Only update status message for important messages
+                    if (ShouldShowInStatus(message, level))
+                    {
+                        StatusMessage = logEntry.FormattedMessage;
+                    }
 
                     while (LogEntries.Count > 100)
                     {
@@ -1100,6 +1110,137 @@ namespace AkademiTrack.ViewModels
                 });
             }
         }
+
+        private bool ShouldShowInStatus(string message, string level)
+        {
+            // Always show ERROR and SUCCESS messages
+            if (level == "ERROR" || level == "SUCCESS")
+            {
+                return true;
+            }
+
+            // Show specific important INFO messages only
+            var importantMessages = new[]
+            {
+        "Applikasjon er klar",
+        "Starter automatisering...",
+        "Automatisering stoppet",
+        "Stopper automatisering på grunn av nettleser problem...",
+        "Automatisering vil bli stoppet - start på nytt for å prøve igjen",
+        "Automatisering fullført - alle STU-økter håndtert",
+        "Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering",
+        "Vennligst fullfør innloggingsprosessen i nettleseren",
+        "Innlogging fullført!",
+        "Autentisering og parametere fullført - starter overvåkingssløyfe...",
+        "Registreringsvindu er ÅPENT for STU økt",
+        "Forsøker å registrere oppmøte...",
+        "Alle STU-økter er håndtert for i dag!",
+        "Automatisering fullført - alle STU-økter håndtert"
+    };
+
+            // Check if message starts with any important message pattern
+            foreach (var important in importantMessages)
+            {
+                if (message.StartsWith(important))
+                {
+                    return true;
+                }
+            }
+
+            // Show messages about found STU sessions
+            if (message.Contains("STU-økter for i dag") && message.Contains("Fant"))
+            {
+                return true;
+            }
+
+            // Show cycle count messages (less frequently)
+            if (message.Contains("Overvåkingssyklus") && message.Contains("#"))
+            {
+                return true;
+            }
+
+            // Show session status summaries
+            if (message.Contains("Øktstatus:") && (message.Contains("åpne") || message.Contains("registrerte")))
+            {
+                return true;
+            }
+
+            // Don't show DEBUG messages in status (regardless of ShowDetailedLogs setting)
+            if (level == "DEBUG")
+            {
+                return false;
+            }
+
+            // Don't show routine/verbose INFO messages or UI interactions
+            var skipMessages = new[]
+            {
+        "Logger tømt",
+        "Detaljert logging",
+        "Innstillinger vindu åpnet",
+        "Settings window opened",
+        "Innstillinger",
+        "Admin notification system initialized",
+        "Notification window closed:",
+        "Notification window shown successfully:",
+        "Creating overlay window for:",
+        "Skipping notification",
+        "Notification filtered out:",
+        "Showing enhanced system overlay notification:",
+        "Ekstraherte cookies:",
+        "Cookies saved to:",
+        "Loaded",
+        "cookies from file:",
+        "Making request with parameters:",
+        "Request URL:",
+        "Response received",
+        "JSON deserialized successfully",
+        "Sending HTTP request...",
+        "Response status:",
+        "Public IP:",
+        "Fetching public IP address...",
+        "Using public IP:",
+        "Registration payload:",
+        "Sending registration request...",
+        "Registration response:",
+        "Bruker parametere:",
+        "Henter timeplandata for hele dagen...",
+        "Hentet",
+        "timeplan elementer for hele dagen",
+        "STU økt:",
+        "Registreringsvindu ikke åpnet ennå for",
+        "Registreringsvindu lukket for",
+        "Venter 2 minutter før neste tidssjekk...",
+        "Venter 1 minutt før nytt forsøk...",
+        "Rydder opp nettleser ressurser...",
+        "Nettleser opprydding fullført",
+        "Disposing resources...",
+        "vindu åpnet",
+        "window opened"
+    };
+
+            foreach (var skip in skipMessages)
+            {
+                if (message.StartsWith(skip) || message.Contains(skip))
+                {
+                    return false;
+                }
+            }
+
+            // For remaining INFO messages, only show if they seem important
+            if (level == "INFO")
+            {
+                // Show WARNING level messages
+                if (level == "WARNING")
+                {
+                    return true;
+                }
+
+                return false; // Skip most other INFO messages from status
+            }
+
+            return true; // Show anything else not explicitly filtered
+        }
+
 
         private async Task ClearLogsAsync()
         {
@@ -1268,7 +1409,6 @@ namespace AkademiTrack.ViewModels
                     settingsWindow.Show();
                 }
 
-                LogSuccess("Innstillinger vindu åpnet");
             }
             catch (Exception ex)
             {
