@@ -1892,6 +1892,58 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private bool HasConflictingClass(ScheduleItem stuSession, List<ScheduleItem> allScheduleItems)
+        {
+            try
+            {
+                // Parse STU session times
+                if (!TimeSpan.TryParse(stuSession.StartKl, out var stuStartTime) ||
+                    !TimeSpan.TryParse(stuSession.SluttKl, out var stuEndTime))
+                {
+                    LogDebug($"Could not parse STU session times: {stuSession.StartKl}-{stuSession.SluttKl}");
+                    return false; // If we can't parse times, allow registration (safer default)
+                }
+
+                // Check ALL other classes on the same date (any class type)
+                var conflictingClasses = allScheduleItems
+                    .Where(item => item.Dato == stuSession.Dato && // Same date
+                                  item.KNavn != "STU" && // Not another STU session
+                                  item.Id != stuSession.Id) // Not the same session
+                    .ToList();
+
+                foreach (var otherClass in conflictingClasses)
+                {
+                    // Parse other class times
+                    if (!TimeSpan.TryParse(otherClass.StartKl, out var otherStartTime) ||
+                        !TimeSpan.TryParse(otherClass.SluttKl, out var otherEndTime))
+                    {
+                        LogDebug($"Could not parse class times for {otherClass.KNavn}: {otherClass.StartKl}-{otherClass.SluttKl}");
+                        continue; // Skip this class if we can't parse its times
+                    }
+
+                    // Check for time overlap
+                    // Two time periods overlap if: start1 < end2 AND start2 < end1
+                    bool hasOverlap = stuStartTime < otherEndTime && otherStartTime < stuEndTime;
+
+                    if (hasOverlap)
+                    {
+                        LogInfo($"CONFLICT DETECTED: STU session {stuSession.StartKl}-{stuSession.SluttKl} overlaps with class {otherClass.KNavn} ({otherClass.StartKl}-{otherClass.SluttKl})");
+                        LogInfo($"Skipping STU registration - student must attend regular class: {otherClass.KNavn}");
+                        return true; // Conflict found with ANY class
+                    }
+                }
+
+                LogDebug($"No conflicts found for STU session {stuSession.StartKl}-{stuSession.SluttKl}");
+                return false; // No conflicts
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error checking for class conflicts: {ex.Message}");
+                return false; // On error, allow registration (safer default)
+            }
+        }
+
+
         // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
         private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
         {
@@ -1928,10 +1980,34 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
-            // Log all found STU sessions
-            foreach (var stuTime in todaysStuSessions)
+            // FILTER OUT STU SESSIONS WITH CONFLICTS
+            var validStuSessions = new List<ScheduleItem>();
+            foreach (var stuSession in todaysStuSessions)
             {
-                LogInfo($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
+                if (HasConflictingClass(stuSession, _cachedScheduleData))
+                {
+                    LogInfo($"STU session {stuSession.StartKl}-{stuSession.SluttKl} has conflicting class - excluded from registration");
+                }
+                else
+                {
+                    validStuSessions.Add(stuSession);
+                }
+            }
+
+            if (validStuSessions.Count == 0)
+            {
+                LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
+                ShowNotification("Ingen gyldige STU-økter",
+                    "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.", "WARNING");
+                return;
+            }
+
+            LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige (ingen klassekonflikt)");
+
+            // Log all valid STU sessions
+            foreach (var stuTime in validStuSessions)
+            {
+                LogInfo($"Gyldig STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
             }
 
             // Track which sessions have been successfully registered
@@ -1949,8 +2025,8 @@ namespace AkademiTrack.ViewModels
                     int closedWindows = 0;
                     int notYetOpenWindows = 0;
 
-                    // Check each STU session using cached data and current time - NO API CALLS
-                    foreach (var stuSession in todaysStuSessions)
+                    // Check each VALID STU session using cached data and current time - NO API CALLS
+                    foreach (var stuSession in validStuSessions) // Use validStuSessions instead of todaysStuSessions
                     {
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
@@ -2004,21 +2080,21 @@ namespace AkademiTrack.ViewModels
                     }
 
                     // Check if all sessions are complete (either registered or windows closed)
-                    if (allSessionsComplete || registeredSessions.Count == todaysStuSessions.Count)
+                    if (allSessionsComplete || registeredSessions.Count == validStuSessions.Count)
                     {
-                        LogSuccess($"Alle {todaysStuSessions.Count} STU-økter er håndtert for i dag!");
-                        LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt: {todaysStuSessions.Count}");
+                        LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
+                        LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt gyldige: {validStuSessions.Count}");
 
                         // Show appropriate completion notification
                         if (registeredSessions.Count > 0)
                         {
                             ShowNotification("Alle Studietimer Registrert",
-                                $"Alle {todaysStuSessions.Count} STU-økter er fullført og registrert!", "SUCCESS");
+                                $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!", "SUCCESS");
                         }
                         else
                         {
                             ShowNotification("Ingen Flere Økter",
-                                $"Alle {todaysStuSessions.Count} STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
+                                $"Alle {validStuSessions.Count} gyldige STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
                         }
                         break;
                     }
