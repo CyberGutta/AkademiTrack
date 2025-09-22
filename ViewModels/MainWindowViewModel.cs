@@ -1756,19 +1756,19 @@ namespace AkademiTrack.ViewModels
         private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
         {
             int cycleCount = 0;
-            
+
             // Initial fetch of schedule data at startup - ONLY API CALL FOR THE DAY
             LogInfo("Henter timeplandata for hele dagen...");
             _cachedScheduleData = await GetFullDayScheduleDataAsync(cookies);
             _scheduleDataFetchTime = DateTime.Now;
-            
+
             if (_cachedScheduleData == null)
             {
                 LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
                 LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
                 return;
             }
-            
+
             LogSuccess($"Hentet {_cachedScheduleData.Count} timeplan elementer for hele dagen");
 
             // Find all STU sessions for today using cached data
@@ -1778,19 +1778,20 @@ namespace AkademiTrack.ViewModels
                 .ToList();
 
             LogInfo($"Fant {todaysStuSessions.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
-            
-            if (todaysStuSessions.Any())
+
+            // CHECK FOR NO STU SESSIONS - SHOW NOTIFICATION IMMEDIATELY
+            if (todaysStuSessions.Count == 0)
             {
-                foreach (var stuTime in todaysStuSessions)
-                {
-                    LogInfo($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
-                }
-            }
-            else
-            {
-                LogInfo("Ingen STUDIE-økter funnet for i dag - stopper automatisering");
-                ShowNotification("Ingen Flere Økter", "Ingen STUDIE-økter funnet for i dag", "INFO");
+                LogInfo("Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering");
+                ShowNotification("Ingen STUDIE-økter funnet for i dag",
+                    "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.", "INFO");
                 return;
+            }
+
+            // Log all found STU sessions
+            foreach (var stuTime in todaysStuSessions)
+            {
+                LogInfo($"STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
             }
 
             // Track which sessions have been successfully registered
@@ -1812,7 +1813,7 @@ namespace AkademiTrack.ViewModels
                     foreach (var stuSession in todaysStuSessions)
                     {
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
-                        
+
                         // Skip if already registered
                         if (registeredSessions.Contains(sessionKey))
                         {
@@ -1837,7 +1838,7 @@ namespace AkademiTrack.ViewModels
                                     LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
                                     ShowNotification("Registration Success",
                                         $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
-                                    
+
                                     // Mark as registered
                                     registeredSessions.Add(sessionKey);
                                 }
@@ -1867,8 +1868,18 @@ namespace AkademiTrack.ViewModels
                     {
                         LogSuccess($"Alle {todaysStuSessions.Count} STU-økter er håndtert for i dag!");
                         LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt: {todaysStuSessions.Count}");
-                        ShowNotification("Alle Studietimer Registrert",
-                            $"{todaysStuSessions.Count} STU-økter er fullført.", "SUCCESS");
+
+                        // Show appropriate completion notification
+                        if (registeredSessions.Count > 0)
+                        {
+                            ShowNotification("Alle Studietimer Registrert",
+                                $"Alle {todaysStuSessions.Count} STU-økter er fullført og registrert!", "SUCCESS");
+                        }
+                        else
+                        {
+                            ShowNotification("Ingen Flere Økter",
+                                $"Alle {todaysStuSessions.Count} STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
+                        }
                         break;
                     }
 

@@ -374,7 +374,7 @@
 				</StackPanel>
 
 				<!-- Current Status Display -->
-			<!--	<Border Background="White"
+				<Border Background="White"
 	                   CornerRadius="6"
 	                   Padding="16,12"
 	                   BorderThickness="1"
@@ -392,7 +392,7 @@
 	                              TextWrapping="Wrap"
 	                              MaxWidth="380"/>
 					</StackPanel>
-				</Border> -->
+				</Border>
 
 			</StackPanel>
 		</Grid>
