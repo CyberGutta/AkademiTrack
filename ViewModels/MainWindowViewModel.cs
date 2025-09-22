@@ -479,6 +479,7 @@ namespace AkademiTrack.ViewModels
         public MainWindowViewModel()
         {
             _httpClient = new HttpClient();
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
             _logEntries = new ObservableCollection<LogEntry>();
             _notifications = new ObservableCollection<NotificationEntry>();
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
@@ -574,68 +575,147 @@ namespace AkademiTrack.ViewModels
                 }
 
                 var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-                // Updated URL to handle RLS properly
                 var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
+
+                // Create request with shorter timeout
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // 30 second timeout instead of 100
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("apikey", _supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
 
-                var response = await _httpClient.SendAsync(request);
+                LogDebug($"Fetching admin notifications for: {userEmail}");
 
-                if (response.IsSuccessStatusCode)
+                HttpResponseMessage response = null;
+                try
                 {
-                    var json = await response.Content.ReadAsStringAsync();
-
-                    var notifications = JsonSerializer.Deserialize<EnhancedAdminNotification[]>(json, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    if (notifications != null)
-                    {
-                        bool hasNewNotifications = false;
-
-                        foreach (var notification in notifications)
-                        {
-                            if (!_processedNotificationIds.Contains(notification.Id))
-                            {
-                                _processedNotificationIds.Add(notification.Id);
-                                hasNewNotifications = true;
-
-                                var notificationLevel = notification.Priority?.ToUpper() switch
-                                {
-                                    "HIGH" => "ERROR",
-                                    "MEDIUM" => "WARNING",
-                                    "LOW" => "SUCCESS",
-                                    _ => "INFO"
-                                };
-
-                                var adminTitle = $"[ADMIN]{notification.Title}";
-
-                                ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
-                                    notification.Image_Url, notification.Custom_Color);
-
-                                LogInfo($"Enhanced admin notification displayed: {notification.Title}");
-                            }
-                        }
-
-                        if (hasNewNotifications)
-                        {
-                            await SaveProcessedNotificationIdsAsync();
-                        }
-                    }
+                    response = await _httpClient.SendAsync(request, cts.Token);
                 }
-                else
+                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || cts.Token.IsCancellationRequested)
+                {
+                    LogDebug("Admin notification request timed out after 30 seconds - skipping this check");
+                    return;
+                }
+                catch (HttpRequestException ex) when (ex.Message.Contains("nodename") || ex.Message.Contains("servname") || ex.Message.Contains("not known"))
+                {
+                    LogDebug($"DNS resolution failed for Supabase: {ex.Message} - checking network connectivity");
+
+                    // Try a simple connectivity test
+                    try
+                    {
+                        using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                        await _httpClient.GetAsync("https://www.google.com", testCts.Token);
+                        LogDebug("Internet connectivity OK - Supabase DNS issue");
+                    }
+                    catch
+                    {
+                        LogDebug("No internet connectivity detected");
+                    }
+                    return;
+                }
+                catch (HttpRequestException ex)
+                {
+                    LogDebug($"Network error fetching admin notifications: {ex.Message}");
+                    return;
+                }
+
+                if (!response.IsSuccessStatusCode)
                 {
                     LogDebug($"Failed to fetch admin notifications: {response.StatusCode}");
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogDebug($"Error response: {errorContent}");
+                    return;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(json) || json == "[]")
+                {
+                    LogDebug("No admin notifications returned");
+                    return;
+                }
+
+                EnhancedAdminNotification[] notifications = null;
+                try
+                {
+                    notifications = JsonSerializer.Deserialize<EnhancedAdminNotification[]>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch (JsonException ex)
+                {
+                    LogError($"Failed to parse admin notifications JSON: {ex.Message}");
+                    LogDebug($"JSON content: {json.Substring(0, Math.Min(200, json.Length))}...");
+                    return;
+                }
+
+                if (notifications == null || notifications.Length == 0)
+                {
+                    LogDebug("No valid admin notifications found");
+                    return;
+                }
+
+                bool hasNewNotifications = false;
+
+                foreach (var notification in notifications)
+                {
+                    if (string.IsNullOrEmpty(notification.Id))
+                    {
+                        LogDebug("Skipping notification with empty ID");
+                        continue;
+                    }
+
+                    if (!_processedNotificationIds.Contains(notification.Id))
+                    {
+                        _processedNotificationIds.Add(notification.Id);
+                        hasNewNotifications = true;
+
+                        var notificationLevel = notification.Priority?.ToUpper() switch
+                        {
+                            "HIGH" => "ERROR",
+                            "MEDIUM" => "WARNING",
+                            "LOW" => "SUCCESS",
+                            _ => "INFO"
+                        };
+
+                        var adminTitle = $"[ADMIN]{notification.Title}";
+
+                        try
+                        {
+                            ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
+                                notification.Image_Url, notification.Custom_Color);
+
+                            LogInfo($"Enhanced admin notification displayed: {notification.Title}");
+                        }
+                        catch (Exception showEx)
+                        {
+                            LogError($"Failed to show admin notification: {showEx.Message}");
+                            // Continue processing other notifications even if one fails
+                        }
+                    }
+                }
+
+                if (hasNewNotifications)
+                {
+                    try
+                    {
+                        await SaveProcessedNotificationIdsAsync();
+                    }
+                    catch (Exception saveEx)
+                    {
+                        LogError($"Failed to save processed notification IDs: {saveEx.Message}");
+                        // Not critical - notifications will just be shown again next time
+                    }
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Error in CheckForNewAdminNotificationsAsync: {ex.Message}");
+                if (ShowDetailedLogs)
+                {
+                    LogDebug($"Stack trace: {ex.StackTrace}");
+                }
             }
         }
 
@@ -1788,7 +1868,7 @@ namespace AkademiTrack.ViewModels
                         LogSuccess($"Alle {todaysStuSessions.Count} STU-økter er håndtert for i dag!");
                         LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt: {todaysStuSessions.Count}");
                         ShowNotification("Alle Studietimer Registrert",
-                            $"Alle {todaysStuSessions.Count} STU-økter er fullført.", "SUCCESS");
+                            $"{todaysStuSessions.Count} STU-økter er fullført.", "SUCCESS");
                         break;
                     }
 
