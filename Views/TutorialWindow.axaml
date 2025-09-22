@@ -3,16 +3,16 @@
         xmlns:vm="using:AkademiTrack.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="600"
         x:Class="AkademiTrack.Views.TutorialWindow"
         x:DataType="vm:TutorialWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="Velkommen til AkademiTrack"
         Background="#F8F9FA"
-        Height="500"
+        Height="600"
         Width="600"
         MinWidth="500"
-        MinHeight="400"
+        MinHeight="450"
         WindowStartupLocation="CenterScreen"
         CanResize="false">
 
@@ -200,6 +200,22 @@
 			<Setter Property="Margin" Value="0,0,0,16"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
+
+		<Style Selector="TextBlock.warning-text">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#856404"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+
+		<Style Selector="TextBlock.info-text">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="#0C5460"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
 	</Window.Styles>
 
 	<Grid Margin="40,30">
@@ -233,6 +249,8 @@
                                       Classes="content"/>
 							<TextBlock Text="• Gi deg beskjed når alt er ferdig"
                                       Classes="content"/>
+							<TextBlock Text="• Forhindre registrering under andre timer (anti-juks)"
+                                      Classes="content"/>
 						</StackPanel>
 					</StackPanel>
 				</Border>
@@ -258,10 +276,41 @@
 						<TextBlock Text="Programmet sjekker timeplanen din hele tiden og venter på at registreringsvinduet skal åpne for STU-timene dine. Når det skjer, registrerer programmet oppmøtet ditt med en gang."
                                   Classes="step-content"/>
 
-						<TextBlock Text="3. Du får beskjed:"
+						<TextBlock Text="3. Smart konfliktdeteksjon:"
                                   Classes="step-title"/>
-						<TextBlock Text="Når alle dagens STU-timer er registrert, får du beskjed om at alt er ferdig. Da stopper programmet av seg selv."
+						<TextBlock Text="Programmet vil IKKE registrere STU-timer som overlapper med andre timer du har. Dette forhindrer at du kan jukse ved å registrere oppmøte på STU når du egentlig skal være i en annen time."
                                   Classes="step-content"/>
+
+						<TextBlock Text="4. Du får beskjed:"
+                                  Classes="step-title"/>
+						<TextBlock Text="Når alle dagens gyldige STU-timer er registrert, får du beskjed om at alt er ferdig. Da stopper programmet av seg selv."
+                                  Classes="step-content"/>
+					</StackPanel>
+				</Border>
+
+				<!-- Security and Privacy -->
+				<Border Background="#D1ECF1"
+                       CornerRadius="8"
+                       Padding="20"
+                       BorderThickness="1"
+                       BorderBrush="#BEE5EB">
+					<StackPanel>
+						<TextBlock Text="Sikkerhet og personvern:"
+                                  Classes="step-title"
+                                  Foreground="#0C5460"/>
+
+						<StackPanel Margin="0,8,0,0">
+							<TextBlock Text="• Programmet lagrer bare cookies (innloggingsinfo) lokalt på din PC"
+                                      Classes="info-text"/>
+							<TextBlock Text="• Dine personopplysninger sendes aldri til tredjepart"
+                                      Classes="info-text"/>
+							<TextBlock Text="• All kommunikasjon skjer direkte med iSkole.net"
+                                      Classes="info-text"/>
+							<TextBlock Text="• Du kan slette lagret data når som helst via innstillinger"
+                                      Classes="info-text"/>
+							<TextBlock Text="• Programmet sender registreringsdata (email og STU-timer) til utvikleren for statistikk og forbedring"
+                                      Classes="info-text"/>
+						</StackPanel>
 					</StackPanel>
 				</Border>
 
@@ -278,18 +327,51 @@
 
 						<StackPanel Margin="0,8,0,0">
 							<TextBlock Text="• Programmet husker at du er logget inn så du slipper å logge inn hver gang"
-                                      Classes="step-content"
-                                      Foreground="#856404"/>
-							<TextBlock Text="• Du må være koblet til Akademiets internett"
-                                      Classes="step-content"
-                                      Foreground="#856404"/>
+                                      Classes="warning-text"/>
+							<TextBlock Text="• Du må være koblet til internett (ikke nødvendigvis Akademiets WiFi)"
+                                      Classes="warning-text"/>
 							<TextBlock Text="• Programmet fungerer kun med Akademiet Drammen Sundland sitt system"
-                                      Classes="step-content"
-                                      Foreground="#856404"/>
+                                      Classes="warning-text"/>
 							<TextBlock Text="• La programmet være åpent mens det jobber - du kan minimere vinduet"
-                                      Classes="step-content"
-                                      Foreground="#856404"/>
+                                      Classes="warning-text"/>
+							<TextBlock Text="• Hvis du ikke har STU-timer en dag, stopper programmet automatisk"
+                                      Classes="warning-text"/>
+							<TextBlock Text="• Du er fortsatt ansvarlig for å møte opp fysisk til timene dine"
+                                      Classes="warning-text"/>
 						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<!-- What happens if... -->
+				<Border Background="White"
+                       CornerRadius="8"
+                       Padding="20"
+                       BorderThickness="1"
+                       BorderBrush="#E9ECEF">
+					<StackPanel>
+						<TextBlock Text="Ofte stilte spørsmål:"
+                                  Classes="step-title"/>
+
+						<TextBlock Text="Hva om jeg ikke har STU i dag?"
+                                  Classes="step-title"
+                                  Margin="0,12,0,4"/>
+						<TextBlock Text="Programmet sjekker timeplanen og stopper automatisk hvis det ikke finner noen STU-timer for dagen."
+                                  Classes="step-content"/>
+
+						<TextBlock Text="Hva om internettet går ned?"
+                                  Classes="step-title"/>
+						<TextBlock Text="Programmet prøver på nytt automatisk. Du kan også starte det på nytt når internettet kommer tilbake."
+                                  Classes="step-content"/>
+
+						<TextBlock Text="Kan jeg stole på at det fungerer?"
+                                  Classes="step-title"/>
+						<TextBlock Text="Programmet sender deg beskjed hver gang det registrerer oppmøte. Du kan alltid sjekke på iSkole.net om registreringen gikk gjennom."
+                                  Classes="step-content"/>
+
+						<TextBlock Text="Hva om jeg har endringer i timeplanen?"
+                                  Classes="step-title"/>
+						<TextBlock Text="Programmet henter fersk timeplandata hver gang det starter, så endringer oppdaget automatisk."
+                                  Classes="step-content"/>
 					</StackPanel>
 				</Border>
 
