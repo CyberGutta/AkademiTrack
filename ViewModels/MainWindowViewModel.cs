@@ -2158,7 +2158,7 @@ namespace AkademiTrack.ViewModels
 
         // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
         // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
-    // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
+        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
         private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
         {
             int cycleCount = 0;
@@ -2240,7 +2240,7 @@ namespace AkademiTrack.ViewModels
                     int notYetOpenWindows = 0;
 
                     // Check each VALID STU session using cached data and current time - NO API CALLS
-                    foreach (var stuSession in validStuSessions) // Use validStuSessions instead of todaysStuSessions
+                    foreach (var stuSession in validStuSessions)
                     {
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
@@ -2265,7 +2265,7 @@ namespace AkademiTrack.ViewModels
                                 {
                                     // ONLY API CALL DURING MONITORING - POST request for registration
                                     var registrationResult = await RegisterAttendanceAsync(stuSession, cookies);
-                                    
+
                                     // Only show success and mark as registered if it actually succeeded
                                     if (registrationResult)
                                     {
@@ -2335,11 +2335,11 @@ namespace AkademiTrack.ViewModels
                         break;
                     }
 
-                    // Now show the "waiting 2 minutes" message
-                    LogInfo("Venter 2 minutter før neste tidssjekk...");
+                    // Now show the "waiting 30 seconds" message
+                    LogInfo("Venter 30 sekunder før neste tidssjekk...");
 
-                    // Wait the remaining time (2 minutes minus the 6 seconds we already waited)
-                    await Task.Delay(TimeSpan.FromMinutes(2).Subtract(TimeSpan.FromSeconds(6)), cancellationToken);
+                    // Wait the remaining time (30 seconds minus the 6 seconds we already waited)
+                    await Task.Delay(TimeSpan.FromSeconds(30).Subtract(TimeSpan.FromSeconds(6)), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -2348,8 +2348,8 @@ namespace AkademiTrack.ViewModels
                 catch (Exception ex)
                 {
                     LogError($"Overvåkingsfeil: {ex.Message}");
-                    LogInfo("Venter 1 minutt før nytt forsøk...");
-                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
+                    LogInfo("Venter 30 sekunder før nytt forsøk...");
+                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
                 }
             }
         }
