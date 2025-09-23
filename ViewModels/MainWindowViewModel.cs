@@ -1324,21 +1324,22 @@ namespace AkademiTrack.ViewModels
             // Show specific important INFO messages only
             var importantMessages = new[]
             {
-        "Applikasjon er klar",
-        "Starter automatisering...",
-        "Automatisering stoppet",
-        "Stopper automatisering på grunn av nettleser problem...",
-        "Automatisering vil bli stoppet - start på nytt for å prøve igjen",
-        "Automatisering fullført - alle STU-økter håndtert",
-        "Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering",
-        "Vennligst fullfør innloggingsprosessen i nettleseren",
-        "Innlogging fullført!",
-        "Autentisering og parametere fullført - starter overvåkingssløyfe...",
-        "Registreringsvindu er ÅPENT for STU økt",
-        "Forsøker å registrere oppmøte...",
-        "Alle STU-økter er håndtert for i dag!",
-        "Automatisering fullført - alle STU-økter håndtert"
-    };
+                "Applikasjon er klar",
+                "Starter automatisering...",
+                "Automatisering stoppet",
+                "Stopper automatisering på grunn av nettleser problem...",
+                "Automatisering vil bli stoppet - start på nytt for å prøve igjen",
+                "Automatisering fullført - alle STU-økter håndtert",
+                "Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering",
+                "Vennligst fullfør innloggingsprosessen i nettleseren",
+                "Innlogging fullført!",
+                "Autentisering og parametere fullført - starter overvåkingssløyfe...",
+                "Registreringsvindu er ÅPENT for STU økt",
+                "Forsøker å registrere oppmøte...",
+                "Alle STU-økter er håndtert for i dag!",
+                "Automatisering fullført - alle STU-økter håndtert",
+                "Venter 2 minutter før neste tidssjekk..."  // ADD THIS LINE
+            };
 
             // Check if message starts with any important message pattern
             foreach (var important in importantMessages)
@@ -2147,179 +2148,191 @@ namespace AkademiTrack.ViewModels
 
 
         // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
-        private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
+        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
+    private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
+    {
+        int cycleCount = 0;
+
+        // Initial fetch of schedule data at startup - ONLY API CALL FOR THE DAY
+        LogInfo("Henter timeplandata for hele dagen...");
+        _cachedScheduleData = await GetFullDayScheduleDataAsync(cookies);
+        _scheduleDataFetchTime = DateTime.Now;
+
+        if (_cachedScheduleData == null)
         {
-            int cycleCount = 0;
+            LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
+            LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
+            return;
+        }
 
-            // Initial fetch of schedule data at startup - ONLY API CALL FOR THE DAY
-            LogInfo("Henter timeplandata for hele dagen...");
-            _cachedScheduleData = await GetFullDayScheduleDataAsync(cookies);
-            _scheduleDataFetchTime = DateTime.Now;
+        LogSuccess($"Hentet {_cachedScheduleData.Count} timeplan elementer for hele dagen");
 
-            if (_cachedScheduleData == null)
+        // Find all STU sessions for today using cached data
+        var today = DateTime.Now.ToString("yyyyMMdd");
+        var todaysStuSessions = _cachedScheduleData
+            .Where(item => item.Dato == today && item.KNavn == "STU")
+            .ToList();
+
+        LogInfo($"Fant {todaysStuSessions.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
+
+        // CHECK FOR NO STU SESSIONS - SHOW NOTIFICATION IMMEDIATELY
+        if (todaysStuSessions.Count == 0)
+        {
+            LogInfo("Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering");
+            ShowNotification("Ingen STUDIE-økter funnet for i dag",
+                "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.", "INFO");
+            return;
+        }
+
+        // FILTER OUT STU SESSIONS WITH CONFLICTS
+        var validStuSessions = new List<ScheduleItem>();
+        foreach (var stuSession in todaysStuSessions)
+        {
+            if (HasConflictingClass(stuSession, _cachedScheduleData))
             {
-                LogError("Kunne ikke hente timeplandata - cookies kan være utløpt");
-                LogInfo("Automatisering vil stoppe - start på nytt for å autentisere igjen");
-                return;
+                LogInfo($"STU session {stuSession.StartKl}-{stuSession.SluttKl} has conflicting class - excluded from registration");
             }
-
-            LogSuccess($"Hentet {_cachedScheduleData.Count} timeplan elementer for hele dagen");
-
-            // Find all STU sessions for today using cached data
-            var today = DateTime.Now.ToString("yyyyMMdd");
-            var todaysStuSessions = _cachedScheduleData
-                .Where(item => item.Dato == today && item.KNavn == "STU")
-                .ToList();
-
-            LogInfo($"Fant {todaysStuSessions.Count} STU-økter for i dag ({DateTime.Now:yyyy-MM-dd})");
-
-            // CHECK FOR NO STU SESSIONS - SHOW NOTIFICATION IMMEDIATELY
-            if (todaysStuSessions.Count == 0)
+            else
             {
-                LogInfo("Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering");
-                ShowNotification("Ingen STUDIE-økter funnet for i dag",
-                    "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.", "INFO");
-                return;
+                validStuSessions.Add(stuSession);
             }
+        }
 
-            // FILTER OUT STU SESSIONS WITH CONFLICTS
-            var validStuSessions = new List<ScheduleItem>();
-            foreach (var stuSession in todaysStuSessions)
+        if (validStuSessions.Count == 0)
+        {
+            LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
+            ShowNotification("Ingen gyldige STU-økter",
+                "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.", "WARNING");
+            return;
+        }
+
+        LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige (ingen klassekonflikt)");
+
+        // Log all valid STU sessions
+        foreach (var stuTime in validStuSessions)
+        {
+            LogInfo($"Gyldig STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
+        }
+
+        // Track which sessions have been successfully registered
+        var registeredSessions = new HashSet<string>();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
             {
-                if (HasConflictingClass(stuSession, _cachedScheduleData))
+                cycleCount++;
+                LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker registreringsvinduer...");
+
+                bool allSessionsComplete = true;
+                int openWindows = 0;
+                int closedWindows = 0;
+                int notYetOpenWindows = 0;
+
+                // Check each VALID STU session using cached data and current time - NO API CALLS
+                foreach (var stuSession in validStuSessions) // Use validStuSessions instead of todaysStuSessions
                 {
-                    LogInfo($"STU session {stuSession.StartKl}-{stuSession.SluttKl} has conflicting class - excluded from registration");
-                }
-                else
-                {
-                    validStuSessions.Add(stuSession);
-                }
-            }
+                    var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
-            if (validStuSessions.Count == 0)
-            {
-                LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
-                ShowNotification("Ingen gyldige STU-økter",
-                    "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.", "WARNING");
-                return;
-            }
-
-            LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige (ingen klassekonflikt)");
-
-            // Log all valid STU sessions
-            foreach (var stuTime in validStuSessions)
-            {
-                LogInfo($"Gyldig STU økt: {stuTime.StartKl}-{stuTime.SluttKl}, Registreringsvindu: {stuTime.TidsromTilstedevaerelse}");
-            }
-
-            // Track which sessions have been successfully registered
-            var registeredSessions = new HashSet<string>();
-
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                try
-                {
-                    cycleCount++;
-                    LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker registreringsvinduer...");
-
-                    bool allSessionsComplete = true;
-                    int openWindows = 0;
-                    int closedWindows = 0;
-                    int notYetOpenWindows = 0;
-
-                    // Check each VALID STU session using cached data and current time - NO API CALLS
-                    foreach (var stuSession in validStuSessions) // Use validStuSessions instead of todaysStuSessions
+                    // Skip if already registered
+                    if (registeredSessions.Contains(sessionKey))
                     {
-                        var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
+                        closedWindows++;
+                        continue;
+                    }
 
-                        // Skip if already registered
-                        if (registeredSessions.Contains(sessionKey))
-                        {
+                    var registrationStatus = GetRegistrationWindowStatus(stuSession);
+
+                    switch (registrationStatus)
+                    {
+                        case RegistrationWindowStatus.Open:
+                            openWindows++;
+                            allSessionsComplete = false;
+                            LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuSession.StartKl}-{stuSession.SluttKl}");
+                            LogInfo("Forsøker å registrere oppmøte...");
+
+                            try
+                            {
+                                // ONLY API CALL DURING MONITORING - POST request for registration
+                                await RegisterAttendanceAsync(stuSession, cookies);
+                                LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
+                                ShowNotification("Registration Success",
+                                    $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
+
+                                // Mark as registered
+                                registeredSessions.Add(sessionKey);
+                            }
+                            catch (Exception regEx)
+                            {
+                                LogError($"Registrering feilet: {regEx.Message}");
+                            }
+                            break;
+
+                        case RegistrationWindowStatus.NotYetOpen:
+                            notYetOpenWindows++;
+                            allSessionsComplete = false;
+                            var now = DateTime.Now.ToString("HH:mm");
+                            LogDebug($"Registreringsvindu ikke åpnet ennå for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {now}, vindu: {stuSession.TidsromTilstedevaerelse})");
+                            break;
+
+                        case RegistrationWindowStatus.Closed:
                             closedWindows++;
-                            continue;
-                        }
-
-                        var registrationStatus = GetRegistrationWindowStatus(stuSession);
-
-                        switch (registrationStatus)
-                        {
-                            case RegistrationWindowStatus.Open:
-                                openWindows++;
-                                allSessionsComplete = false;
-                                LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuSession.StartKl}-{stuSession.SluttKl}");
-                                LogInfo("Forsøker å registrere oppmøte...");
-
-                                try
-                                {
-                                    // ONLY API CALL DURING MONITORING - POST request for registration
-                                    await RegisterAttendanceAsync(stuSession, cookies);
-                                    LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
-                                    ShowNotification("Registration Success",
-                                        $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
-
-                                    // Mark as registered
-                                    registeredSessions.Add(sessionKey);
-                                }
-                                catch (Exception regEx)
-                                {
-                                    LogError($"Registrering feilet: {regEx.Message}");
-                                }
-                                break;
-
-                            case RegistrationWindowStatus.NotYetOpen:
-                                notYetOpenWindows++;
-                                allSessionsComplete = false;
-                                var now = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registreringsvindu ikke åpnet ennå for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {now}, vindu: {stuSession.TidsromTilstedevaerelse})");
-                                break;
-
-                            case RegistrationWindowStatus.Closed:
-                                closedWindows++;
-                                var currentTime = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registreringsvindu lukket for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {currentTime}, vindu: {stuSession.TidsromTilstedevaerelse})");
-                                break;
-                        }
+                            var currentTime = DateTime.Now.ToString("HH:mm");
+                            LogDebug($"Registreringsvindu lukket for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {currentTime}, vindu: {stuSession.TidsromTilstedevaerelse})");
+                            break;
                     }
-
-                    // Check if all sessions are complete (either registered or windows closed)
-                    if (allSessionsComplete || registeredSessions.Count == validStuSessions.Count)
-                    {
-                        LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
-                        LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt gyldige: {validStuSessions.Count}");
-
-                        // Show appropriate completion notification
-                        if (registeredSessions.Count > 0)
-                        {
-                            ShowNotification("Alle Studietimer Registrert",
-                                $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!", "SUCCESS");
-                        }
-                        else
-                        {
-                            ShowNotification("Ingen Flere Økter",
-                                $"Alle {validStuSessions.Count} gyldige STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
-                        }
-                        break;
-                    }
-
-                    // Log summary of current state
-                    LogInfo($"Øktstatus: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
-
-                    // Wait 2 minutes before next time check (NO API CALL NEEDED)
-                    LogInfo("Venter 2 minutter før neste tidssjekk...");
-                    await Task.Delay(TimeSpan.FromMinutes(2), cancellationToken);
                 }
-                catch (OperationCanceledException)
+
+                // Check if all sessions are complete (either registered or windows closed)
+                if (allSessionsComplete || registeredSessions.Count == validStuSessions.Count)
+                {
+                    LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
+                    LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt gyldige: {validStuSessions.Count}");
+
+                    // Show appropriate completion notification
+                    if (registeredSessions.Count > 0)
+                    {
+                        ShowNotification("Alle Studietimer Registrert",
+                            $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!", "SUCCESS");
+                    }
+                    else
+                    {
+                        ShowNotification("Ingen Flere Økter",
+                            $"Alle {validStuSessions.Count} gyldige STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
+                    }
+                    break;
+                }
+
+                // Log summary of current state and show in status for 6 seconds
+                LogInfo($"Øktstatus: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
+
+                // Wait 6 seconds before showing the "waiting" message
+                await Task.Delay(6000, cancellationToken);
+
+                // Check if cancellation was requested during the 6-second delay
+                if (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
-                catch (Exception ex)
-                {
-                    LogError($"Overvåkingsfeil: {ex.Message}");
-                    LogInfo("Venter 1 minutt før nytt forsøk...");
-                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
-                }
+
+                // Now show the "waiting 2 minutes" message
+                LogInfo("Venter 2 minutter før neste tidssjekk...");
+
+                // Wait the remaining time (2 minutes minus the 6 seconds we already waited)
+                await Task.Delay(TimeSpan.FromMinutes(2).Subtract(TimeSpan.FromSeconds(6)), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Overvåkingsfeil: {ex.Message}");
+                LogInfo("Venter 1 minutt før nytt forsøk...");
+                await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
             }
         }
+    }
 
         // New method to get full day schedule data (called only once)
         private async Task<List<ScheduleItem>> GetFullDayScheduleDataAsync(Dictionary<string, string> cookies)
