@@ -1733,7 +1733,8 @@ namespace AkademiTrack.ViewModels
                 // Extract cookies - check if driver is still valid - EXACTLY THE SAME
                 if (!IsWebDriverValid(_webDriver))
                 {
-                    LogError("Nettleser ble lukket under innlogging - kan ikke ekstraktere cookies");
+                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
+                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return null;
                 }
 
@@ -1749,20 +1750,20 @@ namespace AkademiTrack.ViewModels
                 return cookieDict;
             }
             catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
-                                                  webEx.Message.Contains("target window already closed") ||
-                                                  webEx.Message.Contains("Session info: chrome") ||
-                                                  webEx.Message.Contains("disconnected"))
+                                                webEx.Message.Contains("target window already closed") ||
+                                                webEx.Message.Contains("Session info: chrome") ||
+                                                webEx.Message.Contains("disconnected"))
             {
-                LogError("Nettleser vindu ble lukket under innlogging - stopper automatisering");
-                LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
+                LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
+                ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
                 return null;
             }
             catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
-                                                         invEx.Message.Contains("no such session"))
+                                                        invEx.Message.Contains("no such session"))
             {
-                LogError("Nettleser sesjon ble avbrutt under innlogging");
-                LogInfo("Automatisering vil bli stoppet - start på nytt for å prøve igjen");
+                LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
+                ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -1770,6 +1771,7 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Nettleser innlogging feilet: {ex.Message}");
                 LogDebug($"Exception type: {ex.GetType().Name}");
+                ShowNotification("Automation Stopped", "Innlogging feilet - automatisering stoppet", "ERROR");
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -1927,7 +1929,8 @@ namespace AkademiTrack.ViewModels
                     // Check if web driver is still valid
                     if (!IsWebDriverValid(_webDriver))
                     {
-                        LogError("Nettleser vindu ble lukket under venting på innlogging");
+                        LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
+                        ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                         return false;
                     }
 
@@ -1946,16 +1949,18 @@ namespace AkademiTrack.ViewModels
                     }
                 }
                 catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
-                                                      webEx.Message.Contains("target window already closed") ||
-                                                      webEx.Message.Contains("disconnected"))
+                                                    webEx.Message.Contains("target window already closed") ||
+                                                    webEx.Message.Contains("disconnected"))
                 {
-                    LogError("Nettleser vindu ble lukket under venting");
+                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
+                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return false;
                 }
                 catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
-                                                             invEx.Message.Contains("no such session"))
+                                                            invEx.Message.Contains("no such session"))
                 {
-                    LogError("Nettleser sesjon ble avbrutt under venting");
+                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
+                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return false;
                 }
                 catch (Exception ex)
@@ -1965,7 +1970,8 @@ namespace AkademiTrack.ViewModels
                     // If we can't check the URL, the browser might be closed
                     if (!IsWebDriverValid(_webDriver))
                     {
-                        LogError("Nettleser ikke lenger tilgjengelig");
+                        LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
+                        ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                         return false;
                     }
                 }
@@ -1973,7 +1979,8 @@ namespace AkademiTrack.ViewModels
                 await Task.Delay(2000);
             }
 
-            LogError("Tidsavbrudd nådd under venting på innlogging");
+            LogError("Automatisering stoppet - innlogging tidsavbrudd");
+            ShowNotification("Automation Stopped", "Innlogging tidsavbrudd - automatisering stoppet", "ERROR");
             return false;
         }
 
