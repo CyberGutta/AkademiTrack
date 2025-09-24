@@ -1340,7 +1340,7 @@ namespace AkademiTrack.ViewModels
                 "Forsøker å registrere oppmøte...",
                 "Alle STU-økter er håndtert for i dag!",
                 "Automatisering fullført - alle STU-økter håndtert",
-                "Venter 2 minutter før neste tidssjekk..."  // ADD THIS LINE
+                "Syklus #" // ADD THIS LINE - will match cycle status messages
             };
 
             // Check if message starts with any important message pattern
@@ -1358,14 +1358,14 @@ namespace AkademiTrack.ViewModels
                 return true;
             }
 
-            // Show cycle count messages (less frequently)
-            if (message.Contains("Overvåkingssyklus") && message.Contains("#"))
+            // Show cycle count messages (all of them now)
+            if (message.Contains("Syklus #") || message.Contains("Status:"))
             {
                 return true;
             }
 
             // Show session status summaries
-            if (message.Contains("Øktstatus:") && (message.Contains("åpne") || message.Contains("registrerte")))
+            if (message.Contains("Status:") && (message.Contains("åpne") || message.Contains("registrerte") || message.Contains("venter")))
             {
                 return true;
             }
@@ -1379,49 +1379,48 @@ namespace AkademiTrack.ViewModels
             // Don't show routine/verbose INFO messages or UI interactions
             var skipMessages = new[]
             {
-        "Logger tømt",
-        "Detaljert logging",
-        "Innstillinger vindu åpnet",
-        "Settings window opened",
-        "Innstillinger",
-        "Admin notification system initialized",
-        "Notification window closed:",
-        "Notification window shown successfully:",
-        "Creating overlay window for:",
-        "Skipping notification",
-        "Notification filtered out:",
-        "Showing enhanced system overlay notification:",
-        "Ekstraherte cookies:",
-        "Cookies saved to:",
-        "Loaded",
-        "cookies from file:",
-        "Making request with parameters:",
-        "Request URL:",
-        "Response received",
-        "JSON deserialized successfully",
-        "Sending HTTP request...",
-        "Response status:",
-        "Public IP:",
-        "Fetching public IP address...",
-        "Using public IP:",
-        "Registration payload:",
-        "Sending registration request...",
-        "Registration response:",
-        "Bruker parametere:",
-        "Henter timeplandata for hele dagen...",
-        "Hentet",
-        "timeplan elementer for hele dagen",
-        "STU økt:",
-        "Registreringsvindu ikke åpnet ennå for",
-        "Registreringsvindu lukket for",
-        "Venter 2 minutter før neste tidssjekk...",
-        "Venter 1 minutt før nytt forsøk...",
-        "Rydder opp nettleser ressurser...",
-        "Nettleser opprydding fullført",
-        "Disposing resources...",
-        "vindu åpnet",
-        "window opened"
-    };
+                "Logger tømt",
+                "Detaljert logging",
+                "Innstillinger vindu åpnet",
+                "Settings window opened",
+                "Innstillinger",
+                "Admin notification system initialized",
+                "Notification window closed:",
+                "Notification window shown successfully:",
+                "Creating overlay window for:",
+                "Skipping notification",
+                "Notification filtered out:",
+                "Showing enhanced system overlay notification:",
+                "Ekstraherte cookies:",
+                "Cookies saved to:",
+                "Loaded",
+                "cookies from file:",
+                "Making request with parameters:",
+                "Request URL:",
+                "Response received",
+                "JSON deserialized successfully",
+                "Sending HTTP request...",
+                "Response status:",
+                "Public IP:",
+                "Fetching public IP address...",
+                "Using public IP:",
+                "Registration payload:",
+                "Sending registration request...",
+                "Registration response:",
+                "Bruker parametere:",
+                "Henter timeplandata for hele dagen...",
+                "Hentet",
+                "timeplan elementer for hele dagen",
+                "STU økt:",
+                "Registreringsvindu ikke åpnet ennå for",
+                "Registreringsvindu lukket for",
+                "Venter 1 minutt før nytt forsøk...",
+                "Rydder opp nettleser ressurser...",
+                "Nettleser opprydding fullført",
+                "Disposing resources...",
+                "vindu åpnet",
+                "window opened"
+            };
 
             foreach (var skip in skipMessages)
             {
@@ -2232,7 +2231,8 @@ namespace AkademiTrack.ViewModels
                 try
                 {
                     cycleCount++;
-                    LogInfo($"Overvåkingssyklus #{cycleCount} - sjekker registreringsvinduer...");
+                    var currentTime = DateTime.Now.ToString("HH:mm");
+                    LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
 
                     bool allSessionsComplete = true;
                     int openWindows = 0;
@@ -2297,8 +2297,8 @@ namespace AkademiTrack.ViewModels
 
                             case RegistrationWindowStatus.Closed:
                                 closedWindows++;
-                                var currentTime = DateTime.Now.ToString("HH:mm");
-                                LogDebug($"Registreringsvindu lukket for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {currentTime}, vindu: {stuSession.TidsromTilstedevaerelse})");
+                                var currentTimeForClosed = DateTime.Now.ToString("HH:mm");
+                                LogDebug($"Registreringsvindu lukket for {stuSession.StartKl}-{stuSession.SluttKl} (nåværende tid: {currentTimeForClosed}, vindu: {stuSession.TidsromTilstedevaerelse})");
                                 break;
                         }
                     }
@@ -2323,23 +2323,11 @@ namespace AkademiTrack.ViewModels
                         break;
                     }
 
-                    // Log summary of current state and show in status for 6 seconds
-                    LogInfo($"Øktstatus: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
+                    // Log summary of current state - THIS WILL NOW SHOW IN STATUS
+                    LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte - neste sjekk om 30s");
 
-                    // Wait 6 seconds before showing the "waiting" message
-                    await Task.Delay(6000, cancellationToken);
-
-                    // Check if cancellation was requested during the 6-second delay
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        break;
-                    }
-
-                    // Now show the "waiting 30 seconds" message
-                    LogInfo("Venter 30 sekunder før neste tidssjekk...");
-
-                    // Wait the remaining time (30 seconds minus the 6 seconds we already waited)
-                    await Task.Delay(TimeSpan.FromSeconds(30).Subtract(TimeSpan.FromSeconds(6)), cancellationToken);
+                    // Wait 30 seconds before next check
+                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
