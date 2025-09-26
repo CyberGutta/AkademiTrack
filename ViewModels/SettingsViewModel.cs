@@ -701,7 +701,7 @@ Categories=Utility;
         {
             var assembly = Assembly.GetExecutingAssembly();
             Name = assembly.GetName().Name ?? "AkademiTrack";
-            Version = assembly.GetName().Version?.ToString() ?? "1.0.0.0";
+            Version = assembly.GetName().Version?.ToString() ?? "1.1.0";
             Description = "Akademiet automatisk fremmøte registerings program";
         }
 

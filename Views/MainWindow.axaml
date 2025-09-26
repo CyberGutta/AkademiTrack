@@ -330,12 +330,12 @@
 	                      Classes="title"
 	                      HorizontalAlignment="Center"/>
 
-				<TextBlock Text="Automatisk Oppmøte-system - Akademiet Drammen Sundland"
+				<TextBlock Text="Automatisk oppmøte-system - Akademiet Drammen Sundland"
 	                      Classes="subtitle"
 	                      HorizontalAlignment="Center"/>
 
 				<!-- Info Text -->
-				<TextBlock Text="Klikk Start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging automatisk."
+				<TextBlock Text="Klikk start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging automatisk."
 	                      Classes="info"
 	                      HorizontalAlignment="Center"
 	                      TextWrapping="Wrap"
@@ -347,14 +347,14 @@
 	                       Spacing="12">
 
 					<!-- Start button -->
-					<Button Content="Start Automatisering"
+					<Button Content="Start automatisering"
 	                       Classes="start-button"
 	                       Command="{Binding StartAutomationCommand}"
 	                       IsEnabled="{Binding !IsAutomationRunning}"
 	                       ToolTip.Tip="Starter automatisering med automatisk innlogging"/>
 
 					<!-- Stop button -->
-					<Button Content="Stopp Automatisering"
+					<Button Content="Stopp automatisering"
 	                       Classes="stop-button"
 	                       Command="{Binding StopAutomationCommand}"
 	                       IsEnabled="{Binding IsAutomationRunning}"
@@ -367,7 +367,7 @@
 
 				<!-- Settings Button -->
 				<StackPanel HorizontalAlignment="Center">
-					<Button Content="Innstillinger og Aktivitetslogg"
+					<Button Content="Innstillinger og nerde greier"
 	                       Classes="settings"
 	                       Command="{Binding OpenSettingsCommand}"
 	                       ToolTip.Tip="Åpne innstillinger og vis aktivitetslogger"/>
@@ -383,7 +383,7 @@
 	                   MinWidth="300">
 
 					<StackPanel Spacing="6">
-						<TextBlock Text="Gjeldende Status:"
+						<TextBlock Text="Gjeldende status:"
 	                              Classes="status-label"/>
 
 						<TextBlock Text="{Binding StatusMessage}"

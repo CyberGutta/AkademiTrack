@@ -361,7 +361,7 @@
 				<!-- Auto-Start Setting -->
 				<Border Classes="setting-item">
 					<StackPanel Spacing="8">
-						<TextBlock Text="Start med PC" Classes="setting-title"/>
+						<TextBlock Text="Start med pc" Classes="setting-title"/>
 						<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp. Anbefalt for kontinuerlig fremmøteregistrering."
 								   Classes="setting-description"/>
 						<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Slå På|Slå Av'}"
