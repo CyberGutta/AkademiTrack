@@ -476,9 +476,9 @@ namespace AkademiTrack.ViewModels
         private string _userEmail = "TESTGMAIL"; // Replace with actual user email
         private string _userPassword = "TESTPASSWORD";
 
-        private string _loginEmail = "test";
-        private string _loginPassword = "test";
-        private string _schoolName = "test";
+        private string _loginEmail = "";
+        private string _loginPassword = "";
+        private string _schoolName = "";
 
 
         public class NotificationQueueItem
@@ -509,12 +509,14 @@ namespace AkademiTrack.ViewModels
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
 
-
             LogInfo("Applikasjon er klar");
 
+            // Load credentials from settings
+            _ = Task.Run(LoadCredentialsAsync);
+
             _processedNotificationsFile = Path.Combine(
-            Path.GetDirectoryName(GetCookiesFilePath()),
-            "processed_notifications.json"
+                Path.GetDirectoryName(GetCookiesFilePath()),
+                "processed_notifications.json"
             );
 
             // Load previously processed notifications
@@ -524,6 +526,38 @@ namespace AkademiTrack.ViewModels
             _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
 
             LogInfo("Admin notification system initialized");
+        }
+
+        private async Task LoadCredentialsAsync()
+        {
+            try
+            {
+                // Create a settings view model to get the decrypted credentials
+                var settingsViewModel = new SettingsViewModel();
+
+                // Wait a moment for settings to load
+                await Task.Delay(500);
+
+                var credentials = settingsViewModel.GetDecryptedCredentials();
+
+                _loginEmail = credentials.email;
+                _loginPassword = credentials.password;
+                _schoolName = credentials.school;
+
+                if (!string.IsNullOrEmpty(_loginEmail))
+                {
+                    LogInfo($"Lastet innloggingsinformasjon for: {_loginEmail}");
+                }
+                else
+                {
+                    LogInfo("Ingen lagrede innloggingsopplysninger funnet - bruker må konfigurere innstillinger");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Kunne ikke laste innloggingsopplysninger: {ex.Message}");
+                LogInfo("Bruker standardverdier for innlogging");
+            }
         }
 
         private string GetProcessedNotificationsFilePath()
@@ -1468,12 +1502,22 @@ namespace AkademiTrack.ViewModels
         {
             if (IsAutomationRunning) return;
 
+            // Validate credentials before starting
+            if (string.IsNullOrEmpty(_loginEmail) || string.IsNullOrEmpty(_loginPassword) || string.IsNullOrEmpty(_schoolName))
+            {
+                LogError("Mangler innloggingsopplysninger - åpne Innstillinger for å konfigurere");
+                ShowNotification("Mangler Innloggingsopplysninger",
+                    "Du må konfigurere e-post, passord og skolenavn i Innstillinger før automatisering kan starte.", "ERROR");
+                return;
+            }
+
             IsAutomationRunning = true;
             _cancellationTokenSource = new CancellationTokenSource();
 
             try
             {
                 LogInfo("Starter automatisering...");
+                LogInfo($"Bruker innloggingsopplysninger for: {_loginEmail}");
                 ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
                 Dictionary<string, string> cookies = null;
@@ -2125,19 +2169,26 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo("Found Feide login form - filling in credentials...");
 
+                    // Validate that we have credentials to use
+                    if (string.IsNullOrEmpty(_loginEmail) || string.IsNullOrEmpty(_loginPassword))
+                    {
+                        LogError("Ingen innloggingsopplysninger tilgjengelig - kan ikke utføre automatisk innlogging");
+                        return false;
+                    }
+
                     try
                     {
                         // Clear and fill username
                         usernameField.Clear();
                         await Task.Delay(500);
                         usernameField.SendKeys(_loginEmail);
-                        LogDebug("Username entered");
+                        LogDebug($"Username entered: {_loginEmail}");
 
                         // Clear and fill password
                         passwordField.Clear();
                         await Task.Delay(500);
                         passwordField.SendKeys(_loginPassword);
-                        LogDebug("Password entered");
+                        LogDebug("Password entered (hidden)");
 
                         await Task.Delay(1000);
 

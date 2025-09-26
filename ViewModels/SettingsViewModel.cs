@@ -9,6 +9,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -24,9 +26,115 @@ namespace AkademiTrack.ViewModels
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true; // Default on
         public DateTime LastUpdated { get; set; } = DateTime.Now;
+
+        // Encrypted credentials
+        public string EncryptedLoginEmail { get; set; } = "";
+        public string EncryptedLoginPassword { get; set; } = "";
+        public string EncryptedSchoolName { get; set; } = "";
     }
 
-    // Auto-start manager for cross-platform support
+    // Simple encryption helper class
+    public static class CredentialEncryption
+    {
+        private static readonly string EncryptionKey = GenerateKey();
+
+        private static string GenerateKey()
+        {
+            try
+            {
+                // Create a consistent key based on machine/user info
+                var machineInfo = Environment.MachineName + Environment.UserName + "AkademiTrack2025";
+                using (var sha256 = SHA256.Create())
+                {
+                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(machineInfo));
+                    var base64 = Convert.ToBase64String(hash);
+                    // Ensure we have exactly 32 bytes for AES-256
+                    var key = base64.Length >= 32 ? base64.Substring(0, 32) : base64.PadRight(32, '0');
+                    Debug.WriteLine($"Generated encryption key length: {key.Length}");
+                    return key;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error generating encryption key: {ex.Message}");
+                // Fallback key
+                return "AkademiTrack2025DefaultKey12345";
+            }
+        }
+
+        public static string Encrypt(string plainText)
+        {
+            if (string.IsNullOrEmpty(plainText)) return "";
+
+            try
+            {
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
+                    aes.GenerateIV();
+
+                    using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
+                    using (var msEncrypt = new MemoryStream())
+                    {
+                        // Prepend IV to the encrypted data
+                        msEncrypt.Write(aes.IV, 0, aes.IV.Length);
+
+                        using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+                        using (var swEncrypt = new StreamWriter(csEncrypt))
+                        {
+                            swEncrypt.Write(plainText);
+                        }
+
+                        return Convert.ToBase64String(msEncrypt.ToArray());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Encryption failed: {ex.Message}");
+                return "";
+            }
+        }
+
+        public static string Decrypt(string encryptedText)
+        {
+            if (string.IsNullOrEmpty(encryptedText)) return "";
+
+            try
+            {
+                var fullCipher = Convert.FromBase64String(encryptedText);
+
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
+
+                    // Extract IV from the beginning
+                    var iv = new byte[aes.BlockSize / 8];
+                    var cipher = new byte[fullCipher.Length - iv.Length];
+
+                    Array.Copy(fullCipher, 0, iv, 0, iv.Length);
+                    Array.Copy(fullCipher, iv.Length, cipher, 0, cipher.Length);
+
+                    aes.IV = iv;
+
+                    using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+                    using (var msDecrypt = new MemoryStream(cipher))
+                    using (var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
+                    using (var srDecrypt = new StreamReader(csDecrypt))
+                    {
+                        return srDecrypt.ReadToEnd();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Decryption failed: {ex.Message}");
+                return "";
+            }
+        }
+    }
+
+    // Auto-start manager for cross-platform support (keeping existing code)
     public static class AutoStartManager
     {
         private static readonly string AppName = "AkademiTrack";
@@ -468,7 +576,7 @@ Categories=Utility;
         }
     }
 
-    // Converters
+    // Converters (keeping existing code)
     public class BoolToStringConverter : IValueConverter
     {
         public static readonly BoolToStringConverter Instance = new();
@@ -612,6 +720,11 @@ Categories=Utility;
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
 
+        // New credential fields
+        private string _loginEmail = "";
+        private string _loginPassword = "";
+        private string _schoolName = "";
+
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
 
@@ -625,6 +738,49 @@ Categories=Utility;
 
         // This is what the UI binds to
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
+
+        // Credential properties
+        public string LoginEmail
+        {
+            get => _loginEmail;
+            set
+            {
+                if (_loginEmail != value)
+                {
+                    _loginEmail = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync(); // Auto-save when changed
+                }
+            }
+        }
+
+        public string LoginPassword
+        {
+            get => _loginPassword;
+            set
+            {
+                if (_loginPassword != value)
+                {
+                    _loginPassword = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync(); // Auto-save when changed
+                }
+            }
+        }
+
+        public string SchoolName
+        {
+            get => _schoolName;
+            set
+            {
+                if (_schoolName != value)
+                {
+                    _schoolName = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync(); // Auto-save when changed
+                }
+            }
+        }
 
         public bool ShowActivityLog
         {
@@ -701,8 +857,19 @@ Categories=Utility;
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
 
+            // Initialize credential fields to empty strings
+            _loginEmail = "";
+            _loginPassword = "";
+            _schoolName = "";
+
             // Load settings on initialization
             _ = LoadSettingsAsync();
+        }
+
+        // Method to get decrypted credentials for use in MainWindowViewModel
+        public (string email, string password, string school) GetDecryptedCredentials()
+        {
+            return (_loginEmail, _loginPassword, _schoolName);
         }
 
         // Method to set the log entries from the main view model
@@ -814,20 +981,31 @@ Categories=Utility;
                         _showDetailedLogs = settings.ShowDetailedLogs;
                         _startWithSystem = settings.StartWithSystem;
 
-                        // Notify UI of changes
+                        // Decrypt credentials after loading
+                        _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
+                        _loginPassword = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
+                        _schoolName = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
+
+                        // Notify UI of changes for all properties
                         OnPropertyChanged(nameof(ShowActivityLog));
                         OnPropertyChanged(nameof(ShowDetailedLogs));
                         OnPropertyChanged(nameof(StartWithSystem));
+                        OnPropertyChanged(nameof(LoginEmail));
+                        OnPropertyChanged(nameof(LoginPassword));
+                        OnPropertyChanged(nameof(SchoolName));
 
                         RefreshDisplayedLogs();
 
                         // Sync the auto-start setting with the system on load
-                        // This ensures the system setting matches our saved preference
                         _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
+
+                        Debug.WriteLine($"Settings loaded successfully from: {filePath}");
+                        Debug.WriteLine($"Loaded email: {(!string.IsNullOrEmpty(_loginEmail) ? "***" : "empty")}");
                     }
                 }
                 else
                 {
+                    Debug.WriteLine("No settings file found, using defaults");
                     // First time running - set up auto-start if enabled by default
                     if (_startWithSystem)
                     {
@@ -837,7 +1015,6 @@ Categories=Utility;
             }
             catch (Exception ex)
             {
-                // Silently fail - not critical
                 Debug.WriteLine($"Failed to load settings: {ex.Message}");
             }
         }
@@ -859,15 +1036,20 @@ Categories=Utility;
                     ShowActivityLog = _showActivityLog,
                     ShowDetailedLogs = _showDetailedLogs,
                     StartWithSystem = _startWithSystem,
-                    LastUpdated = DateTime.Now
+                    LastUpdated = DateTime.Now,
+                    // Encrypt credentials before saving
+                    EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail),
+                    EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword),
+                    EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName)
                 };
 
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(filePath, json);
+
+                Debug.WriteLine($"Settings saved successfully to: {filePath}");
             }
             catch (Exception ex)
             {
-                // Silently fail - not critical
                 Debug.WriteLine($"Failed to save settings: {ex.Message}");
             }
         }
