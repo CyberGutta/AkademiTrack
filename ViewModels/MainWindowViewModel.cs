@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -474,6 +475,11 @@ namespace AkademiTrack.ViewModels
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
         private string _userEmail = "TESTGMAIL"; // Replace with actual user email
         private string _userPassword = "TESTPASSWORD";
+
+        private string _loginEmail = "test";
+        private string _loginPassword = "test";
+        private string _schoolName = "test";
+
 
         public class NotificationQueueItem
         {
@@ -1693,7 +1699,7 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Setup Chrome options - EXACTLY THE SAME
+                // Setup Chrome options
                 var options = new ChromeOptions();
                 options.AddArgument("--no-sandbox");
                 options.AddArgument("--disable-dev-shm-usage");
@@ -1704,34 +1710,44 @@ namespace AkademiTrack.ViewModels
                     options.AddArgument("--disable-gpu");
                 }
 
-                LogInfo("Initialiserer Chrome nettleser...");
+                LogInfo("Initialiserer Chrome nettleser for automatisk innlogging...");
                 localWebDriver = new ChromeDriver(options);
-                _webDriver = localWebDriver; // Set the class field for disposal
+                _webDriver = localWebDriver;
 
-                // Navigate to login page - EXACTLY THE SAME
+                // Navigate to login page
                 LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
                 _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
-                LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
-                LogInfo("Venter på navigering til: https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan");
+                // Wait for page to load
+                await Task.Delay(3000);
 
-                // Wait for user to reach the target URL - EXACTLY THE SAME
-                var targetReached = await WaitForTargetUrlAsync();
+                LogInfo("Utfører automatisk innlogging...");
 
-                if (!targetReached)
+                // Attempt automatic login
+                bool loginSuccess = await PerformAutomaticLoginAsync();
+
+                if (!loginSuccess)
                 {
-                    LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
-                    return null;
+                    LogInfo("Automatisk innlogging mislyktes - venter på manuell innlogging");
+                    LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
+
+                    // Fall back to manual login wait
+                    var targetReached = await WaitForTargetUrlAsync();
+                    if (!targetReached)
+                    {
+                        LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
+                        return null;
+                    }
                 }
 
                 LogSuccess("Innlogging fullført!");
 
-                // NEW: Quick parameter capture (only addition - 2 seconds max)
+                // Quick parameter capture
                 await QuickParameterCapture();
 
                 LogInfo("Ekstraherer cookies fra nettleser økten...");
 
-                // Extract cookies - check if driver is still valid - EXACTLY THE SAME
+                // Check if driver is still valid
                 if (!IsWebDriverValid(_webDriver))
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
@@ -1744,7 +1760,7 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug($"Ekstraherte cookies: {string.Join(", ", cookieDict.Keys)}");
 
-                // Save cookies - EXACTLY THE SAME
+                // Save cookies
                 await SaveCookiesAsync(seleniumCookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray());
 
                 LogSuccess($"Ekstraherte og lagret {cookieDict.Count} cookies");
@@ -1778,8 +1794,415 @@ namespace AkademiTrack.ViewModels
             }
             finally
             {
-                // Always clean up the web driver, regardless of what happened - EXACTLY THE SAME
+                // Always clean up the web driver
                 await CleanupWebDriverAsync(localWebDriver);
+            }
+        }
+
+
+        private async Task<bool> PerformAutomaticLoginAsync()
+        {
+            try
+            {
+                if (!IsWebDriverValid(_webDriver))
+                {
+                    LogDebug("WebDriver not valid for automatic login");
+                    return false;
+                }
+
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(20));
+
+                LogDebug("Starting automatic login process...");
+
+                // Step 1: Wait for and click the FEIDE button
+                try
+                {
+                    LogDebug("Looking for FEIDE button...");
+                    var feideButton = wait.Until(driver =>
+                    {
+                        try
+                        {
+                            // Look for the FEIDE button with the specific class structure you showed
+                            var buttons = driver.FindElements(By.XPath("//button[contains(@class, 'button') or contains(., 'FEIDE')]"));
+                            foreach (var btn in buttons)
+                            {
+                                if (btn.Displayed && btn.Enabled &&
+                                    (btn.Text.Contains("FEIDE") || btn.GetAttribute("innerHTML").Contains("FEIDE")))
+                                {
+                                    return btn;
+                                }
+                            }
+
+                            // Alternative selector for FEIDE button
+                            var feideBtn = driver.FindElement(By.XPath("//span[contains(@class, 'feide_icon')]/ancestor::button"));
+                            return feideBtn?.Displayed == true ? feideBtn : null;
+                        }
+                        catch (NoSuchElementException)
+                        {
+                            return null;
+                        }
+                    });
+
+                    if (feideButton != null)
+                    {
+                        LogInfo("Found FEIDE button - clicking to continue to Feide authentication...");
+                        feideButton.Click();
+                        await Task.Delay(3000);
+                    }
+                    else
+                    {
+                        LogDebug("FEIDE button not found, may already be on organization selection");
+                    }
+                }
+                catch (WebDriverTimeoutException)
+                {
+                    LogDebug("FEIDE button not found within timeout, continuing...");
+                }
+
+                // Step 2: Handle organization selection
+                if (await HandleOrganizationSelectionAsync())
+                {
+                    LogDebug("Organization selection completed successfully");
+                }
+
+                // Step 3: Handle the actual Feide login form
+                return await HandleFeideLoginFormAsync();
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error during automatic login: {ex.Message}");
+                if (ShowDetailedLogs)
+                {
+                    LogDebug($"Stack trace: {ex.StackTrace}");
+                }
+                return false;
+            }
+        }
+
+        private async Task<bool> HandleOrganizationSelectionAsync()
+        {
+            try
+            {
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(15));
+
+                LogDebug("Checking for organization selection...");
+
+                // Look for the organization search field
+                IWebElement orgSearchField = null;
+                try
+                {
+                    orgSearchField = wait.Until(driver =>
+                    {
+                        try
+                        {
+                            var element = driver.FindElement(By.Id("org_selector_filter"));
+                            return element.Displayed ? element : null;
+                        }
+                        catch (NoSuchElementException)
+                        {
+                            return null;
+                        }
+                    });
+                }
+                catch (WebDriverTimeoutException)
+                {
+                    LogDebug("Organization selection field not found - may not be needed");
+                    return true;
+                }
+
+                if (orgSearchField != null)
+                {
+                    LogInfo($"Found organization selector - searching for '{_schoolName}'...");
+
+                    // Clear any existing text and type school name
+                    orgSearchField.Clear();
+                    await Task.Delay(500);
+                    orgSearchField.SendKeys(_schoolName);
+                    await Task.Delay(2000); // Give more time for search results
+
+                    // Wait for and select the school from dropdown
+                    try
+                    {
+                        var schoolOption = wait.Until(driver =>
+                        {
+                            try
+                            {
+                                // Try multiple selectors for the school option
+                                var selectors = new[]
+                                {
+                            $"//li[contains(text(), '{_schoolName}')]",
+                            $"//div[contains(text(), '{_schoolName}')]",
+                            $"//option[contains(text(), '{_schoolName}')]",
+                            $"//*[contains(@class, 'org') and contains(text(), '{_schoolName}')]",
+                            $"//*[contains(text(), 'Akademiet Drammen')]" // More specific for your school
+                        };
+
+                                foreach (var selector in selectors)
+                                {
+                                    try
+                                    {
+                                        var elements = driver.FindElements(By.XPath(selector));
+                                        foreach (var elem in elements)
+                                        {
+                                            if (elem.Displayed && elem.Enabled)
+                                            {
+                                                return elem;
+                                            }
+                                        }
+                                    }
+                                    catch (NoSuchElementException) { continue; }
+                                }
+                                return null;
+                            }
+                            catch
+                            {
+                                return null;
+                            }
+                        });
+
+                        if (schoolOption != null)
+                        {
+                            LogInfo("Found school in list - clicking to select...");
+
+                            // Try clicking with JavaScript if regular click fails
+                            try
+                            {
+                                schoolOption.Click();
+                            }
+                            catch
+                            {
+                                var js = (IJavaScriptExecutor)_webDriver;
+                                js.ExecuteScript("arguments[0].click();", schoolOption);
+                            }
+
+                            await Task.Delay(1000);
+
+                            // Look for and click the continue button
+                            try
+                            {
+                                var continueButton = _webDriver.FindElement(By.Id("selectorg_button"));
+                                if (continueButton != null && continueButton.Enabled)
+                                {
+                                    LogInfo("Clicking Continue button...");
+
+                                    // Wait a moment for the button to be enabled
+                                    var continueWait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10));
+                                    continueWait.Until(driver => continueButton.Enabled);
+
+                                    try
+                                    {
+                                        continueButton.Click();
+                                    }
+                                    catch
+                                    {
+                                        var js = (IJavaScriptExecutor)_webDriver;
+                                        js.ExecuteScript("arguments[0].click();", continueButton);
+                                    }
+
+                                    await Task.Delay(3000);
+                                    return true;
+                                }
+                            }
+                            catch (NoSuchElementException)
+                            {
+                                LogDebug("Continue button not found");
+                            }
+                        }
+                        else
+                        {
+                            LogError($"Could not find '{_schoolName}' in organization list");
+                            return false;
+                        }
+                    }
+                    catch (WebDriverTimeoutException)
+                    {
+                        LogError($"Timeout while searching for '{_schoolName}' in organization list");
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error during organization selection: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<bool> HandleFeideLoginFormAsync()
+        {
+            try
+            {
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(20));
+
+                LogInfo("Looking for Feide login form...");
+
+                // Wait for the login form to appear
+                IWebElement usernameField = null;
+                IWebElement passwordField = null;
+                IWebElement loginButton = null;
+
+                // Look for username field
+                try
+                {
+                    usernameField = wait.Until(driver =>
+                    {
+                        try
+                        {
+                            var field = driver.FindElement(By.Id("username"));
+                            return field.Displayed ? field : null;
+                        }
+                        catch (NoSuchElementException)
+                        {
+                            // Try alternative selectors
+                            try
+                            {
+                                var altField = driver.FindElement(By.Name("feidename"));
+                                return altField.Displayed ? altField : null;
+                            }
+                            catch
+                            {
+                                return null;
+                            }
+                        }
+                    });
+                }
+                catch (WebDriverTimeoutException)
+                {
+                    LogDebug("Username field not found within timeout");
+                }
+
+                // Look for password field
+                try
+                {
+                    passwordField = _webDriver.FindElement(By.Id("password"));
+                }
+                catch (NoSuchElementException)
+                {
+                    try
+                    {
+                        passwordField = _webDriver.FindElement(By.Name("password"));
+                    }
+                    catch (NoSuchElementException)
+                    {
+                        LogDebug("Password field not found");
+                    }
+                }
+
+                // Look for login button
+                try
+                {
+                    // Try multiple selectors for the login button
+                    var buttonSelectors = new[]
+                    {
+                "//button[contains(text(), 'Logg inn')]",
+                "//button[@type='submit']",
+                "//input[@value='Logg inn']",
+                "//button[contains(@class, 'button-primary')]"
+            };
+
+                    foreach (var selector in buttonSelectors)
+                    {
+                        try
+                        {
+                            loginButton = _webDriver.FindElement(By.XPath(selector));
+                            if (loginButton.Displayed && loginButton.Enabled)
+                            {
+                                break;
+                            }
+                            loginButton = null;
+                        }
+                        catch (NoSuchElementException) { continue; }
+                    }
+                }
+                catch (NoSuchElementException)
+                {
+                    LogDebug("Login button not found");
+                }
+
+                if (usernameField != null && passwordField != null)
+                {
+                    LogInfo("Found Feide login form - filling in credentials...");
+
+                    try
+                    {
+                        // Clear and fill username
+                        usernameField.Clear();
+                        await Task.Delay(500);
+                        usernameField.SendKeys(_loginEmail);
+                        LogDebug("Username entered");
+
+                        // Clear and fill password
+                        passwordField.Clear();
+                        await Task.Delay(500);
+                        passwordField.SendKeys(_loginPassword);
+                        LogDebug("Password entered");
+
+                        await Task.Delay(1000);
+
+                        // Submit the form
+                        if (loginButton != null)
+                        {
+                            LogDebug("Clicking login button...");
+                            try
+                            {
+                                loginButton.Click();
+                            }
+                            catch
+                            {
+                                // Try JavaScript click as fallback
+                                var js = (IJavaScriptExecutor)_webDriver;
+                                js.ExecuteScript("arguments[0].click();", loginButton);
+                            }
+                        }
+                        else
+                        {
+                            LogDebug("No login button found, trying Enter key...");
+                            passwordField.SendKeys(Keys.Enter);
+                        }
+
+                        LogInfo("Feide login form submitted - waiting for response...");
+
+                        // Wait for redirect
+                        await Task.Delay(5000);
+
+                        // Check if login was successful
+                        var currentUrl = _webDriver.Url;
+                        LogDebug($"Current URL after login attempt: {currentUrl}");
+
+                        // Check for successful login indicators
+                        if (currentUrl.Contains("isFeideinnlogget=true") ||
+                            currentUrl.Contains("ojr=timeplan") ||
+                            (!currentUrl.Contains("login") && !currentUrl.Contains("feide") && !currentUrl.Contains("org_selector")))
+                        {
+                            LogSuccess("Feide automatic login successful!");
+                            return true;
+                        }
+                        else
+                        {
+                            LogInfo("Feide login appears to have failed - falling back to manual login");
+                            LogDebug($"Current URL indicates login failure: {currentUrl}");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Error during form submission: {ex.Message}");
+                        return false;
+                    }
+                }
+                else
+                {
+                    LogInfo("Could not find complete Feide login form - falling back to manual login");
+                    LogDebug($"Username field found: {usernameField != null}, Password field found: {passwordField != null}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in Feide login form handling: {ex.Message}");
+                return false;
             }
         }
 
