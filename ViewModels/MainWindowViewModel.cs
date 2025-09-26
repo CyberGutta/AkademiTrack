@@ -473,7 +473,7 @@ namespace AkademiTrack.ViewModels
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; // Replace with your actual URL
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
-        private string _userEmail = "TESTGMAIL"; // Replace with actual user email
+        private string _userEmail = "TESTGMAIL"; 
         private string _userPassword = "TESTPASSWORD";
 
         private string _loginEmail = "";
@@ -1763,7 +1763,7 @@ namespace AkademiTrack.ViewModels
                 _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
                 // Wait for page to load
-                await Task.Delay(3000);
+                await Task.Delay(1500);
 
                 LogInfo("Utfører automatisk innlogging...");
 
@@ -1854,7 +1854,7 @@ namespace AkademiTrack.ViewModels
                     return false;
                 }
 
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(20));
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10)); // Reduced from 20
 
                 LogDebug("Starting automatic login process...");
 
@@ -1866,7 +1866,6 @@ namespace AkademiTrack.ViewModels
                     {
                         try
                         {
-                            // Look for the FEIDE button with the specific class structure you showed
                             var buttons = driver.FindElements(By.XPath("//button[contains(@class, 'button') or contains(., 'FEIDE')]"));
                             foreach (var btn in buttons)
                             {
@@ -1877,7 +1876,6 @@ namespace AkademiTrack.ViewModels
                                 }
                             }
 
-                            // Alternative selector for FEIDE button
                             var feideBtn = driver.FindElement(By.XPath("//span[contains(@class, 'feide_icon')]/ancestor::button"));
                             return feideBtn?.Displayed == true ? feideBtn : null;
                         }
@@ -1891,7 +1889,7 @@ namespace AkademiTrack.ViewModels
                     {
                         LogInfo("Found FEIDE button - clicking to continue to Feide authentication...");
                         feideButton.Click();
-                        await Task.Delay(3000);
+                        await Task.Delay(1500); // Reduced from 3000
                     }
                     else
                     {
@@ -1927,7 +1925,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(15));
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(8)); // Reduced from 15
 
                 LogDebug("Checking for organization selection...");
 
@@ -1960,9 +1958,9 @@ namespace AkademiTrack.ViewModels
 
                     // Clear any existing text and type school name
                     orgSearchField.Clear();
-                    await Task.Delay(500);
+                    await Task.Delay(200); // Reduced from 500
                     orgSearchField.SendKeys(_schoolName);
-                    await Task.Delay(2000); // Give more time for search results
+                    await Task.Delay(1000); // Reduced from 2000
 
                     // Wait for and select the school from dropdown
                     try
@@ -1971,14 +1969,13 @@ namespace AkademiTrack.ViewModels
                         {
                             try
                             {
-                                // Try multiple selectors for the school option
                                 var selectors = new[]
                                 {
                             $"//li[contains(text(), '{_schoolName}')]",
                             $"//div[contains(text(), '{_schoolName}')]",
                             $"//option[contains(text(), '{_schoolName}')]",
                             $"//*[contains(@class, 'org') and contains(text(), '{_schoolName}')]",
-                            $"//*[contains(text(), 'Akademiet Drammen')]" // More specific for your school
+                            $"//*[contains(text(), 'Akademiet Drammen')]"
                         };
 
                                 foreach (var selector in selectors)
@@ -2008,7 +2005,6 @@ namespace AkademiTrack.ViewModels
                         {
                             LogInfo("Found school in list - clicking to select...");
 
-                            // Try clicking with JavaScript if regular click fails
                             try
                             {
                                 schoolOption.Click();
@@ -2019,7 +2015,7 @@ namespace AkademiTrack.ViewModels
                                 js.ExecuteScript("arguments[0].click();", schoolOption);
                             }
 
-                            await Task.Delay(1000);
+                            await Task.Delay(500); // Reduced from 1000
 
                             // Look for and click the continue button
                             try
@@ -2029,8 +2025,7 @@ namespace AkademiTrack.ViewModels
                                 {
                                     LogInfo("Clicking Continue button...");
 
-                                    // Wait a moment for the button to be enabled
-                                    var continueWait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10));
+                                    var continueWait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(5)); // Reduced from 10
                                     continueWait.Until(driver => continueButton.Enabled);
 
                                     try
@@ -2043,7 +2038,7 @@ namespace AkademiTrack.ViewModels
                                         js.ExecuteScript("arguments[0].click();", continueButton);
                                     }
 
-                                    await Task.Delay(3000);
+                                    await Task.Delay(1500); // Reduced from 3000
                                     return true;
                                 }
                             }
@@ -2078,7 +2073,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(20));
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10)); // Reduced from 20
 
                 LogInfo("Looking for Feide login form...");
 
@@ -2099,7 +2094,6 @@ namespace AkademiTrack.ViewModels
                         }
                         catch (NoSuchElementException)
                         {
-                            // Try alternative selectors
                             try
                             {
                                 var altField = driver.FindElement(By.Name("feidename"));
@@ -2137,7 +2131,6 @@ namespace AkademiTrack.ViewModels
                 // Look for login button
                 try
                 {
-                    // Try multiple selectors for the login button
                     var buttonSelectors = new[]
                     {
                 "//button[contains(text(), 'Logg inn')]",
@@ -2169,7 +2162,6 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo("Found Feide login form - filling in credentials...");
 
-                    // Validate that we have credentials to use
                     if (string.IsNullOrEmpty(_loginEmail) || string.IsNullOrEmpty(_loginPassword))
                     {
                         LogError("Ingen innloggingsopplysninger tilgjengelig - kan ikke utføre automatisk innlogging");
@@ -2178,19 +2170,19 @@ namespace AkademiTrack.ViewModels
 
                     try
                     {
-                        // Clear and fill username
+                        // Clear and fill username (faster)
                         usernameField.Clear();
-                        await Task.Delay(500);
+                        await Task.Delay(200); // Reduced from 500
                         usernameField.SendKeys(_loginEmail);
                         LogDebug($"Username entered: {_loginEmail}");
 
-                        // Clear and fill password
+                        // Clear and fill password (faster)
                         passwordField.Clear();
-                        await Task.Delay(500);
+                        await Task.Delay(200); // Reduced from 500
                         passwordField.SendKeys(_loginPassword);
                         LogDebug("Password entered (hidden)");
 
-                        await Task.Delay(1000);
+                        await Task.Delay(500); // Reduced from 1000
 
                         // Submit the form
                         if (loginButton != null)
@@ -2202,7 +2194,6 @@ namespace AkademiTrack.ViewModels
                             }
                             catch
                             {
-                                // Try JavaScript click as fallback
                                 var js = (IJavaScriptExecutor)_webDriver;
                                 js.ExecuteScript("arguments[0].click();", loginButton);
                             }
@@ -2215,17 +2206,30 @@ namespace AkademiTrack.ViewModels
 
                         LogInfo("Feide login form submitted - waiting for response...");
 
-                        // Wait for redirect
-                        await Task.Delay(5000);
+                        // Reduced wait time and check URL multiple times
+                        for (int i = 0; i < 10; i++) // Check every 300ms for 3 seconds total
+                        {
+                            await Task.Delay(300);
 
-                        // Check if login was successful
-                        var currentUrl = _webDriver.Url;
-                        LogDebug($"Current URL after login attempt: {currentUrl}");
+                            var currentUrl = _webDriver.Url;
 
-                        // Check for successful login indicators
-                        if (currentUrl.Contains("isFeideinnlogget=true") ||
-                            currentUrl.Contains("ojr=timeplan") ||
-                            (!currentUrl.Contains("login") && !currentUrl.Contains("feide") && !currentUrl.Contains("org_selector")))
+                            // Check for successful login indicators
+                            if (currentUrl.Contains("isFeideinnlogget=true") ||
+                                currentUrl.Contains("ojr=timeplan") ||
+                                (!currentUrl.Contains("login") && !currentUrl.Contains("feide") && !currentUrl.Contains("org_selector")))
+                            {
+                                LogSuccess("Feide automatic login successful!");
+                                return true;
+                            }
+                        }
+
+                        // Final check
+                        var finalUrl = _webDriver.Url;
+                        LogDebug($"Final URL after login attempt: {finalUrl}");
+
+                        if (finalUrl.Contains("isFeideinnlogget=true") ||
+                            finalUrl.Contains("ojr=timeplan") ||
+                            (!finalUrl.Contains("login") && !finalUrl.Contains("feide") && !finalUrl.Contains("org_selector")))
                         {
                             LogSuccess("Feide automatic login successful!");
                             return true;
@@ -2233,7 +2237,7 @@ namespace AkademiTrack.ViewModels
                         else
                         {
                             LogInfo("Feide login appears to have failed - falling back to manual login");
-                            LogDebug($"Current URL indicates login failure: {currentUrl}");
+                            LogDebug($"Final URL indicates login failure: {finalUrl}");
                             return false;
                         }
                     }
