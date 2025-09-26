@@ -350,7 +350,7 @@
 								   Classes="setting-description"/>
 						<TextBox Text="{Binding SchoolName}"
 								 Classes="credential-input"
-								 Watermark="Akademiet Drammen"
+								 Watermark="Akademiet Drammen AS"
 								 ToolTip.Tip="Skriv inn skolens navn som det vises i innloggingen"/>
 					</StackPanel>
 				</Border>
