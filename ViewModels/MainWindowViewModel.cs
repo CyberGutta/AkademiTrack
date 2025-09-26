@@ -511,9 +511,6 @@ namespace AkademiTrack.ViewModels
 
             LogInfo("Applikasjon er klar");
 
-            // Load credentials from settings
-            _ = Task.Run(LoadCredentialsAsync);
-
             _processedNotificationsFile = Path.Combine(
                 Path.GetDirectoryName(GetCookiesFilePath()),
                 "processed_notifications.json"
@@ -536,7 +533,7 @@ namespace AkademiTrack.ViewModels
                 var settingsViewModel = new SettingsViewModel();
 
                 // Wait a moment for settings to load
-                await Task.Delay(500);
+                await Task.Delay(200);
 
                 var credentials = settingsViewModel.GetDecryptedCredentials();
 
@@ -546,17 +543,22 @@ namespace AkademiTrack.ViewModels
 
                 if (!string.IsNullOrEmpty(_loginEmail))
                 {
-                    LogInfo($"Lastet innloggingsinformasjon for: {_loginEmail}");
+                    LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
                 }
                 else
                 {
-                    LogInfo("Ingen lagrede innloggingsopplysninger funnet - bruker må konfigurere innstillinger");
+                    LogInfo("Ingen lagrede innloggingsopplysninger funnet");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Kunne ikke laste innloggingsopplysninger: {ex.Message}");
-                LogInfo("Bruker standardverdier for innlogging");
+                LogInfo("Fortsetter uten lagrede innloggingsopplysninger");
+
+                // Clear credentials on error
+                _loginEmail = "";
+                _loginPassword = "";
+                _schoolName = "";
             }
         }
 
@@ -1502,23 +1504,32 @@ namespace AkademiTrack.ViewModels
         {
             if (IsAutomationRunning) return;
 
-            // Validate credentials before starting
-            if (string.IsNullOrEmpty(_loginEmail) || string.IsNullOrEmpty(_loginPassword) || string.IsNullOrEmpty(_schoolName))
-            {
-                LogError("Mangler innloggingsopplysninger - åpne Innstillinger for å konfigurere");
-                ShowNotification("Mangler Innloggingsopplysninger",
-                    "Du må konfigurere e-post, passord og skolenavn i Innstillinger før automatisering kan starte.", "ERROR");
-                return;
-            }
-
             IsAutomationRunning = true;
             _cancellationTokenSource = new CancellationTokenSource();
 
             try
             {
                 LogInfo("Starter automatisering...");
-                LogInfo($"Bruker innloggingsopplysninger for: {_loginEmail}");
-                ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
+
+                // Always try to load/refresh credentials first
+                LogInfo("Laster innloggingsopplysninger...");
+                await LoadCredentialsAsync();
+
+                // Check if we have credentials after loading
+                bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
+                                     !string.IsNullOrEmpty(_loginPassword) &&
+                                     !string.IsNullOrEmpty(_schoolName);
+
+                if (hasCredentials)
+                {
+                    LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
+                    ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
+                }
+                else
+                {
+                    LogInfo("Ingen lagrede innloggingsopplysninger funnet - fortsetter med manuell innlogging");
+                    ShowNotification("Manual Login Required", "Ingen lagrede innloggingsopplysninger - åpner nettleser for manuell innlogging", "INFO");
+                }
 
                 Dictionary<string, string> cookies = null;
                 bool needsFreshLogin = false;
@@ -1566,10 +1577,17 @@ namespace AkademiTrack.ViewModels
                     needsFreshLogin = true;
                 }
 
-                // Step 2: Fresh login if needed (either no cookies or no valid parameters)
+                // Step 2: Fresh login if needed (works with OR without credentials)
                 if (needsFreshLogin || cookies == null)
                 {
-                    LogInfo("Åpner nettleser for ny innlogging og parameterinnhenting...");
+                    if (hasCredentials)
+                    {
+                        LogInfo("Åpner nettleser for automatisk innlogging...");
+                    }
+                    else
+                    {
+                        LogInfo("Åpner nettleser for manuell innlogging...");
+                    }
 
                     cookies = await GetCookiesViaBrowserAsync();
 
@@ -1579,7 +1597,14 @@ namespace AkademiTrack.ViewModels
                         return;
                     }
 
-                    LogSuccess($"Fikk {cookies.Count} nye cookies og oppdaterte parametere");
+                    if (hasCredentials)
+                    {
+                        LogSuccess($"Fikk {cookies.Count} nye cookies via automatisk innlogging");
+                    }
+                    else
+                    {
+                        LogSuccess($"Fikk {cookies.Count} nye cookies via manuell innlogging");
+                    }
                 }
 
                 // Ensure we have valid parameters
@@ -1737,24 +1762,44 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+
         private async Task<Dictionary<string, string>> GetCookiesViaBrowserAsync()
         {
             IWebDriver localWebDriver = null;
 
             try
             {
-                // Setup Chrome options
+                // Check if we should attempt automatic login or go straight to manual
+                bool shouldTryAutomatic = !string.IsNullOrEmpty(_loginEmail) &&
+                                         !string.IsNullOrEmpty(_loginPassword) &&
+                                         !string.IsNullOrEmpty(_schoolName);
+
+                // Setup Chrome options with conditional headless mode
                 var options = new ChromeOptions();
                 options.AddArgument("--no-sandbox");
                 options.AddArgument("--disable-dev-shm-usage");
-                options.AddArgument("--start-maximized");
+                options.AddArgument("--disable-gpu");
+                options.AddArgument("--disable-web-security");
+                options.AddArgument("--disable-features=VizDisplayCompositor");
+
+                if (shouldTryAutomatic)
+                {
+                    // Run headless for automatic login
+                    options.AddArgument("--headless");
+                    LogInfo("Forsøker automatisk innlogging i bakgrunnen...");
+                }
+                else
+                {
+                    // Show browser for manual login
+                    options.AddArgument("--start-maximized");
+                    LogInfo("Åpner synlig nettleser for manuell innlogging...");
+                }
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     options.AddArgument("--disable-gpu");
                 }
 
-                LogInfo("Initialiserer Chrome nettleser for automatisk innlogging...");
                 localWebDriver = new ChromeDriver(options);
                 _webDriver = localWebDriver;
 
@@ -1763,19 +1808,51 @@ namespace AkademiTrack.ViewModels
                 _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
 
                 // Wait for page to load
-                await Task.Delay(1500);
+                await Task.Delay(1000);
 
-                LogInfo("Utfører automatisk innlogging...");
+                bool loginSuccess = false;
 
-                // Attempt automatic login
-                bool loginSuccess = await PerformAutomaticLoginAsync();
-
-                if (!loginSuccess)
+                if (shouldTryAutomatic)
                 {
-                    LogInfo("Automatisk innlogging mislyktes - venter på manuell innlogging");
-                    LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
+                    LogInfo("Utfører rask automatisk innlogging...");
+                    loginSuccess = await PerformFastAutomaticLoginAsync();
 
-                    // Fall back to manual login wait
+                    if (loginSuccess)
+                    {
+                        LogSuccess("Automatisk innlogging fullført!");
+                    }
+                    else
+                    {
+                        LogInfo("Automatisk innlogging mislyktes - skifter til synlig modus for manuell innlogging");
+
+                        // Close headless browser and open visible one
+                        await CleanupWebDriverAsync(localWebDriver);
+
+                        // Recreate with visible browser
+                        var visibleOptions = new ChromeOptions();
+                        visibleOptions.AddArgument("--no-sandbox");
+                        visibleOptions.AddArgument("--disable-dev-shm-usage");
+                        visibleOptions.AddArgument("--start-maximized");
+
+                        localWebDriver = new ChromeDriver(visibleOptions);
+                        _webDriver = localWebDriver;
+
+                        _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
+                        await Task.Delay(1000);
+
+                        LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
+                        var targetReached = await WaitForTargetUrlAsync();
+                        if (!targetReached)
+                        {
+                            LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
+                            return null;
+                        }
+                    }
+                }
+                else
+                {
+                    // Manual login from the start - this is the key fix!
+                    LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
                     var targetReached = await WaitForTargetUrlAsync();
                     if (!targetReached)
                     {
@@ -1791,7 +1868,6 @@ namespace AkademiTrack.ViewModels
 
                 LogInfo("Ekstraherer cookies fra nettleser økten...");
 
-                // Check if driver is still valid
                 if (!IsWebDriverValid(_webDriver))
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
@@ -1843,8 +1919,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
-        private async Task<bool> PerformAutomaticLoginAsync()
+        private async Task<bool> PerformFastAutomaticLoginAsync()
         {
             try
             {
@@ -1854,11 +1929,11 @@ namespace AkademiTrack.ViewModels
                     return false;
                 }
 
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10)); // Reduced from 20
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(6)); // Reduced timeout for speed
 
-                LogDebug("Starting automatic login process...");
+                LogDebug("Starting fast automatic login process...");
 
-                // Step 1: Wait for and click the FEIDE button
+                // Step 1: Quick FEIDE button detection and click
                 try
                 {
                     LogDebug("Looking for FEIDE button...");
@@ -1866,18 +1941,27 @@ namespace AkademiTrack.ViewModels
                     {
                         try
                         {
-                            var buttons = driver.FindElements(By.XPath("//button[contains(@class, 'button') or contains(., 'FEIDE')]"));
-                            foreach (var btn in buttons)
+                            // Try multiple selectors quickly
+                            var selectors = new[]
                             {
-                                if (btn.Displayed && btn.Enabled &&
-                                    (btn.Text.Contains("FEIDE") || btn.GetAttribute("innerHTML").Contains("FEIDE")))
+                        "//span[contains(@class, 'feide_icon')]/ancestor::button",
+                        "//button[contains(., 'FEIDE')]",
+                        "//button[contains(@class, 'button')]"
+                    };
+
+                            foreach (var selector in selectors)
+                            {
+                                var elements = driver.FindElements(By.XPath(selector));
+                                foreach (var btn in elements)
                                 {
-                                    return btn;
+                                    if (btn.Displayed && btn.Enabled &&
+                                        (btn.Text.Contains("FEIDE") || btn.GetAttribute("innerHTML").Contains("FEIDE")))
+                                    {
+                                        return btn;
+                                    }
                                 }
                             }
-
-                            var feideBtn = driver.FindElement(By.XPath("//span[contains(@class, 'feide_icon')]/ancestor::button"));
-                            return feideBtn?.Displayed == true ? feideBtn : null;
+                            return null;
                         }
                         catch (NoSuchElementException)
                         {
@@ -1887,13 +1971,9 @@ namespace AkademiTrack.ViewModels
 
                     if (feideButton != null)
                     {
-                        LogInfo("Found FEIDE button - clicking to continue to Feide authentication...");
+                        LogDebug("Found FEIDE button - clicking...");
                         feideButton.Click();
-                        await Task.Delay(1500); // Reduced from 3000
-                    }
-                    else
-                    {
-                        LogDebug("FEIDE button not found, may already be on organization selection");
+                        await Task.Delay(800); // Reduced delay
                     }
                 }
                 catch (WebDriverTimeoutException)
@@ -1901,35 +1981,30 @@ namespace AkademiTrack.ViewModels
                     LogDebug("FEIDE button not found within timeout, continuing...");
                 }
 
-                // Step 2: Handle organization selection
-                if (await HandleOrganizationSelectionAsync())
+                // Step 2: Fast organization selection
+                if (await HandleFastOrganizationSelectionAsync())
                 {
-                    LogDebug("Organization selection completed successfully");
+                    LogDebug("Organization selection completed");
                 }
 
-                // Step 3: Handle the actual Feide login form
-                return await HandleFeideLoginFormAsync();
+                // Step 3: Fast Feide login form handling
+                return await HandleFastFeideLoginFormAsync();
             }
             catch (Exception ex)
             {
-                LogError($"Error during automatic login: {ex.Message}");
-                if (ShowDetailedLogs)
-                {
-                    LogDebug($"Stack trace: {ex.StackTrace}");
-                }
+                LogError($"Error during fast automatic login: {ex.Message}");
                 return false;
             }
         }
 
-        private async Task<bool> HandleOrganizationSelectionAsync()
+        private async Task<bool> HandleFastOrganizationSelectionAsync()
         {
             try
             {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(8)); // Reduced from 15
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(5)); // Reduced timeout
 
-                LogDebug("Checking for organization selection...");
+                LogDebug("Fast organization selection check...");
 
-                // Look for the organization search field
                 IWebElement orgSearchField = null;
                 try
                 {
@@ -1948,97 +2023,63 @@ namespace AkademiTrack.ViewModels
                 }
                 catch (WebDriverTimeoutException)
                 {
-                    LogDebug("Organization selection field not found - may not be needed");
+                    LogDebug("Organization selection not needed");
                     return true;
                 }
 
                 if (orgSearchField != null)
                 {
-                    LogInfo($"Found organization selector - searching for '{_schoolName}'...");
+                    LogDebug($"Fast search for '{_schoolName}'...");
 
-                    // Clear any existing text and type school name
+                    // Fast typing without delays
                     orgSearchField.Clear();
-                    await Task.Delay(200); // Reduced from 500
                     orgSearchField.SendKeys(_schoolName);
-                    await Task.Delay(1000); // Reduced from 2000
+                    await Task.Delay(500); // Minimal delay for search results
 
-                    // Wait for and select the school from dropdown
+                    // Quick school selection
                     try
                     {
                         var schoolOption = wait.Until(driver =>
                         {
-                            try
+                            var selectors = new[]
                             {
-                                var selectors = new[]
-                                {
-                            $"//li[contains(text(), '{_schoolName}')]",
-                            $"//div[contains(text(), '{_schoolName}')]",
-                            $"//option[contains(text(), '{_schoolName}')]",
-                            $"//*[contains(@class, 'org') and contains(text(), '{_schoolName}')]",
-                            $"//*[contains(text(), 'Akademiet Drammen')]"
-                        };
+                        $"//li[contains(text(), '{_schoolName}')]",
+                        $"//div[contains(text(), '{_schoolName}')]",
+                        $"//*[contains(text(), 'Akademiet Drammen')]"
+                    };
 
-                                foreach (var selector in selectors)
+                            foreach (var selector in selectors)
+                            {
+                                try
                                 {
-                                    try
+                                    var elements = driver.FindElements(By.XPath(selector));
+                                    foreach (var elem in elements)
                                     {
-                                        var elements = driver.FindElements(By.XPath(selector));
-                                        foreach (var elem in elements)
+                                        if (elem.Displayed && elem.Enabled)
                                         {
-                                            if (elem.Displayed && elem.Enabled)
-                                            {
-                                                return elem;
-                                            }
+                                            return elem;
                                         }
                                     }
-                                    catch (NoSuchElementException) { continue; }
                                 }
-                                return null;
+                                catch { continue; }
                             }
-                            catch
-                            {
-                                return null;
-                            }
+                            return null;
                         });
 
                         if (schoolOption != null)
                         {
-                            LogInfo("Found school in list - clicking to select...");
+                            LogDebug("Found school - clicking...");
+                            schoolOption.Click();
+                            await Task.Delay(300);
 
-                            try
-                            {
-                                schoolOption.Click();
-                            }
-                            catch
-                            {
-                                var js = (IJavaScriptExecutor)_webDriver;
-                                js.ExecuteScript("arguments[0].click();", schoolOption);
-                            }
-
-                            await Task.Delay(500); // Reduced from 1000
-
-                            // Look for and click the continue button
+                            // Fast continue button click
                             try
                             {
                                 var continueButton = _webDriver.FindElement(By.Id("selectorg_button"));
-                                if (continueButton != null && continueButton.Enabled)
+                                if (continueButton?.Enabled == true)
                                 {
-                                    LogInfo("Clicking Continue button...");
-
-                                    var continueWait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(5)); // Reduced from 10
-                                    continueWait.Until(driver => continueButton.Enabled);
-
-                                    try
-                                    {
-                                        continueButton.Click();
-                                    }
-                                    catch
-                                    {
-                                        var js = (IJavaScriptExecutor)_webDriver;
-                                        js.ExecuteScript("arguments[0].click();", continueButton);
-                                    }
-
-                                    await Task.Delay(1500); // Reduced from 3000
+                                    continueButton.Click();
+                                    await Task.Delay(800);
                                     return true;
                                 }
                             }
@@ -2047,15 +2088,10 @@ namespace AkademiTrack.ViewModels
                                 LogDebug("Continue button not found");
                             }
                         }
-                        else
-                        {
-                            LogError($"Could not find '{_schoolName}' in organization list");
-                            return false;
-                        }
                     }
                     catch (WebDriverTimeoutException)
                     {
-                        LogError($"Timeout while searching for '{_schoolName}' in organization list");
+                        LogError($"Timeout while searching for '{_schoolName}'");
                         return false;
                     }
                 }
@@ -2064,79 +2100,66 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
-                LogError($"Error during organization selection: {ex.Message}");
+                LogError($"Error during fast organization selection: {ex.Message}");
                 return false;
             }
         }
 
-        private async Task<bool> HandleFeideLoginFormAsync()
+        private async Task<bool> HandleFastFeideLoginFormAsync()
         {
             try
             {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(10)); // Reduced from 20
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(8)); // Reduced timeout
 
-                LogInfo("Looking for Feide login form...");
+                LogDebug("Fast Feide form detection...");
 
-                // Wait for the login form to appear
+                // Quick parallel field detection
                 IWebElement usernameField = null;
                 IWebElement passwordField = null;
                 IWebElement loginButton = null;
 
-                // Look for username field
                 try
                 {
+                    // Find username field quickly
                     usernameField = wait.Until(driver =>
                     {
                         try
                         {
                             var field = driver.FindElement(By.Id("username"));
-                            return field.Displayed ? field : null;
+                            if (field.Displayed) return field;
                         }
-                        catch (NoSuchElementException)
-                        {
-                            try
-                            {
-                                var altField = driver.FindElement(By.Name("feidename"));
-                                return altField.Displayed ? altField : null;
-                            }
-                            catch
-                            {
-                                return null;
-                            }
-                        }
-                    });
-                }
-                catch (WebDriverTimeoutException)
-                {
-                    LogDebug("Username field not found within timeout");
-                }
+                        catch { }
 
-                // Look for password field
-                try
-                {
-                    passwordField = _webDriver.FindElement(By.Id("password"));
-                }
-                catch (NoSuchElementException)
-                {
+                        try
+                        {
+                            var altField = driver.FindElement(By.Name("feidename"));
+                            if (altField.Displayed) return altField;
+                        }
+                        catch { }
+
+                        return null;
+                    });
+
+                    // Find password field quickly
                     try
                     {
-                        passwordField = _webDriver.FindElement(By.Name("password"));
+                        passwordField = _webDriver.FindElement(By.Id("password"));
+                        if (!passwordField.Displayed)
+                        {
+                            passwordField = _webDriver.FindElement(By.Name("password"));
+                        }
                     }
                     catch (NoSuchElementException)
                     {
                         LogDebug("Password field not found");
                     }
-                }
 
-                // Look for login button
-                try
-                {
+                    // Find login button quickly
                     var buttonSelectors = new[]
                     {
-                "//button[contains(text(), 'Logg inn')]",
                 "//button[@type='submit']",
-                "//input[@value='Logg inn']",
-                "//button[contains(@class, 'button-primary')]"
+                "//button[contains(text(), 'Logg inn')]",
+                "//input[@value='Logg inn']"
             };
 
                     foreach (var selector in buttonSelectors)
@@ -2144,122 +2167,101 @@ namespace AkademiTrack.ViewModels
                         try
                         {
                             loginButton = _webDriver.FindElement(By.XPath(selector));
-                            if (loginButton.Displayed && loginButton.Enabled)
-                            {
-                                break;
-                            }
+                            if (loginButton.Displayed && loginButton.Enabled) break;
                             loginButton = null;
                         }
-                        catch (NoSuchElementException) { continue; }
+                        catch { continue; }
                     }
                 }
-                catch (NoSuchElementException)
+                catch (WebDriverTimeoutException)
                 {
-                    LogDebug("Login button not found");
+                    LogDebug("Login form not found within timeout");
+                    return false;
                 }
 
                 if (usernameField != null && passwordField != null)
                 {
-                    LogInfo("Found Feide login form - filling in credentials...");
-
-                    if (string.IsNullOrEmpty(_loginEmail) || string.IsNullOrEmpty(_loginPassword))
-                    {
-                        LogError("Ingen innloggingsopplysninger tilgjengelig - kan ikke utføre automatisk innlogging");
-                        return false;
-                    }
+                    LogDebug("Fast form filling...");
 
                     try
                     {
-                        // Clear and fill username (faster)
+                        // Fast form filling without delays
                         usernameField.Clear();
-                        await Task.Delay(200); // Reduced from 500
                         usernameField.SendKeys(_loginEmail);
-                        LogDebug($"Username entered: {_loginEmail}");
 
-                        // Clear and fill password (faster)
                         passwordField.Clear();
-                        await Task.Delay(200); // Reduced from 500
                         passwordField.SendKeys(_loginPassword);
-                        LogDebug("Password entered (hidden)");
 
-                        await Task.Delay(500); // Reduced from 1000
+                        await Task.Delay(200); // Minimal delay
 
-                        // Submit the form
+                        // Submit form
                         if (loginButton != null)
                         {
                             LogDebug("Clicking login button...");
-                            try
-                            {
-                                loginButton.Click();
-                            }
-                            catch
-                            {
-                                var js = (IJavaScriptExecutor)_webDriver;
-                                js.ExecuteScript("arguments[0].click();", loginButton);
-                            }
+                            loginButton.Click();
                         }
                         else
                         {
-                            LogDebug("No login button found, trying Enter key...");
+                            LogDebug("Using Enter key...");
                             passwordField.SendKeys(Keys.Enter);
                         }
 
-                        LogInfo("Feide login form submitted - waiting for response...");
+                        LogDebug("Form submitted - checking for success...");
 
-                        // Reduced wait time and check URL multiple times
-                        for (int i = 0; i < 10; i++) // Check every 300ms for 3 seconds total
+                        // Fast success checking - check every 200ms for 2 seconds
+                        for (int i = 0; i < 10; i++)
                         {
-                            await Task.Delay(300);
+                            await Task.Delay(200);
 
                             var currentUrl = _webDriver.Url;
 
-                            // Check for successful login indicators
                             if (currentUrl.Contains("isFeideinnlogget=true") ||
                                 currentUrl.Contains("ojr=timeplan") ||
                                 (!currentUrl.Contains("login") && !currentUrl.Contains("feide") && !currentUrl.Contains("org_selector")))
                             {
-                                LogSuccess("Feide automatic login successful!");
+                                LogSuccess("Fast Feide login successful!");
                                 return true;
                             }
                         }
 
                         // Final check
                         var finalUrl = _webDriver.Url;
-                        LogDebug($"Final URL after login attempt: {finalUrl}");
-
                         if (finalUrl.Contains("isFeideinnlogget=true") ||
                             finalUrl.Contains("ojr=timeplan") ||
                             (!finalUrl.Contains("login") && !finalUrl.Contains("feide") && !finalUrl.Contains("org_selector")))
                         {
-                            LogSuccess("Feide automatic login successful!");
+                            LogSuccess("Fast Feide login successful!");
                             return true;
                         }
                         else
                         {
-                            LogInfo("Feide login appears to have failed - falling back to manual login");
-                            LogDebug($"Final URL indicates login failure: {finalUrl}");
+                            LogDebug("Fast login appears to have failed");
                             return false;
                         }
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Error during form submission: {ex.Message}");
+                        LogError($"Error during fast form submission: {ex.Message}");
                         return false;
                     }
                 }
                 else
                 {
-                    LogInfo("Could not find complete Feide login form - falling back to manual login");
-                    LogDebug($"Username field found: {usernameField != null}, Password field found: {passwordField != null}");
+                    LogDebug("Complete login form not found");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                LogError($"Error in Feide login form handling: {ex.Message}");
+                LogError($"Error in fast Feide form handling: {ex.Message}");
                 return false;
             }
         }
+
+
+        
+
+        
 
         private async Task<UserParameters> QuickParameterCapture()
         {
@@ -2416,9 +2418,11 @@ namespace AkademiTrack.ViewModels
                     checkCount++;
                     var currentUrl = _webDriver.Url;
 
-                    if (checkCount % 15 == 0) // Log every 30 seconds (15 * 2 second delay)
+                    // Show progress every 30 seconds instead of logging URL
+                    if (checkCount % 15 == 0) // Every 30 seconds (15 * 2 second delay)
                     {
-                        LogDebug($"Current URL: {currentUrl}");
+                        var elapsed = checkCount * 2;
+                        LogInfo($"Venter på innlogging... ({elapsed} sekunder)");
                     }
 
                     if (currentUrl.Contains("isFeideinnlogget=true") && currentUrl.Contains("ojr=timeplan"))
@@ -2446,7 +2450,6 @@ namespace AkademiTrack.ViewModels
                 {
                     LogDebug($"Error checking URL: {ex.Message}");
 
-                    // If we can't check the URL, the browser might be closed
                     if (!IsWebDriverValid(_webDriver))
                     {
                         LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
