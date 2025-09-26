@@ -955,9 +955,9 @@ namespace AkademiTrack.ViewModels
             // More comprehensive allowed notifications list
             var allowedNotifications = new[]
             {
-        "Automation Started",
-        "Automation Stopped",
-        "Registration Success",
+        "Automatisering startet",
+        "Automatisering stoppet",
+        "Registrering vellykket",
         "Alle Studietimer Registrert",
         "Ingen STUDIE-økter funnet for i dag",
         "Ingen Flere Økter",
@@ -993,8 +993,7 @@ namespace AkademiTrack.ViewModels
             if (level == "ERROR" || title.Contains("FEIL:"))
                 return true;
 
-            // Registration success is always high priority
-            if (title == "Registration Success")
+            if (title == "Registrering vellykket")
                 return true;
 
             // Admin notifications are always high priority  
@@ -1268,7 +1267,7 @@ namespace AkademiTrack.ViewModels
         private void ShowRegistrationSuccess(string sessionTime)
         {
             // This will get high priority automatically due to title matching
-            ShowNotification("Registration Success", $"Registrert for STU {sessionTime}", "SUCCESS");
+            ShowNotification("Registrering vellykket", $"Registrert for STU {sessionTime}", "SUCCESS");
         }
 
         // NETWORK ERROR SPECIFIC HANDLING  
@@ -1509,7 +1508,7 @@ namespace AkademiTrack.ViewModels
                     _activeOverlayWindows.Clear();
                 }
 
-                bool isRegistrationSuccess = title == "Registration Success";
+                bool isRegistrationSuccess = title == "Registrering vellykket";
                 bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STUDIE-økter");
 
                 if (!isRegistrationSuccess && !isPriorityNotification && _activeOverlayWindows.Count > 0)
@@ -1812,7 +1811,7 @@ namespace AkademiTrack.ViewModels
                 if (hasCredentials)
                 {
                     LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
-                    ShowNotification("Automation Started", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
+                    ShowNotification("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
                 }
                 else
                 {
@@ -1913,7 +1912,7 @@ namespace AkademiTrack.ViewModels
             catch (OperationCanceledException)
             {
                 LogInfo("Automatisering stoppet av bruker");
-                ShowNotification("Automation Stopped", "Overvåking har blitt stoppet", "INFO");
+                ShowNotification("Automatisering stoppet", "Overvåking har blitt stoppet", "INFO");
             }
             catch (Exception ex)
             {
@@ -1937,7 +1936,7 @@ namespace AkademiTrack.ViewModels
             {
                 _cancellationTokenSource.Cancel();
                 LogInfo("Stopp forespurt - stopper automatisering...");
-                ShowNotification("Automation Stopped", "Automatisering har blitt stoppet av bruker", "INFO");
+                ShowNotification("Automatisering stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
             }
         }
 
@@ -2160,7 +2159,7 @@ namespace AkademiTrack.ViewModels
                 if (!IsWebDriverValid(_webDriver))
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
-                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                    ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return null;
                 }
 
@@ -2181,7 +2180,7 @@ namespace AkademiTrack.ViewModels
                                                 webEx.Message.Contains("disconnected"))
             {
                 LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
-                ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -2189,7 +2188,7 @@ namespace AkademiTrack.ViewModels
                                                         invEx.Message.Contains("no such session"))
             {
                 LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
-                ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -2197,7 +2196,7 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Nettleser innlogging feilet: {ex.Message}");
                 LogDebug($"Exception type: {ex.GetType().Name}");
-                ShowNotification("Automation Stopped", "Innlogging feilet - automatisering stoppet", "ERROR");
+                ShowNotification("Automatisering stoppet", "Innlogging feilet - automatisering stoppet", "ERROR");
                 await ForceStopAutomationAsync();
                 return null;
             }
@@ -2700,7 +2699,7 @@ namespace AkademiTrack.ViewModels
                     if (!IsWebDriverValid(_webDriver))
                     {
                         LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                        ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                        ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                         return false;
                     }
 
@@ -2725,14 +2724,14 @@ namespace AkademiTrack.ViewModels
                                                     webEx.Message.Contains("disconnected"))
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                    ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return false;
                 }
                 catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
                                                             invEx.Message.Contains("no such session"))
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                    ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                    ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                     return false;
                 }
                 catch (Exception ex)
@@ -2742,7 +2741,7 @@ namespace AkademiTrack.ViewModels
                     if (!IsWebDriverValid(_webDriver))
                     {
                         LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                        ShowNotification("Automation Stopped", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                        ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                         return false;
                     }
                 }
@@ -2751,7 +2750,7 @@ namespace AkademiTrack.ViewModels
             }
 
             LogError("Automatisering stoppet - innlogging tidsavbrudd");
-            ShowNotification("Automation Stopped", "Innlogging tidsavbrudd - automatisering stoppet", "ERROR");
+            ShowNotification("Automatisering stoppet", "Innlogging tidsavbrudd - automatisering stoppet", "ERROR");
             return false;
         }
 
@@ -2924,10 +2923,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
-        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
-        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
-        // OPTIMIZED MONITORING LOOP - SINGLE API CALL, TIME-BASED CHECKING
         private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken, Dictionary<string, string> cookies)
         {
             int cycleCount = 0;
@@ -3040,7 +3035,7 @@ namespace AkademiTrack.ViewModels
                                     if (registrationResult)
                                     {
                                         LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
-                                        ShowNotification("Registration Success",
+                                        ShowNotification("Registrering vellykket",
                                             $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
 
                                         // Mark as registered
