@@ -395,13 +395,13 @@
 				<TextBlock Text="Avanserte innstillinger" Classes="section-header"/>
 				<Border Classes="setting-item">
 					<StackPanel Spacing="12">
-						<TextBlock Text="Vis aktivitetslogger" Classes="setting-title"/>
-						<TextBlock Text="Aktiver for å vise aktivitetslogger i panelet. Loggene viser applikasjonsstatus og feilmeldinger."
+						<TextBlock Text="Vis nerde greier" Classes="setting-title"/>
+						<TextBlock Text="Aktiver for å vise nerde greier i panelet. Knappen viser applikasjonsstatus og feilmeldinger."
 								   Classes="setting-description"/>
-						<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis Logger|Skjul Logger'}"
+						<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis nerde greier|Skjul nerde greier'}"
 								Classes="settings-action"
 								Command="{Binding ToggleActivityLogCommand}"
-								ToolTip.Tip="Viser eller skjuler aktivitetsloggen"
+								ToolTip.Tip="Viser eller skjuler nerde greier"
 								FontSize="14"
 								MinWidth="160"
 								Padding="20,12"/>
@@ -446,7 +446,7 @@
 						<ColumnDefinition Width="Auto"/>
 					</Grid.ColumnDefinitions>
 					<TextBlock Grid.Column="0"
-							   Text="Aktivitetslogg"
+							   Text="Nerde greier"
 							   FontWeight="SemiBold"
 							   FontSize="16"
 							   Foreground="#495057"
