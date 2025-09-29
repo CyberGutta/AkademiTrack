@@ -1,0 +1,179 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:AkademiTrack.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="500"
+        x:Class="AkademiTrack.Views.FeideWindow"
+        x:DataType="vm:FeideWindowViewModel"
+        Title="Feide Pålogging - AkademiTrack"
+        Width="450" Height="500"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+		Icon="/Assets/AT-Transparrent.png">
+
+	<Window.Styles>
+		<Style Selector="TextBox">
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Background" Value="#F5F5F5"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="TextBox:focus">
+			<Setter Property="BorderBrush" Value="#4A90E2"/>
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
+		<Style Selector="TextBlock.label">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
+		</Style>
+
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#4A90E2"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+
+		<Style Selector="Button.primary:pointerover">
+			<Setter Property="Background" Value="#3A7BC8"/>
+		</Style>
+
+		<Style Selector="Button.primary:disabled">
+			<Setter Property="Background" Value="#CCCCCC"/>
+			<Setter Property="Cursor" Value="Arrow"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid RowDefinitions="Auto,*,Auto" Background="White">
+		<!-- Header -->
+		<Border Grid.Row="0" Background="#4A90E2" Padding="30,25">
+			<StackPanel Spacing="8">
+				<TextBlock Text="Feide Pålogging"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+				<TextBlock Text="Vennligst logg inn med din Feide-konto"
+                           FontSize="13"
+                           Foreground="#E8F0F8"/>
+			</StackPanel>
+		</Border>
+
+		<!-- Content -->
+		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+			<StackPanel Margin="30,30,30,20" Spacing="20">
+
+				<!-- Info Box -->
+				<Border Background="#F0F7FF"
+                        BorderBrush="#4A90E2"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="15">
+					<StackPanel Spacing="8">
+						<TextBlock Text="ℹ️ Informasjon"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="#2C5F8D"/>
+						<TextBlock TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#2C5F8D">
+							Oppgi dine Feide-innloggingsdetaljer. Disse vil lagres kryptert lokalt på din enhet og brukes for automatisk fremmøteregistrering.
+						</TextBlock>
+					</StackPanel>
+				</Border>
+
+				<!-- School Name -->
+				<StackPanel Spacing="8">
+					<TextBlock Text="Skolenavn" Classes="label"/>
+					<TextBox Name="SchoolNameTextBox"
+                             Watermark="F.eks: Akademiet"
+                             Text="{Binding SchoolName}"/>
+					<TextBlock Text="Navnet på din skole eller utdanningsinstitusjon"
+                               FontSize="11"
+                               Foreground="#666666"
+                               Margin="0,2,0,0"/>
+				</StackPanel>
+
+				<!-- Username -->
+				<StackPanel Spacing="8">
+					<TextBlock Text="Feide Brukernavn" Classes="label"/>
+					<TextBox Name="UsernameTextBox"
+                             Watermark="F.eks: fornavn.etternavn@skole.no"
+                             Text="{Binding FeideUsername}"/>
+					<TextBlock Text="Din fulle Feide e-postadresse"
+                               FontSize="11"
+                               Foreground="#666666"
+                               Margin="0,2,0,0"/>
+				</StackPanel>
+
+				<!-- Password -->
+				<StackPanel Spacing="8">
+					<TextBlock Text="Feide Passord" Classes="label"/>
+					<TextBox Name="PasswordTextBox"
+                             Watermark="Ditt Feide-passord"
+                             PasswordChar="●"
+                             Text="{Binding FeidePassword}"/>
+					<TextBlock Text="Ditt Feide-passord lagres kryptert"
+                               FontSize="11"
+                               Foreground="#666666"
+                               Margin="0,2,0,0"/>
+				</StackPanel>
+
+				<!-- Error Message -->
+				<Border Background="#FFE8E8"
+                        BorderBrush="#FF4444"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        IsVisible="{Binding HasError}">
+					<TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="#CC0000"
+                               TextWrapping="Wrap"
+                               FontSize="12"/>
+				</Border>
+
+			</StackPanel>
+		</ScrollViewer>
+
+		<!-- Footer -->
+		<Border Grid.Row="2"
+                Background="#F9F9F9"
+                BorderBrush="#E0E0E0"
+                BorderThickness="0,1,0,0"
+                Padding="30,20">
+			<Grid ColumnDefinitions="*,Auto">
+
+				<!-- Exit Button -->
+				<Button Grid.Column="0"
+                        Content="Avslutt"
+                        Command="{Binding ExitCommand}"
+                        Padding="16,10"
+                        Background="Transparent"
+                        BorderBrush="#CCCCCC"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        FontSize="13"
+                        HorizontalAlignment="Left"
+                        Cursor="Hand"/>
+
+				<!-- Save Button -->
+				<Button Grid.Column="1"
+                        Content="{Binding SaveButtonText}"
+                        Command="{Binding SaveCommand}"
+                        IsEnabled="{Binding CanSave}"
+                        Classes="primary"
+                        MinWidth="140"/>
+			</Grid>
+		</Border>
+	</Grid>
+</Window>

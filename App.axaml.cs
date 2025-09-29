@@ -1,6 +1,5 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using AkademiTrack.ViewModels;
 using AkademiTrack.Views;
@@ -11,6 +10,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Avalonia.Markup.Xaml;
 
 namespace AkademiTrack
 {
@@ -25,78 +25,89 @@ namespace AkademiTrack
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Check if user is already activated synchronously first
+                // Først sjekk om bruker er aktivert
                 bool isActivated = CheckActivationStatus();
                 if (isActivated)
                 {
-                    // Start async verification without blocking
-                    _ = Task.Run(async () =>
+                    // Sjekk Feide credentials
+                    bool hasFeideCredentials = CheckFeideCredentials();
+
+                    if (!hasFeideCredentials)
                     {
-                        try
-                        {
-                            var activationData = GetLocalActivationData();
-                            if (activationData != null && !string.IsNullOrEmpty(activationData.ActivationKey))
-                            {
-                                bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
-                                if (!keyStillExists)
-                                {
-                                    // Key doesn't exist anymore - delete local file and show login
-                                    DeleteActivationFile();
-                                    await Dispatcher.UIThread.InvokeAsync(() =>
-                                    {
-                                        // Close current window and create new login window
-                                        var currentWindow = desktop.MainWindow;
-                                        var loginWindow = new LoginWindow();
-                                        desktop.MainWindow = loginWindow;
-                                        loginWindow.Show();
-                                        currentWindow?.Close();
-                                    });
-                                    return;
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Remote verification error: {ex.Message}");
-                            // Continue with normal flow on error
-                        }
-                    });
-
-                    // Continue with normal activated flow
-                    bool shouldShowTutorial = ShouldShowTutorial();
-                    if (shouldShowTutorial)
-                    {
-                        // Show tutorial first
-                        var tutorialWindow = new TutorialWindow();
-                        var tutorialViewModel = new TutorialWindowViewModel();
-
-                        // Handle tutorial completion - show main window after tutorial
-                        tutorialViewModel.ContinueRequested += (s, e) =>
-                        {
-                            var mainWindow = new MainWindow();
-                            mainWindow.Show();
-                            tutorialWindow.Close();
-                            desktop.MainWindow = mainWindow;
-                        };
-
-                        // Handle tutorial exit - close application
-                        tutorialViewModel.ExitRequested += (s, e) =>
-                        {
-                            desktop.Shutdown();
-                        };
-
-                        tutorialWindow.DataContext = tutorialViewModel;
-                        desktop.MainWindow = tutorialWindow;
+                        // Viser Feide setup-vindu etter aktivering
+                        desktop.MainWindow = new FeideWindow();
                     }
                     else
                     {
-                        // Tutorial already seen, show main window directly
+                        // Start asynkron verifisering i bakgrunnen
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var activationData = GetLocalActivationData();
+                                if (activationData != null && !string.IsNullOrEmpty(activationData.ActivationKey))
+                                {
+                                    bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
+                                    if (!keyStillExists)
+                                    {
+                                        // Nøkkelen finnes ikke lenger – slett lokalt og vis login
+                                        DeleteActivationFile();
+                                        await Dispatcher.UIThread.InvokeAsync(() =>
+                                        {
+                                            var currentWindow = desktop.MainWindow;
+                                            var loginWindow = new LoginWindow();
+                                            desktop.MainWindow = loginWindow;
+                                            loginWindow.Show();
+                                            currentWindow?.Close();
+                                        });
+                                        return;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Remote verification error: {ex.Message}");
+                                // Fortsetter normal flyt ved feil
+                            }
+                        });
+
+                        // 🚫 Tutorial deaktivert – her kan du reaktivere hvis ønskelig
+                        /*
+                        bool shouldShowTutorial = ShouldShowTutorial();
+                        if (shouldShowTutorial)
+                        {
+                            var tutorialWindow = new TutorialWindow();
+                            var tutorialViewModel = new TutorialWindowViewModel();
+
+                            tutorialViewModel.ContinueRequested += (s, e) =>
+                            {
+                                var mainWindow = new MainWindow();
+                                mainWindow.Show();
+                                tutorialWindow.Close();
+                                desktop.MainWindow = mainWindow;
+                            };
+
+                            tutorialViewModel.ExitRequested += (s, e) =>
+                            {
+                                desktop.Shutdown();
+                            };
+
+                            tutorialWindow.DataContext = tutorialViewModel;
+                            desktop.MainWindow = tutorialWindow;
+                        }
+                        else
+                        {
+                            desktop.MainWindow = new MainWindow();
+                        }
+                        */
+
+                        // Standard flyt – gå rett til hovedvinduet
                         desktop.MainWindow = new MainWindow();
                     }
                 }
                 else
                 {
-                    // User needs to login, show login window
+                    // Bruker må logge inn først
                     desktop.MainWindow = new LoginWindow();
                 }
             }
@@ -126,6 +137,38 @@ namespace AkademiTrack
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking activation status: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool CheckFeideCredentials()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string settingsPath = Path.Combine(appDataDir, "settings.json");
+
+                if (File.Exists(settingsPath))
+                {
+                    string json = File.ReadAllText(settingsPath);
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    return settings != null &&
+                           !string.IsNullOrEmpty(settings.EncryptedLoginEmail) &&
+                           !string.IsNullOrEmpty(settings.EncryptedLoginPassword) &&
+                           !string.IsNullOrEmpty(settings.EncryptedSchoolName);
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking Feide credentials: {ex.Message}");
                 return false;
             }
         }
@@ -167,7 +210,7 @@ namespace AkademiTrack
                 httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
-                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
+                string supabaseKey = "YOUR_SUPABASE_KEY";
 
                 var url = $"{supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}&select=id,is_activated";
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -175,31 +218,26 @@ namespace AkademiTrack
                 request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
                 request.Headers.Add("Accept", "application/json");
 
-                System.Diagnostics.Debug.WriteLine($"Checking if activation key still exists: {activationKey}");
-
                 var response = await httpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to check activation key - HTTP {response.StatusCode}");
-                    return true; // Assume valid on network errors
+                    return true; // Antar gyldig ved nettverksfeil
                 }
 
                 var responseContent = await response.Content.ReadAsStringAsync();
                 var records = JsonSerializer.Deserialize<RemoteKeyRecord[]>(responseContent, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 });
 
-                bool exists = records?.Any(r => r.IsActivated) == true;
-                System.Diagnostics.Debug.WriteLine($"Key exists and is activated: {exists}");
-                return exists;
+                return records?.Any(r => r.IsActivated) == true;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking activation key: {ex.Message}");
-                return true; // Assume valid on errors
+                return true;
             }
             finally
             {
@@ -229,6 +267,8 @@ namespace AkademiTrack
             }
         }
 
+        /*
+        // 🚫 Tutorial logikk – beholdt, men deaktivert
         private bool ShouldShowTutorial()
         {
             try
@@ -249,16 +289,16 @@ namespace AkademiTrack
                     return tutorialSettings?.DontShowTutorial != true;
                 }
 
-                // If file doesn't exist, show tutorial
+                // Hvis ingen fil – vis tutorial
                 return true;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking tutorial settings: {ex.Message}");
-                // If there's an error, show tutorial to be safe
-                return true;
+                return true; // Som fallback: vis tutorial
             }
         }
+        */
     }
 
     public class ActivationData
@@ -277,9 +317,12 @@ namespace AkademiTrack
         public bool IsActivated { get; set; }
     }
 
+    /*
+    // 🚫 Tutorial-innstillinger – beholdt men kommentert ut
     public class TutorialSettings
     {
         public bool DontShowTutorial { get; set; }
         public DateTime LastUpdated { get; set; }
     }
+    */
 }

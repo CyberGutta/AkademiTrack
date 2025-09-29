@@ -104,7 +104,7 @@ namespace AkademiTrack.ViewModels
                     await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
                     await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
 
-                    // Notify success on UI thread
+                    // Notify success on UI thread - this will trigger navigation to Feide window
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         LoginCompleted?.Invoke(this, true);

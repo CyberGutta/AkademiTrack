@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -36,43 +36,45 @@ namespace AkademiTrack.Views
                     {
                         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                         {
-                            // Check if tutorial should be shown
-                            bool shouldShowTutorial = ShouldShowTutorial();
+                            // 🚫 Tutorial er slått av
+                            // bool shouldShowTutorial = ShouldShowTutorial();
+                            //
+                            // if (shouldShowTutorial)
+                            // {
+                            //     var tutorialWindow = new TutorialWindow();
+                            //     var tutorialViewModel = new TutorialWindowViewModel();
+                            //
+                            //     tutorialViewModel.ContinueRequested += (s, e) =>
+                            //     {
+                            //         var mainWindow = new MainWindow();
+                            //         mainWindow.Show();
+                            //         tutorialWindow.Close();
+                            //         desktop.MainWindow = mainWindow;
+                            //     };
+                            //
+                            //     tutorialViewModel.ExitRequested += (s, e) =>
+                            //     {
+                            //         desktop.Shutdown();
+                            //     };
+                            //
+                            //     tutorialWindow.DataContext = tutorialViewModel;
+                            //     desktop.MainWindow = tutorialWindow;
+                            //     tutorialWindow.Show();
+                            //     this.Close();
+                            // }
+                            // else
+                            // {
+                            //     var mainWindow = new MainWindow();
+                            //     desktop.MainWindow = mainWindow;
+                            //     mainWindow.Show();
+                            //     this.Close();
+                            // }
 
-                            if (shouldShowTutorial)
-                            {
-                                // Show tutorial first
-                                var tutorialWindow = new TutorialWindow();
-                                var tutorialViewModel = new TutorialWindowViewModel();
-
-                                // Handle tutorial completion - show main window after tutorial
-                                tutorialViewModel.ContinueRequested += (s, e) =>
-                                {
-                                    var mainWindow = new MainWindow();
-                                    mainWindow.Show();
-                                    tutorialWindow.Close();
-                                    desktop.MainWindow = mainWindow;
-                                };
-
-                                // Handle tutorial exit - close application
-                                tutorialViewModel.ExitRequested += (s, e) =>
-                                {
-                                    desktop.Shutdown();
-                                };
-
-                                tutorialWindow.DataContext = tutorialViewModel;
-                                desktop.MainWindow = tutorialWindow;
-                                tutorialWindow.Show();
-                                this.Close();
-                            }
-                            else
-                            {
-                                // Tutorial already seen, show main window directly
-                                var mainWindow = new MainWindow();
-                                desktop.MainWindow = mainWindow;
-                                mainWindow.Show();
-                                this.Close();
-                            }
+                            // ✅ Bytt ut tutorial med FeideWindow
+                            var feideWindow = new FeideWindow();
+                            desktop.MainWindow = feideWindow;
+                            feideWindow.Show();
+                            this.Close();
                         }
                     });
                 }
@@ -82,6 +84,7 @@ namespace AkademiTrack.Views
                 }
             }
         }
+
 
         private bool ShouldShowTutorial()
         {

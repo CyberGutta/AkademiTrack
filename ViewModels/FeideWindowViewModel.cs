@@ -1,0 +1,206 @@
+﻿using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Text.Json;
+using System.Windows.Input;
+
+namespace AkademiTrack.ViewModels
+{
+    public class FeideWindowViewModel : ViewModelBase, INotifyPropertyChanged
+    {
+        private string _schoolName = string.Empty;
+        private string _feideUsername = string.Empty;
+        private string _feidePassword = string.Empty;
+        private string _errorMessage = string.Empty;
+        private bool _isLoading = false;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        public event EventHandler<bool> SetupCompleted;
+
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public FeideWindowViewModel()
+        {
+            SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
+            ExitCommand = new RelayCommand(() => ExitApplication());
+        }
+
+        public string SchoolName
+        {
+            get => _schoolName;
+            set
+            {
+                _schoolName = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanSave));
+                (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        public string FeideUsername
+        {
+            get => _feideUsername;
+            set
+            {
+                _feideUsername = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanSave));
+                (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        public string FeidePassword
+        {
+            get => _feidePassword;
+            set
+            {
+                _feidePassword = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanSave));
+                (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        public string ErrorMessage
+        {
+            get => _errorMessage;
+            set
+            {
+                _errorMessage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasError));
+            }
+        }
+
+        public bool HasError => !string.IsNullOrEmpty(_errorMessage);
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set
+            {
+                _isLoading = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanSave));
+                OnPropertyChanged(nameof(SaveButtonText));
+                (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        public bool CanSave => !IsLoading &&
+                               !string.IsNullOrWhiteSpace(SchoolName) &&
+                               !string.IsNullOrWhiteSpace(FeideUsername) &&
+                               !string.IsNullOrWhiteSpace(FeidePassword);
+
+        public string SaveButtonText => IsLoading ? "Lagrer..." : "Lagre og fortsett";
+
+        public ICommand SaveCommand { get; }
+        public ICommand ExitCommand { get; }
+
+        private async System.Threading.Tasks.Task SaveFeideCredentialsAsync()
+        {
+            if (!CanSave) return;
+
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+
+            try
+            {
+                // Validate input
+                if (SchoolName.Length < 2)
+                {
+                    ErrorMessage = "Vennligst oppgi et gyldig skolenavn";
+                    return;
+                }
+
+                if (FeideUsername.Length < 3)
+                {
+                    ErrorMessage = "Feide brukernavn må være minst 3 tegn";
+                    return;
+                }
+
+                if (FeidePassword.Length < 4)
+                {
+                    ErrorMessage = "Passord må være minst 4 tegn";
+                    return;
+                }
+
+                // Save credentials encrypted in settings
+                await SaveCredentialsToSettingsAsync();
+
+                System.Diagnostics.Debug.WriteLine("Feide credentials saved successfully");
+
+                // Notify completion
+                SetupCompleted?.Invoke(this, true);
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Feil ved lagring: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Error saving Feide credentials: {ex}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private async System.Threading.Tasks.Task SaveCredentialsToSettingsAsync()
+        {
+            try
+            {
+                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+                Directory.CreateDirectory(appFolderPath);
+
+                var settingsPath = Path.Combine(appFolderPath, "settings.json");
+
+                // Load existing settings or create new
+                AppSettings settings;
+                if (File.Exists(settingsPath))
+                {
+                    var existingJson = await File.ReadAllTextAsync(settingsPath);
+                    settings = JsonSerializer.Deserialize<AppSettings>(existingJson) ?? new AppSettings();
+                }
+                else
+                {
+                    settings = new AppSettings
+                    {
+                        ShowActivityLog = false,
+                        ShowDetailedLogs = true,
+                        StartWithSystem = true
+                    };
+                }
+
+                // Update with encrypted credentials
+                settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(FeideUsername);
+                settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(FeidePassword);
+                settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
+                settings.LastUpdated = DateTime.Now;
+
+                // Save settings
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(settingsPath, json);
+
+                System.Diagnostics.Debug.WriteLine($"Credentials saved to: {settingsPath}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save credentials: {ex.Message}");
+                throw;
+            }
+        }
+
+        private void ExitApplication()
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        }
+    }
+}
