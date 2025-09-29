@@ -27,6 +27,24 @@
 			<Setter Property="Background" Value="White"/>
 		</Style>
 
+		<Style Selector="ComboBox">
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Background" Value="#F5F5F5"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="ComboBox:focus">
+			<Setter Property="BorderBrush" Value="#4A90E2"/>
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
+		<Style Selector="ComboBox:pointerover">
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
 		<Style Selector="TextBlock.label">
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="FontWeight" Value="Medium"/>
@@ -95,10 +113,11 @@
 				<!-- School Name -->
 				<StackPanel Spacing="8">
 					<TextBlock Text="Skolenavn" Classes="label"/>
-					<TextBox Name="SchoolNameTextBox"
-                             Watermark="F.eks: Akademiet"
-                             Text="{Binding SchoolName}"/>
-					<TextBlock Text="Navnet på din skole eller utdanningsinstitusjon"
+					<ComboBox Name="SchoolNameComboBox"
+                              ItemsSource="{Binding Schools}"
+                              SelectedItem="{Binding SchoolName}"
+                              PlaceholderText="Velg din skole"/>
+					<TextBlock Text="Velg din skole eller utdanningsinstitusjon"
                                FontSize="11"
                                Foreground="#666666"
                                Margin="0,2,0,0"/>

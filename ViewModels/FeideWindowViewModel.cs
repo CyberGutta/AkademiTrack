@@ -1,6 +1,8 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
@@ -28,7 +30,31 @@ namespace AkademiTrack.ViewModels
         {
             SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
             ExitCommand = new RelayCommand(() => ExitApplication());
+
+            // Initialize the schools list
+            Schools = new ObservableCollection<string>
+            {
+                "Akademiet Drammen AS",
+                "Akademiet Fredrikstad AS",
+                "Akademiet Kristiansand AS",
+                "Akademiet Norsk Restaurantskole",
+                "Akademiet Privatist og Nettstudier AS",
+                "Akademiet Realfagsgymnas Sandvika AS",
+                "Akademiet Realfagsskole Drammen",
+                "Akademiet Realfagsskole Oslo",
+                "Akademiet ungdomsskole Lier",
+                "Akademiet VGS Bergen",
+                "Akademiet VGS Bislett",
+                "Akademiet VGS Heltberg Drammen",
+                "Akademiet VGS Kongsberg",
+                "Akademiet VGS Oslo",
+                "Akademiet VGS Sandnes",
+                "Akademiet VGS Ypsilon",
+                "Akademiet vgs Ålesund"
+            };
         }
+
+        public ObservableCollection<string> Schools { get; }
 
         public string SchoolName
         {
@@ -112,9 +138,9 @@ namespace AkademiTrack.ViewModels
             try
             {
                 // Validate input
-                if (SchoolName.Length < 2)
+                if (string.IsNullOrWhiteSpace(SchoolName))
                 {
-                    ErrorMessage = "Vennligst oppgi et gyldig skolenavn";
+                    ErrorMessage = "Vennligst velg en skole";
                     return;
                 }
 
