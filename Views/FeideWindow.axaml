@@ -38,9 +38,17 @@
 			<Setter Property="BorderThickness" Value="2"/>
 		</Style>
 
+		<Style Selector="TextBox:focus">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
 		<Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
 			<Setter Property="Background" Value="White"/>
 			<Setter Property="BorderBrush" Value="#999999"/>
+		</Style>
+
+		<Style Selector="TextBox:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
 		<!-- ComboBox Styles -->
@@ -81,20 +89,38 @@
 			<Setter Property="FontSize" Value="14"/>
 		</Style>
 
+		<Style Selector="ComboBoxItem:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#E8F0F8"/>
+		</Style>
+
 		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#E8F0F8"/>
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected">
+			<Setter Property="Foreground" Value="#333333"/>
 			<Setter Property="Background" Value="#E8F0F8"/>
 		</Style>
 
 		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
-			<Setter Property="Background" Value="#4A90E2"/>
+			<Setter Property="Background" Value="#E8F0F8"/>
+			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
-		<Style Selector="ComboBoxItem:selected">
-			<Setter Property="Foreground" Value="White"/>
+		<Style Selector="ComboBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#D0E7FF"/>
 		</Style>
 
 		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter">
-			<Setter Property="Background" Value="#3A7BC8"/>
+			<Setter Property="Background" Value="#D0E7FF"/>
+			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
 		<!-- Label Styles -->
