@@ -1966,13 +1966,27 @@ namespace AkademiTrack.ViewModels
                     }
                 };
 
-                // Show as dialog
+                // Show as dialog with proper owner checking
                 if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
-                    await settingsWindow.ShowDialog(desktop.MainWindow);
+                    // Safely get the main window
+                    var mainWindow = desktop.MainWindow;
+
+                    if (mainWindow != null && mainWindow.IsVisible)
+                    {
+                        // Main window exists and is visible - show as dialog
+                        await settingsWindow.ShowDialog(mainWindow);
+                    }
+                    else
+                    {
+                        // Main window not ready - show as standalone window
+                        LogDebug("Main window not ready - showing settings as standalone window");
+                        settingsWindow.Show();
+                    }
                 }
                 else
                 {
+                    // Fallback - show as standalone window
                     settingsWindow.Show();
                 }
 
@@ -1980,6 +1994,22 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Kunne ikke åpne innstillinger vindu: {ex.Message}");
+
+                // Additional fallback - try showing without dialog
+                try
+                {
+                    var settingsWindow = new SettingsWindow();
+                    var settingsViewModel = new SettingsViewModel();
+                    settingsViewModel.SetLogEntries(this.LogEntries);
+                    settingsViewModel.ShowDetailedLogs = this.ShowDetailedLogs;
+                    settingsWindow.DataContext = settingsViewModel;
+                    settingsViewModel.CloseRequested += (s, e) => settingsWindow.Close();
+                    settingsWindow.Show();
+                }
+                catch (Exception fallbackEx)
+                {
+                    LogError($"Critical error opening settings: {fallbackEx.Message}");
+                }
             }
         }
 

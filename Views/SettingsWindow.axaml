@@ -19,6 +19,46 @@
 		<vm:SettingsViewModel/>
 	</Design.DataContext>
 	<Window.Styles>
+		<!-- Input Field Styles -->
+		<Style Selector="TextBox.credential-input">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="CaretBrush" Value="#333333"/>
+			<Setter Property="BorderBrush" Value="#CED4DA"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinHeight" Value="40"/>
+		</Style>
+
+		<Style Selector="TextBox.credential-input /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CED4DA"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+
+		<Style Selector="TextBox.credential-input:focus">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
+
+		<Style Selector="TextBox.credential-input:focus /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
+
+		<Style Selector="TextBox.credential-input:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="TextBox.credential-input:pointerover /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#999999"/>
+		</Style>
+
 		<!-- Settings Button Style -->
 		<Style Selector="Button.settings-action">
 			<Setter Property="Background" Value="#007ACC"/>
@@ -192,21 +232,6 @@
 		<Style Selector="Button.log-control:focus /template/ Border#PART_Border">
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
-		</Style>
-
-		<!-- Input Field Styles -->
-		<Style Selector="TextBox.credential-input">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="BorderBrush" Value="#CED4DA"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="4"/>
-			<Setter Property="Padding" Value="12,10"/>
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinHeight" Value="40"/>
-		</Style>
-		<Style Selector="TextBox.credential-input:focus">
-			<Setter Property="BorderBrush" Value="#007ACC"/>
-			<Setter Property="BorderThickness" Value="2"/>
 		</Style>
 
 		<!-- Section Headers -->
