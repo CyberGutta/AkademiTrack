@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AkademiTrack.ViewModels"
+        xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="500"
@@ -8,7 +9,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="AkademiTrack - Akademiet Drammen Sundland"
-        Background="#F8F9FA"
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
 		Height="500"
 		Width="600"
         MinWidth="600"
@@ -43,6 +44,20 @@
 		<Style Selector="Button:focus-visible /template/ Border">
 			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+
+		<!-- Theme Toggle Button Style -->
+		<!-- Theme Toggle Button Style -->
+		<!-- Theme Toggle Button Style -->
+		<Style Selector="Button.theme-toggle">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="22.5"/>
+		</Style>
+
+		<Style Selector="Button.theme-toggle:pointerover">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
 		</Style>
 
 		<!-- Start Button Styles -->
@@ -198,21 +213,21 @@
 		<Style Selector="TextBlock.title">
 			<Setter Property="FontSize" Value="28"/>
 			<Setter Property="FontWeight" Value="Light"/>
-			<Setter Property="Foreground" Value="#212529"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="Margin" Value="0,0,0,6"/>
 		</Style>
 
 		<Style Selector="TextBlock.subtitle">
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="FontWeight" Value="Normal"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="Margin" Value="0,0,0,20"/>
 		</Style>
 
 		<Style Selector="TextBlock.info">
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="FontWeight" Value="Normal"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="Margin" Value="0,0,0,16"/>
 			<Setter Property="TextAlignment" Value="Center"/>
 		</Style>
@@ -220,7 +235,7 @@
 		<Style Selector="TextBlock.status">
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="FontWeight" Value="Medium"/>
-			<Setter Property="Foreground" Value="#495057"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="TextAlignment" Value="Center"/>
 			<Setter Property="Margin" Value="0,0,0,0"/>
 		</Style>
@@ -228,7 +243,7 @@
 		<Style Selector="TextBlock.status-label">
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
 
@@ -321,6 +336,22 @@
 	</Window.Styles>
 
 	<Grid>
+		<!-- Theme Toggle Button (Top Right) -->
+		<!-- Theme Toggle Button (Top Right) -->
+		<Button Classes="theme-toggle"
+				Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
+				Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
+				Command="{Binding ToggleThemeCommand}"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Top"
+				Margin="0,10,15,0"
+				Width="45"
+				Height="45"
+				FontSize="24"
+				ToolTip.Tip="Toggle dark/light mode"
+				Cursor="Hand"
+				ZIndex="1000"/>
+
 		<!-- Main Content -->
 		<Grid Margin="30,25">
 			<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
@@ -360,10 +391,10 @@
 	                       IsEnabled="{Binding IsAutomationRunning}"
 	                       ToolTip.Tip="Stopper automatiseringsprosessen"/>
 
-					
+
 				</StackPanel>
-				
-				
+
+
 
 				<!-- Settings Button -->
 				<StackPanel HorizontalAlignment="Center">
@@ -374,11 +405,11 @@
 				</StackPanel>
 
 				<!-- Current Status Display -->
-				<Border Background="White"
+				<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 	                   CornerRadius="6"
 	                   Padding="16,12"
 	                   BorderThickness="1"
-	                   BorderBrush="#E9ECEF"
+	                   BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 	                   MaxWidth="420"
 	                   MinWidth="300">
 

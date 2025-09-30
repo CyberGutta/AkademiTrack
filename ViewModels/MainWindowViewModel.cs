@@ -1,4 +1,5 @@
-﻿using AkademiTrack.Views;
+﻿using AkademiTrack.Services;
+using AkademiTrack.Views;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -31,6 +32,7 @@ namespace AkademiTrack.ViewModels
         private Timer? _autoCloseTimer;
         private readonly string _level;
 
+        public ThemeManager ThemeManager => Services.ThemeManager.Instance;
         public NotificationOverlayWindow(string title, string message, string level = "INFO", string imageUrl = null, string customColor = null)
         {
             _level = level;
@@ -514,6 +516,7 @@ namespace AkademiTrack.ViewModels
             ClearLogsCommand = new SimpleCommand(ClearLogsAsync);
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
+            ToggleThemeCommand = new SimpleCommand(ToggleThemeAsync);
 
             LogInfo("Applikasjon er klar");
 
@@ -915,6 +918,12 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private async Task ToggleThemeAsync()
+        {
+            Services.ThemeManager.Instance.ToggleTheme();
+            LogInfo($"Theme changed to {(Services.ThemeManager.Instance.IsDarkMode ? "dark" : "light")} mode");
+        }
+
         public NotificationEntry CurrentNotification
         {
             get => _currentNotification;
@@ -941,6 +950,7 @@ namespace AkademiTrack.ViewModels
         public ICommand StartAutomationCommand { get; }
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand ToggleThemeCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
