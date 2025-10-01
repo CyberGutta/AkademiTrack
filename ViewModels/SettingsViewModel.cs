@@ -22,15 +22,18 @@ namespace AkademiTrack.ViewModels
     // Settings data class
     public class AppSettings
     {
-        public bool ShowActivityLog { get; set; } = false; // Hidden by default
+        public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
-        public bool StartWithSystem { get; set; } = true; // Default on
+        public bool StartWithSystem { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
 
         // Encrypted credentials
         public string EncryptedLoginEmail { get; set; } = "";
         public string EncryptedLoginPassword { get; set; } = "";
         public string EncryptedSchoolName { get; set; } = "";
+
+        // ADD THIS LINE:
+        public bool InitialSetupCompleted { get; set; } = false;
     }
 
     // Simple encryption helper class
@@ -1019,6 +1022,7 @@ Categories=Utility;
             }
         }
 
+        // Fixed SaveSettingsAsync for SettingsViewModel
         private async Task SaveSettingsAsync()
         {
             try
@@ -1031,22 +1035,37 @@ Categories=Utility;
 
                 var filePath = GetSettingsFilePath();
 
-                var settings = new AppSettings
+                // ✅ LOAD EXISTING SETTINGS FIRST to preserve InitialSetupCompleted
+                AppSettings settings;
+                if (File.Exists(filePath))
                 {
-                    ShowActivityLog = _showActivityLog,
-                    ShowDetailedLogs = _showDetailedLogs,
-                    StartWithSystem = _startWithSystem,
-                    LastUpdated = DateTime.Now,
-                    // Encrypt credentials before saving
-                    EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail),
-                    EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword),
-                    EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName)
-                };
+                    var existingJson = await File.ReadAllTextAsync(filePath);
+                    settings = JsonSerializer.Deserialize<AppSettings>(existingJson) ?? new AppSettings();
+                }
+                else
+                {
+                    settings = new AppSettings();
+                }
+
+                // Update only the fields we manage in this ViewModel
+                settings.ShowActivityLog = _showActivityLog;
+                settings.ShowDetailedLogs = _showDetailedLogs;
+                settings.StartWithSystem = _startWithSystem;
+                settings.LastUpdated = DateTime.Now;
+
+                // Encrypt credentials before saving
+                settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail);
+                settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword);
+                settings.EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName);
+
+                // ✅ PRESERVE InitialSetupCompleted - don't reset it!
+                // (It's already loaded from existing settings, so we don't touch it)
 
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(filePath, json);
 
                 Debug.WriteLine($"Settings saved successfully to: {filePath}");
+                Debug.WriteLine($"InitialSetupCompleted preserved as: {settings.InitialSetupCompleted}");
             }
             catch (Exception ex)
             {

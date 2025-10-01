@@ -208,11 +208,15 @@ namespace AkademiTrack.ViewModels
                 settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
                 settings.LastUpdated = DateTime.Now;
 
+                // THIS IS THE KEY LINE - Set InitialSetupCompleted to true
+                settings.InitialSetupCompleted = true;
+
                 // Save settings
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(settingsPath, json);
 
                 System.Diagnostics.Debug.WriteLine($"Credentials saved to: {settingsPath}");
+                System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
             }
             catch (Exception ex)
             {

@@ -159,10 +159,8 @@ namespace AkademiTrack
                         PropertyNameCaseInsensitive = true
                     });
 
-                    return settings != null &&
-                           !string.IsNullOrEmpty(settings.EncryptedLoginEmail) &&
-                           !string.IsNullOrEmpty(settings.EncryptedLoginPassword) &&
-                           !string.IsNullOrEmpty(settings.EncryptedSchoolName);
+                    // Check if initial setup is completed
+                    return settings?.InitialSetupCompleted == true;
                 }
                 return false;
             }
