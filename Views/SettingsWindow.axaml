@@ -402,6 +402,24 @@
 					</StackPanel>
 				</Border>
 
+				<!-- NEW: Auto-Start Automation Setting -->
+				<Border Classes="setting-item">
+					<StackPanel Spacing="8">
+						<TextBlock Text="Start automatisering automatisk" Classes="setting-title"/>
+						<TextBlock Text="Når aktivert, vil automatiseringen starte automatisk når programmet åpnes (krever lagrede innloggingsopplysninger). Perfekt for å aldri glemme å registrere STU-timer."
+								   Classes="setting-description"/>
+						<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktivert|Deaktivert'}"
+								Classes="autostart-toggle"
+								Classes.enabled="{Binding AutoStartAutomation}"
+								Classes.disabled="{Binding !AutoStartAutomation}"
+								Command="{Binding ToggleAutoStartAutomationCommand}"
+								ToolTip.Tip="Slår på/av automatisk start av automatisering ved programoppstart"
+								FontSize="14"
+								MinWidth="160"
+								Padding="20,12"/>
+					</StackPanel>
+				</Border>
+
 				<!-- File Management Section -->
 				<TextBlock Text="Filbehandling" Classes="section-header"/>
 				<!-- Open Program Folder Setting -->

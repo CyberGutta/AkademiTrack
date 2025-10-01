@@ -25,14 +25,13 @@ namespace AkademiTrack.ViewModels
         public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true;
+        public bool AutoStartAutomation { get; set; } = false; // ADD THIS LINE
         public DateTime LastUpdated { get; set; } = DateTime.Now;
 
         // Encrypted credentials
         public string EncryptedLoginEmail { get; set; } = "";
         public string EncryptedLoginPassword { get; set; } = "";
         public string EncryptedSchoolName { get; set; } = "";
-
-        // ADD THIS LINE:
         public bool InitialSetupCompleted { get; set; } = false;
     }
 
@@ -738,9 +737,30 @@ Categories=Utility;
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand ToggleActivityLogCommand { get; }
         public ICommand ToggleAutoStartCommand { get; }
+        public ICommand ToggleAutoStartAutomationCommand { get; }
+
+
 
         // This is what the UI binds to
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
+
+        private bool _autoStartAutomation = false;
+
+        public bool AutoStartAutomation
+        {
+            get => _autoStartAutomation;
+            set
+            {
+                if (_autoStartAutomation != value)
+                {
+                    Debug.WriteLine($"AutoStartAutomation changing from {_autoStartAutomation} to {value}");
+                    _autoStartAutomation = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
 
         // Credential properties
         public string LoginEmail
@@ -859,6 +879,8 @@ Categories=Utility;
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
+            ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
+
 
             // Initialize credential fields to empty strings
             _loginEmail = "";
@@ -867,6 +889,11 @@ Categories=Utility;
 
             // Load settings on initialization
             _ = LoadSettingsAsync();
+        }
+
+        private void ToggleAutoStartAutomation()
+        {
+            AutoStartAutomation = !AutoStartAutomation;
         }
 
         // Method to get decrypted credentials for use in MainWindowViewModel
@@ -983,6 +1010,7 @@ Categories=Utility;
                         _showActivityLog = settings.ShowActivityLog;
                         _showDetailedLogs = settings.ShowDetailedLogs;
                         _startWithSystem = settings.StartWithSystem;
+                        _autoStartAutomation = settings.AutoStartAutomation; // ADD THIS LINE
 
                         // Decrypt credentials after loading
                         _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
@@ -993,6 +1021,7 @@ Categories=Utility;
                         OnPropertyChanged(nameof(ShowActivityLog));
                         OnPropertyChanged(nameof(ShowDetailedLogs));
                         OnPropertyChanged(nameof(StartWithSystem));
+                        OnPropertyChanged(nameof(AutoStartAutomation)); // ADD THIS LINE
                         OnPropertyChanged(nameof(LoginEmail));
                         OnPropertyChanged(nameof(LoginPassword));
                         OnPropertyChanged(nameof(SchoolName));
@@ -1003,13 +1032,12 @@ Categories=Utility;
                         _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
 
                         Debug.WriteLine($"Settings loaded successfully from: {filePath}");
-                        Debug.WriteLine($"Loaded email: {(!string.IsNullOrEmpty(_loginEmail) ? "***" : "empty")}");
+                        Debug.WriteLine($"AutoStartAutomation: {_autoStartAutomation}"); // ADD THIS LINE
                     }
                 }
                 else
                 {
                     Debug.WriteLine("No settings file found, using defaults");
-                    // First time running - set up auto-start if enabled by default
                     if (_startWithSystem)
                     {
                         _ = Task.Run(() => AutoStartManager.SetAutoStart(true));
@@ -1030,12 +1058,9 @@ Categories=Utility;
                 var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
 
-                // Create the directory if it doesn't exist
                 Directory.CreateDirectory(appFolderPath);
-
                 var filePath = GetSettingsFilePath();
 
-                // ✅ LOAD EXISTING SETTINGS FIRST to preserve InitialSetupCompleted
                 AppSettings settings;
                 if (File.Exists(filePath))
                 {
@@ -1047,25 +1072,21 @@ Categories=Utility;
                     settings = new AppSettings();
                 }
 
-                // Update only the fields we manage in this ViewModel
                 settings.ShowActivityLog = _showActivityLog;
                 settings.ShowDetailedLogs = _showDetailedLogs;
                 settings.StartWithSystem = _startWithSystem;
+                settings.AutoStartAutomation = _autoStartAutomation; 
                 settings.LastUpdated = DateTime.Now;
 
-                // Encrypt credentials before saving
                 settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail);
                 settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword);
                 settings.EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName);
-
-                // ✅ PRESERVE InitialSetupCompleted - don't reset it!
-                // (It's already loaded from existing settings, so we don't touch it)
 
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(filePath, json);
 
                 Debug.WriteLine($"Settings saved successfully to: {filePath}");
-                Debug.WriteLine($"InitialSetupCompleted preserved as: {settings.InitialSetupCompleted}");
+                Debug.WriteLine($"AutoStartAutomation saved as: {settings.AutoStartAutomation}"); 
             }
             catch (Exception ex)
             {

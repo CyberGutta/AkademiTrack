@@ -525,13 +525,58 @@ namespace AkademiTrack.ViewModels
                 "processed_notifications.json"
             );
 
-            // Load previously processed notifications
             _ = Task.Run(LoadProcessedNotificationIdsAsync);
 
-            // Start checking for admin notifications every 30 seconds
             _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
 
             LogInfo("Admin notification system initialized");
+
+            // ADD THIS - Check for auto-start automation setting
+            _ = Task.Run(CheckAutoStartAutomationAsync);
+        }
+
+        private async Task CheckAutoStartAutomationAsync()
+        {
+            try
+            {
+                // Wait a bit for UI to initialize
+                await Task.Delay(2000);
+
+                // Load settings to check AutoStartAutomation flag
+                var settingsViewModel = new SettingsViewModel();
+                await Task.Delay(300); // Let settings load
+
+                if (settingsViewModel.AutoStartAutomation)
+                {
+                    LogInfo("Auto-start automatisering er aktivert - starter automatisk...");
+
+                    // Check if we have credentials
+                    await LoadCredentialsAsync();
+                    bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
+                                         !string.IsNullOrEmpty(_loginPassword) &&
+                                         !string.IsNullOrEmpty(_schoolName);
+
+                    if (hasCredentials)
+                    {
+                        LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            await StartAutomationAsync();
+                        });
+                    }
+                    else
+                    {
+                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger - venter på manuell start");
+                        ShowNotification("Auto-start Aktivert",
+                            "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet. Lagre innloggingsopplysninger i innstillinger.",
+                            "WARNING");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Feil ved auto-start sjekk: {ex.Message}");
+            }
         }
 
         private async Task LoadCredentialsAsync()
