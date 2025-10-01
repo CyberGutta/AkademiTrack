@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AkademiTrack.ViewModels"
+        xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
@@ -8,7 +9,7 @@
         x:DataType="vm:SettingsViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="Innstillinger - AkademiTrack"
-        Background="#F8F9FA"
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
         Width="{Binding ShowActivityLog, Converter={x:Static vm:BoolToIntConverter.Instance}, ConverterParameter='700|1100'}"
         Height="800"
         MinWidth="{Binding ShowActivityLog, Converter={x:Static vm:BoolToIntConverter.Instance}, ConverterParameter='600|1000'}"
@@ -21,10 +22,10 @@
 	<Window.Styles>
 		<!-- Input Field Styles -->
 		<Style Selector="TextBox.credential-input">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="Foreground" Value="#333333"/>
-			<Setter Property="CaretBrush" Value="#333333"/>
-			<Setter Property="BorderBrush" Value="#CED4DA"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="CaretBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="4"/>
 			<Setter Property="Padding" Value="12,10"/>
@@ -33,30 +34,30 @@
 		</Style>
 
 		<Style Selector="TextBox.credential-input /template/ Border#PART_BorderElement">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="BorderBrush" Value="#CED4DA"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
 			<Setter Property="BorderThickness" Value="1"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input:focus">
-			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="BorderBrush" Value="#007ACC"/>
 			<Setter Property="BorderThickness" Value="2"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input:focus /template/ Border#PART_BorderElement">
-			<Setter Property="Background" Value="White"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
 			<Setter Property="BorderBrush" Value="#007ACC"/>
 			<Setter Property="BorderThickness" Value="2"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input:pointerover">
-			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input:pointerover /template/ Border#PART_BorderElement">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="BorderBrush" Value="#999999"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 		</Style>
 
 		<!-- Settings Button Style -->
@@ -238,26 +239,26 @@
 		<Style Selector="TextBlock.section-header">
 			<Setter Property="FontSize" Value="18"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Foreground" Value="#212529"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="Margin" Value="0,0,0,8"/>
 		</Style>
 		<!-- Setting Item Headers -->
 		<Style Selector="TextBlock.setting-title">
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="Foreground" Value="#495057"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="Margin" Value="0,0,0,4"/>
 		</Style>
 		<!-- Setting Descriptions -->
 		<Style Selector="TextBlock.setting-description">
 			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
 			<Setter Property="Margin" Value="0,0,0,8"/>
 		</Style>
 		<!-- Info Panel Style -->
 		<Style Selector="Border.info-panel">
-			<Setter Property="Background" Value="#E7F3FF"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="#007ACC"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="6"/>
@@ -265,7 +266,7 @@
 		</Style>
 		<!-- Credential Panel Style -->
 		<Style Selector="Border.credential-panel">
-			<Setter Property="Background" Value="#FFF8E1"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="#FF9800"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="6"/>
@@ -273,8 +274,8 @@
 		</Style>
 		<!-- Setting Item Container -->
 		<Style Selector="Border.setting-item">
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="BorderBrush" Value="#E9ECEF"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="Padding" Value="16"/>
@@ -287,7 +288,7 @@
 			<Setter Property="Padding" Value="4,2"/>
 		</Style>
 		<Style Selector="TextBlock.log-entry.INFO">
-			<Setter Property="Foreground" Value="#495057"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 		</Style>
 		<Style Selector="TextBlock.log-entry.SUCCESS">
 			<Setter Property="Foreground" Value="#28A745"/>
@@ -298,7 +299,7 @@
 			<Setter Property="FontWeight" Value="SemiBold"/>
 		</Style>
 		<Style Selector="TextBlock.log-entry.DEBUG">
-			<Setter Property="Foreground" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="FontStyle" Value="Italic"/>
 		</Style>
 	</Window.Styles>
@@ -317,10 +318,10 @@
 			<TextBlock Text="Innstillinger"
                        FontSize="28"
                        FontWeight="Light"
-                       Foreground="#212529"/>
+                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<TextBlock Text="Konfigurer AkademiTrack-preferanser og innloggingsinformasjon"
                        FontSize="14"
-                       Foreground="#6C757D"/>
+                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 		</StackPanel>
 		<!-- Left Column - Settings -->
 		<ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,20,0">
@@ -443,7 +444,7 @@
 								   Foreground="#007ACC"/>
 						<TextBlock Text="{Binding ApplicationInfo}"
 								   FontSize="12"
-								   Foreground="#495057"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 								   TextWrapping="Wrap"/>
 					</StackPanel>
 				</Border>
@@ -452,12 +453,12 @@
 
 		<!-- Right Column - Activity Log (Conditionally Visible) -->
 		<Border Grid.Row="1" Grid.Column="1"
-                Background="White"
+                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
                 CornerRadius="8"
                 Padding="20"
                 Margin="20,0,0,0"
                 BorderThickness="1"
-                BorderBrush="#E9ECEF"
+                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
                 IsVisible="{Binding ShowActivityLog}">
 			<Grid>
 				<Grid.RowDefinitions>
@@ -474,7 +475,7 @@
 							   Text="Nerde greier"
 							   FontWeight="SemiBold"
 							   FontSize="16"
-							   Foreground="#495057"
+							   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 							   VerticalAlignment="Center"/>
 					<StackPanel Grid.Column="1"
 								Orientation="Horizontal"
