@@ -13,7 +13,7 @@
         Width="900"
         Height="700"
         MinWidth="800"
-        MinHeight="600"
+        MinHeight="650"
         CanResize="True"
         WindowStartupLocation="CenterOwner">
 	<Design.DataContext>
@@ -27,10 +27,10 @@
 			<Setter Property="CaretBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
 			<Setter Property="BorderThickness" Value="1.5"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="14,12"/>
 			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinHeight" Value="40"/>
+			<Setter Property="MinHeight" Value="44"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input /template/ Border#PART_BorderElement">
@@ -55,7 +55,7 @@
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="Padding" Value="16,11"/>
+			<Setter Property="Padding" Value="16,12"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="HorizontalContentAlignment" Value="Left"/>
@@ -95,14 +95,18 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="CornerRadius" Value="8"/>
-			<Setter Property="Padding" Value="18,11"/>
+			<Setter Property="Padding" Value="16,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="130"/>
+			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="HorizontalAlignment" Value="Left"/>
 		</Style>
 
-		<Style Selector="Button.settings-action:pointerover">
+		<Style Selector="Button.settings-action /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#007ACC"/>
+			<Setter Property="CornerRadius" Value="8"/>
+		</Style>
+
+		<Style Selector="Button.settings-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#005A9E"/>
 		</Style>
 
@@ -111,24 +115,35 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="CornerRadius" Value="8"/>
-			<Setter Property="Padding" Value="18,11"/>
+			<Setter Property="Padding" Value="16,10"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="150"/>
+			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="HorizontalAlignment" Value="Left"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.enabled">
 			<Setter Property="Background" Value="#28A745"/>
 		</Style>
-		<Style Selector="Button.toggle-button.enabled:pointerover">
+
+		<Style Selector="Button.toggle-button.enabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#28A745"/>
+			<Setter Property="CornerRadius" Value="8"/>
+		</Style>
+
+		<Style Selector="Button.toggle-button.enabled:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#218838"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.disabled">
 			<Setter Property="Background" Value="#DC3545"/>
 		</Style>
-		<Style Selector="Button.toggle-button.disabled:pointerover">
+
+		<Style Selector="Button.toggle-button.disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#DC3545"/>
+			<Setter Property="CornerRadius" Value="8"/>
+		</Style>
+
+		<Style Selector="Button.toggle-button.disabled:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#C82333"/>
 		</Style>
 
@@ -138,10 +153,10 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="CornerRadius" Value="8"/>
-			<Setter Property="Padding" Value="20,11"/>
+			<Setter Property="Padding" Value="24,12"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="FontSize" Value="13"/>
-			<Setter Property="MinWidth" Value="100"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinWidth" Value="110"/>
 		</Style>
 		<Style Selector="Button.cancel:pointerover">
 			<Setter Property="Background" Value="#5A6268"/>
@@ -158,50 +173,97 @@
 
 		<!-- Section Headers -->
 		<Style Selector="TextBlock.section-header">
-			<Setter Property="FontSize" Value="18"/>
+			<Setter Property="FontSize" Value="20"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-			<Setter Property="Margin" Value="0,0,0,16"/>
+			<Setter Property="Margin" Value="0,0,0,20"/>
 		</Style>
 
 		<!-- Setting Item Headers -->
 		<Style Selector="TextBlock.setting-title">
-			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontSize" Value="15"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-			<Setter Property="Margin" Value="0,0,0,4"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
 		</Style>
 
 		<!-- Setting Descriptions -->
 		<Style Selector="TextBlock.setting-description">
-			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+			<Setter Property="LineHeight" Value="20"/>
+		</Style>
+
+		<!-- Compact Setting Description -->
+		<Style Selector="TextBlock.setting-description-compact">
+			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
 			<Setter Property="Margin" Value="0,0,0,8"/>
+			<Setter Property="LineHeight" Value="18"/>
 		</Style>
 
 		<!-- Info Panel Style -->
 		<Style Selector="Border.info-panel">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="#007ACC"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="BorderThickness" Value="1.5"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="14"/>
+		</Style>
+
+		<!-- Compact Info Panel -->
+		<Style Selector="Border.info-panel-compact">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+			<Setter Property="BorderThickness" Value="1.5"/>
+			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Padding" Value="12"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
 		</Style>
 
 		<!-- Warning Panel Style -->
 		<Style Selector="Border.warning-panel">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="#FF9800"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="BorderThickness" Value="1.5"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="14"/>
+		</Style>
+
+		<!-- Compact Warning Panel -->
+		<Style Selector="Border.warning-panel-compact">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="#FF9800"/>
+			<Setter Property="BorderThickness" Value="1.5"/>
+			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Padding" Value="12"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
 		</Style>
 
 		<!-- Setting Item Container -->
 		<Style Selector="Border.setting-item">
 			<Setter Property="Background" Value="Transparent"/>
 			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,0,0,24"/>
+		</Style>
+
+		<!-- Compact Setting Item for Login/Automation sections -->
+		<Style Selector="Border.setting-item-compact">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,0,0,18"/>
+		</Style>
+
+		<!-- Setting Card Style -->
+		<Style Selector="Border.setting-card">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="16"/>
 			<Setter Property="Margin" Value="0,0,0,16"/>
 		</Style>
 
@@ -230,7 +292,7 @@
 
 	<Grid>
 		<Grid.ColumnDefinitions>
-			<ColumnDefinition Width="220"/>
+			<ColumnDefinition Width="240"/>
 			<ColumnDefinition Width="*"/>
 		</Grid.ColumnDefinitions>
 
@@ -239,13 +301,13 @@
 				Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 				BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 				BorderThickness="0,0,1.5,0"
-				Padding="16,20">
+				Padding="20,24">
 			<StackPanel Spacing="4">
 				<TextBlock Text="Innstillinger"
-						   FontSize="20"
+						   FontSize="22"
 						   FontWeight="Bold"
 						   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-						   Margin="8,0,0,24"/>
+						   Margin="8,0,0,28"/>
 
 				<Button x:Name="LoginButton" Classes="category-tab selected" Content="🔐 Innlogging" Tag="login"/>
 				<Button x:Name="AutomationButton" Classes="category-tab" Content="⚙️ Automatisering" Tag="automation"/>
@@ -263,31 +325,47 @@
 			</Grid.RowDefinitions>
 
 			<!-- Content ScrollViewer -->
-			<ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="24,20,24,20">
-				<StackPanel Spacing="16" MaxWidth="600">
+			<ScrollViewer Grid.Row="0"
+						  VerticalScrollBarVisibility="Auto"
+						  HorizontalScrollBarVisibility="Disabled"
+						  Padding="24,20,24,32">
+				<StackPanel Spacing="16" HorizontalAlignment="Stretch" MaxWidth="800">
 					<!-- Login Category -->
 					<StackPanel x:Name="LoginSection" Spacing="12">
-						<TextBlock Text="Innloggingsinformasjon" Classes="section-header"/>
+						<TextBlock Text="Innloggingsinformasjon" Classes="section-header" Margin="0,0,0,12"/>
 
-						<Border Classes="warning-panel" Margin="0,0,0,8">
+						<Border Classes="warning-panel-compact">
 							<StackPanel Spacing="6">
 								<TextBlock Text="🔐 Sikkerhetsinformasjon"
 										   FontWeight="SemiBold"
 										   FontSize="13"
-										   Foreground="#E65100"/>
+										   Foreground="#FF9800"/>
 								<TextBlock Text="Dine innloggingsopplysninger blir automatisk kryptert og lagret sikkert på din datamaskin."
 										   FontSize="12"
-										   Foreground="#E65100"
-										   TextWrapping="Wrap"/>
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="18"/>
+							</StackPanel>
+						</Border>
+
+						<!-- School Name Field (moved to top) -->
+						<Border Classes="setting-item-compact">
+							<StackPanel Spacing="8">
+								<TextBlock Text="Skolenavn" Classes="setting-title"/>
+								<TextBlock Text="Navnet på din skole som det vises i FEIDE-organisasjonsvalget"
+										   Classes="setting-description-compact"/>
+								<TextBox Text="{Binding SchoolName}"
+										 Classes="credential-input"
+										 Watermark="Akademiet Drammen AS"/>
 							</StackPanel>
 						</Border>
 
 						<!-- Email Field -->
-						<Border Classes="setting-item">
+						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="E-post / Brukernavn" Classes="setting-title"/>
 								<TextBlock Text="Din e-postadresse eller brukernavn for FEIDE-innlogging"
-										   Classes="setting-description"/>
+										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginEmail}"
 										 Classes="credential-input"
 										 Watermark="din.epost@elev.drammen.no"/>
@@ -295,59 +373,87 @@
 						</Border>
 
 						<!-- Password Field -->
-						<Border Classes="setting-item">
+						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="Passord" Classes="setting-title"/>
 								<TextBlock Text="Ditt passord for FEIDE-innlogging"
-										   Classes="setting-description"/>
+										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginPassword}"
 										 Classes="credential-input"
 										 PasswordChar="•"
 										 Watermark="Ditt passord"/>
 							</StackPanel>
 						</Border>
-
-						<!-- School Name Field -->
-						<Border Classes="setting-item">
-							<StackPanel Spacing="8">
-								<TextBlock Text="Skolenavn" Classes="setting-title"/>
-								<TextBlock Text="Navnet på din skole som det vises i FEIDE-organisasjonsvalget"
-										   Classes="setting-description"/>
-								<TextBox Text="{Binding SchoolName}"
-										 Classes="credential-input"
-										 Watermark="Akademiet Drammen AS"/>
-							</StackPanel>
-						</Border>
 					</StackPanel>
 
 					<!-- Automation Category -->
 					<StackPanel x:Name="AutomationSection" Spacing="12" IsVisible="False">
-						<TextBlock Text="Automatisering" Classes="section-header"/>
+						<TextBlock Text="Automatisering" Classes="section-header" Margin="0,0,0,12"/>
 
-						<Border Classes="setting-item">
-							<StackPanel Spacing="8">
-								<TextBlock Text="Start automatisering ved oppstart" Classes="setting-title"/>
-								<TextBlock Text="Automatiseringen starter automatisk når programmet åpnes. Perfekt for å aldri glemme å registrere STU-timer."
-										   Classes="setting-description"/>
-								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktivert|Deaktivert'}"
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+								BorderThickness="1"
+								CornerRadius="10"
+								Padding="16"
+								Margin="0,0,0,12">
+							<StackPanel Spacing="10">
+								<TextBlock Text="Start automatisering ved oppstart"
+										   FontSize="15"
+										   FontWeight="SemiBold"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="19"
+										   MaxWidth="750">
+									<Run Text="Automatiseringen starter automatisk når programmet åpnes."/>
+									<LineBreak/>
+									<Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
+								</TextBlock>
+								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Deaktivert|Aktivert'}"
 										Classes="toggle-button"
 										Classes.enabled="{Binding AutoStartAutomation}"
 										Classes.disabled="{Binding !AutoStartAutomation}"
 										Command="{Binding ToggleAutoStartAutomationCommand}"/>
 							</StackPanel>
 						</Border>
+
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								BorderBrush="#007ACC"
+								BorderThickness="1.5"
+								CornerRadius="8"
+								Padding="14"
+								Margin="0">
+							<StackPanel Spacing="7">
+								<TextBlock Text="ℹ️ Om automatisering"
+										   FontWeight="SemiBold"
+										   FontSize="14"
+										   Foreground="#007ACC"/>
+								<TextBlock FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="19"
+										   MaxWidth="750">
+									<Run Text="Når aktivert, vil programmet automatisk registrere din fremmøte"/>
+									<LineBreak/>
+									<Run Text="hver dag. Du kan alltid pause eller stoppe automatiseringen"/>
+									<LineBreak/>
+									<Run Text="fra hovedvinduet."/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
 					</StackPanel>
 
 					<!-- System Category -->
-					<StackPanel x:Name="SystemSection" Spacing="12" IsVisible="False">
+					<StackPanel x:Name="SystemSection" Spacing="16" IsVisible="False">
 						<TextBlock Text="Systemintegrasjon" Classes="section-header"/>
 
-						<Border Classes="setting-item">
-							<StackPanel Spacing="8">
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
 								<TextBlock Text="Start med Windows" Classes="setting-title"/>
 								<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp."
 										   Classes="setting-description"/>
-								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktivert|Deaktivert'}"
+								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Deaktivert|Aktivert'}"
 										Classes="toggle-button"
 										Classes.enabled="{Binding StartWithSystem}"
 										Classes.disabled="{Binding !StartWithSystem}"
@@ -355,8 +461,8 @@
 							</StackPanel>
 						</Border>
 
-						<Border Classes="setting-item">
-							<StackPanel Spacing="8">
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
 								<TextBlock Text="Programfiler" Classes="setting-title"/>
 								<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
 										   Classes="setting-description"/>
@@ -368,11 +474,11 @@
 					</StackPanel>
 
 					<!-- Advanced Category -->
-					<StackPanel x:Name="AdvancedSection" Spacing="12" IsVisible="False">
+					<StackPanel x:Name="AdvancedSection" Spacing="16" IsVisible="False">
 						<TextBlock Text="Avanserte innstillinger" Classes="section-header"/>
 
-						<Border Classes="setting-item">
-							<StackPanel Spacing="8">
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
 								<TextBlock Text="Aktivitetslogg" Classes="setting-title"/>
 								<TextBlock Text="Vis teknisk aktivitetslogg for feilsøking og diagnostikk."
 										   Classes="setting-description"/>
@@ -386,8 +492,8 @@
 						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 								BorderThickness="1"
-								CornerRadius="6"
-								Padding="16"
+								CornerRadius="10"
+								Padding="20"
 								IsVisible="{Binding ShowActivityLog}">
 							<Grid>
 								<Grid.RowDefinitions>
@@ -395,7 +501,7 @@
 									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
 
-								<Grid Grid.Row="0" Margin="0,0,0,12">
+								<Grid Grid.Row="0" Margin="0,0,0,16">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="Auto"/>
@@ -403,23 +509,23 @@
 									<TextBlock Grid.Column="0"
 											   Text="Aktivitetslogg"
 											   FontWeight="SemiBold"
-											   FontSize="14"
+											   FontSize="16"
 											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									<Button Grid.Column="1"
 											Content="Tøm logg"
 											Classes="settings-action"
 											Command="{Binding ClearLogsCommand}"
-											Padding="12,8"
-											MinWidth="90"/>
+											Padding="14,10"
+											MinWidth="100"/>
 								</Grid>
 
 								<Border Grid.Row="1"
 										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
 										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 										BorderThickness="1"
-										CornerRadius="6"
-										Height="280">
-									<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+										CornerRadius="8"
+										Height="320">
+									<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
 										<ItemsControl ItemsSource="{Binding LogEntries}">
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
@@ -440,19 +546,34 @@
 					</StackPanel>
 
 					<!-- About Category -->
-					<StackPanel x:Name="AboutSection" Spacing="12" IsVisible="False">
+					<StackPanel x:Name="AboutSection" Spacing="16" IsVisible="False">
 						<TextBlock Text="Om AkademiTrack" Classes="section-header"/>
 
 						<Border Classes="info-panel">
-							<StackPanel Spacing="8">
+							<StackPanel Spacing="10">
 								<TextBlock Text="📱 Applikasjonsinformasjon"
 										   FontWeight="SemiBold"
-										   FontSize="14"
+										   FontSize="15"
 										   Foreground="#007ACC"/>
 								<TextBlock Text="{Binding ApplicationInfo}"
-										   FontSize="12"
+										   FontSize="14"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-										   TextWrapping="Wrap"/>
+										   TextWrapping="Wrap"
+										   LineHeight="22"/>
+							</StackPanel>
+						</Border>
+
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="📝 Lisens"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock Text="Dette programmet er gratis og kan brukes av alle studenter ved Akademiet."
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="20"/>
 							</StackPanel>
 						</Border>
 					</StackPanel>
@@ -464,7 +585,7 @@
 					Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 					BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 					BorderThickness="0,1.5,0,0"
-					Padding="32,16">
+					Padding="32,20,32,20">
 				<StackPanel Orientation="Horizontal"
 							HorizontalAlignment="Right"
 							Spacing="12">

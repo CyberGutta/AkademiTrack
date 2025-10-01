@@ -703,7 +703,18 @@ Categories=Utility;
         {
             var assembly = Assembly.GetExecutingAssembly();
             Name = assembly.GetName().Name ?? "AkademiTrack";
-            Version = assembly.GetName().Version?.ToString() ?? "1.1.0";
+
+            var version = assembly.GetName().Version;
+            if (version != null)
+            {
+                // Format as Major.Minor.Build (3 parts instead of 4)
+                Version = $"{version.Major}.{version.Minor}.{version.Build}";
+            }
+            else
+            {
+                Version = "1.1.0";
+            }
+
             Description = "Akademiet automatisk fremmøte registerings program";
         }
 
