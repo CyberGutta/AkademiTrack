@@ -25,7 +25,7 @@ namespace AkademiTrack.Services
             );
             Directory.CreateDirectory(appDataDir);
             _settingsFilePath = Path.Combine(appDataDir, "theme_settings.json");
-            
+
             LoadThemeSettings();
         }
 
@@ -47,6 +47,7 @@ namespace AkademiTrack.Services
                     OnPropertyChanged(nameof(InputBackground));
                     OnPropertyChanged(nameof(InputBorder));
                     OnPropertyChanged(nameof(InputBorderFocus));
+                    OnPropertyChanged(nameof(HoverBackground));
                     SaveThemeSettings();
                 }
             }
@@ -65,6 +66,7 @@ namespace AkademiTrack.Services
         public IBrush InputBackground => new SolidColorBrush(_isDarkMode ? Color.Parse("#2D2D2D") : Colors.White);
         public IBrush InputBorder => new SolidColorBrush(_isDarkMode ? Color.Parse("#505050") : Color.Parse("#CED4DA"));
         public IBrush InputBorderFocus => new SolidColorBrush(_isDarkMode ? Color.Parse("#007ACC") : Color.Parse("#007ACC"));
+        public IBrush HoverBackground => new SolidColorBrush(_isDarkMode ? Color.Parse("#3A3A3A") : Color.Parse("#c9c9c9"));
 
         public void ToggleTheme()
         {
