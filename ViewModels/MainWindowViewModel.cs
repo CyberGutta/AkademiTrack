@@ -1019,7 +1019,7 @@ namespace AkademiTrack.ViewModels
         "Ingen gyldige STU-økter",
         "FEIL: Ikke Tilkoblet Skolens Nettverk",
         "Koble til Skolens Nettverk",
-        "Manual Login Required"
+        "Manuell pålogging kreves"
     };
 
             // Check if this is an admin notification
@@ -1871,7 +1871,7 @@ namespace AkademiTrack.ViewModels
                 else
                 {
                     LogInfo("Ingen lagrede innloggingsopplysninger funnet - fortsetter med manuell innlogging");
-                    ShowNotification("Manual Login Required", "Ingen lagrede innloggingsopplysninger - åpner nettleser for manuell innlogging", "INFO");
+                    ShowNotification("Manuell pålogging kreves", "Ingen lagrede innloggingsopplysninger - åpner nettleser for manuell innlogging", "INFO");
                 }
 
                 Dictionary<string, string> cookies = null;
@@ -2197,6 +2197,10 @@ namespace AkademiTrack.ViewModels
                     else
                     {
                         LogInfo("Automatisk innlogging mislyktes - skifter til synlig modus for manuell innlogging");
+
+                        ShowNotification("Manuell pålogging kreves",
+                        "Automatisk innlogging mislyktes. Nettleseren åpnes for manuell innlogging.",
+                        "WARNING");
 
                         // Close headless browser and open visible one
                         await CleanupWebDriverAsync(localWebDriver);
