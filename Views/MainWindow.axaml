@@ -49,7 +49,6 @@
 		<!-- Theme Toggle Button Style -->
 		<!-- Theme Toggle Button Style -->
 		<!-- Theme Toggle Button Style -->
-		<!-- Replace your existing Theme Toggle Button Style with this -->
 		<Style Selector="Button.theme-toggle">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
@@ -100,11 +99,11 @@
 
 		<!-- Subtle hover effect using opacity (works for both themes) -->
 		<Style Selector="Button.theme-toggle:pointerover /template/ Border#PART_HoverOverlay">
-			<Setter Property="Opacity" Value="0.08"/>
+			<Setter Property="Opacity" Value="0.12"/>
 		</Style>
 
 		<Style Selector="Button.theme-toggle:pressed /template/ Border#PART_HoverOverlay">
-			<Setter Property="Opacity" Value="0.15"/>
+			<Setter Property="Opacity" Value="0.20"/>
 		</Style>
 
 		<!-- Start Button Styles -->
