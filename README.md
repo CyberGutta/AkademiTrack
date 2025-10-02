@@ -4,7 +4,7 @@
 
 ## 🇳🇴 Norsk
 
-<img width="867" height="648" alt="AkademiTrack Interface" src="https://github.com/user-attachments/assets/89e77581-89fb-4b20-b315-0e45f2845cfa" />
+<img width="602" height="532" alt="AkademiTrack_AotSuLTUnt" src="https://github.com/user-attachments/assets/d6807ddf-57f5-4c1d-bbee-6aff43042f6f" />
 
 ### Om Programmet
 
