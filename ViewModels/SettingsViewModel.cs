@@ -696,7 +696,7 @@ Categories=Utility;
     public class ApplicationInfo
     {
         public string Name { get; }
-        public string Version { get; }
+        public string Version { get; }  
         public string Description { get; }
 
         public ApplicationInfo()
@@ -712,7 +712,7 @@ Categories=Utility;
             }
             else
             {
-                Version = "1.1.0";
+                Version = "1.0.0";
             }
 
             Description = "Akademiet automatisk fremmøte registerings program";
