@@ -208,7 +208,7 @@ namespace AkademiTrack
                 httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
-                string supabaseKey = "YOUR_SUPABASE_KEY";
+                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
                 var url = $"{supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}&select=id,is_activated";
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -221,7 +221,9 @@ namespace AkademiTrack
                 if (!response.IsSuccessStatusCode)
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to check activation key - HTTP {response.StatusCode}");
-                    return true; // Antar gyldig ved nettverksfeil
+                    // ❌ SECURITY FIX: Return false on network/server errors
+                    // This forces user to have working internet connection
+                    return false;
                 }
 
                 var responseContent = await response.Content.ReadAsStringAsync();
@@ -235,7 +237,8 @@ namespace AkademiTrack
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking activation key: {ex.Message}");
-                return true;
+                // ❌ SECURITY FIX: Return false on exceptions (network errors, timeouts, etc.)
+                return false;
             }
             finally
             {
