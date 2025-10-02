@@ -589,7 +589,7 @@
 				<StackPanel Orientation="Horizontal"
 							HorizontalAlignment="Right"
 							Spacing="12">
-					<Button Content="Lukk"
+					<Button Content="    Lukk"
 							Classes="cancel"
 							Command="{Binding CloseCommand}"
 							IsDefault="True"/>

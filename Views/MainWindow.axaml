@@ -444,7 +444,7 @@
 
 				<!-- Settings Button -->
 				<StackPanel HorizontalAlignment="Center">
-					<Button Content="Innstillinger og nerde greier"
+					<Button Content="Innstillinger"
 	                       Classes="settings"
 	                       Command="{Binding OpenSettingsCommand}"
 	                       ToolTip.Tip="Åpne innstillinger og vis aktivitetslogger"/>
