@@ -186,13 +186,39 @@ namespace AkademiTrack.ViewModels
                 var settingsPath = Path.Combine(appFolderPath, "settings.json");
 
                 // Load existing settings or create new
-                AppSettings settings;
+                AppSettings settings = null;
+
                 if (File.Exists(settingsPath))
                 {
-                    var existingJson = await File.ReadAllTextAsync(settingsPath);
-                    settings = JsonSerializer.Deserialize<AppSettings>(existingJson) ?? new AppSettings();
+                    try
+                    {
+                        var existingJson = await File.ReadAllTextAsync(settingsPath);
+                        settings = JsonSerializer.Deserialize<AppSettings>(existingJson);
+
+                        System.Diagnostics.Debug.WriteLine("Successfully loaded existing settings");
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        // JSON is corrupted - log the error and delete the file
+                        System.Diagnostics.Debug.WriteLine($"Corrupted settings.json detected: {jsonEx.Message}");
+                        System.Diagnostics.Debug.WriteLine("Deleting corrupted file and creating fresh settings");
+
+                        try
+                        {
+                            File.Delete(settingsPath);
+                            System.Diagnostics.Debug.WriteLine("Corrupted settings file deleted successfully");
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Warning: Could not delete corrupted file: {deleteEx.Message}");
+                        }
+
+                        settings = null; // Force creation of new settings
+                    }
                 }
-                else
+
+                // Create new settings if file doesn't exist or was corrupted
+                if (settings == null)
                 {
                     settings = new AppSettings
                     {
@@ -200,6 +226,7 @@ namespace AkademiTrack.ViewModels
                         ShowDetailedLogs = true,
                         StartWithSystem = true
                     };
+                    System.Diagnostics.Debug.WriteLine("Created fresh settings object");
                 }
 
                 // Update with encrypted credentials
@@ -208,15 +235,23 @@ namespace AkademiTrack.ViewModels
                 settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
                 settings.LastUpdated = DateTime.Now;
 
-                // THIS IS THE KEY LINE - Set InitialSetupCompleted to true
+                // Set InitialSetupCompleted to true
                 settings.InitialSetupCompleted = true;
 
-                // Save settings
-                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(settingsPath, json);
+                // Save settings with error handling
+                try
+                {
+                    var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(settingsPath, json);
 
-                System.Diagnostics.Debug.WriteLine($"Credentials saved to: {settingsPath}");
-                System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
+                    System.Diagnostics.Debug.WriteLine($"Credentials saved successfully to: {settingsPath}");
+                    System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
+                }
+                catch (Exception writeEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to write settings file: {writeEx.Message}");
+                    throw new Exception($"Kunne ikke lagre innstillinger: {writeEx.Message}", writeEx);
+                }
             }
             catch (Exception ex)
             {

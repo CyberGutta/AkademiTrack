@@ -1041,103 +1041,466 @@ Categories=Utility;
             return Path.Combine(appFolderPath, "settings.json");
         }
 
+        // Add this helper class to handle self-repairing JSON loading
+        public static class SafeSettingsLoader
+        {
+            private static readonly string SettingsFileName = "settings.json";
+
+            public static string GetSettingsFilePath()
+            {
+                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+                return Path.Combine(appFolderPath, SettingsFileName);
+            }
+
+            /// <summary>
+            /// Loads settings with self-repair capability - adds missing fields automatically
+            /// </summary>
+            public static async Task<AppSettings> LoadSettingsWithAutoRepairAsync()
+            {
+                var filePath = GetSettingsFilePath();
+                var defaultSettings = CreateDefaultSettings();
+                bool needsRepair = false;
+
+                // If file doesn't exist, create it with defaults
+                if (!File.Exists(filePath))
+                {
+                    Debug.WriteLine($"Settings file not found at: {filePath}");
+                    Debug.WriteLine("Creating new settings file with defaults");
+                    await SaveSettingsSafelyAsync(defaultSettings);
+                    return defaultSettings;
+                }
+
+                try
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+
+                    // First try: Parse as flexible JsonDocument to handle missing fields
+                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    {
+                        var root = doc.RootElement;
+                        var settings = CreateDefaultSettings();
+
+                        // Read each property if it exists, otherwise keep default
+                        if (root.TryGetProperty("ShowActivityLog", out JsonElement showActivityLog))
+                        {
+                            settings.ShowActivityLog = showActivityLog.GetBoolean();
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: ShowActivityLog - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("ShowDetailedLogs", out JsonElement showDetailedLogs))
+                        {
+                            settings.ShowDetailedLogs = showDetailedLogs.GetBoolean();
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: ShowDetailedLogs - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("StartWithSystem", out JsonElement startWithSystem))
+                        {
+                            settings.StartWithSystem = startWithSystem.GetBoolean();
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: StartWithSystem - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("AutoStartAutomation", out JsonElement autoStartAutomation))
+                        {
+                            settings.AutoStartAutomation = autoStartAutomation.GetBoolean();
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: AutoStartAutomation - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("InitialSetupCompleted", out JsonElement initialSetupCompleted))
+                        {
+                            settings.InitialSetupCompleted = initialSetupCompleted.GetBoolean();
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: InitialSetupCompleted - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("EncryptedLoginEmail", out JsonElement encryptedLoginEmail))
+                        {
+                            settings.EncryptedLoginEmail = encryptedLoginEmail.GetString() ?? "";
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: EncryptedLoginEmail - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("EncryptedLoginPassword", out JsonElement encryptedLoginPassword))
+                        {
+                            settings.EncryptedLoginPassword = encryptedLoginPassword.GetString() ?? "";
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: EncryptedLoginPassword - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("EncryptedSchoolName", out JsonElement encryptedSchoolName))
+                        {
+                            settings.EncryptedSchoolName = encryptedSchoolName.GetString() ?? "";
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: EncryptedSchoolName - using default");
+                            needsRepair = true;
+                        }
+
+                        if (root.TryGetProperty("LastUpdated", out JsonElement lastUpdated))
+                        {
+                            try
+                            {
+                                settings.LastUpdated = lastUpdated.GetDateTime();
+                                // Validate date isn't in the far future
+                                if (settings.LastUpdated > DateTime.Now.AddYears(1))
+                                {
+                                    Debug.WriteLine($"Invalid LastUpdated date: {settings.LastUpdated}");
+                                    settings.LastUpdated = DateTime.Now;
+                                    needsRepair = true;
+                                }
+                            }
+                            catch
+                            {
+                                Debug.WriteLine("Invalid LastUpdated format - using default");
+                                settings.LastUpdated = DateTime.Now;
+                                needsRepair = true;
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Missing: LastUpdated - using default");
+                            needsRepair = true;
+                        }
+
+                        // Test decryption of credentials - if it fails, clear them
+                        if (!string.IsNullOrEmpty(settings.EncryptedLoginEmail))
+                        {
+                            try
+                            {
+                                var test = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to decrypt email: {ex.Message}");
+                                settings.EncryptedLoginEmail = "";
+                                needsRepair = true;
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(settings.EncryptedLoginPassword))
+                        {
+                            try
+                            {
+                                var test = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to decrypt password: {ex.Message}");
+                                settings.EncryptedLoginPassword = "";
+                                needsRepair = true;
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(settings.EncryptedSchoolName))
+                        {
+                            try
+                            {
+                                var test = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to decrypt school name: {ex.Message}");
+                                settings.EncryptedSchoolName = "";
+                                needsRepair = true;
+                            }
+                        }
+
+                        // If file needed repair, save the corrected version
+                        if (needsRepair)
+                        {
+                            Debug.WriteLine("Settings file was incomplete or invalid - repairing now");
+                            BackupOriginalFile(filePath);
+                            await SaveSettingsSafelyAsync(settings);
+                            Debug.WriteLine("Settings file has been repaired with all required fields");
+                        }
+
+                        return settings;
+                    }
+                }
+                catch (JsonException jsonEx)
+                {
+                    Debug.WriteLine($"JSON parsing error (malformed JSON): {jsonEx.Message}");
+                    Debug.WriteLine("Attempting to repair corrupted file...");
+
+                    // Try to salvage what we can from the corrupted file
+                    var settings = await TryRepairCorruptedJson(filePath, defaultSettings);
+
+                    BackupOriginalFile(filePath);
+                    await SaveSettingsSafelyAsync(settings);
+                    Debug.WriteLine("Corrupted settings file has been repaired");
+
+                    return settings;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Unexpected error loading settings: {ex.Message}");
+                    Debug.WriteLine("Recreating settings file with defaults");
+
+                    BackupOriginalFile(filePath);
+                    await SaveSettingsSafelyAsync(defaultSettings);
+
+                    return defaultSettings;
+                }
+            }
+
+            /// <summary>
+            /// Attempts to extract whatever data is possible from corrupted JSON
+            /// </summary>
+            private static async Task<AppSettings> TryRepairCorruptedJson(string filePath, AppSettings defaults)
+            {
+                try
+                {
+                    // Read the raw file
+                    var rawContent = await File.ReadAllTextAsync(filePath);
+
+                    // Try to extract key-value pairs manually
+                    var settings = CreateDefaultSettings();
+
+                    // Simple pattern matching to extract boolean values
+                    if (rawContent.Contains("\"ShowActivityLog\"") && rawContent.Contains("true"))
+                        settings.ShowActivityLog = true;
+                    else if (rawContent.Contains("\"ShowActivityLog\"") && rawContent.Contains("false"))
+                        settings.ShowActivityLog = false;
+
+                    if (rawContent.Contains("\"ShowDetailedLogs\"") && rawContent.Contains("true"))
+                        settings.ShowDetailedLogs = true;
+                    else if (rawContent.Contains("\"ShowDetailedLogs\"") && rawContent.Contains("false"))
+                        settings.ShowDetailedLogs = false;
+
+                    if (rawContent.Contains("\"StartWithSystem\"") && rawContent.Contains("true"))
+                        settings.StartWithSystem = true;
+                    else if (rawContent.Contains("\"StartWithSystem\"") && rawContent.Contains("false"))
+                        settings.StartWithSystem = false;
+
+                    if (rawContent.Contains("\"AutoStartAutomation\"") && rawContent.Contains("true"))
+                        settings.AutoStartAutomation = true;
+                    else if (rawContent.Contains("\"AutoStartAutomation\"") && rawContent.Contains("false"))
+                        settings.AutoStartAutomation = false;
+
+                    if (rawContent.Contains("\"InitialSetupCompleted\"") && rawContent.Contains("true"))
+                        settings.InitialSetupCompleted = true;
+                    else if (rawContent.Contains("\"InitialSetupCompleted\"") && rawContent.Contains("false"))
+                        settings.InitialSetupCompleted = false;
+
+                    // Try to extract encrypted strings using regex
+                    var emailMatch = System.Text.RegularExpressions.Regex.Match(
+                        rawContent, @"""EncryptedLoginEmail""\s*:\s*""([^""]*)""");
+                    if (emailMatch.Success)
+                        settings.EncryptedLoginEmail = emailMatch.Groups[1].Value;
+
+                    var passwordMatch = System.Text.RegularExpressions.Regex.Match(
+                        rawContent, @"""EncryptedLoginPassword""\s*:\s*""([^""]*)""");
+                    if (passwordMatch.Success)
+                        settings.EncryptedLoginPassword = passwordMatch.Groups[1].Value;
+
+                    var schoolMatch = System.Text.RegularExpressions.Regex.Match(
+                        rawContent, @"""EncryptedSchoolName""\s*:\s*""([^""]*)""");
+                    if (schoolMatch.Success)
+                        settings.EncryptedSchoolName = schoolMatch.Groups[1].Value;
+
+                    Debug.WriteLine("Extracted data from corrupted file where possible");
+                    return settings;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Could not salvage corrupted file: {ex.Message}");
+                    return defaults;
+                }
+            }
+
+            /// <summary>
+            /// Creates default settings object
+            /// </summary>
+            private static AppSettings CreateDefaultSettings()
+            {
+                return new AppSettings
+                {
+                    ShowActivityLog = false,
+                    ShowDetailedLogs = true,
+                    StartWithSystem = true,
+                    AutoStartAutomation = false,
+                    LastUpdated = DateTime.Now,
+                    EncryptedLoginEmail = "",
+                    EncryptedLoginPassword = "",
+                    EncryptedSchoolName = "",
+                    InitialSetupCompleted = false
+                };
+            }
+
+            /// <summary>
+            /// Backs up original file before repairing
+            /// </summary>
+            private static void BackupOriginalFile(string filePath)
+            {
+                try
+                {
+                    if (File.Exists(filePath))
+                    {
+                        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                        var backupPath = $"{filePath}.backup_{timestamp}";
+                        File.Copy(filePath, backupPath, true);
+                        Debug.WriteLine($"Original file backed up to: {backupPath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to backup file: {ex.Message}");
+                }
+            }
+
+            /// <summary>
+            /// Safely saves settings with atomic write operation
+            /// </summary>
+            public static async Task<bool> SaveSettingsSafelyAsync(AppSettings settings)
+            {
+                try
+                {
+                    var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
+
+                    Directory.CreateDirectory(appFolderPath);
+                    var filePath = GetSettingsFilePath();
+                    var tempPath = filePath + ".tmp";
+
+                    // Update timestamp
+                    settings.LastUpdated = DateTime.Now;
+
+                    // Serialize with indentation for readability
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+                    var json = JsonSerializer.Serialize(settings, options);
+
+                    // Write to temporary file first
+                    await File.WriteAllTextAsync(tempPath, json);
+
+                    // Verify the temp file is valid before replacing
+                    try
+                    {
+                        var testRead = await File.ReadAllTextAsync(tempPath);
+                        var testDeserialize = JsonSerializer.Deserialize<AppSettings>(testRead);
+                        if (testDeserialize == null)
+                        {
+                            Debug.WriteLine("Verification failed: deserialized to null");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Verification failed: {ex.Message}");
+                        File.Delete(tempPath);
+                        return false;
+                    }
+
+                    // Replace old file with new one atomically
+                    File.Move(tempPath, filePath, true);
+
+                    Debug.WriteLine($"Settings saved successfully to: {filePath}");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Failed to save settings: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        // Updated LoadSettingsAsync method for SettingsViewModel
         private async Task LoadSettingsAsync()
         {
             try
             {
-                var filePath = GetSettingsFilePath();
+                var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
 
-                if (File.Exists(filePath))
-                {
-                    var json = await File.ReadAllTextAsync(filePath);
-                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                // Apply loaded settings to view model properties
+                _showActivityLog = settings.ShowActivityLog;
+                _showDetailedLogs = settings.ShowDetailedLogs;
+                _startWithSystem = settings.StartWithSystem;
+                _autoStartAutomation = settings.AutoStartAutomation;
 
-                    if (settings != null)
-                    {
-                        _showActivityLog = settings.ShowActivityLog;
-                        _showDetailedLogs = settings.ShowDetailedLogs;
-                        _startWithSystem = settings.StartWithSystem;
-                        _autoStartAutomation = settings.AutoStartAutomation; // ADD THIS LINE
+                // Decrypt credentials
+                _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
+                _loginPassword = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
+                _schoolName = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
 
-                        // Decrypt credentials after loading
-                        _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
-                        _loginPassword = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
-                        _schoolName = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
+                // Notify UI of all changes
+                OnPropertyChanged(nameof(ShowActivityLog));
+                OnPropertyChanged(nameof(ShowDetailedLogs));
+                OnPropertyChanged(nameof(StartWithSystem));
+                OnPropertyChanged(nameof(AutoStartAutomation));
+                OnPropertyChanged(nameof(LoginEmail));
+                OnPropertyChanged(nameof(LoginPassword));
+                OnPropertyChanged(nameof(SchoolName));
 
-                        // Notify UI of changes for all properties
-                        OnPropertyChanged(nameof(ShowActivityLog));
-                        OnPropertyChanged(nameof(ShowDetailedLogs));
-                        OnPropertyChanged(nameof(StartWithSystem));
-                        OnPropertyChanged(nameof(AutoStartAutomation)); // ADD THIS LINE
-                        OnPropertyChanged(nameof(LoginEmail));
-                        OnPropertyChanged(nameof(LoginPassword));
-                        OnPropertyChanged(nameof(SchoolName));
+                RefreshDisplayedLogs();
 
-                        RefreshDisplayedLogs();
+                // Sync auto-start setting with system
+                _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
 
-                        // Sync the auto-start setting with the system on load
-                        _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
-
-                        Debug.WriteLine($"Settings loaded successfully from: {filePath}");
-                        Debug.WriteLine($"AutoStartAutomation: {_autoStartAutomation}"); // ADD THIS LINE
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine("No settings file found, using defaults");
-                    if (_startWithSystem)
-                    {
-                        _ = Task.Run(() => AutoStartManager.SetAutoStart(true));
-                    }
-                }
+                Debug.WriteLine("Settings loaded and applied successfully");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to load settings: {ex.Message}");
+                Debug.WriteLine($"Critical error in LoadSettingsAsync: {ex.Message}");
+                // Even if this fails, the app should continue with defaults
             }
         }
 
-        // Fixed SaveSettingsAsync for SettingsViewModel
+        // Updated SaveSettingsAsync method for SettingsViewModel
         private async Task SaveSettingsAsync()
         {
             try
             {
-                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
-
-                Directory.CreateDirectory(appFolderPath);
-                var filePath = GetSettingsFilePath();
-
-                AppSettings settings;
-                if (File.Exists(filePath))
+                var settings = new AppSettings
                 {
-                    var existingJson = await File.ReadAllTextAsync(filePath);
-                    settings = JsonSerializer.Deserialize<AppSettings>(existingJson) ?? new AppSettings();
-                }
-                else
+                    ShowActivityLog = _showActivityLog,
+                    ShowDetailedLogs = _showDetailedLogs,
+                    StartWithSystem = _startWithSystem,
+                    AutoStartAutomation = _autoStartAutomation,
+                    EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail),
+                    EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword),
+                    EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName),
+                    InitialSetupCompleted = true // Mark as completed when saving
+                };
+
+                var success = await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
+
+                if (!success)
                 {
-                    settings = new AppSettings();
+                    Debug.WriteLine("Warning: Settings save operation reported failure");
                 }
-
-                settings.ShowActivityLog = _showActivityLog;
-                settings.ShowDetailedLogs = _showDetailedLogs;
-                settings.StartWithSystem = _startWithSystem;
-                settings.AutoStartAutomation = _autoStartAutomation; 
-                settings.LastUpdated = DateTime.Now;
-
-                settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail);
-                settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword);
-                settings.EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName);
-
-                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(filePath, json);
-
-                Debug.WriteLine($"Settings saved successfully to: {filePath}");
-                Debug.WriteLine($"AutoStartAutomation saved as: {settings.AutoStartAutomation}"); 
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to save settings: {ex.Message}");
+                Debug.WriteLine($"Critical error in SaveSettingsAsync: {ex.Message}");
             }
         }
 
