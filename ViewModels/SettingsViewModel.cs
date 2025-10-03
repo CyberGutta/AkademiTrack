@@ -749,6 +749,8 @@ Categories=Utility;
         public ICommand ToggleActivityLogCommand { get; }
         public ICommand ToggleAutoStartCommand { get; }
         public ICommand ToggleAutoStartAutomationCommand { get; }
+        public ICommand OpenContactFormCommand { get; }
+        public ICommand OpenEmailCommand { get; }
 
 
 
@@ -891,6 +893,8 @@ Categories=Utility;
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
+            OpenContactFormCommand = new RelayCommand(OpenContactForm);
+            OpenEmailCommand = new RelayCommand(OpenEmail);
 
 
             // Initialize credential fields to empty strings
@@ -900,6 +904,38 @@ Categories=Utility;
 
             // Load settings on initialization
             _ = LoadSettingsAsync();
+        }
+
+        private void OpenEmail()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "mailto:cyberbrothershq@gmail.com",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error opening email: {ex.Message}");
+            }
+        }
+
+        private void OpenContactForm()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://cybergutta.github.io/AkademietTrack/dashboard.html",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error opening contact form: {ex.Message}");
+            }
         }
 
         private void ToggleAutoStartAutomation()

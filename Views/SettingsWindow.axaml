@@ -288,6 +288,62 @@
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 			<Setter Property="FontStyle" Value="Italic"/>
 		</Style>
+		<Style Selector="Button.link-button">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="#1E40AF" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Cursor" Value="Hand" />
+		</Style>
+
+		<Style Selector="Button.link-button:pointerover">
+			<Setter Property="Foreground" Value="#1E3A8A" />
+		</Style>
+
+		<Style Selector="Button.link-button /template/ ContentPresenter">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+
+		<Style Selector="Button.link">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="#0066CC" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="HorizontalAlignment" Value="Left" />
+			<Setter Property="Cursor" Value="Hand" />
+		</Style>
+
+		<Style Selector="Button.link:pointerover /template/ ContentPresenter">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+
+		<Style Selector="Button.email-link">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="#0066CC" />
+			<Setter Property="Opacity" Value="1" />
+		</Style>
+
+		<Style Selector="Button.email-link:pointerover">
+			<Setter Property="Foreground" Value="#004C99" />
+			<!-- CRITICAL: Must explicitly set this -->
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
+		<Style Selector="Button.email-link /template/ ContentPresenter">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+
+		<Style Selector="Button.email-link:pointerover /template/ ContentPresenter">
+			<Setter Property="Foreground" Value="#004C99" />
+			<!-- Also set it here for the ContentPresenter -->
+		</Style>
+
+		
 	</Window.Styles>
 
 	<Grid>
@@ -574,6 +630,41 @@
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 										   TextWrapping="Wrap"
 										   LineHeight="20"/>
+							</StackPanel>
+						</Border>
+
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
+								<TextBlock Text="📧 Kontakt oss" Classes="setting-title"/>
+
+								<TextBlock Text="Har du spørsmål, tilbakemeldinger eller trenger support?"
+										   Classes="setting-description"/>
+
+								<StackPanel Spacing="8">
+									<TextBlock Text="For rask support:"
+											   FontSize="13"
+											   FontWeight="SemiBold"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									<TextBlock Text="Logg inn på dashboard, gå til nedre høyre hjørne og klikk på chat-boblen. Deretter trykker du på boblen, og velger hva du trenger hjelp med så er det bare å skrive. "
+											   
+											   Classes="setting-description"
+											   Margin="0,0,0,0"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="5">
+									<TextBlock Text="Alternativt kan du sende epost til oss:"
+											   Classes="setting-description"
+											   VerticalAlignment="Center"
+											   Margin="0,1,0,0"/>
+									<Button Content="cyberbrothershq@gmail.com"
+											Command="{Binding OpenEmailCommand}"
+											Classes="email-link"
+											VerticalAlignment="Center"/>
+								</StackPanel>
+
+								<Button Content="Åpne kontaktskjema"
+										Classes="settings-action"
+										Command="{Binding OpenContactFormCommand}"/>
 							</StackPanel>
 						</Border>
 					</StackPanel>
