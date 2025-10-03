@@ -111,7 +111,6 @@
 		</Style>
 
 		<!-- Toggle Button Style -->
-		<!-- Toggle Button Style -->
 		<Style Selector="Button.toggle-button">
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
@@ -326,13 +325,10 @@
 			<Setter Property="VerticalAlignment" Value="Center" />
 			<Setter Property="Cursor" Value="Hand" />
 			<Setter Property="Foreground" Value="#3B9EFF" />
-			<!-- Brighter blue that works in both modes -->
 		</Style>
-
 
 		<Style Selector="Button.email-link:pointerover">
 			<Setter Property="Foreground" Value="#5DB3FF" />
-			<!-- Lighter on hover -->
 			<Setter Property="Background" Value="Transparent" />
 		</Style>
 
@@ -344,7 +340,12 @@
 			<Setter Property="Foreground" Value="#5DB3FF" />
 		</Style>
 
-
+		<!-- Icon Styles for Navigation -->
+		<Style Selector="TextBlock.nav-icon">
+			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="Margin" Value="0,0,10,0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
 
 	</Window.Styles>
 
@@ -367,11 +368,40 @@
 						   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 						   Margin="8,0,0,28"/>
 
-				<Button x:Name="LoginButton" Classes="category-tab selected" Content="🔐 Innlogging" Tag="login"/>
-				<Button x:Name="AutomationButton" Classes="category-tab" Content="⚙️ Automatisering" Tag="automation"/>
-				<Button x:Name="SystemButton" Classes="category-tab" Content="💾 System" Tag="system"/>
-				<Button x:Name="AdvancedButton" Classes="category-tab" Content="🛠️ Avansert" Tag="advanced"/>
-				<Button x:Name="AboutButton" Classes="category-tab" Content="ℹ️ Om" Tag="about"/>
+				<Button x:Name="LoginButton" Classes="category-tab selected" Tag="login">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="🔑" Classes="nav-icon"/>
+						<TextBlock Text="Innlogging" VerticalAlignment="Center"/>
+					</StackPanel>
+				</Button>
+
+				<Button x:Name="AutomationButton" Classes="category-tab" Tag="automation">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="⚡" Classes="nav-icon"/>
+						<TextBlock Text="Automatisering" VerticalAlignment="Center"/>
+					</StackPanel>
+				</Button>
+
+				<Button x:Name="SystemButton" Classes="category-tab" Tag="system">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="💻" Classes="nav-icon"/>
+						<TextBlock Text="System" VerticalAlignment="Center"/>
+					</StackPanel>
+				</Button>
+
+				<Button x:Name="AdvancedButton" Classes="category-tab" Tag="advanced">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="⚙️" Classes="nav-icon"/>
+						<TextBlock Text="Avansert" VerticalAlignment="Center"/>
+					</StackPanel>
+				</Button>
+
+				<Button x:Name="AboutButton" Classes="category-tab" Tag="about">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="ℹ️" Classes="nav-icon"/>
+						<TextBlock Text="Om" VerticalAlignment="Center"/>
+					</StackPanel>
+				</Button>
 			</StackPanel>
 		</Border>
 
@@ -394,7 +424,7 @@
 
 						<Border Classes="warning-panel-compact">
 							<StackPanel Spacing="6">
-								<TextBlock Text="🔐 Sikkerhetsinformasjon"
+								<TextBlock Text="🔒 Sikkerhetsinformasjon"
 										   FontWeight="SemiBold"
 										   FontSize="13"
 										   Foreground="#FF9800"/>
@@ -406,7 +436,7 @@
 							</StackPanel>
 						</Border>
 
-						<!-- School Name Field (moved to top) -->
+						<!-- School Name Field -->
 						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="Skolenavn" Classes="setting-title"/>
@@ -483,7 +513,7 @@
 								Padding="14"
 								Margin="0">
 							<StackPanel Spacing="7">
-								<TextBlock Text="ℹ️ Om automatisering"
+								<TextBlock Text="💡 Om automatisering"
 										   FontWeight="SemiBold"
 										   FontSize="14"
 										   Foreground="#007ACC"/>
@@ -609,7 +639,7 @@
 
 						<Border Classes="info-panel">
 							<StackPanel Spacing="10">
-								<TextBlock Text="📱 Applikasjonsinformasjon"
+								<TextBlock Text="📋 Applikasjonsinformasjon"
 										   FontWeight="SemiBold"
 										   FontSize="15"
 										   Foreground="#007ACC"/>
@@ -623,7 +653,7 @@
 
 						<Border Classes="setting-card">
 							<StackPanel Spacing="10">
-								<TextBlock Text="📝 Lisens"
+								<TextBlock Text="📜 Lisens"
 										   FontWeight="SemiBold"
 										   FontSize="15"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
@@ -647,8 +677,7 @@
 											   FontSize="13"
 											   FontWeight="SemiBold"
 											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-									<TextBlock Text="Logg inn på dashboard, gå til nedre høyre hjørne og klikk på chat-boblen. Deretter trykker du på boblen, og velger hva du trenger hjelp med så er det bare å skrive. "
-											   
+									<TextBlock Text="Logg inn på dashboard, gå til nedre høyre hjørne og klikk på chat-boblen. Deretter trykker du på boblen, og velger hva du trenger hjelp med så er det bare å skrive."
 											   Classes="setting-description"
 											   Margin="0,0,0,0"/>
 								</StackPanel>
@@ -682,7 +711,7 @@
 				<StackPanel Orientation="Horizontal"
 							HorizontalAlignment="Right"
 							Spacing="12">
-					<Button Content="    Lukk"
+					<Button Content="Lukk"
 							Classes="cancel"
 							Command="{Binding CloseCommand}"
 							IsDefault="True"/>
