@@ -180,6 +180,24 @@
 		<Style Selector="Button.secondary:pressed">
 			<Setter Property="Background" Value="#E0E0E0"/>
 		</Style>
+
+		<!-- Password Toggle Button -->
+		<Style Selector="Button.passwordToggle">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="8"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Width" Value="36"/>
+			<Setter Property="Height" Value="36"/>
+		</Style>
+
+		<Style Selector="Button.passwordToggle:pointerover">
+			<Setter Property="Background" Value="#F0F0F0"/>
+		</Style>
+
+		<Style Selector="Button.passwordToggle:pressed">
+			<Setter Property="Background" Value="#E0E0E0"/>
+		</Style>
 	</Window.Styles>
 
 	<Grid RowDefinitions="Auto,*,Auto" Background="White">
@@ -245,13 +263,31 @@
                                Margin="0,2,0,0"/>
 				</StackPanel>
 
-				<!-- Password -->
+				<!-- Password with Toggle -->
 				<StackPanel Spacing="8">
 					<TextBlock Text="Feide Passord" Classes="label"/>
-					<TextBox Name="PasswordTextBox"
-                             Watermark="Ditt Feide-passord"
-                             PasswordChar="●"
-                             Text="{Binding FeidePassword}"/>
+					<Grid>
+						<TextBox Name="PasswordTextBox"
+                                 Watermark="Ditt Feide-passord"
+                                 PasswordChar="●"
+                                 Text="{Binding FeidePassword}"
+                                 Padding="12,10,48,10"/>
+
+						<Button Name="TogglePasswordButton"
+                                Classes="passwordToggle"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,4,0"
+                                Click="TogglePasswordVisibility"
+                                ToolTip.Tip="Vis/skjul passord">
+							<Path Name="EyeIcon"
+                                  Fill="#666666"
+                                  Data="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                                  Stretch="Uniform"
+                                  Width="20"
+                                  Height="20"/>
+						</Button>
+					</Grid>
 					<TextBlock Text="Ditt Feide-passord lagres kryptert"
                                FontSize="11"
                                Foreground="#666666"
