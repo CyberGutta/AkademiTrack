@@ -111,6 +111,7 @@
 		</Style>
 
 		<!-- Toggle Button Style -->
+		<!-- Toggle Button Style -->
 		<Style Selector="Button.toggle-button">
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
@@ -122,29 +123,29 @@
 		</Style>
 
 		<Style Selector="Button.toggle-button.enabled">
-			<Setter Property="Background" Value="#28A745"/>
+			<Setter Property="Background" Value="#DC3545"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.enabled /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="#28A745"/>
+			<Setter Property="Background" Value="#DC3545"/>
 			<Setter Property="CornerRadius" Value="8"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.enabled:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="#218838"/>
+			<Setter Property="Background" Value="#C82333"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.disabled">
-			<Setter Property="Background" Value="#DC3545"/>
+			<Setter Property="Background" Value="#28A745"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.disabled /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="#DC3545"/>
+			<Setter Property="Background" Value="#28A745"/>
 			<Setter Property="CornerRadius" Value="8"/>
 		</Style>
 
 		<Style Selector="Button.toggle-button.disabled:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="#C82333"/>
+			<Setter Property="Background" Value="#218838"/>
 		</Style>
 
 		<!-- Cancel/Close Button Style -->
@@ -410,7 +411,7 @@
 									<LineBreak/>
 									<Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
 								</TextBlock>
-								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Deaktivert|Aktivert'}"
+								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
 										Classes="toggle-button"
 										Classes.enabled="{Binding AutoStartAutomation}"
 										Classes.disabled="{Binding !AutoStartAutomation}"
@@ -453,7 +454,7 @@
 								<TextBlock Text="Start med Windows" Classes="setting-title"/>
 								<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp."
 										   Classes="setting-description"/>
-								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Deaktivert|Aktivert'}"
+								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
 										Classes="toggle-button"
 										Classes.enabled="{Binding StartWithSystem}"
 										Classes.disabled="{Binding !StartWithSystem}"
