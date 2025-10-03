@@ -325,13 +325,14 @@
 			<Setter Property="Margin" Value="0" />
 			<Setter Property="VerticalAlignment" Value="Center" />
 			<Setter Property="Cursor" Value="Hand" />
-			<Setter Property="Foreground" Value="#0066CC" />
-			<Setter Property="Opacity" Value="1" />
+			<Setter Property="Foreground" Value="#3B9EFF" />
+			<!-- Brighter blue that works in both modes -->
 		</Style>
 
+
 		<Style Selector="Button.email-link:pointerover">
-			<Setter Property="Foreground" Value="#004C99" />
-			<!-- CRITICAL: Must explicitly set this -->
+			<Setter Property="Foreground" Value="#5DB3FF" />
+			<!-- Lighter on hover -->
 			<Setter Property="Background" Value="Transparent" />
 		</Style>
 
@@ -340,11 +341,11 @@
 		</Style>
 
 		<Style Selector="Button.email-link:pointerover /template/ ContentPresenter">
-			<Setter Property="Foreground" Value="#004C99" />
-			<!-- Also set it here for the ContentPresenter -->
+			<Setter Property="Foreground" Value="#5DB3FF" />
 		</Style>
 
-		
+
+
 	</Window.Styles>
 
 	<Grid>
