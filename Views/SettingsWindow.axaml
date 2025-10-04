@@ -576,7 +576,7 @@
 
 						<Border Classes="setting-card">
 							<StackPanel Spacing="12">
-								<TextBlock Text="Start med Windows" Classes="setting-title"/>
+								<TextBlock Text="Åpne appen automatisk ved oppstart" Classes="setting-title"/>
 								<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp."
 										   Classes="setting-description"/>
 								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
