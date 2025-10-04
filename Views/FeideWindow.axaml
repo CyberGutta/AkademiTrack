@@ -269,7 +269,7 @@
 					<Grid>
 						<TextBox Name="PasswordTextBox"
                                  Watermark="Ditt Feide-passord"
-                                 PasswordChar="●"
+                                 PasswordChar="•"
                                  Text="{Binding FeidePassword}"
                                  Padding="12,10,48,10"/>
 
