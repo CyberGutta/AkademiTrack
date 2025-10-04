@@ -653,22 +653,43 @@
 								</Grid>
 
 								<Border Grid.Row="1"
-										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
-										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-										BorderThickness="1"
-										CornerRadius="8"
-										Height="250">
-									<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
-										<ItemsControl ItemsSource="{Binding LogEntries}">
+									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+									BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+									BorderThickness="1"
+									CornerRadius="8"
+									Height="250"
+									ClipToBounds="True">
+									<ScrollViewer VerticalScrollBarVisibility="Auto"
+												  HorizontalScrollBarVisibility="Disabled"
+												  Padding="10,10,10,16"
+												  ClipToBounds="True">
+										<ItemsControl ItemsSource="{Binding LogEntries}"
+													  HorizontalAlignment="Stretch"
+													  ClipToBounds="True"
+													  Margin="0,0,0,20">
+											<ItemsControl.ItemsPanel>
+												<ItemsPanelTemplate>
+													<StackPanel ClipToBounds="True"/>
+												</ItemsPanelTemplate>
+											</ItemsControl.ItemsPanel>
 											<ItemsControl.ItemTemplate>
 												<DataTemplate>
-													<TextBlock Text="{Binding FormattedMessage}"
-															   Classes="log-entry"
-															   Classes.INFO="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='INFO'}"
-															   Classes.SUCCESS="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='SUCCESS'}"
-															   Classes.ERROR="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='ERROR'}"
-															   Classes.DEBUG="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='DEBUG'}"
-															   TextWrapping="Wrap"/>
+													<Border Padding="0"
+															Margin="0,0,0,2"
+															HorizontalAlignment="Stretch"
+															ClipToBounds="True"
+															MaxWidth="700">
+														<TextBlock Text="{Binding FormattedMessage}"
+																   Classes="log-entry"
+																   Classes.INFO="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='INFO'}"
+																   Classes.SUCCESS="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='SUCCESS'}"
+																   Classes.ERROR="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='ERROR'}"
+																   Classes.DEBUG="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='DEBUG'}"
+																   TextWrapping="Wrap"
+																   TextTrimming="CharacterEllipsis"
+																   HorizontalAlignment="Left"
+																   MaxWidth="690"/>
+													</Border>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>
 										</ItemsControl>
