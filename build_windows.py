@@ -88,6 +88,21 @@ def build_windows_release(version):
     publish_single = Path("./publish-win-single")
     release_folder = Path(f"./Releases/v{version}")
     
+    # Check for icon file
+    icon_path = Path("./Assets/AT-1024.ico")
+    if not icon_path.exists():
+        print(f"⚠️  Icon file not found: {icon_path}")
+        print("Checking for alternative formats...")
+        # Check for PNG as fallback
+        png_icon = Path("./Assets/AT-1024.png")
+        if png_icon.exists():
+            print(f"⚠️  Found PNG but VPK requires .ico format")
+            print("Please convert AT-1024.png to AT-1024.ico")
+        icon_path = None
+    else:
+        icon_size = icon_path.stat().st_size
+        print(f"✅ Icon file found: {icon_path} ({icon_size} bytes)")
+    
     # Clean directories
     if publish_dir.exists():
         print(f"🧹 Cleaning publish directory...")
@@ -152,7 +167,7 @@ def build_windows_release(version):
     exe_size = exe_single.stat().st_size / 1024 / 1024
     print(f"✅ Single-file executable: {exe_single.name} ({exe_size:.1f} MB)")
     
-    if exe_size < 10:  # If it's less than 10MB, something is wrong
+    if exe_size < 10:
         print(f"⚠️  Warning: Executable seems too small ({exe_size:.1f} MB). This might be a stub, not a full exe.")
     
     # Step 3: Create portable ZIP from multi-file build
@@ -190,6 +205,7 @@ def build_windows_release(version):
     # Get absolute paths for VPK
     publish_dir_abs = publish_dir.absolute()
     
+    # Build VPK command with icon
     vpk_cmd = [
         "vpk", "pack",
         "--packId", "AkademiTrack",
@@ -198,8 +214,14 @@ def build_windows_release(version):
         "--mainExe", "AkademiTrack.exe"
     ]
     
+    # Add icon parameter if icon exists
+    if icon_path and icon_path.exists():
+        vpk_cmd.extend(["--icon", str(icon_path.absolute())])
+        print(f"🎨 Using icon: {icon_path}")
+    else:
+        print(f"⚠️  Building without custom icon (will use default)")
+    
     print(f"Running: {' '.join(vpk_cmd)}")
-    # Run from project root, not release folder
     result = subprocess.run(vpk_cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
@@ -219,7 +241,7 @@ def build_windows_release(version):
     import time
     time.sleep(1)
     
-    # VPK creates files directly in the Releases folder (not in v1.0.0)
+    # VPK creates files directly in the Releases folder
     vpk_releases_path = Path("./Releases")
     
     if vpk_releases_path.exists():
@@ -229,13 +251,11 @@ def build_windows_release(version):
         for item in vpk_releases_path.iterdir():
             if item.is_file():
                 dest = release_folder / item.name
-                # Skip if already exists (avoid duplicates)
                 if dest.exists():
                     print(f"  ⏭️  Already exists: {item.name}")
                     continue
                 
                 try:
-                    # Try to copy with retry on file lock
                     max_retries = 3
                     for retry in range(max_retries):
                         try:
@@ -250,7 +270,7 @@ def build_windows_release(version):
                 except Exception as e:
                     print(f"  ⚠️  Skipped {item.name}: {e}")
         
-        # Don't delete Releases folder - just remove VPK files we copied
+        # Clean up VPK files from root Releases folder
         for item in vpk_releases_path.iterdir():
             if item.is_file() and item.parent == vpk_releases_path:
                 try:
@@ -290,7 +310,7 @@ def main():
     print(f"\n📌 Using version: {version}")
     
     # Ask if user wants to update .csproj
-    update_proj = input("\nUpdate version in .csproj file? (y/n) [y]: ").strip().lower()
+    update_proj = input("\nUpdate version in .csproj file? (y/n) [n]: ").strip().lower()
     if update_proj != 'n':
         update_csproj_version(version)
     
@@ -322,6 +342,11 @@ def main():
         print(f"  • Distribute the portable ZIP for manual installs")
         print(f"  • Use the .nupkg + RELEASES for auto-updates")
         print(f"  • Upload to your release server/CDN")
+        
+        print("\n🎨 Icon troubleshooting:")
+        print(f"  • Make sure Assets/AT-1024.ico exists (not just .png)")
+        print(f"  • Convert PNG to ICO if needed (online tools available)")
+        print(f"  • High-res ICO should contain multiple sizes: 16x16, 32x32, 48x48, 256x256")
     else:
         print("\n❌ Build failed!")
 
