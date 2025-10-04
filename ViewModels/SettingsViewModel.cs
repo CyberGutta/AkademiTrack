@@ -672,31 +672,219 @@ Terminal=false
             try
             {
                 IsCheckingForUpdates = true;
-                UpdateStatus = "Laster ned oppdatering...";
+                UpdateStatus = "Forbereder oppdatering...";
 
-                var mgr = new UpdateManager("https://github.com/CyberGutta/AkademiTrack/releases/latest/download");
-                var newVersion = await mgr.CheckForUpdatesAsync();
-
-                if (newVersion == null)
+                // Determine platform-specific package suffix
+                string platformSuffix = "";
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    UpdateStatus = "Ingen oppdatering funnet";
+                    platformSuffix = "-osx";
+                    Debug.WriteLine("Platform detected: macOS");
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    platformSuffix = "-linux";
+                    Debug.WriteLine("Platform detected: Linux");
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    platformSuffix = ""; // Windows uses base package name
+                    Debug.WriteLine("Platform detected: Windows");
+                }
+
+                UpdateManager? mgr = null;
+                UpdateInfo? updateInfo = null;
+                bool updateFound = false;
+
+                // Strategy 1: Try GithubSource (recommended approach)
+                try
+                {
+                    Debug.WriteLine("Strategy 1: Attempting GithubSource...");
+                    UpdateStatus = "Kobler til GitHub...";
+
+                    var githubSource = new GithubSource("https://github.com/CyberGutta/AkademiTrack", "", false);
+                    mgr = new UpdateManager(githubSource);
+
+                    updateInfo = await mgr.CheckForUpdatesAsync();
+                    if (updateInfo != null)
+                    {
+                        Debug.WriteLine($"Strategy 1 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                        updateFound = true;
+                    }
+                    else
+                    {
+                        Debug.WriteLine("Strategy 1: No update found via GithubSource");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Strategy 1 FAILED: {ex.Message}");
+                }
+
+                // Strategy 2: Try direct URL with version tag
+                if (!updateFound && !string.IsNullOrEmpty(AvailableVersion))
+                {
+                    try
+                    {
+                        Debug.WriteLine($"Strategy 2: Attempting direct URL with version v{AvailableVersion}...");
+                        UpdateStatus = "Prøver alternativ nedlasting...";
+
+                        var directUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
+                        mgr = new UpdateManager(directUrl);
+
+                        updateInfo = await mgr.CheckForUpdatesAsync();
+                        if (updateInfo != null)
+                        {
+                            Debug.WriteLine($"Strategy 2 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            updateFound = true;
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Strategy 2: No update found via direct URL");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Strategy 2 FAILED: {ex.Message}");
+                    }
+                }
+
+                // Strategy 3: Try with platform-specific package name hint
+                if (!updateFound && !string.IsNullOrEmpty(AvailableVersion) && !string.IsNullOrEmpty(platformSuffix))
+                {
+                    try
+                    {
+                        Debug.WriteLine($"Strategy 3: Attempting platform-specific URL ({platformSuffix})...");
+                        UpdateStatus = "Søker etter plattform-spesifikk pakke...";
+
+                        var platformUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
+                        mgr = new UpdateManager(platformUrl);
+
+                        updateInfo = await mgr.CheckForUpdatesAsync();
+                        if (updateInfo != null)
+                        {
+                            Debug.WriteLine($"Strategy 3 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            updateFound = true;
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Strategy 3: No update found with platform suffix");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Strategy 3 FAILED: {ex.Message}");
+                    }
+                }
+
+                // Strategy 4: Try /releases/latest path
+                if (!updateFound)
+                {
+                    try
+                    {
+                        Debug.WriteLine("Strategy 4: Attempting /releases/latest...");
+                        UpdateStatus = "Prøver siste utgivelse...";
+
+                        var latestUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
+                        mgr = new UpdateManager(latestUrl);
+
+                        updateInfo = await mgr.CheckForUpdatesAsync();
+                        if (updateInfo != null)
+                        {
+                            Debug.WriteLine($"Strategy 4 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            updateFound = true;
+                        }
+                        else
+                        {
+                            Debug.WriteLine("Strategy 4: No update found via latest");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Strategy 4 FAILED: {ex.Message}");
+                    }
+                }
+
+                // If no update found after all strategies
+                if (!updateFound || updateInfo == null || mgr == null)
+                {
+                    Debug.WriteLine("ALL STRATEGIES FAILED: No update could be found");
+                    UpdateStatus = "Kunne ikke finne oppdatering";
+
+                    // Fallback: Open browser to releases page
+                    try
+                    {
+                        Debug.WriteLine("Opening browser as fallback...");
+                        UpdateStatus = "Åpner nedlastingsside...";
+                        await Task.Delay(1000);
+
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "https://github.com/CyberGutta/AkademiTrack/releases/latest",
+                            UseShellExecute = true
+                        });
+
+                        UpdateStatus = "Vennligst last ned manuelt fra nettleseren";
+                    }
+                    catch (Exception browserEx)
+                    {
+                        Debug.WriteLine($"Browser fallback failed: {browserEx.Message}");
+                        UpdateStatus = "Kunne ikke åpne nettleser. Besøk GitHub manuelt.";
+                    }
                     return;
                 }
 
-                await mgr.DownloadUpdatesAsync(newVersion, progress =>
+                // Download the update
+                Debug.WriteLine($"Starting download for version {updateInfo.TargetFullRelease.Version}...");
+                UpdateStatus = "Laster ned oppdatering...";
+
+                await mgr.DownloadUpdatesAsync(updateInfo, progress =>
                 {
-                    UpdateStatus = $"Laster ned... {progress}%";
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        UpdateStatus = $"Laster ned... {progress}%";
+                        Debug.WriteLine($"Download progress: {progress}%");
+                    });
                 });
 
+                Debug.WriteLine("Download completed successfully");
+                UpdateStatus = "Installerer oppdatering...";
+                await Task.Delay(500);
+
+                // Apply update and restart
+                Debug.WriteLine("Applying updates and restarting...");
                 UpdateStatus = "Starter på nytt...";
-                await Task.Delay(1500);
-                mgr.ApplyUpdatesAndRestart(newVersion);
+                await Task.Delay(1000);
+
+                mgr.ApplyUpdatesAndRestart(updateInfo);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error installing update: {ex.Message}");
-                UpdateStatus = "Feil ved nedlasting";
+                Debug.WriteLine($"CRITICAL ERROR in update process: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+
+                UpdateStatus = $"Feil ved oppdatering: {ex.Message}";
                 UpdateAvailable = false;
+
+                // Final fallback: Open browser
+                try
+                {
+                    Debug.WriteLine("Attempting final browser fallback...");
+                    await Task.Delay(2000);
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "https://github.com/CyberGutta/AkademiTrack/releases/latest",
+                        UseShellExecute = true
+                    });
+
+                    UpdateStatus = "Åpnet nedlastingsside - installer manuelt";
+                }
+                catch (Exception browserEx)
+                {
+                    Debug.WriteLine($"Final browser fallback failed: {browserEx.Message}");
+                    UpdateStatus = "Besøk: github.com/CyberGutta/AkademiTrack/releases";
+                }
             }
             finally
             {
