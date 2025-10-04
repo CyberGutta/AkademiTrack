@@ -375,3 +375,4 @@ AkademiTrack-macOS.zip
 /build-windows
 /publish-windows
 *.zip
+/publish-win-single
