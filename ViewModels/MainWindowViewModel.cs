@@ -458,6 +458,11 @@ namespace AkademiTrack.ViewModels
         private NotificationEntry _currentNotification;
         private int _notificationIdCounter = 0;
         private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
+        private Timer _updateCheckTimer;
+        private DateTime _lastUpdateCheck = DateTime.MinValue;
+        private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
+        private readonly ApplicationInfo _applicationInfo;
+
 
         // New fields for cached schedule data
         private List<ScheduleItem> _cachedScheduleData;
@@ -499,6 +504,16 @@ namespace AkademiTrack.ViewModels
             public string UniqueId { get; set; } = Guid.NewGuid().ToString();
         }
 
+        public class UpdateInfo
+        {
+            public string latest_version { get; set; }
+            public string download_url { get; set; }
+            public string notes { get; set; }
+            public string published_at { get; set; }
+            public string timestamp { get; set; }
+        }
+
+
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -510,6 +525,7 @@ namespace AkademiTrack.ViewModels
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
             _logEntries = new ObservableCollection<LogEntry>();
             _notifications = new ObservableCollection<NotificationEntry>();
+            _applicationInfo = new ApplicationInfo();
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
@@ -533,6 +549,11 @@ namespace AkademiTrack.ViewModels
 
             // ADD THIS - Check for auto-start automation setting
             _ = Task.Run(CheckAutoStartAutomationAsync);
+
+            _updateCheckTimer = new Timer(CheckForUpdatesAutomatically, null,
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(30));
+            LogInfo("Automatisk oppdateringssjekker startet (sjekker hver 30. minutt)");
         }
 
         private async Task CheckAutoStartAutomationAsync()
@@ -4029,10 +4050,114 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        // Find your Dispose() method at the bottom of the file
+        // ADD THESE 3 METHODS RIGHT BEFORE IT:
+
+        private async void CheckForUpdatesAutomatically(object state)
+        {
+            try
+            {
+                if ((DateTime.Now - _lastUpdateCheck).TotalMinutes < 25)
+                {
+                    LogDebug("Hopper over oppdateringssjekk - for tidlig siden forrige sjekk");
+                    return;
+                }
+
+                _lastUpdateCheck = DateTime.Now;
+                LogDebug($"Sjekker automatisk etter oppdateringer fra {UPDATE_JSON_URL}");
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var response = await _httpClient.GetAsync(UPDATE_JSON_URL, cts.Token);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    LogDebug($"Kunne ikke hente oppdateringsinfo: {response.StatusCode}");
+                    return;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var updateInfo = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (updateInfo == null || string.IsNullOrEmpty(updateInfo.latest_version))
+                {
+                    LogDebug("Ugyldig oppdateringsinfo mottatt");
+                    return;
+                }
+
+                var latestVersion = updateInfo.latest_version.TrimStart('v');
+                var currentVersion = _applicationInfo.Version.TrimStart('v');
+
+                LogDebug($"Nåværende versjon: {currentVersion}, Siste versjon: {latestVersion}");
+
+                if (IsNewerVersion(latestVersion, currentVersion))
+                {
+                    LogSuccess($"Ny versjon tilgjengelig: v{latestVersion}");
+
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        ShowUpdateNotification(updateInfo);
+                    });
+                }
+                else
+                {
+                    LogDebug("Ingen nye oppdateringer tilgjengelig");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                LogDebug("Oppdateringssjekk tidsavbrudd - hopper over");
+            }
+            catch (HttpRequestException ex)
+            {
+                LogDebug($"Nettverksfeil ved oppdateringssjekk: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Feil ved automatisk oppdateringssjekk: {ex.Message}");
+            }
+        }
+
+        private bool IsNewerVersion(string latestVersion, string currentVersion)
+        {
+            try
+            {
+                var latestParts = latestVersion.Split('.').Select(int.Parse).ToArray();
+                var currentParts = currentVersion.Split('.').Select(int.Parse).ToArray();
+
+                for (int i = 0; i < Math.Min(latestParts.Length, currentParts.Length); i++)
+                {
+                    if (latestParts[i] > currentParts[i])
+                        return true;
+                    if (latestParts[i] < currentParts[i])
+                        return false;
+                }
+
+                return latestParts.Length > currentParts.Length;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Kunne ikke sammenligne versjoner: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void ShowUpdateNotification(UpdateInfo updateInfo)
+        {
+            var title = "[ADMIN]Ny Oppdatering Tilgjengelig!";
+            var message = $"Versjon {updateInfo.latest_version} er tilgjengelig!\n\n";
+
+            LogInfo($"Viser oppdateringsvarsel: {updateInfo.latest_version}");
+            ShowNotification(title, message, "INFO");
+        }
+
         public void Dispose()
         {
             LogInfo("Disposing notification resources...");
-
+            
+            _updateCheckTimer?.Dispose();
             // Stop queue processing
             _isProcessingQueue = false;
 
@@ -4057,6 +4182,8 @@ namespace AkademiTrack.ViewModels
             }
 
             // Clean up other resources
+            _adminNotificationTimer?.Dispose();
+            _isProcessingQueue = false;
             _notificationSemaphore?.Dispose();
             _cancellationTokenSource?.Cancel();
             _webDriver?.Quit();

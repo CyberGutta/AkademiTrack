@@ -602,6 +602,7 @@ Terminal=false
         }
 
         // Update Methods
+        // Update Methods
         private async Task CheckForUpdatesAsync()
         {
             try
@@ -610,21 +611,35 @@ Terminal=false
                 UpdateStatus = "Sjekker etter oppdateringer...";
                 UpdateAvailable = false;
 
-                // Use the correct URL with /download at the end
-                var mgr = new UpdateManager("https://github.com/CyberGutta/AkademiTrack/releases/latest/download");
+                // Check custom JSON for version info
+                using var httpClient = new System.Net.Http.HttpClient();
+                var jsonResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/update.json");
+                var updateInfo = JsonSerializer.Deserialize<JsonElement>(jsonResponse);
 
-                var newVersion = await mgr.CheckForUpdatesAsync();
+                var latestVersion = updateInfo.GetProperty("latest_version").GetString();
+                var currentVersion = ApplicationInfo.Version;
 
-                if (newVersion == null)
+                if (string.IsNullOrEmpty(latestVersion))
                 {
-                    UpdateStatus = $"Du har den nyeste versjonen (v{ApplicationInfo.Version})";
+                    UpdateStatus = "Kunne ikke hente versjonsinformasjon";
                     UpdateAvailable = false;
+                    return;
+                }
+
+                // Remove 'v' prefix if present for comparison
+                var latestVersionClean = latestVersion.TrimStart('v');
+
+                // Compare versions
+                if (IsNewerVersion(currentVersion, latestVersionClean))
+                {
+                    AvailableVersion = latestVersionClean;
+                    UpdateStatus = $"Ny versjon tilgjengelig: v{AvailableVersion}";
+                    UpdateAvailable = true;
                 }
                 else
                 {
-                    AvailableVersion = newVersion.TargetFullRelease.Version.ToString();
-                    UpdateStatus = $"Ny versjon tilgjengelig: v{AvailableVersion}";
-                    UpdateAvailable = true;
+                    UpdateStatus = $"Du har den nyeste versjonen (v{ApplicationInfo.Version})";
+                    UpdateAvailable = false;
                 }
             }
             catch (Exception ex)
@@ -636,6 +651,20 @@ Terminal=false
             finally
             {
                 IsCheckingForUpdates = false;
+            }
+        }
+
+        private bool IsNewerVersion(string currentVersion, string latestVersion)
+        {
+            try
+            {
+                var current = new Version(currentVersion);
+                var latest = new Version(latestVersion);
+                return latest > current;
+            }
+            catch
+            {
+                return false;
             }
         }
         private async Task DownloadAndInstallUpdateAsync()
