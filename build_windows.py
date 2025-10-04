@@ -301,6 +301,67 @@ def build_windows_release(version):
     
     return release_folder
 
+def clear_icon_cache():
+    """Clear Windows icon cache to show updated icons immediately"""
+    print("\n🔄 Clearing Windows icon cache...")
+    print("=" * 50)
+    
+    try:
+        import platform
+        if platform.system() != 'Windows':
+            print("⏭️  Not on Windows, skipping icon cache clear")
+            return
+        
+        # Kill Explorer to release icon cache files
+        subprocess.run(["taskkill", "/F", "/IM", "explorer.exe"], 
+                      capture_output=True, check=False)
+        
+        # Delete icon cache files
+        localappdata = os.environ.get('LOCALAPPDATA')
+        if localappdata:
+            cache_files = [
+                os.path.join(localappdata, "IconCache.db"),
+                os.path.join(localappdata, "Microsoft", "Windows", "Explorer", "iconcache_*.db")
+            ]
+            
+            deleted_count = 0
+            for pattern in cache_files:
+                if '*' in pattern:
+                    # Handle wildcard patterns
+                    import glob
+                    for file in glob.glob(pattern):
+                        try:
+                            os.remove(file)
+                            deleted_count += 1
+                        except:
+                            pass
+                else:
+                    # Handle single file
+                    try:
+                        if os.path.exists(pattern):
+                            os.remove(pattern)
+                            deleted_count += 1
+                    except:
+                        pass
+            
+            if deleted_count > 0:
+                print(f"✅ Deleted {deleted_count} icon cache file(s)")
+            else:
+                print("ℹ️  No icon cache files found to delete")
+        
+        # Restart Explorer
+        subprocess.Popen(["explorer.exe"])
+        
+        import time
+        time.sleep(1)  # Give Explorer a moment to start
+        
+        print("✅ Icon cache cleared - new icons should display correctly")
+        print("💡 If icons still look blurry, try restarting your PC")
+        
+    except Exception as e:
+        print(f"⚠️  Could not clear icon cache: {e}")
+        print("💡 You can manually restart Explorer or reboot to see new icons")
+
 def main():
     print("🚀 AkademiTrack Windows Build & Package Tool")
     print("=" * 50)
@@ -311,7 +372,7 @@ def main():
     
     # Ask if user wants to update .csproj
     update_proj = input("\nUpdate version in .csproj file? (y/n) [n]: ").strip().lower()
-    if update_proj == 'y':  # Only updates if you type 'y'
+    if update_proj == 'y':
         update_csproj_version(version)
     
     # Build everything
@@ -347,6 +408,9 @@ def main():
         print(f"  • Make sure Assets/AT-1024.ico exists (not just .png)")
         print(f"  • Convert PNG to ICO if needed (online tools available)")
         print(f"  • High-res ICO should contain multiple sizes: 16x16, 32x32, 48x48, 256x256")
+        
+        # Clear icon cache at the end
+        clear_icon_cache()
     else:
         print("\n❌ Build failed!")
 
