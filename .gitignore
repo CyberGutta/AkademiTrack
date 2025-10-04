@@ -371,3 +371,7 @@ AkademiTrack-macOS.zip
 /build
 /publish-arm64
 /publish-win
+/build-windows/selenium-manager/macos
+/build-windows
+/publish-windows
+*.zip
