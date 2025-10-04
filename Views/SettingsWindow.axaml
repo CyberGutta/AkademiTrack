@@ -650,7 +650,7 @@
 										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 										BorderThickness="1"
 										CornerRadius="8"
-										Height="320">
+										Height="250">
 									<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
 										<ItemsControl ItemsSource="{Binding LogEntries}">
 											<ItemsControl.ItemTemplate>
