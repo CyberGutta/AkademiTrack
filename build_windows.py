@@ -12,7 +12,6 @@ def get_version_input():
     print("\n📦 Version Configuration")
     print("=" * 50)
     
-    # Try to read current version from .csproj
     current_version = get_current_version()
     if current_version:
         print(f"Current version in .csproj: {current_version}")
@@ -22,7 +21,6 @@ def get_version_input():
     if not version:
         version = current_version or "1.0.0"
     
-    # Validate version format
     if not re.match(r'^\d+\.\d+\.\d+$', version):
         print(f"⚠️  Invalid version format. Using default: 1.0.0")
         version = "1.0.0"
@@ -35,7 +33,6 @@ def get_current_version():
         tree = ET.parse("./AkademiTrack.csproj")
         root = tree.getroot()
         
-        # Look for Version element
         for prop_group in root.findall('.//PropertyGroup'):
             version_elem = prop_group.find('Version')
             if version_elem is not None and version_elem.text:
@@ -54,7 +51,6 @@ def update_csproj_version(version):
         
         version_updated = False
         
-        # Look for existing Version element
         for prop_group in root.findall('.//PropertyGroup'):
             version_elem = prop_group.find('Version')
             if version_elem is not None:
@@ -62,7 +58,6 @@ def update_csproj_version(version):
                 version_updated = True
                 break
         
-        # If no Version element exists, add it to first PropertyGroup
         if not version_updated:
             prop_groups = root.findall('.//PropertyGroup')
             if prop_groups:
@@ -82,98 +77,106 @@ def update_csproj_version(version):
         print(f"❌ Failed to update .csproj: {e}")
         return False
 
-def create_windows_package(version, use_single_file=True):
-    """Create Windows package with optional single file"""
-    PROJECT_PATH = "./AkademiTrack.csproj"
-    BUILD_DIR = "./build-windows"
-    APP_NAME = "AkademiTrack"
+def build_windows_release(version):
+    """Build Windows release - creates exe, portable zip, and VPK package"""
     
     print(f"\n🏗️  Building AkademiTrack for Windows (x64)...")
     print("=" * 50)
     
-    # Clean build directory
-    if os.path.exists(BUILD_DIR):
-        print(f"🧹 Cleaning existing build directory: {BUILD_DIR}")
-        shutil.rmtree(BUILD_DIR)
+    # Directories
+    publish_dir = Path("./publish-win")
+    publish_single = Path("./publish-win-single")
+    release_folder = Path(f"./Releases/v{version}")
     
-    # Build command
-    build_cmd = [
-        "dotnet", "publish", PROJECT_PATH,
-        "--configuration", "Release",
-        "--runtime", "win-x64",
-        "--self-contained", "true",
-        "--output", BUILD_DIR,
-        "-p:IncludeNativeLibrariesForSelfExtract=true",
-        "-p:PublishTrimmed=false",
+    # Clean directories
+    if publish_dir.exists():
+        print(f"🧹 Cleaning publish directory...")
+        shutil.rmtree(publish_dir)
+    
+    if publish_single.exists():
+        print(f"🧹 Cleaning single-file directory...")
+        shutil.rmtree(publish_single)
+    
+    if release_folder.exists():
+        print(f"🧹 Cleaning release folder...")
+        shutil.rmtree(release_folder)
+    
+    release_folder.mkdir(parents=True, exist_ok=True)
+    
+    # Step 1: Publish for VPK (multi-file, needed for VPK)
+    print(f"\n📦 Step 1: Publishing for VPK (multi-file)...")
+    publish_cmd = [
+        "dotnet", "publish",
+        "-c", "Release",
+        "--self-contained",
+        "-r", "win-x64",
+        "-o", str(publish_dir),
+        "-p:PublishSingleFile=false"
     ]
     
-    if use_single_file:
-        build_cmd.append("-p:PublishSingleFile=true")
-        print("📦 Building as single file executable...")
-    else:
-        build_cmd.append("-p:PublishSingleFile=false")
-        print("📦 Building with separate files...")
-    
-    print(f"🔨 Building...")
-    result = subprocess.run(build_cmd, capture_output=True, text=True)
+    print(f"Running: {' '.join(publish_cmd)}")
+    result = subprocess.run(publish_cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"❌ Build failed: {result.stderr}")
+        print(f"❌ Publish failed: {result.stderr}")
         return False
     
-    print("✅ Build completed successfully")
+    print("✅ Published for VPK successfully")
     
-    # Check what was built
-    build_path = Path(BUILD_DIR)
-    if not build_path.exists():
-        print(f"❌ Build directory doesn't exist: {build_path}")
+    # Step 2: Publish single file exe (for standalone distribution)
+    print(f"\n📦 Step 2: Publishing standalone single-file exe...")
+    publish_single_cmd = [
+        "dotnet", "publish",
+        "-c", "Release",
+        "--self-contained",
+        "-r", "win-x64",
+        "-o", str(publish_single),
+        "-p:PublishSingleFile=true",
+        "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:EnableCompressionInSingleFile=true"
+    ]
+    
+    print(f"Running: {' '.join(publish_single_cmd)}")
+    result = subprocess.run(publish_single_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"❌ Single-file publish failed: {result.stderr}")
         return False
     
-    # Find the executable
-    exe_path = build_path / f"{APP_NAME}.exe"
-    if not exe_path.exists():
-        print(f"⚠️  Executable not found at expected path, searching...")
-        exes = list(build_path.glob("*.exe"))
-        if exes:
-            exe_path = exes[0]
-            APP_NAME = exe_path.stem
-            print(f"✅ Found executable: {APP_NAME}.exe")
-        else:
-            print("❌ No executables found!")
-            return False
+    print("✅ Published single-file exe successfully")
     
-    exe_size = exe_path.stat().st_size / 1024 / 1024
-    print(f"✅ Executable: {exe_path.name} ({exe_size:.1f} MB)")
+    # Verify single-file executable exists and is substantial
+    exe_single = publish_single / "AkademiTrack.exe"
+    if not exe_single.exists():
+        print(f"❌ Single-file executable not found: {exe_single}")
+        return False
     
-    # Create zip file
-    zip_path = Path(f"AkademiTrack-Windows-v{version}.zip").absolute()
-    if zip_path.exists():
-        zip_path.unlink()
+    exe_size = exe_single.stat().st_size / 1024 / 1024
+    print(f"✅ Single-file executable: {exe_single.name} ({exe_size:.1f} MB)")
     
-    print(f"📦 Creating zip archive...")
+    if exe_size < 10:  # If it's less than 10MB, something is wrong
+        print(f"⚠️  Warning: Executable seems too small ({exe_size:.1f} MB). This might be a stub, not a full exe.")
+    
+    # Step 3: Create portable ZIP from multi-file build
+    print(f"\n📦 Step 3: Creating portable ZIP...")
+    portable_zip = release_folder / f"AkademiTrack-win-Portable.zip"
+    
     try:
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(portable_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
             file_count = 0
-            for file_path in build_path.rglob('*'):
+            for file_path in publish_dir.rglob('*'):
                 if file_path.is_file():
-                    arc_name = file_path.relative_to(build_path)
+                    arc_name = file_path.relative_to(publish_dir)
                     zipf.write(file_path, arc_name)
                     file_count += 1
-            print(f"✅ Added {file_count} files to zip")
+            print(f"✅ Added {file_count} files to portable ZIP")
     except Exception as e:
-        print(f"❌ Failed to create zip: {e}")
+        print(f"❌ Failed to create portable ZIP: {e}")
         return False
     
-    zip_size = zip_path.stat().st_size / 1024 / 1024
-    print(f"✅ Zip archive created: {zip_path.name} ({zip_size:.1f} MB)")
+    portable_size = portable_zip.stat().st_size / 1024 / 1024
+    print(f"✅ Portable ZIP created: {portable_zip.name} ({portable_size:.1f} MB)")
     
-    return True
-
-def create_vpk_package(version, use_single_file=True):
-    """Create VPK package using Velopack"""
-    print("\n📦 Creating VPK Package for Windows")
-    print("=" * 50)
-    
-    publish_dir = Path("./publish-windows")
+    # Step 4: Create VPK package
+    print(f"\n📦 Step 4: Creating VPK package...")
     
     # Check if vpk is installed
     try:
@@ -184,60 +187,99 @@ def create_vpk_package(version, use_single_file=True):
         print("Install it with: dotnet tool install -g vpk")
         return False
     
-    # Clean and create publish directory
-    if publish_dir.exists():
-        shutil.rmtree(publish_dir)
-    publish_dir.mkdir(parents=True)
-    
-    print(f"📂 Publishing to {publish_dir}...")
-    
-    # Publish the application
-    publish_cmd = [
-        "dotnet", "publish",
-        "-c", "Release",
-        "--self-contained",
-        "-r", "win-x64",
-        "-o", str(publish_dir),
-        "-p:PublishTrimmed=false"
-    ]
-    
-    if use_single_file:
-        publish_cmd.append("-p:PublishSingleFile=true")
-        publish_cmd.append("-p:IncludeNativeLibrariesForSelfExtract=true")
-        print("📦 Publishing as single file for VPK...")
-    else:
-        publish_cmd.append("-p:PublishSingleFile=false")
-        print("📦 Publishing with separate files for VPK...")
-    
-    result = subprocess.run(publish_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"❌ Publish failed: {result.stderr}")
-        return False
-    
-    print("✅ Published successfully")
-    
-    # Create VPK package
-    print(f"📦 Creating VPK package (version {version})...")
+    # Get absolute paths for VPK
+    publish_dir_abs = publish_dir.absolute()
     
     vpk_cmd = [
         "vpk", "pack",
         "--packId", "AkademiTrack",
         "--packVersion", version,
-        "--packDir", str(publish_dir),
+        "--packDir", str(publish_dir_abs),
         "--mainExe", "AkademiTrack.exe"
     ]
     
     print(f"Running: {' '.join(vpk_cmd)}")
+    # Run from project root, not release folder
     result = subprocess.run(vpk_cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
-        print(f"❌ VPK pack failed: {result.stderr}")
+        print(f"❌ VPK pack failed:")
+        print(f"STDERR: {result.stderr}")
+        print(f"STDOUT: {result.stdout}")
         return False
     
     print("✅ VPK package created successfully")
-    print(result.stdout)
+    if result.stdout:
+        print(result.stdout)
     
-    return True
+    # Step 5: Move VPK output to release folder
+    print(f"\n📦 Step 5: Organizing VPK release files...")
+    
+    # Give VPK a moment to release file handles
+    import time
+    time.sleep(1)
+    
+    # VPK creates files directly in the Releases folder (not in v1.0.0)
+    vpk_releases_path = Path("./Releases")
+    
+    if vpk_releases_path.exists():
+        print(f"✅ Found VPK Releases folder")
+        
+        # Copy VPK files from Releases root to our version folder
+        for item in vpk_releases_path.iterdir():
+            if item.is_file():
+                dest = release_folder / item.name
+                # Skip if already exists (avoid duplicates)
+                if dest.exists():
+                    print(f"  ⏭️  Already exists: {item.name}")
+                    continue
+                
+                try:
+                    # Try to copy with retry on file lock
+                    max_retries = 3
+                    for retry in range(max_retries):
+                        try:
+                            shutil.copy2(item, dest)
+                            print(f"  ✅ Copied: {item.name}")
+                            break
+                        except PermissionError:
+                            if retry < max_retries - 1:
+                                time.sleep(0.5)
+                            else:
+                                raise
+                except Exception as e:
+                    print(f"  ⚠️  Skipped {item.name}: {e}")
+        
+        # Don't delete Releases folder - just remove VPK files we copied
+        for item in vpk_releases_path.iterdir():
+            if item.is_file() and item.parent == vpk_releases_path:
+                try:
+                    item.unlink()
+                except:
+                    pass
+        
+        print(f"✅ Organized VPK files into {release_folder}")
+    else:
+        print(f"⚠️  VPK Releases folder not found")
+    
+    # Step 6: Copy the standalone single-file EXE to release folder
+    print(f"\n📦 Step 6: Adding standalone single-file EXE...")
+    standalone_exe = release_folder / "AkademiTrack.exe"
+    shutil.copy2(exe_single, standalone_exe)
+    standalone_size = standalone_exe.stat().st_size / 1024 / 1024
+    print(f"✅ Standalone single-file EXE: {standalone_exe.name} ({standalone_size:.1f} MB)")
+    
+    # Verify the release folder exists and has files
+    if not release_folder.exists():
+        print(f"❌ Release folder was not created!")
+        return False
+    
+    files_in_release = list(release_folder.iterdir())
+    if not files_in_release:
+        print(f"❌ Release folder is empty!")
+        return False
+    
+    return release_folder
 
 def main():
     print("🚀 AkademiTrack Windows Build & Package Tool")
@@ -252,57 +294,36 @@ def main():
     if update_proj != 'n':
         update_csproj_version(version)
     
-    # Ask about single file
-    print("\n📦 Build Type:")
-    print("1. Single file executable (recommended)")
-    print("2. Multiple files")
+    # Build everything
+    release_folder = build_windows_release(version)
     
-    single_choice = input("\nSelect option (1/2) [1]: ").strip()
-    use_single_file = (single_choice != "2")
-    
-    # Ask what to build
-    print("\n🔧 Build Options:")
-    print("1. Create Windows zip only")
-    print("2. Create VPK package only")
-    print("3. Create both")
-    
-    choice = input("\nSelect option (1/2/3) [3]: ").strip()
-    if not choice:
-        choice = "3"
-    
-    success = True
-    
-    if choice in ["1", "3"]:
-        print("\n" + "=" * 50)
-        success = create_windows_package(version, use_single_file)
-        if not success:
-            print("❌ Windows package creation failed")
-            return
-    
-    if choice in ["2", "3"]:
-        print("\n" + "=" * 50)
-        vpk_success = create_vpk_package(version, use_single_file)
-        if not vpk_success:
-            print("❌ VPK package creation failed")
-            success = False
-    
-    if success:
+    if release_folder:
         print("\n" + "=" * 50)
         print("🎉 Build completed successfully!")
         print(f"📦 Version: {version}")
+        print(f"\n📁 Release folder: {release_folder}/")
+        print("\n📋 Contents:")
         
-        if choice in ["1", "3"]:
-            print(f"✅ Windows build: ./build-windows/")
-            print(f"✅ Zip file: AkademiTrack-Windows-v{version}.zip")
+        # List all files in release folder
+        for item in sorted(release_folder.iterdir()):
+            if item.is_file():
+                size = item.stat().st_size / 1024 / 1024
+                print(f"  ✅ {item.name} ({size:.1f} MB)")
         
-        if choice in ["2", "3"]:
-            print(f"✅ VPK package: ./publish-windows/")
+        print("\n📋 Files created:")
+        print(f"  • AkademiTrack.exe - Standalone single-file executable (RUN THIS ONE!)")
+        print(f"  • AkademiTrack-win-Portable.zip - Portable ZIP package")
+        print(f"  • *.nupkg - VPK/NuGet package for auto-updates")
+        print(f"  • RELEASES - VPK release manifest")
+        print(f"  • AkademiTrack-win-Setup.exe - Installer with auto-update support")
         
-        print("\n📋 Next steps:")
-        print("  • Test the .exe from ./build-windows/")
-        print("  • Distribute the zip file to users")
-        print("  • Use VPK for auto-updates")
-        print(f"  • {'Single file' if use_single_file else 'Multiple files'} build ready!")
+        print("\n💡 Next steps:")
+        print(f"  • Test AkademiTrack.exe from {release_folder}/")
+        print(f"  • Distribute the portable ZIP for manual installs")
+        print(f"  • Use the .nupkg + RELEASES for auto-updates")
+        print(f"  • Upload to your release server/CDN")
+    else:
+        print("\n❌ Build failed!")
 
 if __name__ == "__main__":
     try:
