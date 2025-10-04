@@ -93,7 +93,6 @@ def build_windows_release(version):
     if not icon_path.exists():
         print(f"⚠️  Icon file not found: {icon_path}")
         print("Checking for alternative formats...")
-        # Check for PNG as fallback
         png_icon = Path("./Assets/AT-1024.png")
         if png_icon.exists():
             print(f"⚠️  Found PNG but VPK requires .ico format")
@@ -102,6 +101,20 @@ def build_windows_release(version):
     else:
         icon_size = icon_path.stat().st_size
         print(f"✅ Icon file found: {icon_path} ({icon_size} bytes)")
+    
+    # Check for splash image
+    splash_path = None
+    for ext in ['.png', '.jpg', '.jpeg', '.gif']:
+        splash_candidate = Path(f"./Assets/splash{ext}")
+        if splash_candidate.exists():
+            splash_path = splash_candidate
+            splash_size = splash_path.stat().st_size / 1024
+            print(f"✅ Splash image found: {splash_path} ({splash_size:.1f} KB)")
+            break
+    
+    if not splash_path:
+        print(f"⚠️  No splash image found (looked for Assets/splash.png/jpg/gif)")
+        print("💡 Create a splash screen for a more professional installer!")
     
     # Clean directories
     if publish_dir.exists():
@@ -205,11 +218,12 @@ def build_windows_release(version):
     # Get absolute paths for VPK
     publish_dir_abs = publish_dir.absolute()
     
-    # Build VPK command with icon
+    # Build VPK command with all customizations
     vpk_cmd = [
         "vpk", "pack",
         "--packId", "AkademiTrack",
         "--packVersion", version,
+        "--packTitle", "AkademiTrack",
         "--packDir", str(publish_dir_abs),
         "--mainExe", "AkademiTrack.exe"
     ]
@@ -220,6 +234,13 @@ def build_windows_release(version):
         print(f"🎨 Using icon: {icon_path}")
     else:
         print(f"⚠️  Building without custom icon (will use default)")
+    
+    # Add splash image parameter if exists
+    if splash_path and splash_path.exists():
+        vpk_cmd.extend(["--splashImage", str(splash_path.absolute())])
+        print(f"🖼️  Using splash image: {splash_path}")
+    else:
+        print(f"⚠️  Building without splash image")
     
     print(f"Running: {' '.join(vpk_cmd)}")
     result = subprocess.run(vpk_cmd, capture_output=True, text=True)
@@ -327,7 +348,6 @@ def clear_icon_cache():
             deleted_count = 0
             for pattern in cache_files:
                 if '*' in pattern:
-                    # Handle wildcard patterns
                     import glob
                     for file in glob.glob(pattern):
                         try:
@@ -336,7 +356,6 @@ def clear_icon_cache():
                         except:
                             pass
                 else:
-                    # Handle single file
                     try:
                         if os.path.exists(pattern):
                             os.remove(pattern)
@@ -353,7 +372,7 @@ def clear_icon_cache():
         subprocess.Popen(["explorer.exe"])
         
         import time
-        time.sleep(1)  # Give Explorer a moment to start
+        time.sleep(1)
         
         print("✅ Icon cache cleared - new icons should display correctly")
         print("💡 If icons still look blurry, try restarting your PC")
@@ -364,6 +383,10 @@ def clear_icon_cache():
 
 def main():
     print("🚀 AkademiTrack Windows Build & Package Tool")
+    print("=" * 50)
+    print("📧 Contact: cyberbrothershq@gmail.com")
+    print("🌐 Website: https://cybergutta.github.io/CG/")
+    print("💻 GitHub: https://github.com/CyberGutta/AkademiTrack")
     print("=" * 50)
     
     # Get version number
@@ -404,13 +427,17 @@ def main():
         print(f"  • Use the .nupkg + RELEASES for auto-updates")
         print(f"  • Upload to your release server/CDN")
         
-        print("\n🎨 Icon troubleshooting:")
-        print(f"  • Make sure Assets/AT-1024.ico exists (not just .png)")
-        print(f"  • Convert PNG to ICO if needed (online tools available)")
-        print(f"  • High-res ICO should contain multiple sizes: 16x16, 32x32, 48x48, 256x256")
+        print("\n🎨 Customization tips:")
+        print(f"  • Create Assets/splash.png (400x300 or 600x400) for installer splash screen")
+        print(f"  • Include your logo, tagline, and 'By CyberGutta' credit")
+        print(f"  • For animated splash, use .gif format")
+        print(f"  • Make sure Assets/AT-1024.ico exists (multiple sizes: 16,32,48,256)")
         
         # Clear icon cache at the end
         clear_icon_cache()
+        
+        print("\n✨ Built with ❤️ by CyberGutta")
+        print("   Andreas Nilsen & Mathias Hansen")
     else:
         print("\n❌ Build failed!")
 
@@ -422,4 +449,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         import traceback
-        traceback.print_exc()
+        traceback
