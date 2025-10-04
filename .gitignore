@@ -376,3 +376,4 @@ AkademiTrack-macOS.zip
 /publish-windows
 *.zip
 /publish-win-single
+/publish-mac-arm
