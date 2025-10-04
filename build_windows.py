@@ -311,7 +311,7 @@ def main():
     
     # Ask if user wants to update .csproj
     update_proj = input("\nUpdate version in .csproj file? (y/n) [n]: ").strip().lower()
-    if update_proj != 'n':
+    if update_proj == 'y':  # Only updates if you type 'y'
         update_csproj_version(version)
     
     # Build everything
