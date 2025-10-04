@@ -667,29 +667,42 @@ Terminal=false
                 return false;
             }
         }
+        private void LogInfo(string message)
+        {
+            Debug.WriteLine($"[UPDATE] {message}");
+        }
+
         private async Task DownloadAndInstallUpdateAsync()
         {
             try
             {
                 IsCheckingForUpdates = true;
                 UpdateStatus = "Forbereder oppdatering...";
+                LogInfo("=== UPDATE PROCESS STARTED ===");
+
+                // Log environment info
+                LogInfo($"Current app location: {Environment.ProcessPath}");
+                LogInfo($"Current version: {ApplicationInfo.Version}");
+                LogInfo($"Target version: {AvailableVersion}");
+
+                // Determine platform-specific package suffix
 
                 // Determine platform-specific package suffix
                 string platformSuffix = "";
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     platformSuffix = "-osx";
-                    Debug.WriteLine("Platform detected: macOS");
+                    LogInfo("Platform detected: macOS");
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     platformSuffix = "-linux";
-                    Debug.WriteLine("Platform detected: Linux");
+                    LogInfo("Platform detected: Linux");
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     platformSuffix = ""; // Windows uses base package name
-                    Debug.WriteLine("Platform detected: Windows");
+                    LogInfo("Platform detected: Windows");
                 }
 
                 UpdateManager? mgr = null;
@@ -699,26 +712,34 @@ Terminal=false
                 // Strategy 1: Try GithubSource (recommended approach)
                 try
                 {
-                    Debug.WriteLine("Strategy 1: Attempting GithubSource...");
+                    LogInfo("Strategy 1: Attempting GithubSource...");
+                    LogInfo("URL: https://github.com/CyberGutta/AkademiTrack");
                     UpdateStatus = "Kobler til GitHub...";
 
-                    var githubSource = new GithubSource("https://github.com/CyberGutta/AkademiTrack", "", false);
+                    // GithubSource expects repo URL without /releases
+                    var githubSource = new GithubSource("https://github.com/CyberGutta/AkademiTrack", null, false);
                     mgr = new UpdateManager(githubSource);
 
+                    LogInfo("Calling CheckForUpdatesAsync()...");
                     updateInfo = await mgr.CheckForUpdatesAsync();
+
                     if (updateInfo != null)
                     {
-                        Debug.WriteLine($"Strategy 1 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                        LogInfo($"Strategy 1 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                        LogInfo($"Package name: {updateInfo.TargetFullRelease.FileName}");
+                        LogInfo($"Package size: {updateInfo.TargetFullRelease.Size} bytes");
                         updateFound = true;
                     }
                     else
                     {
-                        Debug.WriteLine("Strategy 1: No update found via GithubSource");
+                        LogInfo("Strategy 1: CheckForUpdatesAsync returned null");
+                        LogInfo("This usually means no newer version was found");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Strategy 1 FAILED: {ex.Message}");
+                    LogInfo($"Strategy 1 FAILED: {ex.GetType().Name}: {ex.Message}");
+                    LogInfo($"Stack trace: {ex.StackTrace}");
                 }
 
                 // Strategy 2: Try direct URL with version tag
@@ -726,26 +747,32 @@ Terminal=false
                 {
                     try
                     {
-                        Debug.WriteLine($"Strategy 2: Attempting direct URL with version v{AvailableVersion}...");
+                        LogInfo($"Strategy 2: Attempting direct URL with version v{AvailableVersion}...");
+                        var directUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
+                        LogInfo($"URL: {directUrl}");
                         UpdateStatus = "Prøver alternativ nedlasting...";
 
-                        var directUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
                         mgr = new UpdateManager(directUrl);
 
+                        LogInfo("Calling CheckForUpdatesAsync()...");
                         updateInfo = await mgr.CheckForUpdatesAsync();
+
                         if (updateInfo != null)
                         {
-                            Debug.WriteLine($"Strategy 2 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            LogInfo($"Strategy 2 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            LogInfo($"Package name: {updateInfo.TargetFullRelease.FileName}");
                             updateFound = true;
                         }
                         else
                         {
-                            Debug.WriteLine("Strategy 2: No update found via direct URL");
+                            LogInfo("Strategy 2: CheckForUpdatesAsync returned null");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Strategy 2 FAILED: {ex.Message}");
+                        LogInfo($"Strategy 2 FAILED: {ex.GetType().Name}: {ex.Message}");
+                        if (ex.InnerException != null)
+                            LogInfo($"Inner exception: {ex.InnerException.Message}");
                     }
                 }
 
@@ -754,26 +781,29 @@ Terminal=false
                 {
                     try
                     {
-                        Debug.WriteLine($"Strategy 3: Attempting platform-specific URL ({platformSuffix})...");
+                        LogInfo($"Strategy 3: Attempting platform-specific URL ({platformSuffix})...");
+                        var platformUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
+                        LogInfo($"URL: {platformUrl}");
                         UpdateStatus = "Søker etter plattform-spesifikk pakke...";
 
-                        var platformUrl = $"https://github.com/CyberGutta/AkademiTrack/releases/download/v{AvailableVersion}";
                         mgr = new UpdateManager(platformUrl);
 
+                        LogInfo("Calling CheckForUpdatesAsync()...");
                         updateInfo = await mgr.CheckForUpdatesAsync();
+
                         if (updateInfo != null)
                         {
-                            Debug.WriteLine($"Strategy 3 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            LogInfo($"Strategy 3 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
                             updateFound = true;
                         }
                         else
                         {
-                            Debug.WriteLine("Strategy 3: No update found with platform suffix");
+                            LogInfo("Strategy 3: CheckForUpdatesAsync returned null");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Strategy 3 FAILED: {ex.Message}");
+                        LogInfo($"Strategy 3 FAILED: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -782,39 +812,48 @@ Terminal=false
                 {
                     try
                     {
-                        Debug.WriteLine("Strategy 4: Attempting /releases/latest...");
+                        LogInfo("Strategy 4: Attempting /releases/latest...");
+                        var latestUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
+                        LogInfo($"URL: {latestUrl}");
                         UpdateStatus = "Prøver siste utgivelse...";
 
-                        var latestUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
                         mgr = new UpdateManager(latestUrl);
 
+                        LogInfo("Calling CheckForUpdatesAsync()...");
                         updateInfo = await mgr.CheckForUpdatesAsync();
+
                         if (updateInfo != null)
                         {
-                            Debug.WriteLine($"Strategy 4 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
+                            LogInfo($"Strategy 4 SUCCESS: Found version {updateInfo.TargetFullRelease.Version}");
                             updateFound = true;
                         }
                         else
                         {
-                            Debug.WriteLine("Strategy 4: No update found via latest");
+                            LogInfo("Strategy 4: CheckForUpdatesAsync returned null");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Strategy 4 FAILED: {ex.Message}");
+                        LogInfo($"Strategy 4 FAILED: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
                 // If no update found after all strategies
                 if (!updateFound || updateInfo == null || mgr == null)
                 {
-                    Debug.WriteLine("ALL STRATEGIES FAILED: No update could be found");
+                    LogInfo("=== ALL STRATEGIES FAILED ===");
+                    LogInfo("No update could be found through any method");
+                    LogInfo("Possible reasons:");
+                    LogInfo("1. Missing RELEASES file in GitHub release");
+                    LogInfo("2. Incorrect package naming");
+                    LogInfo("3. Network/connectivity issues");
+                    LogInfo("4. GitHub API rate limiting");
                     UpdateStatus = "Kunne ikke finne oppdatering";
 
                     // Fallback: Open browser to releases page
                     try
                     {
-                        Debug.WriteLine("Opening browser as fallback...");
+                        LogInfo("Opening browser as fallback...");
                         UpdateStatus = "Åpner nedlastingsside...";
                         await Task.Delay(1000);
 
@@ -825,17 +864,21 @@ Terminal=false
                         });
 
                         UpdateStatus = "Vennligst last ned manuelt fra nettleseren";
+                        LogInfo("Browser opened successfully");
                     }
                     catch (Exception browserEx)
                     {
-                        Debug.WriteLine($"Browser fallback failed: {browserEx.Message}");
+                        LogInfo($"Browser fallback failed: {browserEx.Message}");
                         UpdateStatus = "Kunne ikke åpne nettleser. Besøk GitHub manuelt.";
                     }
                     return;
                 }
 
                 // Download the update
-                Debug.WriteLine($"Starting download for version {updateInfo.TargetFullRelease.Version}...");
+                LogInfo($"=== STARTING DOWNLOAD ===");
+                LogInfo($"Version: {updateInfo.TargetFullRelease.Version}");
+                LogInfo($"Package: {updateInfo.TargetFullRelease.FileName}");
+                LogInfo($"Size: {updateInfo.TargetFullRelease.Size / 1024 / 1024} MB");
                 UpdateStatus = "Laster ned oppdatering...";
 
                 await mgr.DownloadUpdatesAsync(updateInfo, progress =>
@@ -843,25 +886,36 @@ Terminal=false
                     Dispatcher.UIThread.Post(() =>
                     {
                         UpdateStatus = $"Laster ned... {progress}%";
-                        Debug.WriteLine($"Download progress: {progress}%");
+                        if (progress % 10 == 0) // Log every 10%
+                            LogInfo($"Download progress: {progress}%");
                     });
                 });
 
-                Debug.WriteLine("Download completed successfully");
+                LogInfo("✓ Download completed successfully");
                 UpdateStatus = "Installerer oppdatering...";
                 await Task.Delay(500);
 
                 // Apply update and restart
-                Debug.WriteLine("Applying updates and restarting...");
+                LogInfo("=== APPLYING UPDATE ===");
+                LogInfo("Calling ApplyUpdatesAndRestart()...");
                 UpdateStatus = "Starter på nytt...";
                 await Task.Delay(1000);
 
                 mgr.ApplyUpdatesAndRestart(updateInfo);
+                LogInfo("ApplyUpdatesAndRestart() called - app should restart now");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CRITICAL ERROR in update process: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                LogInfo("=== CRITICAL ERROR ===");
+                LogInfo($"Exception type: {ex.GetType().Name}");
+                LogInfo($"Error message: {ex.Message}");
+                LogInfo($"Stack trace: {ex.StackTrace}");
+
+                if (ex.InnerException != null)
+                {
+                    LogInfo($"Inner exception: {ex.InnerException.GetType().Name}");
+                    LogInfo($"Inner message: {ex.InnerException.Message}");
+                }
 
                 UpdateStatus = $"Feil ved oppdatering: {ex.Message}";
                 UpdateAvailable = false;
@@ -869,7 +923,7 @@ Terminal=false
                 // Final fallback: Open browser
                 try
                 {
-                    Debug.WriteLine("Attempting final browser fallback...");
+                    LogInfo("Attempting final browser fallback...");
                     await Task.Delay(2000);
 
                     Process.Start(new ProcessStartInfo
@@ -879,16 +933,18 @@ Terminal=false
                     });
 
                     UpdateStatus = "Åpnet nedlastingsside - installer manuelt";
+                    LogInfo("Final browser fallback successful");
                 }
                 catch (Exception browserEx)
                 {
-                    Debug.WriteLine($"Final browser fallback failed: {browserEx.Message}");
+                    LogInfo($"Final browser fallback failed: {browserEx.Message}");
                     UpdateStatus = "Besøk: github.com/CyberGutta/AkademiTrack/releases";
                 }
             }
             finally
             {
                 IsCheckingForUpdates = false;
+                LogInfo("=== UPDATE PROCESS ENDED ===");
             }
         }
 
