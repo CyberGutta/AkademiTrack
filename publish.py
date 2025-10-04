@@ -89,10 +89,10 @@ def create_vpk_package(version, build_dir):
     
     publish_dir = Path("./publish-mac-arm")
     
-    # Check if vpk is installed
+    # Check if vpk is installed (without --version flag)
     try:
-        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True)
-        print(f"✅ Velopack found: {result.stdout.strip()}")
+        result = subprocess.run(["vpk"], capture_output=True, text=True)
+        print(f"✅ Velopack (vpk) found")
     except FileNotFoundError:
         print("❌ Velopack (vpk) not found!")
         print("Install it with: dotnet tool install -g vpk")
@@ -124,12 +124,16 @@ def create_vpk_package(version, build_dir):
     # Create VPK package
     print(f"📦 Creating VPK package (version {version})...")
     
+    # Check if icon exists for VPK
+    icon_path = Path("./Assets/AT-1024.icns")
+    
     vpk_cmd = [
         "vpk", "pack",
         "--packId", "AkademiTrack",
         "--packVersion", version,
         "--packDir", str(publish_dir),
-        "--mainExe", "AkademiTrack"
+        "--mainExe", "AkademiTrack",
+        "--icon", str(icon_path.absolute())
     ]
     
     print(f"Running: {' '.join(vpk_cmd)}")
@@ -140,7 +144,8 @@ def create_vpk_package(version, build_dir):
         return False
     
     print("✅ VPK package created successfully")
-    print(result.stdout)
+    if result.stdout:
+        print(result.stdout)
     
     return True
 
@@ -155,6 +160,24 @@ def create_avalonia_macos_bundle(version):
     
     print("\n🏗️  Building AkademiTrack app for macOS Apple Silicon...")
     print("=" * 50)
+    
+    # Verify icon exists before building
+    if not os.path.exists(ICON_PATH):
+        print(f"❌ Icon file not found: {ICON_PATH}")
+        print("\n📁 Looking for icon files in Assets directory...")
+        assets_dir = Path("./Assets")
+        if assets_dir.exists():
+            icon_files = list(assets_dir.glob("*.icns"))
+            if icon_files:
+                print(f"Found {len(icon_files)} .icns file(s):")
+                for icon in icon_files:
+                    print(f"  - {icon.name} ({icon.stat().st_size} bytes)")
+            else:
+                print("  No .icns files found in Assets directory")
+        return False
+    else:
+        icon_size = Path(ICON_PATH).stat().st_size
+        print(f"✅ Icon file found: {ICON_PATH} ({icon_size} bytes)")
     
     # Clean build directory
     if os.path.exists(BUILD_DIR):
@@ -226,18 +249,21 @@ def create_avalonia_macos_bundle(version):
         except Exception as e:
             print(f"  ⚠️  Failed to copy {item.name}: {e}")
     
-    # Handle icon file
+    # Handle icon file - CRITICAL: Use correct filename
     icon_filename = "AppIcon.icns"
-    if os.path.exists(ICON_PATH):
-        try:
-            icon_dest = resources_dir / icon_filename
-            shutil.copy2(ICON_PATH, icon_dest)
-            print(f"✅ Added app icon ({icon_dest.stat().st_size} bytes)")
-        except Exception as e:
-            print(f"❌ Failed to add icon: {e}")
-            return False
-    else:
-        print(f"❌ Icon not found: {ICON_PATH}")
+    icon_dest = resources_dir / icon_filename
+    
+    try:
+        shutil.copy2(ICON_PATH, icon_dest)
+        copied_size = icon_dest.stat().st_size
+        print(f"✅ Added app icon: {icon_filename} ({copied_size} bytes)")
+        
+        # Verify it was copied correctly
+        if copied_size < 1000:
+            print(f"⚠️  Warning: Icon file seems too small ({copied_size} bytes)")
+        
+    except Exception as e:
+        print(f"❌ Failed to copy icon: {e}")
         return False
     
     # Create Info.plist with version
@@ -309,15 +335,20 @@ def create_avalonia_macos_bundle(version):
     if dylib_count + so_count > 0:
         print(f"✅ Set permissions for {dylib_count} .dylib and {so_count} .so files")
     
-    # Remove quarantine attributes and clear icon cache
+    # Remove quarantine attributes
     try:
         subprocess.run(["xattr", "-cr", str(bundle_dir)], check=True, capture_output=True)
         print("✅ Removed quarantine attributes")
-        
-        subprocess.run(["killall", "-HUP", "Finder"], capture_output=True, errors='ignore')
-        subprocess.run(["killall", "-HUP", "Dock"], capture_output=True, errors='ignore')
-        
     except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    
+    # Force icon cache refresh
+    try:
+        subprocess.run(["touch", str(bundle_dir)], capture_output=True)
+        subprocess.run(["killall", "Finder"], capture_output=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["killall", "Dock"], capture_output=True, stderr=subprocess.DEVNULL)
+        print("✅ Refreshed icon cache")
+    except:
         pass
     
     # Create zip file
@@ -341,6 +372,13 @@ def create_avalonia_macos_bundle(version):
     
     print(f"✅ App bundle created: {bundle_dir}")
     print(f"✅ Zip archive created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+    
+    # Verify icon is in bundle
+    final_icon_path = resources_dir / "AppIcon.icns"
+    if final_icon_path.exists():
+        print(f"✅ Icon verified in bundle: {final_icon_path.stat().st_size} bytes")
+    else:
+        print(f"⚠️  Warning: Icon not found in final bundle!")
     
     return True
 
@@ -400,6 +438,10 @@ def main():
         print("  • Distribute the zip file to users")
         print("  • Use VPK for auto-updates")
         print("  • Right-click → Open if blocked by Gatekeeper")
+        print("\n💡 Icon troubleshooting:")
+        print("  • If icon doesn't show, restart Finder: killall Finder")
+        print("  • Clear icon cache: rm ~/Library/Caches/com.apple.iconservices.store")
+        print("  • Verify icon file: ls -lh ./build/AkademiTrack.app/Contents/Resources/")
 
 if __name__ == "__main__":
     try:
