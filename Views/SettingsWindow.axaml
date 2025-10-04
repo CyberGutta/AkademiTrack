@@ -666,7 +666,7 @@
 										<ItemsControl ItemsSource="{Binding LogEntries}"
 													  HorizontalAlignment="Stretch"
 													  ClipToBounds="True"
-													  Margin="0,0,0,20">
+													  Margin="0,0,0,25">
 											<ItemsControl.ItemsPanel>
 												<ItemsPanelTemplate>
 													<StackPanel ClipToBounds="True"/>
@@ -678,7 +678,7 @@
 															Margin="0,0,0,2"
 															HorizontalAlignment="Stretch"
 															ClipToBounds="True"
-															MaxWidth="700">
+															MaxWidth="520">
 														<TextBlock Text="{Binding FormattedMessage}"
 																   Classes="log-entry"
 																   Classes.INFO="{Binding Level, Converter={x:Static vm:StringEqualityConverter.Instance}, ConverterParameter='INFO'}"
@@ -688,7 +688,7 @@
 																   TextWrapping="Wrap"
 																   TextTrimming="CharacterEllipsis"
 																   HorizontalAlignment="Left"
-																   MaxWidth="690"/>
+																   MaxWidth="510"/>
 													</Border>
 												</DataTemplate>
 											</ItemsControl.ItemTemplate>
