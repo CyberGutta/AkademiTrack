@@ -1,18 +1,21 @@
 ﻿using System;
 using Avalonia;
+using Velopack;
 
 namespace AkademiTrack
 {
     internal sealed class Program
     {
-        // Initialization code. Don't use any Avalonia, third-party APIs or any
-        // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-        // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static void Main(string[] args)
+        {
+            // MUST be first - Velopack initialization
+            VelopackApp.Build().Run();
 
-        // Avalonia configuration, don't remove; also used by visual designer.
+            // Then start Avalonia app
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
