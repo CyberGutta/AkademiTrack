@@ -424,7 +424,7 @@
 	                       Spacing="12">
 
 					<!-- Start button -->
-					<Button Content="Start automatisering"
+					<Button Content="Start automatisering Mathias HJELP MEG JEG TRENGER HJELP STEMMENE SKRIKER"
 	                       Classes="start-button"
 	                       Command="{Binding StartAutomationCommand}"
 	                       IsEnabled="{Binding !IsAutomationRunning}"

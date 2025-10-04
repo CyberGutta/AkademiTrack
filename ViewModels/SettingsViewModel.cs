@@ -411,7 +411,7 @@ Terminal=false
             var assembly = Assembly.GetExecutingAssembly();
             Name = assembly.GetName().Name ?? "AkademiTrack";
             var version = assembly.GetName().Version;
-            Version = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
+            Version = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.1.0";
             Description = "Akademiet automatisk fremmøte registerings program";
             NameAndDescription = $"{Name}\n{Description}"; // Without version
         }
