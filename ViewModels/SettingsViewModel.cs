@@ -404,6 +404,7 @@ Terminal=false
         public string Name { get; }
         public string Version { get; }
         public string Description { get; }
+        public string NameAndDescription { get; } // New property for "Om" section
 
         public ApplicationInfo()
         {
@@ -412,6 +413,7 @@ Terminal=false
             var version = assembly.GetName().Version;
             Version = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
             Description = "Akademiet automatisk fremmøte registerings program";
+            NameAndDescription = $"{Name}\n{Description}"; // Without version
         }
 
         public override string ToString() => $"{Name} v{Version}\n{Description}";

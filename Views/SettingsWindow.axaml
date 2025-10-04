@@ -766,7 +766,7 @@
 										   FontWeight="SemiBold"
 										   FontSize="15"
 										   Foreground="#007ACC"/>
-								<TextBlock Text="{Binding ApplicationInfo}"
+								<TextBlock Text="{Binding ApplicationInfo.NameAndDescription}"
 										   FontSize="14"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 										   TextWrapping="Wrap"
