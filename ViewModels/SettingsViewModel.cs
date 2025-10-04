@@ -521,7 +521,16 @@ Terminal=false
         public bool UpdateAvailable
         {
             get => _updateAvailable;
-            set { if (_updateAvailable != value) { _updateAvailable = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_updateAvailable != value)
+                {
+                    _updateAvailable = value;
+                    OnPropertyChanged();
+                    // Notify the command to re-evaluate CanExecute
+                    (DownloadAndInstallUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                }
+            }
         }
 
         public string AvailableVersion
@@ -599,25 +608,22 @@ Terminal=false
                 UpdateStatus = "Sjekker etter oppdateringer...";
                 UpdateAvailable = false;
 
-                // Detect platform and use appropriate URL
-                string updateUrl;
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    updateUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    updateUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
-                }
-                else // Linux
-                {
-                    updateUrl = "https://github.com/CyberGutta/AkademiTrack/releases/latest/download";
-                }
+                // Use the correct URL with /download at the end
+                var mgr = new UpdateManager("https://github.com/CyberGutta/AkademiTrack/releases/latest/download");
 
-                var mgr = new UpdateManager(updateUrl);
                 var newVersion = await mgr.CheckForUpdatesAsync();
 
-                // ... rest of your code
+                if (newVersion == null)
+                {
+                    UpdateStatus = $"Du har den nyeste versjonen (v{ApplicationInfo.Version})";
+                    UpdateAvailable = false;
+                }
+                else
+                {
+                    AvailableVersion = newVersion.TargetFullRelease.Version.ToString();
+                    UpdateStatus = $"Ny versjon tilgjengelig: v{AvailableVersion}";
+                    UpdateAvailable = true;
+                }
             }
             catch (Exception ex)
             {
@@ -637,7 +643,7 @@ Terminal=false
                 IsCheckingForUpdates = true;
                 UpdateStatus = "Laster ned oppdatering...";
 
-                var mgr = new UpdateManager("https://your-update-server.com/releases");
+                var mgr = new UpdateManager("https://github.com/CyberGutta/AkademiTrack/releases/latest/download");
                 var newVersion = await mgr.CheckForUpdatesAsync();
 
                 if (newVersion == null)
