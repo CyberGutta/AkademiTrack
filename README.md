@@ -147,7 +147,7 @@ See the Development Guide for detailed information.
 See CHANGELOG.md for version history.
 
 ## License
-This project is licensed under the MIT License - see LICENSE file for details.
+This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details.
 
 ## Disclaimer
 AkademiTrack is designed to assist students with legitimate attendance registration. Users are responsible for ensuring their use complies with school policies and academic integrity standards. This is not an official Akademiet or iSkole product.
