@@ -37,16 +37,16 @@ AkademiTrack is a desktop automation tool designed for students at Akademiet sch
 ### Installation
 
 **Windows**
-1. Download `AkademiTrack-windows.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+1. Download `AkademiTrack-win-Setup.exe` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
 2. Extract and run `AkademiTrack.exe`
 
 **macOS**
-1. Download `AkademiTrack-macos.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+1. Download `AkademiTrack-osx-Setup.pkg` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
 2. Extract and remove quarantine: `xattr -cr /path/to/AkademiTrack.app`
 3. Run the application
 
 **Linux**
-1. Download `AkademiTrack-linux.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+1. Download `AkademiTrack.AppImage` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
 2. Extract and make executable: `chmod +x ./AkademiTrack`
 3. Run: `./AkademiTrack`
 
