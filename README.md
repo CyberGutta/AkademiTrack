@@ -1,150 +1,164 @@
-# AkademiTrack - STU Tidsregistrering
+# AkademiTrack
 
-*Automatisk oppmøteregistrering for STU-økter på Akademiet*
+**Automated attendance registration for STU sessions at Akademiet schools**
 
-## 🇳🇴 Norsk
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/github/v/release/CyberGutta/AkademiTrack)](https://github.com/CyberGutta/AkademiTrack/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/CyberGutta/AkademiTrack/releases)
 
-<img width="738" height="649" alt="AkademiTrack Interface" src="https://github.com/user-attachments/assets/2abb0222-9737-48da-bdb8-b82df2c0c32d" />
+<img width="738" alt="AkademiTrack Interface" src="https://github.com/user-attachments/assets/2abb0222-9737-48da-bdb8-b82df2c0c32d" />
 
-### Om Programmet
+## Overview
 
-AkademiTrack er et automatiseringsverktøy som hjelper studenter ved Akademiet med å registrere oppmøte for STU (Selvstendige Terminoppgaver) økter automatisk. Programmet overvåker timeplandata og registrerer oppmøte når registreringsvinduene åpner seg.
+AkademiTrack is a desktop automation tool designed for students at Akademiet schools in Norway. It automatically monitors your schedule and registers attendance for STU (Selvstendige Terminoppgaver / Independent Term Projects) sessions when registration windows open, eliminating the need to manually track and register throughout the day.
 
-### Hovedfunksjoner
+## Features
 
-- **Automatisk innlogging**: Bruker nettleser for sikker autentisering mot iSkole systemet
-- **Intelligent overvåking**: Overvåker kun aktuelle STU-økter for gjeldende dag
-- **Optimalisert ytelse**: Gjør kun én API-forespørsel per dag for å hente timeplandata
-- **Sanntids registrering**: Registrerer oppmøte automatisk når registreringsvinduene åpner
-- **Detaljert logging**: Omfattende loggføring med mulighet for detaljerte debug-meldinger
-- **System notifikasjoner**: Diskrete overlay-notifikasjoner for viktige hendelser
-- **Innstillinger**: Konfigurerbar logging og programinnstillinger
+### Core Functionality
+- **Automatic Authentication** - Secure Feide login with encrypted credential storage
+- **Intelligent Session Detection** - Identifies STU sessions from your daily schedule
+- **Conflict Detection** - Automatically skips sessions that overlap with regular classes
+- **Real-Time Registration** - Registers attendance the moment windows open
+- **Efficient Monitoring** - Single API request per day, minimal resource usage
 
-### Hvordan Det Fungerer
+### User Experience
+- **Auto-Start Options** - Launch with system and/or begin automation automatically
+- **Activity Logging** - Comprehensive logs with optional debug mode for troubleshooting
+- **System Notifications** - Discrete alerts for successful registrations and important events
+- **Cross-Platform** - Native support for Windows, macOS, and Linux
 
-1. **Start automatisering**: Klikk på "Start Automatisering" knappen
-2. **Første gangs innlogging**: Nettleser åpnes for sikker pålogging til iSkole
-3. **Cookie lagring**: Autentisering lagres sikkert for fremtidige økter
-4. **Overvåking starter**: Programmet henter dagens STU-økter og overvåker registreringsvinduene
-5. **Automatisk registrering**: Når et registreringsvindu åpner, registreres oppmøte automatisk
-6. **Fullføring**: Programmet stopper når alle økter for dagen er behandlet
+### Maintenance
+- **Automatic Updates** - Checks for new versions every 30 minutes
+- **One-Click Updates** - Download and install updates with a single button
+- **Configuration Management** - Flexible settings for personalized workflows
 
-### Systemkrav
+## Quick Start
 
-- **Operativsystem**: Windows, macOS
-- **Internett**: Stabil internettforbindelse
-- **Tilgang**: Gyldig iSkole konto ved Akademiet
+### Installation
 
-### Installasjon og Bruk
+**Windows**
+1. Download `AkademiTrack-windows.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+2. Extract and run `AkademiTrack.exe`
 
-1. Last ned den nyeste versjonen fra releases
-2. Pakk ut filene til ønsket mappe
-3. Kjør `AkademiTrack.exe` (Windows) eller tilsvarende for ditt operativsystem
-4. Klikk "Start Automatisering" og følg instruksjonene for innlogging
-5. La programmet kjøre i bakgrunnen - det vil håndtere alt automatisk
+**macOS**
+1. Download `AkademiTrack-macos.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+2. Extract and remove quarantine: `xattr -cr /path/to/AkademiTrack.app`
+3. Run the application
 
-### Sikkerhet og Personvern
+**Linux**
+1. Download `AkademiTrack-linux.zip` from [releases](https://github.com/CyberGutta/AkademiTrack/releases/latest)
+2. Extract and make executable: `chmod +x ./AkademiTrack`
+3. Run: `./AkademiTrack`
 
-- **Lokalt lagret data**: Alle cookies og data lagres kun lokalt på din maskin
-- **Ingen datainnsamling**: Programmet sender ikke personopplysninger til utvikleren
-- **Sikker autentisering**: Bruker offisiell iSkole innloggingsmetode
-- **Automatisk opprydding**: Gamle logger og data slettes automatisk
+### First-Time Setup
 
-### Feilsøking
+1. Launch AkademiTrack
+2. Select your Akademiet school from the dropdown
+3. Enter your Feide credentials (email and password)
+4. Click "Lagre og fortsett" (Save and continue)
+5. Your encrypted credentials are now saved for automatic login
 
-**Problem: Automatisering stopper uventet**
-- Løsning: Start på nytt for å få nye autentisering-cookies
+### Usage
 
+1. Click "Start automatisering" to begin monitoring
+2. AkademiTrack will automatically:
+   - Log in to iSkole
+   - Fetch today's schedule
+   - Identify STU sessions
+   - Skip sessions with conflicts
+   - Register attendance when windows open
+3. Monitor progress in the activity log
+4. The application will notify you of successful registrations
 
-**Problem: Ingen STU-økter funnet**
-- Løsning: Kontroller at du har STU-økter i timeplanen din for i dag
+## Documentation
 
-### Support
+- **[Wiki](https://github.com/CyberGutta/AkademiTrack/wiki)** - Comprehensive documentation
+- **[Installation Guide](https://github.com/CyberGutta/AkademiTrack/wiki/Installation-Guide)** - Detailed setup instructions
+- **[User Guide](https://github.com/CyberGutta/AkademiTrack/wiki/User-Guide)** - Complete usage documentation
+- **[Troubleshooting](https://github.com/CyberGutta/AkademiTrack/wiki/Troubleshooting)** - Common issues and solutions
+- **[FAQ](https://github.com/CyberGutta/AkademiTrack/wiki/FAQ)** - Frequently asked questions
 
-For teknisk support eller spørsmål, opprett en issue i GitHub repository eller kontakt utvikleren direkte.
+## System Requirements
 
-### Versjon
+- **OS**: Windows 10/11, macOS 10.15+, or Linux (Ubuntu 20.04+, Fedora 35+)
+- **Internet**: Stable connection required
+- **Storage**: ~100 MB free space
+- **Account**: Valid iSkole account at an Akademiet school
 
-Gjeldende versjon: 1.0.0.0
+## Security & Privacy
 
----
+AkademiTrack takes your security seriously:
 
-## 🇺🇸 English Version Below
+- **Local Storage Only** - All data stored exclusively on your device
+- **Encrypted Credentials** - Industry-standard encryption for stored passwords
+- **No Telemetry** - Zero data collection or tracking
+- **Official Authentication** - Uses Feide's official SSO system
+- **Open Source** - Code available for community review
 
----
+Read our [Security Policy](SECURITY.md) for vulnerability reporting.
 
-# AkademiTrack - STU Time Registration
+## Known Issues
 
-*Automated attendance registration for STU sessions at Akademiet*
+- **Linux Auto-Start Bug** - "Start with system" feature currently doesn't work on Linux (fix planned)
 
-## 🇺🇸 English
+See [Issues](https://github.com/CyberGutta/AkademiTrack/issues) for current bugs and feature requests.
 
-### About the Program
+## Contributing
 
-AkademiTrack is an automation tool that helps students at Akademiet (a Norwegian school) automatically register attendance for STU (Independent Term Projects) sessions. The program monitors schedule data and registers attendance when registration windows open.
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
 
-### Key Features
+### Development
+```bash
+# Clone repository
+git clone https://github.com/CyberGutta/AkademiTrack.git
+cd AkademiTrack
 
-- **Automatic login**: Uses browser for secure authentication against the iSkole system
-- **Intelligent monitoring**: Only monitors relevant STU sessions for the current day
-- **Optimized performance**: Makes only one API request per day to fetch schedule data
-- **Real-time registration**: Automatically registers attendance when registration windows open
-- **Detailed logging**: Comprehensive logging with option for detailed debug messages
-- **System notifications**: Discrete overlay notifications for important events
-- **Settings**: Configurable logging and program settings
+# Build and run
+dotnet restore
+dotnet build
+dotnet run
+```
+See the Development Guide for detailed information.
 
-### How It Works
+## Support
 
-1. **Start automation**: Click the "Start Automatisering" (Start Automation) button
-2. **First-time login**: Browser opens for secure login to iSkole
-3. **Cookie storage**: Authentication is stored securely for future sessions
-4. **Monitoring begins**: Program fetches today's STU sessions and monitors registration windows
-5. **Automatic registration**: When a registration window opens, attendance is automatically registered
-6. **Completion**: Program stops when all sessions for the day have been handled
+- Documentation: Wiki
+- Issues: GitHub Issues
+- Discussions: GitHub Discussions
+- Email: cyberbrothershq@gmail.com
+- Website: cybergutta.github.io/AkademietTrack
 
-### System Requirements
+## Technology Stack
 
-- **Operating System**: Windows, macOS
-- **Internet**: Stable internet connection
-- **Access**: Valid iSkole account at Akademiet
+- Language: C# (.NET 6+)
+- UI Framework: Avalonia UI
+- Authentication: Selenium WebDriver
+- Updates: Velopack
+- Architecture: MVVM pattern
 
-### Installation and Usage
+## Roadmap
 
-1. Download the latest version from releases
-2. Extract files to desired folder
-3. Run `AkademiTrack.exe` (Windows) or equivalent for your operating system
-4. Click "Start Automatisering" and follow the login instructions
-5. Let the program run in the background - it will handle everything automatically
+ - Fix Linux auto-start functionality
+ - Enhanced notification customization
+ - Improved error recovery
+ - Performance optimizations
+ - Multi-account support (under consideration)
 
-### Security and Privacy
-
-- **Locally stored data**: All cookies and data are stored only locally on your machine
-- **No data collection**: Program does not send personal information to the developer
-- **Secure authentication**: Uses official iSkole login method
-- **Automatic cleanup**: Old logs and data are automatically deleted
-
-### Troubleshooting
-
-**Problem: Automation stops unexpectedly**
-- Solution: Restart to get new authentication cookies
-
-**Problem: No STU sessions found**
-- Solution: Check that you have STU sessions in your schedule for today
-
-### Support
-
-For technical support or questions, create an issue in the GitHub repository or contact the developer directly.
-
-### Version
-
-Current version: 1.0.0.0
-
----
+See CHANGELOG.md for version history.
 
 ## License
-
-This project is provided as-is for educational and personal use. Please ensure compliance with your school's policies regarding automated tools.
+This project is licensed under the MIT License - see LICENSE file for details.
 
 ## Disclaimer
+AkademiTrack is designed to assist students with legitimate attendance registration. Users are responsible for ensuring their use complies with school policies and academic integrity standards. This is not an official Akademiet or iSkole product.
 
-This tool is designed to assist students with legitimate attendance registration. Users are responsible for ensuring their use complies with school policies and academic integrity standards.
+## Authors
+
+- @CyberNilsen
+- @CyberHansen
+
+## Acknowledgments
+Built for the Akademiet student community. Special thanks to all contributors and users providing feedback.
+
+Note for Norwegian speakers: While the documentation is in English, the application interface is in Norwegian to match the iSkole system used at Akademiet schools.
+RetryClaude does not have the ability to run the code it generates yet.
