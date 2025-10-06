@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Net.Http;
@@ -18,6 +19,9 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = string.Empty;
         private string _userEmail;
         private string _latestVersion = "1.0";
+        private string _userCurrentVersion = null;
+        private List<string> _changelogItems = new List<string>();
+        private bool _isUpgrade = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
         public event EventHandler Accepted;
@@ -36,8 +40,8 @@ namespace AkademiTrack.ViewModels
             AcceptCommand = new InlineCommand(async () => await AcceptPrivacyPolicyAsync(), () => CanAccept);
             ExitCommand = new InlineCommand(() => Exit());
 
-            // Load the latest version on initialization
-            _ = LoadLatestVersionAsync();
+            // Load the latest version and check for upgrades on initialization
+            _ = LoadLatestVersionAndCheckUpgradeAsync();
         }
 
         public bool HasAccepted
@@ -82,26 +86,124 @@ namespace AkademiTrack.ViewModels
 
         public string AcceptButtonText => IsLoading ? "Lagrer..." : "Godta og fortsett";
 
+        public bool IsUpgrade
+        {
+            get => _isUpgrade;
+            set
+            {
+                _isUpgrade = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public List<string> ChangelogItems
+        {
+            get => _changelogItems;
+            set
+            {
+                _changelogItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string UserCurrentVersion
+        {
+            get => _userCurrentVersion;
+            set
+            {
+                _userCurrentVersion = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LatestVersion
+        {
+            get => _latestVersion;
+            set
+            {
+                _latestVersion = value;
+                OnPropertyChanged();
+            }
+        }
+
         public ICommand AcceptCommand { get; }
         public ICommand ExitCommand { get; }
 
-        private async Task LoadLatestVersionAsync()
+        private async Task LoadLatestVersionAndCheckUpgradeAsync()
         {
             try
             {
+                // First, get the user's current version from database
+                await GetUserCurrentVersionAsync();
+
+                // Then load the latest version from JSON
                 var response = await _httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/privacy-policy.json");
                 var versionInfo = JsonSerializer.Deserialize<PrivacyPolicyVersionInfo>(response);
 
                 if (versionInfo != null && !string.IsNullOrEmpty(versionInfo.Version))
                 {
-                    _latestVersion = versionInfo.Version.Trim();
+                    LatestVersion = versionInfo.Version.Trim();
                     System.Diagnostics.Debug.WriteLine($"Latest privacy policy version: {_latestVersion}");
+
+                    // Check if this is an upgrade (user has old version)
+                    if (!string.IsNullOrEmpty(_userCurrentVersion) && _userCurrentVersion != _latestVersion)
+                    {
+                        _isUpgrade = true;
+
+                        // Load changelog for the new version
+                        if (versionInfo.Changelog != null && versionInfo.Changelog.ContainsKey(_latestVersion))
+                        {
+                            _changelogItems = versionInfo.Changelog[_latestVersion];
+                            System.Diagnostics.Debug.WriteLine($"Loaded {_changelogItems.Count} changelog items for version {_latestVersion}");
+                        }
+
+                        OnPropertyChanged(nameof(IsUpgrade));
+                        OnPropertyChanged(nameof(ChangelogItems));
+                        OnPropertyChanged(nameof(UserCurrentVersion));
+                    }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error loading latest privacy policy version: {ex.Message}");
                 // Keep default version if loading fails
+            }
+        }
+
+        private async Task GetUserCurrentVersionAsync()
+        {
+            try
+            {
+                string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
+                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
+
+                string normalizedEmail = _userEmail?.Trim().ToLowerInvariant();
+
+                if (string.IsNullOrEmpty(normalizedEmail))
+                    return;
+
+                var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_version";
+
+                var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
+                checkRequest.Headers.Add("apikey", supabaseKey);
+                checkRequest.Headers.Add("Authorization", $"Bearer {supabaseKey}");
+
+                var checkResponse = await _httpClient.SendAsync(checkRequest);
+                var checkContent = await checkResponse.Content.ReadAsStringAsync();
+
+                if (checkResponse.IsSuccessStatusCode && !string.IsNullOrEmpty(checkContent) && checkContent != "[]")
+                {
+                    var profiles = JsonSerializer.Deserialize<UserProfile[]>(checkContent);
+                    if (profiles != null && profiles.Length > 0 && !string.IsNullOrEmpty(profiles[0].PrivacyPolicyVersion))
+                    {
+                        UserCurrentVersion = profiles[0].PrivacyPolicyVersion;
+                        System.Diagnostics.Debug.WriteLine($"User's current privacy policy version: {_userCurrentVersion}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting user's current version: {ex.Message}");
             }
         }
 
@@ -392,6 +494,9 @@ namespace AkademiTrack.ViewModels
 
             [JsonPropertyName("markdownUrl")]
             public string MarkdownUrl { get; set; }
+
+            [JsonPropertyName("changelog")]
+            public Dictionary<string, List<string>> Changelog { get; set; }
         }
 
         public class UserProfile

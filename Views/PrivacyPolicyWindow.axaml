@@ -9,16 +9,13 @@
         Icon="/Assets/AT-Transparrent.png"
         Title="Personvernserklæring - AkademiTrack"
         Background="#F8F9FA"
-        Height="610"
+        Height="700"
         Width="500"
         MinWidth="500"
-        MinHeight="610"
+        MinHeight="600"
+        MaxHeight="750"
         WindowStartupLocation="CenterScreen"
         CanResize="true">
-
-	<Design.DataContext>
-		<vm:PrivacyPolicyWindowViewModel/>
-	</Design.DataContext>
 
 	<Window.Styles>
 		<!-- Force all buttons to always be visible -->
@@ -48,11 +45,11 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="Padding" Value="24,14"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
-			<Setter Property="FontSize" Value="14"/>
-			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="FontSize" Value="15"/>
+			<Setter Property="MinWidth" Value="160"/>
 			<Setter Property="IsVisible" Value="True"/>
 			<Setter Property="Template">
 				<ControlTemplate>
@@ -102,10 +99,10 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="Padding" Value="18,12"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
-			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="IsVisible" Value="True"/>
 			<Setter Property="Template">
 				<ControlTemplate>
@@ -204,39 +201,106 @@
 		</Style>
 	</Window.Styles>
 
-	<Grid RowDefinitions="Auto,*,Auto" Margin="0">
+	<Grid RowDefinitions="Auto,*,Auto" Margin="0" MaxHeight="750">
 		<!-- Header -->
-		<Border Grid.Row="0" Background="#007ACC" Padding="30,20">
-			<StackPanel Spacing="4">
+		<Border Grid.Row="0" Background="#007ACC" Padding="30,16">
+			<StackPanel Spacing="3">
 				<TextBlock Text="Personvernserklæring"
-                           FontSize="22"
+                           FontSize="20"
                            FontWeight="Bold"
                            Foreground="White"/>
 				<TextBlock Text="Vennligst les og godta personvernserklæringen for å fortsette"
-                           FontSize="12"
+                           FontSize="11"
                            Foreground="#E8F4FC"/>
 			</StackPanel>
 		</Border>
 
 		<!-- Content -->
-		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="25,20,25,10">
-			<StackPanel Spacing="14">
+		<ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Visible"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="20,15,20,15">
+			<StackPanel Spacing="16">
+
+				<!-- NEW: Upgrade Changelog Box (only visible for existing users) -->
+				<Border Background="#FFF4E5"
+                        BorderBrush="#FF9800"
+                        BorderThickness="2"
+                        CornerRadius="8"
+                        Padding="16"
+                        IsVisible="{Binding IsUpgrade}">
+					<StackPanel Spacing="10">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Text="🔔"
+                                       FontSize="18"
+                                       VerticalAlignment="Center"/>
+							<TextBlock Text="Oppdatert personvernserklæring"
+                                       FontWeight="Bold"
+                                       FontSize="15"
+                                       Foreground="#E65100"
+                                       VerticalAlignment="Center"/>
+						</StackPanel>
+
+						<TextBlock TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#BF360C"
+                                   LineHeight="18">
+							<Run Text="Vi har oppdatert vår personvernserklæring fra versjon "/>
+							<Run Text="{Binding UserCurrentVersion, FallbackValue='1.0'}" FontWeight="Bold"/>
+							<Run Text=" til versjon "/>
+							<Run Text="{Binding LatestVersion, FallbackValue='1.1'}" FontWeight="Bold"/>
+							<Run Text=". Vennligst les endringene nedenfor og godta den nye versjonen."/>
+						</TextBlock>
+
+						<Separator Background="#FFB74D" Height="1" Margin="0,4"/>
+
+						<TextBlock TextWrapping="Wrap"
+                                   FontSize="13"
+                                   Foreground="#E65100">
+							<Run Text="Hva er nytt i versjon "/>
+							<Run Text="{Binding LatestVersion, FallbackValue='1.1'}" FontWeight="SemiBold"/>
+							<Run Text=":"/>
+						</TextBlock>
+
+						<!-- Changelog bullet points -->
+						<ItemsControl ItemsSource="{Binding ChangelogItems, FallbackValue={x:Null}}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate x:DataType="x:String">
+									<StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
+										<TextBlock Text="✓"
+                                                   FontSize="12"
+                                                   Foreground="#43A047"
+                                                   FontWeight="Bold"
+                                                   VerticalAlignment="Top"
+                                                   Margin="0,1,0,0"/>
+										<TextBlock Text="{Binding}"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="12"
+                                                   Foreground="#4E342E"
+                                                   LineHeight="18"/>
+									</StackPanel>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</Border>
 
 				<!-- Info Box -->
 				<Border Background="#E7F3FF"
                         BorderBrush="#007ACC"
                         BorderThickness="1"
                         CornerRadius="6"
-                        Padding="14">
-					<StackPanel Spacing="6">
+                        Padding="16"
+						Margin="-10,0,0,0">
+					<StackPanel Spacing="8">
 						<TextBlock Text="📋 Viktig informasjon"
                                    FontWeight="SemiBold"
-                                   FontSize="13"
+                                   FontSize="14"
                                    Foreground="#004C7F"/>
 						<TextBlock TextWrapping="Wrap"
-                                   FontSize="12"
+                                   FontSize="13"
                                    Foreground="#004C7F"
-                                   LineHeight="18">
+                                   LineHeight="20">
 							Du må godta personvernserklæringen for å bruke AkademiTrack. For full informasjon om hvordan vi behandler dine data, besøk vår nettside.
 						</TextBlock>
 					</StackPanel>
@@ -247,7 +311,7 @@
 					<TextBlock Text="Les vår fullstendige personvernserklæring:"
                                Classes="content"
                                FontWeight="Medium"
-                               FontSize="12"/>
+                               FontSize="13"/>
 					<TextBlock Text="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
                                Classes="link"
                                FontSize="12"
@@ -255,25 +319,25 @@
 				</StackPanel>
 
 				<!-- Summary -->
-				<StackPanel Spacing="8">
+				<StackPanel Spacing="6">
 					<TextBlock Text="Sammendrag av databehandling:"
                                FontSize="14"
                                FontWeight="SemiBold"
                                Foreground="#212529"/>
 
-					<TextBlock Classes="content" FontSize="12">
+					<TextBlock Classes="content" FontSize="13" LineHeight="20">
 						• Vi lagrer dine Feide-innloggingsopplysninger kryptert lokalt på din enhet
 					</TextBlock>
-					<TextBlock Classes="content" FontSize="12">
+					<TextBlock Classes="content" FontSize="13" LineHeight="20">
 						• Vi bruker disse opplysningene kun for automatisk fremmøteregistrering
 					</TextBlock>
-					<TextBlock Classes="content" FontSize="12">
+					<TextBlock Classes="content" FontSize="13" LineHeight="20">
 						• Din aktiveringsnøkkel og e-post lagres i vår database
 					</TextBlock>
-					<TextBlock Classes="content" FontSize="12">
+					<TextBlock Classes="content" FontSize="13" LineHeight="20">
 						• Vi deler ikke dine personopplysninger med tredjeparter
 					</TextBlock>
-					<TextBlock Classes="content" FontSize="12">
+					<TextBlock Classes="content" FontSize="13" LineHeight="20">
 						• Du kan når som helst slette dine data ved å kontakte oss
 					</TextBlock>
 				</StackPanel>
@@ -284,12 +348,13 @@
 						BorderThickness="2"
 						CornerRadius="6"
 						Padding="14"
-						Margin="-10,8,10,0">
+						Margin="-10,8,0,55">
 					<CheckBox IsChecked="{Binding HasAccepted}">
 						<TextBlock TextWrapping="Wrap"
 								   FontSize="13"
 								   Foreground="#212529"
-								   FontWeight="Medium">
+								   FontWeight="Medium"
+								   LineHeight="20">
 							<Run Text="Jeg har lest og godtar"/>
 							<Run Text="personvernserklæringen" FontWeight="Bold"/>
 							<Run Text="for AkademiTrack"/>
@@ -308,12 +373,13 @@
 			</StackPanel>
 		</ScrollViewer>
 
-		<!-- Footer -->
+		<!-- Footer (ALWAYS VISIBLE) -->
 		<Border Grid.Row="2"
-                Background="#F9F9F9"
+                Background="White"
                 BorderBrush="#DEE2E6"
-                BorderThickness="0,1,0,0"
-                Padding="25,18">
+                BorderThickness="0,2,0,0"
+                Padding="20,18"
+                BoxShadow="0 -2 8 0 #10000000">
 			<Grid ColumnDefinitions="*,Auto">
 
 				<!-- Exit Button -->
