@@ -1,4 +1,8 @@
-﻿using Avalonia.Data.Converters;
+﻿using AkademiTrack.Views;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Data.Converters;
+using Avalonia.Threading;
+using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -6,16 +10,16 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia.Threading;
-using Microsoft.Win32;
 using Velopack;
 using Velopack.Sources;
 
@@ -487,6 +491,14 @@ Terminal=false
         private bool _isCheckingForUpdates = false;
         private bool _updateAvailable = false;
         private string _availableVersion = "";
+        private bool _isDeleting = false;
+
+        public bool IsDeleting
+        {
+            get => _isDeleting;
+            set { if (_isDeleting != value) { _isDeleting = value; OnPropertyChanged(); } }
+        }
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
@@ -506,6 +518,8 @@ Terminal=false
         public ICommand OpenEmailCommand { get; }
         public ICommand CheckForUpdatesCommand { get; }
         public ICommand DownloadAndInstallUpdateCommand { get; }
+        public ICommand DeleteLocalDataCommand { get; }
+        public ICommand DeleteAccountCompletelyCommand { get; }
 
         // Properties
         public string UpdateStatus
@@ -597,11 +611,450 @@ Terminal=false
             OpenEmailCommand = new RelayCommand(OpenEmail);
             CheckForUpdatesCommand = new RelayCommand(async () => await CheckForUpdatesAsync());
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
+            DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
+            DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
 
             _ = LoadSettingsAsync();
         }
 
-        // Update Methods
+        private async Task DeleteLocalDataAsync()
+        {
+            if (IsDeleting) return;
+
+            try
+            {
+                // Show confirmation dialog BEFORE deletion
+                var result = await ShowConfirmationDialog(
+                    "Slett lokal data",
+                    "Er du sikker på at du vil slette all lokal data?\n\n" +
+                    "Dette vil fjerne:\n" +
+                    "• Lagrede innloggingsopplysninger\n" +
+                    "• Cookies og tokens\n" +
+                    "• Appinnstillinger\n" +
+                    "• Cache-data\n\n" +
+                    "Programmet starter på nytt etter sletting.",
+                    false
+                );
+
+                if (!result)
+                {
+                    Debug.WriteLine("User cancelled deletion");
+                    return;
+                }
+
+                IsDeleting = true;
+                Debug.WriteLine("=== DELETING LOCAL DATA ===");
+
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                Debug.WriteLine($"App data directory: {appDataDir}");
+
+                if (!Directory.Exists(appDataDir))
+                {
+                    Debug.WriteLine("App data directory doesn't exist - nothing to delete");
+                    IsDeleting = false;
+                    return;
+                }
+
+                // Get all files and directories
+                var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+
+                Debug.WriteLine($"Found {allFiles.Length} files and {allDirectories.Length} directories to delete");
+
+                // Delete ALL files
+                foreach (var file in allFiles)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete file {Path.GetFileName(file)}: {ex.Message}");
+                    }
+                }
+
+                // Delete ALL subdirectories (deepest first)
+                foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                {
+                    try
+                    {
+                        if (Directory.Exists(dir))
+                        {
+                            Directory.Delete(dir, true);
+                            Debug.WriteLine($"✓ Deleted directory: {Path.GetFileName(dir)}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete directory {Path.GetFileName(dir)}: {ex.Message}");
+                    }
+                }
+
+                // Delete main directory
+                try
+                {
+                    if (Directory.Exists(appDataDir))
+                    {
+                        Directory.Delete(appDataDir, true);
+                        Debug.WriteLine("✓ Main app data directory deleted");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠️ Could not delete main directory: {ex.Message}");
+                }
+
+                Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
+
+                // Close settings window
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+
+                // Small delay
+                await Task.Delay(300);
+
+                // RESTART THE APP
+                RestartApplication();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error deleting local data: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                await ShowErrorDialog(
+                    "Feil ved sletting",
+                    $"Kunne ikke slette all data: {ex.Message}"
+                );
+            }
+            finally
+            {
+                IsDeleting = false;
+            }
+        }
+
+        private void RestartApplication()
+        {
+            try
+            {
+                Debug.WriteLine("=== RESTARTING APPLICATION ===");
+
+                // Get current executable path
+                var exePath = Environment.ProcessPath;
+                if (string.IsNullOrEmpty(exePath))
+                {
+                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                }
+
+                Debug.WriteLine($"Executable path: {exePath}");
+
+                if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+                {
+                    // Start new instance
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        UseShellExecute = true,
+                        WorkingDirectory = Path.GetDirectoryName(exePath)
+                    });
+
+                    Debug.WriteLine("New instance started, shutting down current instance...");
+                }
+                else
+                {
+                    Debug.WriteLine("Could not find executable path");
+                }
+
+                // Shutdown current instance
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error restarting application: {ex.Message}");
+                Debug.WriteLine($"Falling back to simple shutdown...");
+
+                // Fallback: just shutdown
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown(0);
+                }
+            }
+        }
+
+        private async Task DeleteAccountCompletelyAsync()
+        {
+            if (IsDeleting) return;
+
+            try
+            {
+                // First confirmation
+                var result = await ShowConfirmationDialog(
+                    "⚠️ SLETT KONTO PERMANENT",
+                    "ADVARSEL: Dette vil PERMANENT slette kontoen din!\n\n" +
+                    "Dette inkluderer:\n" +
+                    "• All lokal data på denne maskinen\n" +
+                    "• Din aktivering i databasen\n" +
+                    "• All tilknyttet data i systemet\n\n" +
+                    "Denne handlingen KAN IKKE angres!\n\n" +
+                    "Er du helt sikker?",
+                    true
+                );
+
+                if (!result) return;
+
+                // Double confirmation
+                var doubleCheck = await ShowConfirmationDialog(
+                    "Siste bekreftelse",
+                    "Dette er din siste sjanse!\n\n" +
+                    "Trykk OK for å PERMANENT slette kontoen din,\n" +
+                    "eller Avbryt for å beholde kontoen.",
+                    true
+                );
+
+                if (!doubleCheck) return;
+
+                IsDeleting = true;
+                Debug.WriteLine("=== DELETING ACCOUNT COMPLETELY ===");
+
+                // Get activation data
+                var activationData = GetLocalActivationData();
+                string activationKey = activationData?.ActivationKey ?? "";
+                string email = activationData?.Email ?? "";
+
+                // Delete from Supabase FIRST
+                if (!string.IsNullOrEmpty(activationKey) && !string.IsNullOrEmpty(email))
+                {
+                    bool remoteDeleted = await DeleteFromSupabase(activationKey, email);
+                    if (!remoteDeleted)
+                    {
+                        Debug.WriteLine("⚠️ Remote deletion failed, but continuing with local deletion");
+                    }
+                }
+
+                // Delete local data
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                if (Directory.Exists(appDataDir))
+                {
+                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+
+                    foreach (var file in allFiles)
+                    {
+                        try { File.Delete(file); Debug.WriteLine($"✓ Deleted: {Path.GetFileName(file)}"); }
+                        catch (Exception ex) { Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}"); }
+                    }
+
+                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                    {
+                        try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+                        catch { }
+                    }
+
+                    try { if (Directory.Exists(appDataDir)) Directory.Delete(appDataDir, true); }
+                    catch { }
+                }
+
+                Debug.WriteLine("=== ACCOUNT COMPLETELY DELETED ===");
+
+                // Close settings window
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+                await Task.Delay(300);
+
+                // Restart the app
+                RestartApplication();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error: {ex.Message}");
+                await ShowErrorDialog("Feil", $"Det oppstod en feil: {ex.Message}");
+            }
+            finally
+            {
+                IsDeleting = false;
+            }
+        }
+
+        private async Task<bool> DeleteFromSupabase(string activationKey, string email)
+        {
+            HttpClient? httpClient = null;
+            try
+            {
+                httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+
+                string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
+                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
+
+                Debug.WriteLine("=== CALLING SUPABASE EDGE FUNCTION ===");
+                Debug.WriteLine($"User email: {email}");
+                Debug.WriteLine($"Activation key: {activationKey}");
+
+                var edgeFunctionUrl = $"{supabaseUrl}/functions/v1/delete-user-by-activation-key";
+                var request = new HttpRequestMessage(HttpMethod.Post, edgeFunctionUrl);
+
+                // ADD BOTH HEADERS
+                request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
+                request.Headers.Add("apikey", supabaseKey);
+
+                var requestBody = new
+                {
+                    activationKey = activationKey,
+                    email = email
+                };
+
+                var jsonBody = JsonSerializer.Serialize(requestBody);
+                request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+                Debug.WriteLine($"Sending request to: {edgeFunctionUrl}");
+
+                var response = await httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Debug.WriteLine($"Response Status: {response.StatusCode}");
+                Debug.WriteLine($"Response: {responseContent}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        var result = JsonSerializer.Deserialize<EdgeFunctionResponse>(responseContent);
+                        if (result?.Success == true)
+                        {
+                            Debug.WriteLine($"✓ Deleted {result.RecordsDeleted} records from Supabase");
+                            return true;
+                        }
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        Debug.WriteLine($"Parse error: {jsonEx.Message}");
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                httpClient?.Dispose();
+            }
+        }
+
+        private class EdgeFunctionResponse
+        {
+            [JsonPropertyName("success")]
+            public bool Success { get; set; }
+
+            [JsonPropertyName("recordsDeleted")]
+            public int RecordsDeleted { get; set; }
+
+            [JsonPropertyName("errors")]
+            public string[]? Errors { get; set; }
+
+            [JsonPropertyName("message")]
+            public string? Message { get; set; }
+
+            [JsonPropertyName("error")]
+            public string? Error { get; set; }
+        }
+
+        private ActivationData? GetLocalActivationData()
+        {
+            try
+            {
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                var activationPath = Path.Combine(appDataDir, "activation.json");
+
+                if (File.Exists(activationPath))
+                {
+                    string json = File.ReadAllText(activationPath);
+                    return JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error reading activation data: {ex.Message}");
+                return null;
+            }
+        }
+
+        private void RestartToLogin()
+        {
+            try
+            {
+                // Get the application instance
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    // Close current window and show login
+                    var loginWindow = new LoginWindow();
+                    desktop.MainWindow = loginWindow;
+                    loginWindow.Show();
+
+                    // Close settings window
+                    CloseRequested?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error restarting to login: {ex.Message}");
+            }
+        }
+
+        // Helper methods for dialogs (Avalonia doesn't have built-in MessageBox, so we'll use a simple approach)
+        private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
+        {
+            try
+            {
+                // Get the current window (Settings window)
+                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
+                    : null;
+
+                if (window == null)
+                {
+                    Debug.WriteLine("Could not find settings window for dialog");
+                    return false;
+                }
+
+                return await ConfirmationDialog.ShowAsync(window, title, message, isDangerous);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error showing confirmation dialog: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task ShowInfoDialog(string title, string message)
+        {
+            await ShowConfirmationDialog(title, message, false);
+        }
+
+        private async Task ShowErrorDialog(string title, string message)
+        {
+            await ShowConfirmationDialog(title, message, true);
+        }
+
+
         // Update Methods
         private async Task CheckForUpdatesAsync()
         {

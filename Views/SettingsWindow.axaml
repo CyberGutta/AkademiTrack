@@ -441,7 +441,7 @@
 			<ScrollViewer Grid.Row="0"
 						  VerticalScrollBarVisibility="Auto"
 						  HorizontalScrollBarVisibility="Disabled"
-						  Padding="24,20,24,32">
+						  Padding="24,20,24,80">
 				<StackPanel Spacing="16" HorizontalAlignment="Stretch" MaxWidth="800">
 					<!-- Login Category -->
 					<StackPanel x:Name="LoginSection" Spacing="12">
@@ -696,6 +696,104 @@
 									</ScrollViewer>
 								</Border>
 							</Grid>
+						</Border>
+
+						<!-- DATA MANAGEMENT SECTION -->
+						<TextBlock Text="Databehandling"
+								   Classes="section-header"
+								   Margin="0,24,0,12"/>
+
+						<!-- Delete Local Data -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
+								<TextBlock Text="Slett lokal data" Classes="setting-title"/>
+								<TextBlock Classes="setting-description">
+									<Run Text="Fjern all lagret data fra denne maskinen, inkludert innloggingsopplysninger,"/>
+									<LineBreak/>
+									<Run Text="cookies, og innstillinger. Du må logge inn på nytt etter sletting."/>
+								</TextBlock>
+
+								<Border Classes="info-panel-compact" Margin="0,8,0,0">
+									<StackPanel Spacing="6">
+										<TextBlock Text="ℹ️ Dette sletter:"
+												   FontWeight="SemiBold"
+												   FontSize="13"
+												   Foreground="#007ACC"/>
+										<TextBlock FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   TextWrapping="Wrap"
+												   LineHeight="18">
+											<Run Text="• Lagrede FEIDE-innloggingsopplysninger"/>
+											<LineBreak/>
+											<Run Text="• Cookies og tokens"/>
+											<LineBreak/>
+											<Run Text="• Alle appinnstillinger"/>
+											<LineBreak/>
+											<Run Text="• Cache-filer"/>
+										</TextBlock>
+									</StackPanel>
+								</Border>
+
+								<Button Content="Slett lokal data"
+										Classes="settings-action"
+										Command="{Binding DeleteLocalDataCommand}"
+										IsEnabled="{Binding !IsDeleting}"
+										Background="#FF9800"
+										Margin="0,8,0,0"/>
+							</StackPanel>
+						</Border>
+
+						<!-- Delete Account Completely -->
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								BorderBrush="#DC3545"
+								BorderThickness="1.5"
+								CornerRadius="10"
+								Padding="16"
+								Margin="0,0,0,200">
+							<StackPanel Spacing="12">
+								<TextBlock Text="⚠️ Faresone"
+										   Classes="setting-title"
+										   Foreground="#DC3545"/>
+
+								<TextBlock Classes="setting-description">
+									<Run Text="ADVARSEL: Dette vil permanent slette kontoen din fra systemet."/>
+									<LineBreak/>
+									<Run Text="Denne handlingen kan ikke angres!"/>
+								</TextBlock>
+
+								<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+										BorderBrush="#DC3545"
+										BorderThickness="1.5"
+										CornerRadius="8"
+										Padding="12"
+										Margin="0,8,0,0">
+									<StackPanel Spacing="6">
+										<TextBlock Text="🗑️ Dette sletter PERMANENT:"
+												   FontWeight="SemiBold"
+												   FontSize="13"
+												   Foreground="#DC3545"/>
+										<TextBlock FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   TextWrapping="Wrap"
+												   LineHeight="18">
+											<Run Text="• All lokal data på denne maskinen"/>
+											<LineBreak/>
+											<Run Text="• Din aktivering i databasen"/>
+											<LineBreak/>
+											<Run Text="• All tilknyttet brukerdata"/>
+											<LineBreak/>
+											<Run Text="• Aktiviseringsnøkkelen blir ugyldig"/>
+										</TextBlock>
+									</StackPanel>
+								</Border>
+
+								<Button Content="Slett konto permanent"
+										Classes="settings-action"
+										Command="{Binding DeleteAccountCompletelyCommand}"
+										IsEnabled="{Binding !IsDeleting}"
+										Background="#DC3545"
+										Margin="0,8,0,0"/>
+							</StackPanel>
 						</Border>
 					</StackPanel>
 
