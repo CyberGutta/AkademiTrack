@@ -1,0 +1,335 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AkademiTrack.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="650"
+        x:Class="AkademiTrack.Views.PrivacyPolicyWindow"
+        x:DataType="vm:PrivacyPolicyWindowViewModel"
+        Icon="/Assets/AT-Transparrent.png"
+        Title="Personvernserklæring - AkademiTrack"
+        Background="#F8F9FA"
+        Height="610"
+        Width="500"
+        MinWidth="500"
+        MinHeight="610"
+        WindowStartupLocation="CenterScreen"
+        CanResize="true">
+
+	<Design.DataContext>
+		<vm:PrivacyPolicyWindowViewModel/>
+	</Design.DataContext>
+
+	<Window.Styles>
+		<!-- Force all buttons to always be visible -->
+		<Style Selector="Button">
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Focusable" Value="True"/>
+		</Style>
+
+		<Style Selector="Button:disabled">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+
+		<!-- Remove focus outlines globally -->
+		<Style Selector="Button:focus /template/ Border">
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+
+		<Style Selector="Button:focus-visible /template/ Border">
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+
+		<!-- Primary Button Style -->
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#007ACC"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinWidth" Value="140"/>
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}"
+							BorderThickness="0"
+							BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+										Content="{TemplateBinding Content}"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										TextBlock.Foreground="{TemplateBinding Foreground}"
+										TextBlock.FontWeight="{TemplateBinding FontWeight}"
+										TextBlock.FontSize="{TemplateBinding FontSize}"
+										TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.primary:pointerover /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#005A9E"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.primary:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.primary:disabled /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="TextBlock.Foreground" Value="#888888"/>
+		</Style>
+
+		<!-- Secondary Button Style -->
+		<Style Selector="Button.secondary">
+			<Setter Property="Background" Value="#6C757D"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}"
+							BorderThickness="0"
+							BorderBrush="Transparent">
+						<ContentPresenter Name="PART_ContentPresenter"
+										Content="{TemplateBinding Content}"
+										HorizontalAlignment="Center"
+										VerticalAlignment="Center"
+										TextBlock.Foreground="{TemplateBinding Foreground}"
+										TextBlock.FontWeight="{TemplateBinding FontWeight}"
+										TextBlock.FontSize="{TemplateBinding FontSize}"
+										TextBlock.TextAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.secondary:pointerover /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#545B62"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Button.secondary:focus /template/ Border#PART_Border">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+		</Style>
+
+		<!-- CheckBox Styles with Full Template -->
+		<Style Selector="CheckBox">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="Foreground" Value="#212529"/>
+			<Setter Property="MinHeight" Value="32"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Grid ColumnDefinitions="Auto,*">
+						<Border Name="PART_Border"
+								Grid.Column="0"
+								Width="24"
+								Height="24"
+								Background="White"
+								BorderBrush="#CED4DA"
+								BorderThickness="2"
+								CornerRadius="4"
+								VerticalAlignment="Center"
+								Margin="0,0,10,0">
+							<Viewbox Width="16" Height="16">
+								<Path Name="PART_Check"
+									  IsVisible="False"
+									  Stroke="#007ACC"
+									  StrokeThickness="2"
+									  Data="M 2,8 L 8,14 L 18,4"
+									  Stretch="Uniform"/>
+							</Viewbox>
+						</Border>
+						<ContentPresenter Grid.Column="1"
+										  Content="{TemplateBinding Content}"
+										  VerticalAlignment="Center"/>
+					</Grid>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="CheckBox:pointerover /template/ Border#PART_Border">
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+		</Style>
+
+		<Style Selector="CheckBox:checked /template/ Border#PART_Border">
+			<Setter Property="Background" Value="#007ACC"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+		</Style>
+
+		<Style Selector="CheckBox:checked /template/ Path#PART_Check">
+			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Stroke" Value="White"/>
+		</Style>
+
+		<!-- Text Styles -->
+		<Style Selector="TextBlock.content">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="Foreground" Value="#495057"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="LineHeight" Value="20"/>
+		</Style>
+
+		<Style Selector="TextBlock.link">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="Foreground" Value="#007ACC"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="TextDecorations" Value="Underline"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid RowDefinitions="Auto,*,Auto" Margin="0">
+		<!-- Header -->
+		<Border Grid.Row="0" Background="#007ACC" Padding="30,20">
+			<StackPanel Spacing="4">
+				<TextBlock Text="Personvernserklæring"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="White"/>
+				<TextBlock Text="Vennligst les og godta personvernserklæringen for å fortsette"
+                           FontSize="12"
+                           Foreground="#E8F4FC"/>
+			</StackPanel>
+		</Border>
+
+		<!-- Content -->
+		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="25,20,25,10">
+			<StackPanel Spacing="14">
+
+				<!-- Info Box -->
+				<Border Background="#E7F3FF"
+                        BorderBrush="#007ACC"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="14">
+					<StackPanel Spacing="6">
+						<TextBlock Text="📋 Viktig informasjon"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="#004C7F"/>
+						<TextBlock TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="#004C7F"
+                                   LineHeight="18">
+							Du må godta personvernserklæringen for å bruke AkademiTrack. For full informasjon om hvordan vi behandler dine data, besøk vår nettside.
+						</TextBlock>
+					</StackPanel>
+				</Border>
+
+				<!-- Link to full policy -->
+				<StackPanel Spacing="6">
+					<TextBlock Text="Les vår fullstendige personvernserklæring:"
+                               Classes="content"
+                               FontWeight="Medium"
+                               FontSize="12"/>
+					<TextBlock Text="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
+                               Classes="link"
+                               FontSize="12"
+                               Tapped="OnPrivacyPolicyLinkTapped"/>
+				</StackPanel>
+
+				<!-- Summary -->
+				<StackPanel Spacing="8">
+					<TextBlock Text="Sammendrag av databehandling:"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#212529"/>
+
+					<TextBlock Classes="content" FontSize="12">
+						• Vi lagrer dine Feide-innloggingsopplysninger kryptert lokalt på din enhet
+					</TextBlock>
+					<TextBlock Classes="content" FontSize="12">
+						• Vi bruker disse opplysningene kun for automatisk fremmøteregistrering
+					</TextBlock>
+					<TextBlock Classes="content" FontSize="12">
+						• Din aktiveringsnøkkel og e-post lagres i vår database
+					</TextBlock>
+					<TextBlock Classes="content" FontSize="12">
+						• Vi deler ikke dine personopplysninger med tredjeparter
+					</TextBlock>
+					<TextBlock Classes="content" FontSize="12">
+						• Du kan når som helst slette dine data ved å kontakte oss
+					</TextBlock>
+				</StackPanel>
+
+				<!-- Consent Checkbox -->
+				<Border Background="#F8F9FA"
+						BorderBrush="#007ACC"
+						BorderThickness="2"
+						CornerRadius="6"
+						Padding="14"
+						Margin="-10,8,10,0">
+					<CheckBox IsChecked="{Binding HasAccepted}">
+						<TextBlock TextWrapping="Wrap"
+								   FontSize="13"
+								   Foreground="#212529"
+								   FontWeight="Medium">
+							<Run Text="Jeg har lest og godtar"/>
+							<Run Text="personvernserklæringen" FontWeight="Bold"/>
+							<Run Text="for AkademiTrack"/>
+						</TextBlock>
+					</CheckBox>
+				</Border>
+
+				<!-- Error Message -->
+				<TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="#DC3545"
+                           FontSize="12"
+                           IsVisible="{Binding HasError}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10"/>
+
+			</StackPanel>
+		</ScrollViewer>
+
+		<!-- Footer -->
+		<Border Grid.Row="2"
+                Background="#F9F9F9"
+                BorderBrush="#DEE2E6"
+                BorderThickness="0,1,0,0"
+                Padding="25,18">
+			<Grid ColumnDefinitions="*,Auto">
+
+				<!-- Exit Button -->
+				<Button Grid.Column="0"
+                        Content="Avslutt"
+                        Command="{Binding ExitCommand}"
+                        Classes="secondary"
+                        HorizontalAlignment="Left"/>
+
+				<!-- Accept Button -->
+				<Button Grid.Column="1"
+                        Content="{Binding AcceptButtonText}"
+                        Command="{Binding AcceptCommand}"
+                        IsEnabled="{Binding CanAccept}"
+                        Classes="primary"/>
+			</Grid>
+		</Border>
+	</Grid>
+</Window>

@@ -19,7 +19,7 @@ namespace AkademiTrack.ViewModels
         private bool _isLoading = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler<bool> SetupCompleted;
+        public event EventHandler<FeideSetupCompletedEventArgs> SetupCompleted;
 
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
@@ -156,13 +156,26 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
+                // Get the user's email from activation.json
+                string userEmail = await GetUserEmailFromActivationAsync();
+
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    ErrorMessage = "Kunne ikke finne brukerens e-post. Vennligst logg inn på nytt.";
+                    return;
+                }
+
                 // Save credentials encrypted in settings
                 await SaveCredentialsToSettingsAsync();
 
-                System.Diagnostics.Debug.WriteLine("Feide credentials saved successfully");
+                System.Diagnostics.Debug.WriteLine($"Feide credentials saved successfully for user: {userEmail}");
 
-                // Notify completion
-                SetupCompleted?.Invoke(this, true);
+                // Notify completion with user email
+                SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
+                {
+                    Success = true,
+                    UserEmail = userEmail
+                });
             }
             catch (Exception ex)
             {
@@ -172,6 +185,36 @@ namespace AkademiTrack.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        private async System.Threading.Tasks.Task<string> GetUserEmailFromActivationAsync()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string activationPath = Path.Combine(appDataDir, "activation.json");
+
+                if (!File.Exists(activationPath))
+                {
+                    System.Diagnostics.Debug.WriteLine("activation.json not found");
+                    return null;
+                }
+
+                var json = await File.ReadAllTextAsync(activationPath);
+                var activationData = JsonSerializer.Deserialize<ActivationData>(json);
+
+                System.Diagnostics.Debug.WriteLine($"Retrieved email from activation.json: {activationData?.Email}");
+
+                return activationData?.Email;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error reading activation.json: {ex.Message}");
+                return null;
             }
         }
 
@@ -267,5 +310,20 @@ namespace AkademiTrack.ViewModels
                 desktop.Shutdown();
             }
         }
+
+        private class ActivationData
+        {
+            public bool IsActivated { get; set; }
+            public DateTime ActivatedAt { get; set; }
+            public string Email { get; set; }
+            public string ActivationKey { get; set; }
+        }
+    }
+
+    // Event args for Feide setup completion
+    public class FeideSetupCompletedEventArgs : EventArgs
+    {
+        public bool Success { get; set; }
+        public string UserEmail { get; set; }
     }
 }

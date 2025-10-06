@@ -25,7 +25,7 @@ namespace AkademiTrack.ViewModels
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
         public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler<bool> LoginCompleted;
+        public event EventHandler<LoginCompletedEventArgs> LoginCompleted;
 
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {
@@ -104,10 +104,21 @@ namespace AkademiTrack.ViewModels
                     await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
                     await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
 
-                    // Notify success on UI thread - this will trigger navigation to Feide window
+                    // Check if user needs to accept privacy policy
+                    System.Diagnostics.Debug.WriteLine($"Checking privacy policy for: {result.FoundRecord.UserEmail}");
+                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(result.FoundRecord.UserEmail);
+
+                    System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
+
+                    // Notify success on UI thread - pass both success status and privacy info
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        LoginCompleted?.Invoke(this, true);
+                        LoginCompleted?.Invoke(this, new LoginCompletedEventArgs
+                        {
+                            Success = true,
+                            UserEmail = result.FoundRecord.UserEmail,
+                            NeedsPrivacyAcceptance = needsPrivacyAcceptance
+                        });
                     });
                 }
                 // ErrorMessage is already set in ValidateActivationKeyAsync if invalid
@@ -301,6 +312,14 @@ namespace AkademiTrack.ViewModels
         {
             _httpClient?.Dispose();
         }
+    }
+
+    // Event args to pass login completion data
+    public class LoginCompletedEventArgs : EventArgs
+    {
+        public bool Success { get; set; }
+        public string UserEmail { get; set; }
+        public bool NeedsPrivacyAcceptance { get; set; }
     }
 
     // Simple inline command implementation

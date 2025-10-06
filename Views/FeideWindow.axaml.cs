@@ -3,6 +3,8 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using AkademiTrack.ViewModels;
+using System.Threading.Tasks;
+using System;
 
 namespace AkademiTrack.Views
 {
@@ -16,14 +18,52 @@ namespace AkademiTrack.Views
             var viewModel = new FeideWindowViewModel();
 
             // Handle setup completion
-            viewModel.SetupCompleted += (s, success) =>
+            viewModel.SetupCompleted += async (s, e) =>
             {
-                if (success)
+                if (e.Success)
                 {
-                    // Close this window and open main window
-                    var mainWindow = new MainWindow();
-                    mainWindow.Show();
-                    this.Close();
+                    System.Diagnostics.Debug.WriteLine($"Feide setup completed for email: {e.UserEmail}");
+
+                    // Check if user needs to accept privacy policy
+                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(e.UserEmail);
+
+                    System.Diagnostics.Debug.WriteLine($"Privacy check result - Needs acceptance: {needsPrivacyAcceptance}");
+
+                    if (needsPrivacyAcceptance)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
+
+                        var privacyWindow = new PrivacyPolicyWindow();
+                        var privacyViewModel = new PrivacyPolicyWindowViewModel(e.UserEmail);
+
+                        privacyViewModel.Accepted += (sender, args) =>
+                        {
+                            System.Diagnostics.Debug.WriteLine("Privacy policy accepted, showing MainWindow...");
+                            privacyWindow.Close();
+                            var mainWindow = new MainWindow();
+                            mainWindow.Show();
+                            this.Close();
+                        };
+
+                        privacyViewModel.Exited += (sender, args) =>
+                        {
+                            System.Diagnostics.Debug.WriteLine("User declined privacy policy, closing app...");
+                            privacyWindow.Close();
+                            this.Close();
+                        };
+
+                        privacyWindow.DataContext = privacyViewModel;
+                        privacyWindow.Show();
+                        this.Close();
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("Privacy policy already up-to-date, showing MainWindow directly...");
+                        // Privacy already accepted with correct version, go to MainWindow
+                        var mainWindow = new MainWindow();
+                        mainWindow.Show();
+                        this.Close();
+                    }
                 }
             };
 
@@ -43,7 +83,6 @@ namespace AkademiTrack.Views
             {
                 // Show password
                 passwordTextBox.PasswordChar = '\0';
-
                 // Eye with slash icon (eye-off)
                 eyeIcon.Data = Geometry.Parse("M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z");
             }
@@ -51,7 +90,6 @@ namespace AkademiTrack.Views
             {
                 // Hide password
                 passwordTextBox.PasswordChar = '•';
-
                 // Normal eye icon
                 eyeIcon.Data = Geometry.Parse("M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z");
             }

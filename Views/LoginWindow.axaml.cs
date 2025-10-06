@@ -26,9 +26,9 @@ namespace AkademiTrack.Views
             Closing += OnWindowClosing;
         }
 
-        private async void OnLoginCompleted(object sender, bool isSuccessful)
+        private async void OnLoginCompleted(object sender, LoginCompletedEventArgs e)
         {
-            if (isSuccessful)
+            if (e.Success)
             {
                 try
                 {
@@ -36,45 +36,39 @@ namespace AkademiTrack.Views
                     {
                         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                         {
-                            // 🚫 Tutorial er slått av
-                            // bool shouldShowTutorial = ShouldShowTutorial();
-                            //
-                            // if (shouldShowTutorial)
-                            // {
-                            //     var tutorialWindow = new TutorialWindow();
-                            //     var tutorialViewModel = new TutorialWindowViewModel();
-                            //
-                            //     tutorialViewModel.ContinueRequested += (s, e) =>
-                            //     {
-                            //         var mainWindow = new MainWindow();
-                            //         mainWindow.Show();
-                            //         tutorialWindow.Close();
-                            //         desktop.MainWindow = mainWindow;
-                            //     };
-                            //
-                            //     tutorialViewModel.ExitRequested += (s, e) =>
-                            //     {
-                            //         desktop.Shutdown();
-                            //     };
-                            //
-                            //     tutorialWindow.DataContext = tutorialViewModel;
-                            //     desktop.MainWindow = tutorialWindow;
-                            //     tutorialWindow.Show();
-                            //     this.Close();
-                            // }
-                            // else
-                            // {
-                            //     var mainWindow = new MainWindow();
-                            //     desktop.MainWindow = mainWindow;
-                            //     mainWindow.Show();
-                            //     this.Close();
-                            // }
+                            // Check if user needs to accept privacy policy
+                            if (e.NeedsPrivacyAcceptance)
+                            {
+                                System.Diagnostics.Debug.WriteLine("User needs to accept privacy policy, showing privacy window...");
 
-                            // ✅ Bytt ut tutorial med FeideWindow
-                            var feideWindow = new FeideWindow();
-                            desktop.MainWindow = feideWindow;
-                            feideWindow.Show();
-                            this.Close();
+                                var privacyWindow = new PrivacyPolicyWindow();
+                                var privacyViewModel = new PrivacyPolicyWindowViewModel(e.UserEmail);
+
+                                privacyViewModel.Accepted += (s, args) =>
+                                {
+                                    System.Diagnostics.Debug.WriteLine("Privacy policy accepted, continuing to Feide window...");
+                                    privacyWindow.Close();
+                                    ShowFeideWindow(desktop);
+                                };
+
+                                privacyViewModel.Exited += (s, args) =>
+                                {
+                                    System.Diagnostics.Debug.WriteLine("User declined privacy policy, shutting down...");
+                                    privacyWindow.Close();
+                                    desktop.Shutdown();
+                                };
+
+                                privacyWindow.DataContext = privacyViewModel;
+                                desktop.MainWindow = privacyWindow;
+                                privacyWindow.Show();
+                                this.Close();
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("Privacy policy already accepted, going directly to Feide window...");
+                                ShowFeideWindow(desktop);
+                                this.Close();
+                            }
                         }
                     });
                 }
@@ -85,6 +79,12 @@ namespace AkademiTrack.Views
             }
         }
 
+        private void ShowFeideWindow(IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var feideWindow = new FeideWindow();
+            desktop.MainWindow = feideWindow;
+            feideWindow.Show();
+        }
 
         private bool ShouldShowTutorial()
         {
