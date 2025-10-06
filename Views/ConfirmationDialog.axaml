@@ -4,16 +4,15 @@
         x:Class="AkademiTrack.Views.ConfirmationDialog"
         Title="Bekreft"
         Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground}"
-        Width="500"
-        Height="280"
+        Width="480"
+        Height="300"
         MinWidth="450"
-        MinHeight="250"
-        MaxWidth="600"
-        MaxHeight="400"
+        MinHeight="280"
+        MaxWidth="550"
+        MaxHeight="450"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False">
-
 	<Window.Styles>
 		<Style Selector="Button.dialog-button">
 			<Setter Property="Foreground" Value="White"/>
@@ -25,49 +24,40 @@
 			<Setter Property="MinWidth" Value="120"/>
 			<Setter Property="Cursor" Value="Hand"/>
 		</Style>
-
 		<Style Selector="Button.ok-button">
 			<Setter Property="Background" Value="#007ACC"/>
 		</Style>
-
 		<Style Selector="Button.ok-button /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#007ACC"/>
 			<Setter Property="CornerRadius" Value="8"/>
 		</Style>
-
 		<Style Selector="Button.ok-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#005A9E"/>
 		</Style>
-
 		<Style Selector="Button.cancel-button">
 			<Setter Property="Background" Value="#6C757D"/>
 		</Style>
-
 		<Style Selector="Button.cancel-button /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#6C757D"/>
 			<Setter Property="CornerRadius" Value="8"/>
 		</Style>
-
 		<Style Selector="Button.cancel-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Background" Value="#5A6268"/>
 		</Style>
 	</Window.Styles>
-
-	<Grid Margin="24">
+	<Grid Margin="20">
 		<Grid.RowDefinitions>
 			<RowDefinition Height="Auto"/>
 			<RowDefinition Height="*"/>
 			<RowDefinition Height="Auto"/>
 		</Grid.RowDefinitions>
-
 		<!-- Icon -->
 		<TextBlock x:Name="IconText"
                    Grid.Row="0"
                    Text="❓"
-                   FontSize="48"
+                   FontSize="42"
                    HorizontalAlignment="Center"
-                   Margin="0,0,0,20"/>
-
+                   Margin="0,0,0,14"/>
 		<!-- Message -->
 		<Border Grid.Row="1"
                 Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
@@ -75,17 +65,17 @@
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16"
-                Margin="0,0,0,24">
-			<ScrollViewer VerticalScrollBarVisibility="Auto">
+                Margin="0,0,0,18">
+			<ScrollViewer VerticalScrollBarVisibility="Auto"
+                          MaxHeight="150">
 				<TextBlock x:Name="MessageText"
                            Text="Er du sikker?"
-                           FontSize="14"
+                           FontSize="13.5"
                            Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
                            TextWrapping="Wrap"
-                           LineHeight="22"/>
+                           LineHeight="20"/>
 			</ScrollViewer>
 		</Border>
-
 		<!-- Buttons -->
 		<StackPanel Grid.Row="2"
                     Orientation="Horizontal"

@@ -793,27 +793,26 @@ Terminal=false
 
             try
             {
-                // First confirmation
+                // First confirmation - SHORTER TEXT
                 var result = await ShowConfirmationDialog(
                     "⚠️ SLETT KONTO PERMANENT",
-                    "ADVARSEL: Dette vil PERMANENT slette kontoen din!\n\n" +
-                    "Dette inkluderer:\n" +
-                    "• All lokal data på denne maskinen\n" +
+                    "ADVARSEL: Dette sletter kontoen din permanent!\n\n" +
+                    "• All lokal data\n" +
                     "• Din aktivering i databasen\n" +
-                    "• All tilknyttet data i systemet\n\n" +
-                    "Denne handlingen KAN IKKE angres!\n\n" +
-                    "Er du helt sikker?",
+                    "• All brukerdata\n\n" +
+                    "Dette kan IKKE angres!\n\n" +
+                    "Er du sikker?",
                     true
                 );
 
                 if (!result) return;
 
-                // Double confirmation
+                // Second confirmation - SHORTER TEXT
                 var doubleCheck = await ShowConfirmationDialog(
                     "Siste bekreftelse",
                     "Dette er din siste sjanse!\n\n" +
-                    "Trykk OK for å PERMANENT slette kontoen din,\n" +
-                    "eller Avbryt for å beholde kontoen.",
+                    "Trykk Ja for å slette kontoen permanent,\n" +
+                    "eller Avbryt for å beholde den.",
                     true
                 );
 
