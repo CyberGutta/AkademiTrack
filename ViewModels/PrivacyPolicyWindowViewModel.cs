@@ -14,14 +14,23 @@ namespace AkademiTrack.ViewModels
     public class PrivacyPolicyWindowViewModel : ViewModelBase, INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
-        private bool _hasAccepted;
+        private bool _hasAcceptedPrivacy;
+        private bool _hasAcceptedTerms;
         private bool _isLoading;
         private string _errorMessage = string.Empty;
         private string _userEmail;
-        private string _latestVersion = "1.0";
-        private string _userCurrentVersion = null;
-        private List<string> _changelogItems = new List<string>();
-        private bool _isUpgrade = false;
+
+        // Privacy Policy
+        private string _latestPrivacyVersion = "1.0";
+        private string _userCurrentPrivacyVersion = null;
+        private List<string> _privacyChangelogItems = new List<string>();
+        private bool _isPrivacyUpgrade = false;
+
+        // Terms of Use
+        private string _latestTermsVersion = "1.0";
+        private string _userCurrentTermsVersion = null;
+        private List<string> _termsChangelogItems = new List<string>();
+        private bool _isTermsUpgrade = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
         public event EventHandler Accepted;
@@ -36,26 +45,131 @@ namespace AkademiTrack.ViewModels
         {
             _userEmail = userEmail;
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            _isLoading = true; // Start in loading state
 
-            AcceptCommand = new InlineCommand(async () => await AcceptPrivacyPolicyAsync(), () => CanAccept);
+            AcceptCommand = new InlineCommand(async () => await AcceptBothAsync(), () => CanAccept);
             ExitCommand = new InlineCommand(() => Exit());
 
-            // Load the latest version and check for upgrades on initialization
-            _ = LoadLatestVersionAndCheckUpgradeAsync();
+            // Load versions and check for upgrades
+            _ = LoadVersionsAndCheckUpgradesAsync();
+
+            System.Diagnostics.Debug.WriteLine($"=== VIEWMODEL CREATED ===");
+            System.Diagnostics.Debug.WriteLine($"Initial HasAcceptedPrivacy: {HasAcceptedPrivacy}");
+            System.Diagnostics.Debug.WriteLine($"Initial HasAcceptedTerms: {HasAcceptedTerms}");
+            System.Diagnostics.Debug.WriteLine($"=======================");
         }
 
-        public bool HasAccepted
+        #region Privacy Policy Properties
+        public bool HasAcceptedPrivacy
         {
-            get => _hasAccepted;
+            get => _hasAcceptedPrivacy;
             set
             {
-                _hasAccepted = value;
+                _hasAcceptedPrivacy = value;
+                System.Diagnostics.Debug.WriteLine($"HasAcceptedPrivacy changed to: {value}");
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanAccept));
                 (AcceptCommand as InlineCommand)?.NotifyCanExecuteChanged();
             }
         }
 
+        public bool IsPrivacyUpgrade
+        {
+            get => _isPrivacyUpgrade;
+            set
+            {
+                _isPrivacyUpgrade = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public List<string> PrivacyChangelogItems
+        {
+            get => _privacyChangelogItems;
+            set
+            {
+                _privacyChangelogItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string UserCurrentPrivacyVersion
+        {
+            get => _userCurrentPrivacyVersion;
+            set
+            {
+                _userCurrentPrivacyVersion = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LatestPrivacyVersion
+        {
+            get => _latestPrivacyVersion;
+            set
+            {
+                _latestPrivacyVersion = value;
+                OnPropertyChanged();
+            }
+        }
+        #endregion
+
+        #region Terms of Use Properties
+        public bool HasAcceptedTerms
+        {
+            get => _hasAcceptedTerms;
+            set
+            {
+                _hasAcceptedTerms = value;
+                System.Diagnostics.Debug.WriteLine($"HasAcceptedTerms changed to: {value}");
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanAccept));
+                (AcceptCommand as InlineCommand)?.NotifyCanExecuteChanged();
+            }
+        }
+
+        public bool IsTermsUpgrade
+        {
+            get => _isTermsUpgrade;
+            set
+            {
+                _isTermsUpgrade = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public List<string> TermsChangelogItems
+        {
+            get => _termsChangelogItems;
+            set
+            {
+                _termsChangelogItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string UserCurrentTermsVersion
+        {
+            get => _userCurrentTermsVersion;
+            set
+            {
+                _userCurrentTermsVersion = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LatestTermsVersion
+        {
+            get => _latestTermsVersion;
+            set
+            {
+                _latestTermsVersion = value;
+                OnPropertyChanged();
+            }
+        }
+        #endregion
+
+        #region Common Properties
         public bool IsLoading
         {
             get => _isLoading;
@@ -65,6 +179,7 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanAccept));
                 OnPropertyChanged(nameof(AcceptButtonText));
+                OnPropertyChanged(nameof(IsContentReady)); // NEW!
                 (AcceptCommand as InlineCommand)?.NotifyCanExecuteChanged();
             }
         }
@@ -82,95 +197,167 @@ namespace AkademiTrack.ViewModels
 
         public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-        public bool CanAccept => HasAccepted && !IsLoading;
+        public bool NeedsPrivacyConsent
+        {
+            get
+            {
+                // If user has never accepted (null/empty), they need to accept
+                if (string.IsNullOrEmpty(_userCurrentPrivacyVersion))
+                    return true;
+
+                // If user has accepted but version is outdated, they need to accept
+                return _userCurrentPrivacyVersion != _latestPrivacyVersion;
+            }
+        }
+
+        public bool NeedsTermsConsent
+        {
+            get
+            {
+                // If user has never accepted (null/empty), they need to accept
+                if (string.IsNullOrEmpty(_userCurrentTermsVersion))
+                    return true;
+
+                // If user has accepted but version is outdated, they need to accept
+                return _userCurrentTermsVersion != _latestTermsVersion;
+            }
+        }
+
+        public bool ShowBothSections => NeedsPrivacyConsent && NeedsTermsConsent;
+
+        public bool IsContentReady => !IsLoading; // NEW PROPERTY!
+
+        public bool CanAccept
+        {
+            get
+            {
+                if (IsLoading) return false;
+
+                // Only require consent for documents that need it
+                bool privacyOk = !NeedsPrivacyConsent || HasAcceptedPrivacy;
+                bool termsOk = !NeedsTermsConsent || HasAcceptedTerms;
+
+                bool result = privacyOk && termsOk;
+
+                System.Diagnostics.Debug.WriteLine($"CanAccept: IsLoading={IsLoading}, Privacy OK={privacyOk} (needs={NeedsPrivacyConsent}, has={HasAcceptedPrivacy}), Terms OK={termsOk} (needs={NeedsTermsConsent}, has={HasAcceptedTerms}), Result={result}");
+
+                return result;
+            }
+        }
 
         public string AcceptButtonText => IsLoading ? "Lagrer..." : "Godta og fortsett";
 
-        public bool IsUpgrade
-        {
-            get => _isUpgrade;
-            set
-            {
-                _isUpgrade = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public List<string> ChangelogItems
-        {
-            get => _changelogItems;
-            set
-            {
-                _changelogItems = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string UserCurrentVersion
-        {
-            get => _userCurrentVersion;
-            set
-            {
-                _userCurrentVersion = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string LatestVersion
-        {
-            get => _latestVersion;
-            set
-            {
-                _latestVersion = value;
-                OnPropertyChanged();
-            }
-        }
-
         public ICommand AcceptCommand { get; }
         public ICommand ExitCommand { get; }
+        #endregion
 
-        private async Task LoadLatestVersionAndCheckUpgradeAsync()
+        private async Task LoadVersionsAndCheckUpgradesAsync()
         {
             try
             {
-                // First, get the user's current version from database
-                await GetUserCurrentVersionAsync();
+                // Get user's current versions from database
+                await GetUserCurrentVersionsAsync();
 
-                // Then load the latest version from JSON
+                System.Diagnostics.Debug.WriteLine($"=== AFTER DB CHECK ===");
+                System.Diagnostics.Debug.WriteLine($"User Privacy Version: '{_userCurrentPrivacyVersion}'");
+                System.Diagnostics.Debug.WriteLine($"User Terms Version: '{_userCurrentTermsVersion}'");
+
+                // Load privacy policy version
+                await LoadPrivacyVersionAsync();
+
+                System.Diagnostics.Debug.WriteLine($"Latest Privacy Version: '{_latestPrivacyVersion}'");
+                System.Diagnostics.Debug.WriteLine($"Needs Privacy Consent: {NeedsPrivacyConsent}");
+
+                // Load terms of use version
+                await LoadTermsVersionAsync();
+
+                System.Diagnostics.Debug.WriteLine($"Latest Terms Version: '{_latestTermsVersion}'");
+                System.Diagnostics.Debug.WriteLine($"Needs Terms Consent: {NeedsTermsConsent}");
+                System.Diagnostics.Debug.WriteLine($"===================");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading versions: {ex.Message}");
+            }
+            finally
+            {
+                // CRITICAL: Finish loading and refresh UI
+                IsLoading = false;
+                OnPropertyChanged(nameof(NeedsPrivacyConsent));
+                OnPropertyChanged(nameof(NeedsTermsConsent));
+                OnPropertyChanged(nameof(ShowBothSections));
+                OnPropertyChanged(nameof(CanAccept));
+                (AcceptCommand as InlineCommand)?.NotifyCanExecuteChanged();
+
+                System.Diagnostics.Debug.WriteLine($"=== LOADING COMPLETE ===");
+                System.Diagnostics.Debug.WriteLine($"NeedsPrivacyConsent: {NeedsPrivacyConsent}");
+                System.Diagnostics.Debug.WriteLine($"NeedsTermsConsent: {NeedsTermsConsent}");
+            }
+        }
+
+        private async Task LoadPrivacyVersionAsync()
+        {
+            try
+            {
                 var response = await _httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/privacy-policy.json");
-                var versionInfo = JsonSerializer.Deserialize<PrivacyPolicyVersionInfo>(response);
+                var versionInfo = JsonSerializer.Deserialize<VersionInfo>(response);
 
                 if (versionInfo != null && !string.IsNullOrEmpty(versionInfo.Version))
                 {
-                    LatestVersion = versionInfo.Version.Trim();
-                    System.Diagnostics.Debug.WriteLine($"Latest privacy policy version: {_latestVersion}");
+                    LatestPrivacyVersion = versionInfo.Version.Trim();
+                    System.Diagnostics.Debug.WriteLine($"Latest privacy policy version: {_latestPrivacyVersion}");
 
-                    // Check if this is an upgrade (user has old version)
-                    if (!string.IsNullOrEmpty(_userCurrentVersion) && _userCurrentVersion != _latestVersion)
+                    // Check if this is an upgrade
+                    if (!string.IsNullOrEmpty(_userCurrentPrivacyVersion) && _userCurrentPrivacyVersion != _latestPrivacyVersion)
                     {
-                        _isUpgrade = true;
+                        IsPrivacyUpgrade = true;
 
-                        // Load changelog for the new version
-                        if (versionInfo.Changelog != null && versionInfo.Changelog.ContainsKey(_latestVersion))
+                        if (versionInfo.Changelog != null && versionInfo.Changelog.ContainsKey(_latestPrivacyVersion))
                         {
-                            _changelogItems = versionInfo.Changelog[_latestVersion];
-                            System.Diagnostics.Debug.WriteLine($"Loaded {_changelogItems.Count} changelog items for version {_latestVersion}");
+                            PrivacyChangelogItems = versionInfo.Changelog[_latestPrivacyVersion];
+                            System.Diagnostics.Debug.WriteLine($"Loaded {_privacyChangelogItems.Count} privacy changelog items");
                         }
-
-                        OnPropertyChanged(nameof(IsUpgrade));
-                        OnPropertyChanged(nameof(ChangelogItems));
-                        OnPropertyChanged(nameof(UserCurrentVersion));
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading latest privacy policy version: {ex.Message}");
-                // Keep default version if loading fails
+                System.Diagnostics.Debug.WriteLine($"Error loading privacy policy version: {ex.Message}");
             }
         }
 
-        private async Task GetUserCurrentVersionAsync()
+        private async Task LoadTermsVersionAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/terms-of-use.json");
+                var versionInfo = JsonSerializer.Deserialize<VersionInfo>(response);
+
+                if (versionInfo != null && !string.IsNullOrEmpty(versionInfo.Version))
+                {
+                    LatestTermsVersion = versionInfo.Version.Trim();
+                    System.Diagnostics.Debug.WriteLine($"Latest terms of use version: {_latestTermsVersion}");
+
+                    // Check if this is an upgrade
+                    if (!string.IsNullOrEmpty(_userCurrentTermsVersion) && _userCurrentTermsVersion != _latestTermsVersion)
+                    {
+                        IsTermsUpgrade = true;
+
+                        if (versionInfo.Changelog != null && versionInfo.Changelog.ContainsKey(_latestTermsVersion))
+                        {
+                            TermsChangelogItems = versionInfo.Changelog[_latestTermsVersion];
+                            System.Diagnostics.Debug.WriteLine($"Loaded {_termsChangelogItems.Count} terms changelog items");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading terms of use version: {ex.Message}");
+            }
+        }
+
+        private async Task GetUserCurrentVersionsAsync()
         {
             try
             {
@@ -182,7 +369,7 @@ namespace AkademiTrack.ViewModels
                 if (string.IsNullOrEmpty(normalizedEmail))
                     return;
 
-                var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_version";
+                var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_version,terms_of_use_version";
 
                 var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
                 checkRequest.Headers.Add("apikey", supabaseKey);
@@ -194,21 +381,32 @@ namespace AkademiTrack.ViewModels
                 if (checkResponse.IsSuccessStatusCode && !string.IsNullOrEmpty(checkContent) && checkContent != "[]")
                 {
                     var profiles = JsonSerializer.Deserialize<UserProfile[]>(checkContent);
-                    if (profiles != null && profiles.Length > 0 && !string.IsNullOrEmpty(profiles[0].PrivacyPolicyVersion))
+                    if (profiles != null && profiles.Length > 0)
                     {
-                        UserCurrentVersion = profiles[0].PrivacyPolicyVersion;
-                        System.Diagnostics.Debug.WriteLine($"User's current privacy policy version: {_userCurrentVersion}");
+                        if (!string.IsNullOrEmpty(profiles[0].PrivacyPolicyVersion))
+                        {
+                            UserCurrentPrivacyVersion = profiles[0].PrivacyPolicyVersion;
+                            System.Diagnostics.Debug.WriteLine($"User's current privacy policy version: {_userCurrentPrivacyVersion}");
+                            OnPropertyChanged(nameof(NeedsPrivacyConsent));
+                        }
+
+                        if (!string.IsNullOrEmpty(profiles[0].TermsOfUseVersion))
+                        {
+                            UserCurrentTermsVersion = profiles[0].TermsOfUseVersion;
+                            System.Diagnostics.Debug.WriteLine($"User's current terms of use version: {_userCurrentTermsVersion}");
+                            OnPropertyChanged(nameof(NeedsTermsConsent));
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error getting user's current version: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error getting user's current versions: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Checks if the user needs to accept the privacy policy (either never accepted or outdated version)
+        /// Checks if the user needs to accept the privacy policy or terms of use
         /// </summary>
         public static async Task<bool> NeedsPrivacyPolicyAcceptance(string userEmail)
         {
@@ -221,31 +419,38 @@ namespace AkademiTrack.ViewModels
 
                 if (string.IsNullOrEmpty(normalizedEmail))
                 {
-                    return true; // Require acceptance if email is invalid
+                    return true;
                 }
 
                 using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
                 {
-                    // Get latest version
-                    string latestVersion = "1.0";
+                    // Get latest versions
+                    string latestPrivacyVersion = "1.0";
+                    string latestTermsVersion = "1.0";
+
                     try
                     {
-                        var versionResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/privacy-policy.json");
-                        var versionInfo = JsonSerializer.Deserialize<PrivacyPolicyVersionInfo>(versionResponse);
-                        if (versionInfo != null && !string.IsNullOrEmpty(versionInfo.Version))
+                        var privacyResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/privacy-policy.json");
+                        var privacyInfo = JsonSerializer.Deserialize<VersionInfo>(privacyResponse);
+                        if (privacyInfo != null && !string.IsNullOrEmpty(privacyInfo.Version))
                         {
-                            latestVersion = versionInfo.Version.Trim();
+                            latestPrivacyVersion = privacyInfo.Version.Trim();
+                        }
+
+                        var termsResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/terms-of-use.json");
+                        var termsInfo = JsonSerializer.Deserialize<VersionInfo>(termsResponse);
+                        if (termsInfo != null && !string.IsNullOrEmpty(termsInfo.Version))
+                        {
+                            latestTermsVersion = termsInfo.Version.Trim();
                         }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error loading latest version: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"Error loading latest versions: {ex.Message}");
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"Latest version from JSON: {latestVersion}");
-
                     // Check user's current acceptance status
-                    var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_accepted,privacy_policy_version";
+                    var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_accepted,privacy_policy_version,terms_of_use_accepted,terms_of_use_version";
 
                     var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
                     checkRequest.Headers.Add("apikey", supabaseKey);
@@ -254,11 +459,9 @@ namespace AkademiTrack.ViewModels
                     var checkResponse = await httpClient.SendAsync(checkRequest);
                     var checkContent = await checkResponse.Content.ReadAsStringAsync();
 
-                    System.Diagnostics.Debug.WriteLine($"User profile check: {checkContent}");
-
                     if (!checkResponse.IsSuccessStatusCode || string.IsNullOrEmpty(checkContent) || checkContent == "[]")
                     {
-                        return true; // Require acceptance if user not found
+                        return true;
                     }
 
                     var profiles = JsonSerializer.Deserialize<UserProfile[]>(checkContent);
@@ -269,19 +472,28 @@ namespace AkademiTrack.ViewModels
 
                     var profile = profiles[0];
 
-                    // User needs to accept if:
-                    // 1. They haven't accepted at all (privacy_policy_accepted is false)
-                    // 2. Their version is different from the latest version
-                    bool needsAcceptance = !profile.PrivacyPolicyAccepted ||
-                                          profile.PrivacyPolicyVersion != latestVersion;
+                    // User needs to accept if either:
+                    // 1. Privacy policy not accepted or outdated
+                    // 2. Terms of use not accepted or outdated
+                    bool needsPrivacy = !profile.PrivacyPolicyAccepted || profile.PrivacyPolicyVersion != latestPrivacyVersion;
+                    bool needsTerms = !profile.TermsOfUseAccepted || profile.TermsOfUseVersion != latestTermsVersion;
 
-                    System.Diagnostics.Debug.WriteLine($"User accepted: {profile.PrivacyPolicyAccepted}, User version: {profile.PrivacyPolicyVersion}, Latest: {latestVersion}, Needs acceptance: {needsAcceptance}");
+                    bool needsAcceptance = needsPrivacy || needsTerms;
 
-                    // If user has old version, reset their acceptance
-                    if (profile.PrivacyPolicyAccepted && profile.PrivacyPolicyVersion != latestVersion)
+                    System.Diagnostics.Debug.WriteLine($"Privacy accepted: {profile.PrivacyPolicyAccepted}, version: {profile.PrivacyPolicyVersion}, latest: {latestPrivacyVersion}");
+                    System.Diagnostics.Debug.WriteLine($"Terms accepted: {profile.TermsOfUseAccepted}, version: {profile.TermsOfUseVersion}, latest: {latestTermsVersion}");
+                    System.Diagnostics.Debug.WriteLine($"Needs acceptance: {needsAcceptance}");
+                    System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacy}");
+
+                    // Reset acceptance for outdated versions
+                    if (needsPrivacy && profile.PrivacyPolicyAccepted)
                     {
-                        System.Diagnostics.Debug.WriteLine($"User has outdated version ({profile.PrivacyPolicyVersion}), resetting acceptance...");
-                        await ResetPrivacyPolicyAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
+                        await ResetPrivacyAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
+                    }
+
+                    if (needsTerms && profile.TermsOfUseAccepted)
+                    {
+                        await ResetTermsAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
                     }
 
                     return needsAcceptance;
@@ -289,12 +501,12 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error checking privacy policy status: {ex.Message}");
-                return true; // Require acceptance on error to be safe
+                System.Diagnostics.Debug.WriteLine($"Error checking acceptance status: {ex.Message}");
+                return true;
             }
         }
 
-        private static async Task ResetPrivacyPolicyAcceptance(string normalizedEmail, HttpClient httpClient, string supabaseUrl, string supabaseKey)
+        private static async Task ResetPrivacyAcceptance(string normalizedEmail, HttpClient httpClient, string supabaseUrl, string supabaseKey)
         {
             try
             {
@@ -302,35 +514,62 @@ namespace AkademiTrack.ViewModels
                 {
                     privacy_policy_accepted = false,
                     privacy_policy_accepted_at = (string)null
-                    // Don't update version - keep old version to track what they had
                 };
 
                 var jsonContent = JsonSerializer.Serialize(resetData);
                 var updateUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}";
 
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                var request = new HttpRequestMessage(HttpMethod.Patch, updateUrl)
-                {
-                    Content = content
-                };
+                var request = new HttpRequestMessage(HttpMethod.Patch, updateUrl) { Content = content };
                 request.Headers.Add("apikey", supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
-                request.Headers.Add("Prefer", "return=representation");
 
-                var response = await httpClient.SendAsync(request);
-                System.Diagnostics.Debug.WriteLine($"Reset acceptance response: {response.StatusCode}");
+                await httpClient.SendAsync(request);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error resetting privacy policy: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error resetting privacy acceptance: {ex.Message}");
             }
         }
 
-        private async Task AcceptPrivacyPolicyAsync()
+        private static async Task ResetTermsAcceptance(string normalizedEmail, HttpClient httpClient, string supabaseUrl, string supabaseKey)
         {
-            if (!HasAccepted)
+            try
+            {
+                var resetData = new
+                {
+                    terms_of_use_accepted = false,
+                    terms_of_use_accepted_at = (string)null
+                };
+
+                var jsonContent = JsonSerializer.Serialize(resetData);
+                var updateUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}";
+
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var request = new HttpRequestMessage(HttpMethod.Patch, updateUrl) { Content = content };
+                request.Headers.Add("apikey", supabaseKey);
+                request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
+
+                await httpClient.SendAsync(request);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error resetting terms acceptance: {ex.Message}");
+            }
+        }
+
+        private async Task AcceptBothAsync()
+        {
+            // Only validate the checkboxes that need to be checked
+            if (NeedsPrivacyConsent && !HasAcceptedPrivacy)
             {
                 ErrorMessage = "Du må godta personvernserklæringen for å fortsette.";
+                return;
+            }
+
+            if (NeedsTermsConsent && !HasAcceptedTerms)
+            {
+                ErrorMessage = "Du må godta brukervilkårene for å fortsette.";
                 return;
             }
 
@@ -339,7 +578,8 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                bool success = await SavePrivacyPolicyAcceptance(_userEmail);
+                // Only save what needs to be saved
+                bool success = await SaveAcceptances(_userEmail);
 
                 if (success)
                 {
@@ -353,7 +593,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 ErrorMessage = $"En feil oppstod: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Privacy policy acceptance error: {ex}");
+                System.Diagnostics.Debug.WriteLine($"Acceptance error: {ex}");
             }
             finally
             {
@@ -361,7 +601,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<bool> SavePrivacyPolicyAcceptance(string email)
+        private async Task<bool> SaveAcceptances(string email)
         {
             try
             {
@@ -372,62 +612,40 @@ namespace AkademiTrack.ViewModels
 
                 if (string.IsNullOrEmpty(normalizedEmail))
                 {
-                    System.Diagnostics.Debug.WriteLine("Error: Email is null or empty");
                     return false;
                 }
 
-                System.Diagnostics.Debug.WriteLine($"=== PRIVACY POLICY UPDATE START ===");
-                System.Diagnostics.Debug.WriteLine($"Email to update: {normalizedEmail}");
-                System.Diagnostics.Debug.WriteLine($"Version to set: {_latestVersion}");
+                System.Diagnostics.Debug.WriteLine($"=== ACCEPTANCE UPDATE START ===");
+                System.Diagnostics.Debug.WriteLine($"Email: {normalizedEmail}");
+                System.Diagnostics.Debug.WriteLine($"Needs Privacy: {NeedsPrivacyConsent}");
+                System.Diagnostics.Debug.WriteLine($"Needs Terms: {NeedsTermsConsent}");
 
-                // First verify the record exists
-                var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=id,user_email,privacy_policy_accepted";
+                // Build update data dynamically based on what needs updating
+                var updateDict = new Dictionary<string, object>();
 
-                var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
-                checkRequest.Headers.Add("apikey", supabaseKey);
-                checkRequest.Headers.Add("Authorization", $"Bearer {supabaseKey}");
-
-                System.Diagnostics.Debug.WriteLine($"Checking if record exists: {checkUrl}");
-                var checkResponse = await _httpClient.SendAsync(checkRequest);
-                var checkContent = await checkResponse.Content.ReadAsStringAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Check response: {checkResponse.StatusCode}");
-                System.Diagnostics.Debug.WriteLine($"Check content: {checkContent}");
-
-                if (!checkResponse.IsSuccessStatusCode)
+                if (NeedsPrivacyConsent)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to check record existence");
-                    return false;
+                    updateDict["privacy_policy_accepted"] = true;
+                    updateDict["privacy_policy_accepted_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    updateDict["privacy_policy_version"] = _latestPrivacyVersion;
+                    System.Diagnostics.Debug.WriteLine($"Updating Privacy version: {_latestPrivacyVersion}");
                 }
 
-                if (string.IsNullOrEmpty(checkContent) || checkContent == "[]")
+                if (NeedsTermsConsent)
                 {
-                    System.Diagnostics.Debug.WriteLine($"ERROR: No record found with email {normalizedEmail}");
-                    return false;
+                    updateDict["terms_of_use_accepted"] = true;
+                    updateDict["terms_of_use_accepted_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    updateDict["terms_of_use_version"] = _latestTermsVersion;
+                    System.Diagnostics.Debug.WriteLine($"Updating Terms version: {_latestTermsVersion}");
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Record exists, proceeding with update...");
-
-                // Now perform the update with the latest version
-                var updateData = new
-                {
-                    privacy_policy_accepted = true,
-                    privacy_policy_accepted_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-                    privacy_policy_version = _latestVersion
-                };
-
-                var jsonContent = JsonSerializer.Serialize(updateData);
+                var jsonContent = JsonSerializer.Serialize(updateDict);
                 System.Diagnostics.Debug.WriteLine($"Update payload: {jsonContent}");
 
                 var updateUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}";
-                System.Diagnostics.Debug.WriteLine($"Update URL: {updateUrl}");
 
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-                var request = new HttpRequestMessage(HttpMethod.Patch, updateUrl)
-                {
-                    Content = content
-                };
+                var request = new HttpRequestMessage(HttpMethod.Patch, updateUrl) { Content = content };
                 request.Headers.Add("apikey", supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
                 request.Headers.Add("Prefer", "return=representation");
@@ -435,35 +653,23 @@ namespace AkademiTrack.ViewModels
                 var response = await _httpClient.SendAsync(request);
                 string responseContent = await response.Content.ReadAsStringAsync();
 
-                System.Diagnostics.Debug.WriteLine($"Update Response Status: {response.StatusCode}");
-                System.Diagnostics.Debug.WriteLine($"Update Response Content: {responseContent}");
-                System.Diagnostics.Debug.WriteLine($"Response Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}");
+                System.Diagnostics.Debug.WriteLine($"Response Status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"Response Content: {responseContent}");
 
-                if (!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode || string.IsNullOrEmpty(responseContent) || responseContent == "[]")
                 {
-                    System.Diagnostics.Debug.WriteLine($"Update failed with status {response.StatusCode}");
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Update failed!");
                     return false;
                 }
 
-                // Check if any rows were actually updated
-                if (string.IsNullOrEmpty(responseContent) || responseContent == "[]")
-                {
-                    System.Diagnostics.Debug.WriteLine($"ERROR: Update returned success but NO ROWS WERE UPDATED!");
-                    System.Diagnostics.Debug.WriteLine($"This is likely an RLS policy issue blocking the update.");
-                    System.Diagnostics.Debug.WriteLine($"Check your 'Allow updates for privacy policy acceptance' RLS policy.");
-                    return false;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"SUCCESS: Privacy policy updated to version {_latestVersion}!");
-                System.Diagnostics.Debug.WriteLine($"Updated record: {responseContent}");
-                System.Diagnostics.Debug.WriteLine($"=== PRIVACY POLICY UPDATE END ===");
+                System.Diagnostics.Debug.WriteLine($"SUCCESS: Acceptances updated!");
+                System.Diagnostics.Debug.WriteLine($"=== ACCEPTANCE UPDATE END ===");
 
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error saving privacy policy acceptance: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"Error saving acceptances: {ex.Message}");
                 return false;
             }
         }
@@ -478,7 +684,7 @@ namespace AkademiTrack.ViewModels
             _httpClient?.Dispose();
         }
 
-        public class PrivacyPolicyVersionInfo
+        public class VersionInfo
         {
             [JsonPropertyName("version")]
             public string Version { get; set; }
@@ -515,6 +721,15 @@ namespace AkademiTrack.ViewModels
 
             [JsonPropertyName("privacy_policy_accepted_at")]
             public string PrivacyPolicyAcceptedAt { get; set; }
+
+            [JsonPropertyName("terms_of_use_accepted")]
+            public bool TermsOfUseAccepted { get; set; }
+
+            [JsonPropertyName("terms_of_use_version")]
+            public string TermsOfUseVersion { get; set; }
+
+            [JsonPropertyName("terms_of_use_accepted_at")]
+            public string TermsOfUseAcceptedAt { get; set; }
         }
     }
 }

@@ -7,7 +7,7 @@
         x:Class="AkademiTrack.Views.PrivacyPolicyWindow"
         x:DataType="vm:PrivacyPolicyWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
-        Title="Personvernserklæring - AkademiTrack"
+        Title="Godkjenn avtaler - AkademiTrack"
         Background="#F8F9FA"
         Height="700"
         Width="500"
@@ -205,11 +205,11 @@
 		<!-- Header -->
 		<Border Grid.Row="0" Background="#007ACC" Padding="30,16">
 			<StackPanel Spacing="3">
-				<TextBlock Text="Personvernserklæring"
+				<TextBlock Text="Personvern og brukervilkår"
                            FontSize="20"
                            FontWeight="Bold"
                            Foreground="White"/>
-				<TextBlock Text="Vennligst les og godta personvernserklæringen for å fortsette"
+				<TextBlock Text="Vennligst les og godta våre avtaler for å fortsette"
                            FontSize="11"
                            Foreground="#E8F4FC"/>
 			</StackPanel>
@@ -217,160 +217,262 @@
 
 		<!-- Content -->
 		<ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Visible"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Padding="20,15,20,15">
-			<StackPanel Spacing="16">
+					  VerticalScrollBarVisibility="Visible"
+					  HorizontalScrollBarVisibility="Disabled"
+					  Padding="20,15,20,15">
+			<!-- WRAP EVERYTHING IN A GRID -->
+			<Grid>
+				<!-- Loading Indicator -->
+				<TextBlock Text="Laster inn..."
+						   FontSize="14"
+						   Foreground="#6C757D"
+						   HorizontalAlignment="Center"
+						   VerticalAlignment="Center"
+						   Margin="0,50"
+						   IsVisible="{Binding IsLoading}"/>
 
-				<!-- NEW: Upgrade Changelog Box (only visible for existing users) -->
-				<Border Background="#FFF4E5"
-                        BorderBrush="#FF9800"
-                        BorderThickness="2"
-                        CornerRadius="8"
-                        Padding="16"
-                        IsVisible="{Binding IsUpgrade}">
-					<StackPanel Spacing="10">
-						<StackPanel Orientation="Horizontal" Spacing="8">
-							<TextBlock Text="🔔"
-                                       FontSize="18"
-                                       VerticalAlignment="Center"/>
-							<TextBlock Text="Oppdatert personvernserklæring"
-                                       FontWeight="Bold"
-                                       FontSize="15"
-                                       Foreground="#E65100"
-                                       VerticalAlignment="Center"/>
+				<!-- Actual Content - Only show when loaded -->
+				<StackPanel Spacing="16" IsVisible="{Binding IsContentReady}">
+
+					<!-- Privacy Policy Upgrade Changelog (only visible for existing users with outdated privacy) -->
+					<Border Background="#FFF4E5"
+							BorderBrush="#FF9800"
+							BorderThickness="2"
+							CornerRadius="8"
+							Padding="16"
+							IsVisible="{Binding IsPrivacyUpgrade}">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<TextBlock Text="🔔"
+										   FontSize="18"
+										   VerticalAlignment="Center"/>
+								<TextBlock Text="Oppdatert personvernserklæring"
+										   FontWeight="Bold"
+										   FontSize="15"
+										   Foreground="#E65100"
+										   VerticalAlignment="Center"/>
+							</StackPanel>
+
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="12"
+									   Foreground="#BF360C"
+									   LineHeight="18">
+								<Run>Vi har oppdatert vår personvernserklæring fra versjon </Run>
+								<Run Text="{Binding UserCurrentPrivacyVersion, FallbackValue='1.0'}" FontWeight="Bold"/>
+								<Run> til versjon </Run>
+								<Run Text="{Binding LatestPrivacyVersion, FallbackValue='1.1'}" FontWeight="Bold"/>
+								<Run>. Vennligst les endringene nedenfor og godta den nye versjonen.</Run>
+							</TextBlock>
+
+							<Separator Background="#FFB74D" Height="1" Margin="0,4"/>
+
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="#E65100">
+								<Run>Hva er nytt i versjon </Run>
+								<Run Text="{Binding LatestPrivacyVersion, FallbackValue='1.1'}" FontWeight="SemiBold"/>
+								<Run>:</Run>
+							</TextBlock>
+
+							<!-- Privacy Changelog bullet points -->
+							<ItemsControl ItemsSource="{Binding PrivacyChangelogItems, FallbackValue={x:Null}}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="x:String">
+										<StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
+											<TextBlock Text="✓"
+													   FontSize="12"
+													   Foreground="#43A047"
+													   FontWeight="Bold"
+													   VerticalAlignment="Top"
+													   Margin="0,1,0,0"/>
+											<TextBlock Text="{Binding}"
+													   TextWrapping="Wrap"
+													   FontSize="12"
+													   Foreground="#4E342E"
+													   LineHeight="18"/>
+										</StackPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
 						</StackPanel>
+					</Border>
 
-						<TextBlock TextWrapping="Wrap"
-                                   FontSize="12"
-                                   Foreground="#BF360C"
-                                   LineHeight="18">
-							<Run Text="Vi har oppdatert vår personvernserklæring fra versjon "/>
-							<Run Text="{Binding UserCurrentVersion, FallbackValue='1.0'}" FontWeight="Bold"/>
-							<Run Text=" til versjon "/>
-							<Run Text="{Binding LatestVersion, FallbackValue='1.1'}" FontWeight="Bold"/>
-							<Run Text=". Vennligst les endringene nedenfor og godta den nye versjonen."/>
-						</TextBlock>
+					<!-- Terms of Use Upgrade Changelog (only visible for existing users with outdated terms) -->
+					<Border Background="#E3F2FD"
+							BorderBrush="#2196F3"
+							BorderThickness="2"
+							CornerRadius="8"
+							Padding="16"
+							IsVisible="{Binding IsTermsUpgrade}">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<TextBlock Text="📄"
+										   FontSize="18"
+										   VerticalAlignment="Center"/>
+								<TextBlock Text="Oppdaterte brukervilkår"
+										   FontWeight="Bold"
+										   FontSize="15"
+										   Foreground="#0D47A1"
+										   VerticalAlignment="Center"/>
+							</StackPanel>
 
-						<Separator Background="#FFB74D" Height="1" Margin="0,4"/>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="12"
+									   Foreground="#1565C0"
+									   LineHeight="18">
+								<Run>Vi har oppdatert våre brukervilkår fra versjon </Run>
+								<Run Text="{Binding UserCurrentTermsVersion, FallbackValue='1.0'}" FontWeight="Bold"/>
+								<Run> til versjon </Run>
+								<Run Text="{Binding LatestTermsVersion, FallbackValue='1.1'}" FontWeight="Bold"/>
+								<Run>. Vennligst les endringene nedenfor og godta den nye versjonen.</Run>
+							</TextBlock>
 
-						<TextBlock TextWrapping="Wrap"
-                                   FontSize="13"
-                                   Foreground="#E65100">
-							<Run Text="Hva er nytt i versjon "/>
-							<Run Text="{Binding LatestVersion, FallbackValue='1.1'}" FontWeight="SemiBold"/>
-							<Run Text=":"/>
-						</TextBlock>
+							<Separator Background="#90CAF9" Height="1" Margin="0,4"/>
 
-						<!-- Changelog bullet points -->
-						<ItemsControl ItemsSource="{Binding ChangelogItems, FallbackValue={x:Null}}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate x:DataType="x:String">
-									<StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
-										<TextBlock Text="✓"
-                                                   FontSize="12"
-                                                   Foreground="#43A047"
-                                                   FontWeight="Bold"
-                                                   VerticalAlignment="Top"
-                                                   Margin="0,1,0,0"/>
-										<TextBlock Text="{Binding}"
-                                                   TextWrapping="Wrap"
-                                                   FontSize="12"
-                                                   Foreground="#4E342E"
-                                                   LineHeight="18"/>
-									</StackPanel>
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="#0D47A1">
+								<Run>Hva er nytt i versjon </Run>
+								<Run Text="{Binding LatestTermsVersion, FallbackValue='1.1'}" FontWeight="SemiBold"/>
+								<Run>:</Run>
+							</TextBlock>
+
+							<!-- Terms Changelog bullet points -->
+							<ItemsControl ItemsSource="{Binding TermsChangelogItems, FallbackValue={x:Null}}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="x:String">
+										<StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3">
+											<TextBlock Text="✓"
+													   FontSize="12"
+													   Foreground="#43A047"
+													   FontWeight="Bold"
+													   VerticalAlignment="Top"
+													   Margin="0,1,0,0"/>
+											<TextBlock Text="{Binding}"
+													   TextWrapping="Wrap"
+													   FontSize="12"
+													   Foreground="#1A237E"
+													   LineHeight="18"/>
+										</StackPanel>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</StackPanel>
+					</Border>
+
+					<!-- Section: Personvernserklæring (only show if needs consent) -->
+					<StackPanel Spacing="8" IsVisible="{Binding NeedsPrivacyConsent}">
+						<TextBlock Text="📜 Personvernserklæring"
+								   FontSize="15"
+								   FontWeight="Bold"
+								   Foreground="#212529"/>
+
+						<TextBlock Text="Les vår fullstendige personvernserklæring:"
+								   Classes="content"
+								   FontSize="13"/>
+						<TextBlock Text="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
+								   Classes="link"
+								   FontSize="12"
+								   Tapped="OnPrivacyPolicyLinkTapped"
+								   Name="PrivacyLink"/>
+
+						<StackPanel Spacing="4" Margin="0,6,0,0">
+							<TextBlock Text="Sammendrag av databehandling:"
+									   FontSize="13"
+									   FontWeight="SemiBold"
+									   Foreground="#212529"/>
+
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Vi lagrer dine Feide-innloggingsopplysninger kryptert lokalt på din enhet
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Vi bruker disse opplysningene kun for automatisk fremmøteregistrering
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Din aktiveringsnøkkel og e-post lagres i vår database
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Vi deler ikke dine personopplysninger med tredjeparter
+							</TextBlock>
+						</StackPanel>
 					</StackPanel>
-				</Border>
 
-				<!-- Info Box -->
-				<Border Background="#E7F3FF"
-                        BorderBrush="#007ACC"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="16"
-						Margin="-10,0,0,0">
-					<StackPanel Spacing="8">
-						<TextBlock Text="📋 Viktig informasjon"
-                                   FontWeight="SemiBold"
-                                   FontSize="14"
-                                   Foreground="#004C7F"/>
-						<TextBlock TextWrapping="Wrap"
-                                   FontSize="13"
-                                   Foreground="#004C7F"
-                                   LineHeight="20">
-							Du må godta personvernserklæringen for å bruke AkademiTrack. For full informasjon om hvordan vi behandler dine data, besøk vår nettside.
-						</TextBlock>
+					<!-- Separator - only show if BOTH sections are visible -->
+					<Separator Background="#DEE2E6" Height="1" Margin="0,4"
+							   IsVisible="{Binding ShowBothSections}"/>
+
+					<!-- Section: Brukervilkår (only show if needs consent) -->
+					<StackPanel Spacing="8" IsVisible="{Binding NeedsTermsConsent}">
+						<TextBlock Text="📋 Brukervilkår"
+								   FontSize="15"
+								   FontWeight="Bold"
+								   Foreground="#212529"/>
+
+						<TextBlock Text="Les våre fullstendige brukervilkår:"
+								   Classes="content"
+								   FontSize="13"/>
+						<TextBlock Text="https://cybergutta.github.io/AkademietTrack/terms-of-use.html"
+								   Classes="link"
+								   FontSize="12"
+								   Tapped="OnTermsOfUseLinkTapped"
+								   Name="TermsLink"/>
+
+						<StackPanel Spacing="4" Margin="0,6,0,0">
+							<TextBlock Text="Viktige punkter:"
+									   FontSize="13"
+									   FontWeight="SemiBold"
+									   Foreground="#212529"/>
+
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Du er ansvarlig for å holde dine innloggingsopplysninger sikre
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Tjenesten leveres "som den er" uten garantier
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Du må følge alle gjeldende lover og regler ved bruk av tjenesten
+							</TextBlock>
+							<TextBlock Classes="content" FontSize="12" LineHeight="18">
+								• Vi forbeholder oss retten til å endre tjenesten eller vilkårene
+							</TextBlock>
+						</StackPanel>
 					</StackPanel>
-				</Border>
 
-				<!-- Link to full policy -->
-				<StackPanel Spacing="6">
-					<TextBlock Text="Les vår fullstendige personvernserklæring:"
-                               Classes="content"
-                               FontWeight="Medium"
-                               FontSize="13"/>
-					<TextBlock Text="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
-                               Classes="link"
-                               FontSize="12"
-                               Tapped="OnPrivacyPolicyLinkTapped"/>
+					<!-- Consent Checkboxes -->
+					<StackPanel Spacing="12" Margin="0,8,0,55">
+						<!-- Privacy Policy Checkbox - ONLY if needs privacy consent -->
+						<Border Background="#F8F9FA"
+								BorderBrush="#FF9800"
+								BorderThickness="2"
+								CornerRadius="6"
+								Padding="14"
+								IsVisible="{Binding NeedsPrivacyConsent}">
+							<CheckBox IsChecked="{Binding HasAcceptedPrivacy}"
+									  Content="Jeg har lest og godtar personvernserklæringen"/>
+						</Border>
+
+						<!-- Terms of Use Checkbox - ONLY if needs terms consent -->
+						<Border Background="#F8F9FA"
+								BorderBrush="#2196F3"
+								BorderThickness="2"
+								CornerRadius="6"
+								Padding="14"
+								IsVisible="{Binding NeedsTermsConsent}">
+							<CheckBox IsChecked="{Binding HasAcceptedTerms}"
+									  Content="Jeg har lest og godtar brukervilkårene"/>
+						</Border>
+					</StackPanel>
+
+					<!-- Error Message -->
+					<TextBlock Text="{Binding ErrorMessage}"
+							   Foreground="#DC3545"
+							   FontSize="12"
+							   IsVisible="{Binding HasError}"
+							   TextWrapping="Wrap"
+							   Margin="0,0,0,10"/>
+
 				</StackPanel>
-
-				<!-- Summary -->
-				<StackPanel Spacing="6">
-					<TextBlock Text="Sammendrag av databehandling:"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="#212529"/>
-
-					<TextBlock Classes="content" FontSize="13" LineHeight="20">
-						• Vi lagrer dine Feide-innloggingsopplysninger kryptert lokalt på din enhet
-					</TextBlock>
-					<TextBlock Classes="content" FontSize="13" LineHeight="20">
-						• Vi bruker disse opplysningene kun for automatisk fremmøteregistrering
-					</TextBlock>
-					<TextBlock Classes="content" FontSize="13" LineHeight="20">
-						• Din aktiveringsnøkkel og e-post lagres i vår database
-					</TextBlock>
-					<TextBlock Classes="content" FontSize="13" LineHeight="20">
-						• Vi deler ikke dine personopplysninger med tredjeparter
-					</TextBlock>
-					<TextBlock Classes="content" FontSize="13" LineHeight="20">
-						• Du kan når som helst slette dine data ved å kontakte oss
-					</TextBlock>
-				</StackPanel>
-
-				<!-- Consent Checkbox -->
-				<Border Background="#F8F9FA"
-						BorderBrush="#007ACC"
-						BorderThickness="2"
-						CornerRadius="6"
-						Padding="14"
-						Margin="-10,8,0,55">
-					<CheckBox IsChecked="{Binding HasAccepted}">
-						<TextBlock TextWrapping="Wrap"
-								   FontSize="13"
-								   Foreground="#212529"
-								   FontWeight="Medium"
-								   LineHeight="20">
-							<Run Text="Jeg har lest og godtar"/>
-							<Run Text="personvernserklæringen" FontWeight="Bold"/>
-							<Run Text="for AkademiTrack"/>
-						</TextBlock>
-					</CheckBox>
-				</Border>
-
-				<!-- Error Message -->
-				<TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="#DC3545"
-                           FontSize="12"
-                           IsVisible="{Binding HasError}"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,10"/>
-
-			</StackPanel>
+			</Grid>
 		</ScrollViewer>
 
 		<!-- Footer (ALWAYS VISIBLE) -->
