@@ -499,6 +499,21 @@ Terminal=false
             set { if (_isDeleting != value) { _isDeleting = value; OnPropertyChanged(); } }
         }
 
+        private bool _isExporting = false;
+        private string _lastExportPath = "";
+
+        public bool IsExporting
+        {
+            get => _isExporting;
+            set { if (_isExporting != value) { _isExporting = value; OnPropertyChanged(); } }
+        }
+
+        public string LastExportPath
+        {
+            get => _lastExportPath;
+            set { if (_lastExportPath != value) { _lastExportPath = value; OnPropertyChanged(); } }
+        }
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
@@ -520,6 +535,8 @@ Terminal=false
         public ICommand DownloadAndInstallUpdateCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
         public ICommand DeleteAccountCompletelyCommand { get; }
+        public ICommand ExportDataAsJsonCommand { get; }
+        public ICommand ExportDataAsCsvCommand { get; }
 
         // Properties
         public string UpdateStatus
@@ -613,8 +630,132 @@ Terminal=false
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
+            ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
+            ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
 
             _ = LoadSettingsAsync();
+        }
+
+        private async Task ExportDataAsync(string format)
+        {
+            if (IsExporting) return;
+
+            try
+            {
+                IsExporting = true;
+                Debug.WriteLine($"=== STARTING LOCAL DATA EXPORT ({format.ToUpper()}) ===");
+
+                // Get user email from credentials or activation
+                string userEmail = LoginEmail;
+
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    // Try to get from activation file
+                    var activationData = GetLocalActivationData();
+                    userEmail = activationData?.Email ?? "";
+                }
+
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    await ShowErrorDialog(
+                        "Eksport feilet",
+                        "Kunne ikke finne bruker-e-post. Vennligst logg inn på nytt."
+                    );
+                    return;
+                }
+
+                // Show confirmation dialog with updated message
+                var proceed = await ShowConfirmationDialog(
+                    "Eksporter lokal data",
+                    $"Dette vil eksportere all LOKAL data som {format.ToUpper()}.\n\n" +
+                    "⚠️ VIKTIG:\n" +
+                    "Dette eksporterer KUN data lagret på din datamaskin:\n" +
+                    "• Appinnstillinger\n" +
+                    "• Aktiveringsinformasjon\n" +
+                    "• Lokale filer og cookies\n\n" +
+                    "For DATABASE-data (STU-registreringer, profil, etc.),\n" +
+                    "besøk: https://cybergutta.github.io/AkademietTrack/index.html\n\n" +
+                    "Vil du fortsette med lokal eksport?",
+                    false
+                );
+
+                if (!proceed)
+                {
+                    Debug.WriteLine("User cancelled export");
+                    return;
+                }
+
+                // Collect all data (local only now)
+                Debug.WriteLine("Collecting local user data...");
+                var exportData = await AkademiTrack.Services.DataExportService.CollectAllDataAsync(
+                    userEmail,
+                    ApplicationInfo.Version
+                );
+
+                Debug.WriteLine($"Local data collected successfully");
+                Debug.WriteLine($"- Local files: {exportData.Local.Files.Count}");
+
+                // Export based on format
+                string filePath;
+                if (format.ToLower() == "json")
+                {
+                    filePath = await AkademiTrack.Services.DataExportService.ExportAsJsonAsync(exportData);
+                }
+                else
+                {
+                    filePath = await AkademiTrack.Services.DataExportService.ExportAsCsvAsync(exportData);
+                }
+
+                LastExportPath = filePath;
+                Debug.WriteLine($"✓ Export completed: {filePath}");
+
+                // Show success dialog with database reminder
+                var openFolder = await ShowConfirmationDialog(
+                    "Lokal eksport fullført! ✓",
+                    $"Din LOKALE data er eksportert til:\n\n{filePath}\n\n" +
+                    "📋 HUSK: For database-data (STU-registreringer, etc.),\n" +
+                    "besøk: https://cybergutta.github.io/AkademietTrack/index.html\n\n" +
+                    "Vil du åpne mappen der filen er lagret?",
+                    false
+                );
+
+                if (openFolder)
+                {
+                    try
+                    {
+                        var directory = Path.GetDirectoryName(filePath);
+                        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = directory,
+                                UseShellExecute = true
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error opening folder: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"=== EXPORT FAILED ===");
+                Debug.WriteLine($"Error: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+
+                await ShowErrorDialog(
+                    "Eksport feilet",
+                    $"Kunne ikke eksportere lokal data:\n\n{ex.Message}\n\n" +
+                    "Vennligst prøv igjen eller kontakt support hvis problemet vedvarer."
+                );
+            }
+            finally
+            {
+                IsExporting = false;
+                Debug.WriteLine("=== EXPORT PROCESS ENDED ===");
+            }
         }
 
         private async Task DeleteLocalDataAsync()
@@ -982,16 +1123,31 @@ Terminal=false
                 if (File.Exists(activationPath))
                 {
                     string json = File.ReadAllText(activationPath);
-                    return JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                    Debug.WriteLine($"[SETTINGS] Activation JSON: {json}");
+
+                    var options = new JsonSerializerOptions
                     {
-                        PropertyNameCaseInsensitive = true
-                    });
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = null
+                    };
+
+                    var data = JsonSerializer.Deserialize<ActivationData>(json, options);
+
+                    if (data != null)
+                    {
+                        Debug.WriteLine($"[SETTINGS] ✓ Found activation key: {data.ActivationKey}");
+                        Debug.WriteLine($"[SETTINGS] ✓ Email: {data.Email}");
+                    }
+
+                    return data;
                 }
+
+                Debug.WriteLine("[SETTINGS] ✗ activation.json not found");
                 return null;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error reading activation data: {ex.Message}");
+                Debug.WriteLine($"[SETTINGS] Error reading activation data: {ex.Message}");
                 return null;
             }
         }

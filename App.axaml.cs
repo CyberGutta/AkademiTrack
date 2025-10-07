@@ -315,10 +315,23 @@ namespace AkademiTrack
 
     public class ActivationData
     {
+        [JsonPropertyName("activationKey")]
+        public string ActivationKey { get; set; } = "";
+
+        [JsonPropertyName("email")]
+        public string Email { get; set; } = "";
+
+        [JsonPropertyName("activatedAt")]
+        public DateTime? ActivatedAt { get; set; }
+
+        [JsonPropertyName("deviceId")]
+        public string? DeviceId { get; set; }
+
+        [JsonPropertyName("deviceName")]
+        public string? DeviceName { get; set; }
+
+        [JsonPropertyName("isActivated")]
         public bool IsActivated { get; set; }
-        public DateTime ActivatedAt { get; set; }
-        public string Email { get; set; }
-        public string ActivationKey { get; set; }
     }
 
     public class RemoteKeyRecord
