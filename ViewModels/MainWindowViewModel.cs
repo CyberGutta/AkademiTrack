@@ -26,7 +26,6 @@ using System.Windows.Input;
 
 namespace AkademiTrack.ViewModels
 {
-    // Overlay notification window class
     public class NotificationOverlayWindow : Window
     {
         private Timer? _autoCloseTimer;
@@ -109,7 +108,6 @@ namespace AkademiTrack.ViewModels
             };
             Grid.SetColumn(contentArea, 1);
 
-            // BACK TO YOUR ORIGINAL GRID - NO CHANGES
             var layoutGrid = new Grid();
             layoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
             layoutGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -181,7 +179,7 @@ namespace AkademiTrack.ViewModels
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.85,
                 LineHeight = 15.0,
-                Margin = new Thickness(0, 4, 0, 0), // BIGGER MARGIN TO PUSH TEXT DOWN
+                Margin = new Thickness(0, 4, 0, 0), 
                 MaxWidth = 280
             };
 
@@ -337,8 +335,6 @@ namespace AkademiTrack.ViewModels
             return iconBorder;
         }
 
-
-
         private void PositionWindow()
         {
             try
@@ -353,11 +349,9 @@ namespace AkademiTrack.ViewModels
                     var windowWidth = (int)(this.Width * scaling);
                     var windowHeight = (int)(this.Height * scaling);
 
-                    // Position from top-right
                     var x = (int)(workingArea.Right - windowWidth - margin);
                     var y = (int)(workingArea.Y + margin);
 
-                    // Ensure bounds
                     if (x < workingArea.X) x = (int)(workingArea.X + margin);
                     if (y + windowHeight > workingArea.Bottom) y = (int)(workingArea.Bottom - windowHeight - margin);
 
@@ -463,8 +457,6 @@ namespace AkademiTrack.ViewModels
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
         private readonly ApplicationInfo _applicationInfo;
 
-
-        // New fields for cached schedule data
         private List<ScheduleItem> _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
@@ -484,8 +476,7 @@ namespace AkademiTrack.ViewModels
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; // Replace with your actual URL
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
-        private string _userEmail = "TESTGMAIL"; 
-        private string _userPassword = "TESTPASSWORD";
+
 
         private string _loginEmail = "";
         private string _loginPassword = "";
@@ -547,7 +538,6 @@ namespace AkademiTrack.ViewModels
 
             LogInfo("Admin notification system initialized");
 
-            // ADD THIS - Check for auto-start automation setting
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
             _updateCheckTimer = new Timer(CheckForUpdatesAutomatically, null,
@@ -604,10 +594,8 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Create a settings view model to get the decrypted credentials
                 var settingsViewModel = new SettingsViewModel();
 
-                // Wait a moment for settings to load
                 await Task.Delay(200);
 
                 var credentials = settingsViewModel.GetDecryptedCredentials();
@@ -680,8 +668,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        
-
         private async void CheckForAdminNotifications(object state)
         {
             try
@@ -693,7 +679,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Method to fetch and display new admin notifications
         private async Task CheckForNewAdminNotificationsAsync()
         {
             try
@@ -708,7 +693,6 @@ namespace AkademiTrack.ViewModels
                 var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
 
-                // Create request with shorter timeout
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // 30 second timeout instead of 100
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -849,54 +833,6 @@ namespace AkademiTrack.ViewModels
                 }
             }
         }
-
-        private async Task SendAdminNotificationAsync(string title, string message, string targetEmail = "all", string priority = "INFO")
-        {
-            try
-            {
-                LogInfo($"Sending admin notification via secure function: {title}");
-
-                var payload = new
-                {
-                    p_title = title,
-                    p_message = message,
-                    p_target_email = targetEmail,
-                    p_priority = priority
-                };
-
-                var json = JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/rpc/send_admin_notification")
-                {
-                    Content = content
-                };
-
-                // Add Supabase headers
-                request.Headers.Add("apikey", _supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-                request.Headers.Add("Prefer", "return=representation");
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    LogSuccess($"Admin notification sent successfully: {title}");
-                    LogDebug($"Response: {responseContent}");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    LogError($"Failed to send admin notification: {response.StatusCode} - {errorContent}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Admin notification request failed: {ex.Message}");
-            }
-        }
-
         public class EnhancedAdminNotification
         {
             public string Id { get; set; }
@@ -904,13 +840,10 @@ namespace AkademiTrack.ViewModels
             public string Message { get; set; }
             public string Priority { get; set; }
             public string Target_Email { get; set; }
-            public string Image_Url { get; set; }    // New: URL to image
-            public string Custom_Color { get; set; }  // New: Custom hex color
+            public string Image_Url { get; set; }    
+            public string Custom_Color { get; set; }  
             public DateTime Created_At { get; set; }
-        }
-
-        // Method to mark notification as delivered
-        
+        }        
 
         public class AdminNotification
         {
@@ -1023,12 +956,8 @@ namespace AkademiTrack.ViewModels
 
         public ICommand TestSupabaseCommand { get; }
 
-
-
-        // Replace your existing ShowNotification method with this enhanced version
         private void ShowNotification(string title, string message, string level = "INFO")
         {
-            // More comprehensive allowed notifications list
             var allowedNotifications = new[]
             {
         "Automatisering startet",
@@ -1051,7 +980,6 @@ namespace AkademiTrack.ViewModels
             {
                 LogDebug($"Queueing notification: {title}");
 
-                // Determine priority more intelligently
                 bool isHighPriority = DetermineNotificationPriority(title, level);
 
                 // Queue the notification without blocking
@@ -1102,7 +1030,6 @@ namespace AkademiTrack.ViewModels
 
             lock (_queueLock)
             {
-                // Smart queue insertion
                 if (isHighPriority)
                 {
                     // For high priority, add to front but don't disrupt current processing
@@ -1339,315 +1266,6 @@ namespace AkademiTrack.ViewModels
             // Use the same entry point to ensure consistent behavior
             ShowNotification(title, message, level);
         }
-
-        private void ShowRegistrationSuccess(string sessionTime)
-        {
-            // This will get high priority automatically due to title matching
-            ShowNotification("Registrering vellykket", $"Registrert for STU {sessionTime}", "SUCCESS");
-        }
-
-        // NETWORK ERROR SPECIFIC HANDLING  
-        private void ShowNetworkError(string sessionTime)
-        {
-            ShowNotification("Koble til Skolens Nettverk",
-                $"Du må være tilkoblet skolens WiFi for å registrere STU {sessionTime}. " +
-                $"Automatiseringen fortsetter å kjøre - koble til skolens nettverk så prøver den igjen.",
-                "WARNING");
-        }
-
-        private void QueueNotification(string title, string message, string level, string imageUrl = null, string customColor = null, bool isHighPriority = false)
-        {
-            var queueItem = new NotificationQueueItem
-            {
-                Title = title,
-                Message = message,
-                Level = level,
-                ImageUrl = imageUrl,
-                CustomColor = customColor,
-                IsHighPriority = isHighPriority
-            };
-
-            lock (_notificationLock)
-            {
-                if (isHighPriority)
-                {
-                    // High priority notifications go to the front of the queue
-                    var tempQueue = new Queue<NotificationQueueItem>();
-                    tempQueue.Enqueue(queueItem);
-
-                    while (_notificationQueue.Count > 0)
-                    {
-                        tempQueue.Enqueue(_notificationQueue.Dequeue());
-                    }
-
-                    while (tempQueue.Count > 0)
-                    {
-                        _notificationQueue.Enqueue(tempQueue.Dequeue());
-                    }
-
-                    LogDebug($"High priority notification queued at front: {title}");
-                }
-                else
-                {
-                    _notificationQueue.Enqueue(queueItem);
-                    LogDebug($"Notification queued: {title} (Queue size: {_notificationQueue.Count})");
-                }
-
-                // Start processing queue if not already showing a notification
-                if (!_isShowingNotification)
-                {
-                    ProcessNotificationQueue();
-                }
-            }
-        }
-
-        private async void ProcessNotificationQueue()
-        {
-            while (true)
-            {
-                NotificationQueueItem nextNotification = null;
-
-                lock (_notificationLock)
-                {
-                    if (_notificationQueue.Count == 0)
-                    {
-                        _isShowingNotification = false;
-                        LogDebug("Notification queue empty - stopping processing");
-                        return;
-                    }
-
-                    nextNotification = _notificationQueue.Dequeue();
-                    _isShowingNotification = true;
-                }
-
-                LogDebug($"Processing queued notification: {nextNotification.Title} (Remaining in queue: {_notificationQueue.Count})");
-
-                try
-                {
-                    // Show the notification and wait for it to complete
-                    await ShowNotificationAndWaitAsync(nextNotification);
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Failed to show queued notification: {ex.Message}");
-                }
-
-                // Add a small delay between notifications for better UX
-                await Task.Delay(500);
-            }
-        }
-
-        // New method to show notification and wait for completion
-        private async Task ShowNotificationAndWaitAsync(NotificationQueueItem item)
-        {
-            TaskCompletionSource<bool> notificationComplete = new TaskCompletionSource<bool>();
-
-            try
-            {
-                if (Dispatcher.UIThread.CheckAccess())
-                {
-                    await CreateOverlayWindowAndWaitAsync(item, notificationComplete);
-                }
-                else
-                {
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await CreateOverlayWindowAndWaitAsync(item, notificationComplete);
-                    });
-                }
-
-                // Wait for the notification to complete
-                await notificationComplete.Task;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to show notification window: {ex.Message}");
-                LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                notificationComplete.SetResult(true); // Complete even on failure
-            }
-        }
-
-        private async Task CreateOverlayWindowAndWaitAsync(NotificationQueueItem item, TaskCompletionSource<bool> completionSource)
-        {
-            try
-            {
-                // Clean up old windows
-                try
-                {
-                    for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
-                    {
-                        if (!_activeOverlayWindows[i].IsVisible)
-                        {
-                            _activeOverlayWindows.RemoveAt(i);
-                        }
-                    }
-                }
-                catch (Exception cleanupEx)
-                {
-                    LogDebug($"Error during window cleanup: {cleanupEx.Message}");
-                    _activeOverlayWindows.Clear();
-                }
-
-                LogDebug($"Creating overlay window for: {item.Title}");
-
-                NotificationOverlayWindow overlayWindow = null;
-                try
-                {
-                    if (!string.IsNullOrEmpty(item.ImageUrl) || !string.IsNullOrEmpty(item.CustomColor))
-                    {
-                        overlayWindow = new NotificationOverlayWindow(item.Title, item.Message, item.Level, item.ImageUrl, item.CustomColor);
-                    }
-                    else
-                    {
-                        overlayWindow = new NotificationOverlayWindow(item.Title, item.Message, item.Level);
-                    }
-                }
-                catch (Exception createEx)
-                {
-                    LogError($"Failed to create notification window: {createEx.Message}");
-                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                    completionSource.SetResult(true);
-                    return;
-                }
-
-                bool windowClosed = false;
-                overlayWindow.Closed += (s, e) =>
-                {
-                    try
-                    {
-                        if (!windowClosed)
-                        {
-                            windowClosed = true;
-                            _activeOverlayWindows.Remove(overlayWindow);
-                            LogDebug($"Notification window closed: {item.Title}");
-                            completionSource.SetResult(true);
-                        }
-                    }
-                    catch (Exception removeEx)
-                    {
-                        LogDebug($"Error removing closed window: {removeEx.Message}");
-                        completionSource.SetResult(true);
-                    }
-                };
-
-                _activeOverlayWindows.Add(overlayWindow);
-
-                try
-                {
-                    overlayWindow.Show();
-                    LogDebug($"✓ Notification window shown successfully: {item.Title}");
-
-                    // Set a backup timeout in case the window doesn't close properly
-                    _ = Task.Delay(15000).ContinueWith(_ =>
-                    {
-                        if (!windowClosed)
-                        {
-                            LogDebug($"Notification timeout reached for: {item.Title}");
-                            windowClosed = true;
-                            completionSource.TrySetResult(true);
-                        }
-                    });
-                }
-                catch (Exception showEx)
-                {
-                    LogError($"Failed to show notification window: {showEx.Message}");
-                    _activeOverlayWindows.Remove(overlayWindow);
-                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                    completionSource.SetResult(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Complete failure in CreateOverlayWindowAndWaitAsync: {ex.Message}");
-                LogInfo($"NOTIFICATION (emergency fallback): {item.Title} - {item.Message}");
-                completionSource.SetResult(true);
-            }
-        }
-
-        private void CreateOverlayWindow(string title, string message, string level, string imageUrl = null, string customColor = null)
-        {
-            try
-            {
-                try
-                {
-                    for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
-                    {
-                        if (!_activeOverlayWindows[i].IsVisible)
-                        {
-                            _activeOverlayWindows.RemoveAt(i);
-                        }
-                    }
-                }
-                catch (Exception cleanupEx)
-                {
-                    LogDebug($"Error during window cleanup: {cleanupEx.Message}");
-                    _activeOverlayWindows.Clear();
-                }
-
-                bool isRegistrationSuccess = title == "Registrering vellykket";
-                bool isPriorityNotification = title == "Ingen Flere Økter" || title.Contains("Ingen STUDIE-økter");
-
-                if (!isRegistrationSuccess && !isPriorityNotification && _activeOverlayWindows.Count > 0)
-                {
-                    LogDebug($"Skipping notification '{title}' - another notification is already showing");
-                    return;
-                }
-
-                LogDebug($"Creating overlay window for: {title}");
-
-                NotificationOverlayWindow overlayWindow = null;
-                try
-                {
-                    if (!string.IsNullOrEmpty(imageUrl) || !string.IsNullOrEmpty(customColor))
-                    {
-                        overlayWindow = new NotificationOverlayWindow(title, message, level, imageUrl, customColor);
-                    }
-                    else
-                    {
-                        overlayWindow = new NotificationOverlayWindow(title, message, level);
-                    }
-                }
-                catch (Exception createEx)
-                {
-                    LogError($"Failed to create notification window: {createEx.Message}");
-                    LogInfo($"NOTIFICATION (fallback): {title} - {message}");
-                    return;
-                }
-
-                overlayWindow.Closed += (s, e) =>
-                {
-                    try
-                    {
-                        _activeOverlayWindows.Remove(overlayWindow);
-                        LogDebug($"Notification window closed: {title}");
-                    }
-                    catch (Exception removeEx)
-                    {
-                        LogDebug($"Error removing closed window: {removeEx.Message}");
-                    }
-                };
-
-                _activeOverlayWindows.Add(overlayWindow);
-
-                try
-                {
-                    overlayWindow.Show();
-                    LogDebug($"✓ Notification window shown successfully: {title}");
-                }
-                catch (Exception showEx)
-                {
-                    LogError($"Failed to show notification window: {showEx.Message}");
-                    _activeOverlayWindows.Remove(overlayWindow);
-                    LogInfo($"NOTIFICATION (fallback): {title} - {message}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Complete failure in CreateOverlayWindow: {ex.Message}");
-                LogInfo($"NOTIFICATION (emergency fallback): {title} - {message}");
-            }
-        }
-
         private async Task DismissCurrentNotificationAsync()
         {
             CurrentNotification = null;
@@ -1746,7 +1364,7 @@ namespace AkademiTrack.ViewModels
                 "Forsøker å registrere oppmøte...",
                 "Alle STU-økter er håndtert for i dag!",
                 "Automatisering fullført - alle STU-økter håndtert",
-                "Syklus #" // ADD THIS LINE - will match cycle status messages
+                "Syklus #"
             };
 
             // Check if message starts with any important message pattern
@@ -1825,7 +1443,8 @@ namespace AkademiTrack.ViewModels
                 "Nettleser opprydding fullført",
                 "Disposing resources...",
                 "vindu åpnet",
-                "window opened"
+                "window opened",
+                "HTTP request failed with status"
             };
 
             foreach (var skip in skipMessages)
@@ -2020,7 +1639,6 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Create and show the settings window
                 var settingsWindow = new SettingsWindow();
                 var settingsViewModel = new SettingsViewModel();
 
@@ -2071,7 +1689,6 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Kunne ikke åpne innstillinger vindu: {ex.Message}");
 
-                // Additional fallback - try showing without dialog
                 try
                 {
                     var settingsWindow = new SettingsWindow();
@@ -2091,14 +1708,11 @@ namespace AkademiTrack.ViewModels
 
         private string GetCookiesFilePath()
         {
-            // Get the user's Application Support directory (best practice for macOS)
             string appSupportPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string appDataDir = Path.Combine(appSupportPath, "AkademiTrack");
             
-            // Create directory if it doesn't exist
             Directory.CreateDirectory(appDataDir);
             
-            // Return full path to cookies file
             return Path.Combine(appDataDir, "cookies.json");
         }
 
@@ -2223,7 +1837,6 @@ namespace AkademiTrack.ViewModels
                         "Automatisk innlogging mislyktes. Nettleseren åpnes for manuell innlogging.",
                         "WARNING");
 
-                        // Close headless browser and open visible one
                         await CleanupWebDriverAsync(localWebDriver);
 
                         // Recreate with visible browser
@@ -2249,7 +1862,6 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    // Manual login from the start - this is the key fix!
                     LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
                     var targetReached = await WaitForTargetUrlAsync();
                     if (!targetReached)
@@ -2261,7 +1873,6 @@ namespace AkademiTrack.ViewModels
 
                 LogSuccess("Innlogging fullført!");
 
-                // Quick parameter capture
                 await QuickParameterCapture();
 
                 LogInfo("Ekstraherer cookies fra nettleser økten...");
@@ -2312,7 +1923,7 @@ namespace AkademiTrack.ViewModels
             }
             finally
             {
-                // Always clean up the web driver
+                // Clean up the web driver
                 await CleanupWebDriverAsync(localWebDriver);
             }
         }
@@ -2327,11 +1938,10 @@ namespace AkademiTrack.ViewModels
                     return false;
                 }
 
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(6)); // Reduced timeout for speed
+                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(6));
 
                 LogDebug("Starting fast automatic login process...");
 
-                // Step 1: Quick FEIDE button detection and click
                 try
                 {
                     LogDebug("Looking for FEIDE button...");
@@ -2339,7 +1949,6 @@ namespace AkademiTrack.ViewModels
                     {
                         try
                         {
-                            // Try multiple selectors quickly
                             var selectors = new[]
                             {
                         "//span[contains(@class, 'feide_icon')]/ancestor::button",
@@ -2655,12 +2264,6 @@ namespace AkademiTrack.ViewModels
                 return false;
             }
         }
-
-
-        
-
-        
-
         private async Task<UserParameters> QuickParameterCapture()
         {
             try
@@ -2870,7 +2473,6 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Try to access a simple property to test if the driver is still connected
                 var _ = driver.CurrentWindowHandle;
                 return true;
             }
@@ -3217,7 +2819,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // New method to get full day schedule data (called only once)
         private async Task<List<ScheduleItem>> GetFullDayScheduleDataAsync(Dictionary<string, string> cookies)
         {
             try
@@ -3232,27 +2833,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Optional: Method to refresh schedule data if needed (for edge cases)
-        private async Task RefreshScheduleDataIfNeeded(Dictionary<string, string> cookies)
-        {
-            // Only refresh if data is very old (e.g., more than 6 hours) or if it's a new day
-            var dataAge = DateTime.Now - _scheduleDataFetchTime;
-            var isNewDay = _scheduleDataFetchTime.Date != DateTime.Now.Date;
-            
-            if (dataAge.TotalHours > 6 || isNewDay)
-            {
-                LogInfo("Oppdaterer timeplandata...");
-                var newData = await GetFullDayScheduleDataAsync(cookies);
-                if (newData != null)
-                {
-                    _cachedScheduleData = newData;
-                    _scheduleDataFetchTime = DateTime.Now;
-                    LogSuccess("Timeplandata oppdatert");
-                }
-            }
-        }
-
-        // Add this enum for registration window status
         private enum RegistrationWindowStatus
         {
             NotYetOpen,
@@ -3299,8 +2879,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // REMOVED: ShouldRegisterNow method (no longer needed as it's replaced by GetRegistrationWindowStatus)
-
         private async Task<ScheduleResponse> GetScheduleDataAsync(Dictionary<string, string> cookies)
         {
             try
@@ -3318,7 +2896,7 @@ namespace AkademiTrack.ViewModels
                         {
                             FylkeId = "00",
                             PlanPeri = "2025-26", 
-                            SkoleId = "312" // Your original value as fallback
+                            SkoleId = "312"
                         };
                     }
                 }
@@ -3374,9 +2952,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        
-
-
         private async Task<string> GetUserEmailFromActivationAsync()
         {
             try
@@ -3419,14 +2994,12 @@ namespace AkademiTrack.ViewModels
             public string SkoleId { get; set; }
             
             public bool IsComplete => !string.IsNullOrEmpty(FylkeId) && 
-                                    !string.IsNullOrEmpty(PlanPeri) && 
-                                    !string.IsNullOrEmpty(SkoleId);
+                                      !string.IsNullOrEmpty(PlanPeri) && 
+                                      !string.IsNullOrEmpty(SkoleId);
         }
 
-        // Add these fields to your MainWindowViewModel class
         private UserParameters _userParameters;
 
-        // Add this method to extract parameters dynamically
         private async Task<UserParameters> ExtractUserParametersAsync(Dictionary<string, string> cookies)
         {
             try
@@ -3494,186 +3067,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<UserParameters> ExtractParametersFromBrowserAsync()
-        {
-            try
-            {
-                if (!IsWebDriverValid(_webDriver))
-                {
-                    return null;
-                }
-                
-                LogInfo("VIKTIG: Gå til 'Fravær' siden i nettleseren for å la programmet finne dine skoleparametere");
-                LogInfo("Nettleseren vil lukke automatisk når du er på Fravær siden og parametere er funnet");
-                LogInfo("Venter på at du navigerer til Fravær siden...");
-                
-                var timeout = DateTime.Now.AddMinutes(5); // Give user more time
-                
-                while (DateTime.Now < timeout && IsWebDriverValid(_webDriver))
-                {
-                    try
-                    {
-                        var currentUrl = _webDriver.Url;
-                        
-                        // Only proceed when user is specifically on the Fravær page
-                        if (currentUrl.Contains("ojr=fravar"))
-                        {
-                            LogInfo("Bruker er på Fravær siden - ekstraherer parametere...");
-                            
-                            // Wait for the page to fully load and make its API calls
-                            await Task.Delay(4000);
-                            
-                            // Try multiple extraction methods
-                            var parameters = await ExtractParametersFromPage();
-                            
-                            if (parameters != null && parameters.IsComplete)
-                            {
-                                LogSuccess($"Fant parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-                                LogInfo("Lukker nettleser automatisk...");
-                                
-                                // Auto-close browser since we found the parameters
-                                await Task.Delay(1000); // Brief pause to let user see the success message
-                                return parameters;
-                            }
-                            else
-                            {
-                                LogInfo("Kunne ikke finne parametere på denne siden - oppdater siden eller prøv igjen");
-                                await Task.Delay(3000);
-                            }
-                        }
-                        else if (currentUrl.Contains("ojr=timeplan"))
-                        {
-                            LogInfo("Du er på Timeplan siden - gå til Fravær siden i stedet for best resultat");
-                            await Task.Delay(3000);
-                        }
-                        else
-                        {
-                            // User is somewhere else, just wait
-                            await Task.Delay(2000);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogDebug($"Feil ved søking i nettleser: {ex.Message}");
-                        await Task.Delay(2000);
-                    }
-                }
-                
-                LogInfo("Tidsavbrudd - kunne ikke finne parametere automatisk");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Feil ved parametersøking: {ex.Message}");
-                return null;
-            }
-        }
-
-        private async Task<UserParameters> ExtractParametersFromPage()
-        {
-            try
-            {
-                var jsExecutor = (IJavaScriptExecutor)_webDriver;
-                
-                // Enhanced JavaScript to search for parameters in multiple ways
-                var script = @"
-                    try {
-                        var parameters = {};
-                        
-                        // Method 1: Search in page HTML content
-                        var pageHtml = document.documentElement.outerHTML;
-                        var fylkeMatch = pageHtml.match(/fylkeid[=:]['\""\s]*([0-9]+)/i);
-                        var planMatch = pageHtml.match(/planperi[=:]['\""\s]*([0-9-]+)/i);
-                        var skoleMatch = pageHtml.match(/skoleid[=:]['\""\s]*([0-9]+)/i);
-                        
-                        if (fylkeMatch && planMatch && skoleMatch) {
-                            parameters.fylkeid = fylkeMatch[1];
-                            parameters.planperi = planMatch[1];
-                            parameters.skoleid = skoleMatch[1];
-                            return parameters;
-                        }
-                        
-                        // Method 2: Look for RESTFilter patterns
-                        var restFilterMatch = pageHtml.match(/RESTFilter[^;]*;fylkeid=([0-9]+)[^,]*,planperi=([0-9-]+)[^,]*,skoleid=([0-9]+)/i);
-                        if (restFilterMatch && restFilterMatch.length >= 4) {
-                            parameters.fylkeid = restFilterMatch[1];
-                            parameters.planperi = restFilterMatch[2];
-                            parameters.skoleid = restFilterMatch[3];
-                            return parameters;
-                        }
-                        
-                        // Method 3: Check all script elements for these values
-                        var scripts = document.querySelectorAll('script');
-                        for (var i = 0; i < scripts.length; i++) {
-                            var scriptContent = scripts[i].textContent || scripts[i].innerHTML;
-                            var match = scriptContent.match(/fylkeid[=:]['\""\s]*([0-9]+).*?planperi[=:]['\""\s]*([0-9-]+).*?skoleid[=:]['\""\s]*([0-9]+)/i);
-                            if (match && match.length >= 4) {
-                                parameters.fylkeid = match[1];
-                                parameters.planperi = match[2];
-                                parameters.skoleid = match[3];
-                                return parameters;
-                            }
-                        }
-                        
-                        // Method 4: Check for individual parameters separately
-                        var fylkeFound = pageHtml.match(/fylkeid[=:]['\""\s]*([0-9]+)/i);
-                        var planFound = pageHtml.match(/planperi[=:]['\""\s]*([0-9-]+)/i);
-                        var skoleFound = pageHtml.match(/skoleid[=:]['\""\s]*([0-9]+)/i);
-                        
-                        if (fylkeFound) parameters.fylkeid = fylkeFound[1];
-                        if (planFound) parameters.planperi = planFound[1];
-                        if (skoleFound) parameters.skoleid = skoleFound[1];
-                        
-                        return Object.keys(parameters).length > 0 ? parameters : null;
-                        
-                    } catch (e) {
-                        console.error('Parameter extraction error:', e);
-                        return null;
-                    }
-                ";
-                
-                var result = jsExecutor.ExecuteScript(script);
-                
-                if (result is Dictionary<string, object> resultDict && resultDict.Count > 0)
-                {
-                    LogDebug($"Fant data i siden: {string.Join(", ", resultDict.Select(kv => $"{kv.Key}={kv.Value}"))}");
-                    
-                    var parameters = new UserParameters();
-                    
-                    if (resultDict.ContainsKey("fylkeid"))
-                        parameters.FylkeId = resultDict["fylkeid"].ToString();
-                    if (resultDict.ContainsKey("planperi"))
-                        parameters.PlanPeri = resultDict["planperi"].ToString();
-                    if (resultDict.ContainsKey("skoleid"))
-                        parameters.SkoleId = resultDict["skoleid"].ToString();
-                    
-                    // Return even if not complete - we'll use fallbacks for missing values
-                    if (!string.IsNullOrEmpty(parameters.SkoleId) || !string.IsNullOrEmpty(parameters.PlanPeri))
-                    {
-                        // Fill in missing values with educated guesses
-                        if (string.IsNullOrEmpty(parameters.FylkeId))
-                            parameters.FylkeId = "00";
-                        
-                        if (string.IsNullOrEmpty(parameters.PlanPeri))
-                        {
-                            var currentYear = DateTime.Now.Year;
-                            var schoolYearStart = DateTime.Now.Month >= 8 ? currentYear : currentYear - 1;
-                            parameters.PlanPeri = $"{schoolYearStart}-{(schoolYearStart + 1).ToString().Substring(2)}";
-                        }
-                        
-                        return parameters;
-                    }
-                }
-                
-                return null;
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil ved utvinning av parametere: {ex.Message}");
-                return null;
-            }
-        }
-
         private string GetUserParametersFilePath()
         {
             string appDataDir = Path.Combine(
@@ -3709,11 +3102,10 @@ namespace AkademiTrack.ViewModels
 
                 var age = DateTime.Now - savedData.SavedAt;
 
-                // Check if parameters are still valid for current school year
                 if (!IsCurrentSchoolYear(savedData.Parameters.PlanPeri))
                 {
                     LogInfo($"Lagrede parametere er for gammelt skoleår ({savedData.Parameters.PlanPeri}) - trenger oppdatering");
-                    File.Delete(filePath); // Clean up old file
+                    File.Delete(filePath);
                     return null;
                 }
 
@@ -3781,76 +3173,14 @@ namespace AkademiTrack.ViewModels
         {
             public UserParameters Parameters { get; set; }
             public DateTime SavedAt { get; set; }
-            public string SchoolYear { get; set; } // Track which school year these parameters are for
+            public string SchoolYear { get; set; } 
         }
-
-
-
-        private async Task<UserParameters> LoadSavedParametersAsync()
-        {
-            try
-            {
-                var filePath = GetUserParametersFilePath();
-                if (!File.Exists(filePath))
-                {
-                    return null;
-                }
-                
-                var json = await File.ReadAllTextAsync(filePath);
-                var parameters = JsonSerializer.Deserialize<UserParameters>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                
-                if (parameters != null && parameters.IsComplete)
-                {
-                    LogDebug($"Lastet lagrede parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-                    return parameters;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Kunne ikke laste lagrede parametere: {ex.Message}");
-            }
-            
-            return null;
-        }
-
-        private UserParameters EstimateUserParameters()
-        {
-            // Estimate current school year
-            var currentYear = DateTime.Now.Year;
-            var currentMonth = DateTime.Now.Month;
-            
-            // School year typically starts in August/September
-            var schoolYearStart = currentMonth >= 8 ? currentYear : currentYear - 1;
-            var schoolYearEnd = schoolYearStart + 1;
-            
-            var parameters = new UserParameters
-            {
-                FylkeId = "00", // Most common for Norwegian schools
-                PlanPeri = $"{schoolYearStart}-{schoolYearEnd.ToString().Substring(2)}", // e.g., "2024-25"
-                SkoleId = "312" // Use your original value as fallback
-            };
-            
-            LogInfo($"Estimerte parametere: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-            LogInfo("Bruker estimerte verdier. Hvis programmet ikke fungerer, kan du finne dine parametere manuelt:");
-            LogInfo("1. Gå til timeplan siden i nettleseren");  
-            LogInfo("2. Åpne Developer Tools (F12)");
-            LogInfo("3. Gå til Network tab");
-            LogInfo("4. Oppdater siden");
-            LogInfo("5. Se etter en request som inneholder 'fylkeid=XX&planperi=XXXX-XX&skoleid=XXX'");
-            
-            return parameters;
-        }
-
         private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
         {
             try
             {
                 LogInfo("Sending STU registration to Supabase...");
 
-                // Get email from activation file if not provided
                 if (string.IsNullOrEmpty(userEmail))
                 {
                     userEmail = await GetUserEmailFromActivationAsync();
@@ -3881,7 +3211,7 @@ namespace AkademiTrack.ViewModels
                     Content = content
                 };
 
-                // Add Supabase headers
+                // Supabase headers
                 request.Headers.Add("apikey", _supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
                 request.Headers.Add("Prefer", "return=minimal");
@@ -3941,7 +3271,7 @@ namespace AkademiTrack.ViewModels
 
                 var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
 
-                // Add headers
+                // Headers
                 request.Headers.Add("Host", "iskole.net");
                 request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
                 request.Headers.Add("X-Requested-With", "XMLHttpRequest");
@@ -3949,7 +3279,7 @@ namespace AkademiTrack.ViewModels
                 request.Headers.Add("Origin", "https://iskole.net");
                 request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
 
-                // Add cookies
+                // Cookies
                 var cookieString = string.Join("; ", cookies.Select(c => $"{c.Key}={c.Value}"));
                 request.Headers.Add("Cookie", cookieString);
 
@@ -4004,7 +3334,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
         private async Task<bool> CheckForNetworkErrorInResponse(string responseContent, ScheduleItem stuTime)
         {
             try
@@ -4049,9 +3378,6 @@ namespace AkademiTrack.ViewModels
                 return "127.0.0.1";
             }
         }
-
-        // Find your Dispose() method at the bottom of the file
-        // ADD THESE 3 METHODS RIGHT BEFORE IT:
 
         private async void CheckForUpdatesAutomatically(object state)
         {

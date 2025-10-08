@@ -175,14 +175,12 @@ namespace AkademiTrack.ViewModels
                     return new ValidationResult { IsValid = false };
                 }
 
-                // Log all records for debugging
                 System.Diagnostics.Debug.WriteLine("=== ALL DATABASE RECORDS ===");
                 foreach (var record in allRecords)
                 {
                     System.Diagnostics.Debug.WriteLine($"ID: {record.Id}, Email: '{record.UserEmail}', Key: '{record.ActivationKey}', IsActivated: {record.IsActivated}");
                 }
 
-                // Find exact key match
                 var exactMatch = allRecords.FirstOrDefault(r =>
                     string.Equals(r.ActivationKey?.Trim(), cleanKey, StringComparison.OrdinalIgnoreCase));
 
@@ -219,7 +217,6 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Update the activation key to mark it as used - using the exact key match
                 var updateData = new
                 {
                     is_activated = true,
@@ -229,7 +226,6 @@ namespace AkademiTrack.ViewModels
                 var json = JsonSerializer.Serialize(updateData);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                // Use exact match for the key from the database
                 var url = $"{_supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}";
 
                 var request = new HttpRequestMessage(HttpMethod.Patch, url)
@@ -257,14 +253,12 @@ namespace AkademiTrack.ViewModels
                 else
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to mark activation key as used: {response.StatusCode}");
-                    // Don't throw here - the validation was successful, we just couldn't update the status
-                    // This prevents double usage but doesn't block the user if there's a temporary issue
+                    
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error marking activation key as used: {ex.Message}");
-                // Don't throw - validation was successful, just updating failed
             }
         }
 
@@ -276,8 +270,8 @@ namespace AkademiTrack.ViewModels
                 {
                     IsActivated = true,
                     ActivatedAt = DateTime.UtcNow,
-                    Email = associatedEmail, // Use the email from the database record
-                    ActivationKey = ActivationKey // Store for remote verification
+                    Email = associatedEmail, 
+                    ActivationKey = ActivationKey 
                 };
 
                 var json = JsonSerializer.Serialize(activationData, new JsonSerializerOptions { WriteIndented = true });
@@ -314,7 +308,6 @@ namespace AkademiTrack.ViewModels
         }
     }
 
-    // Event args to pass login completion data
     public class LoginCompletedEventArgs : EventArgs
     {
         public bool Success { get; set; }
@@ -322,7 +315,6 @@ namespace AkademiTrack.ViewModels
         public bool NeedsPrivacyAcceptance { get; set; }
     }
 
-    // Simple inline command implementation
     public class InlineCommand : ICommand
     {
         private readonly Action _execute;
