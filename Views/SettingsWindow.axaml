@@ -1118,7 +1118,7 @@
 							</StackPanel>
 						</Border>
 
-						<Border Classes="setting-card">
+						<Border Classes="setting-card" Margin="0,0,0,180">
 							<StackPanel Spacing="12">
 								<TextBlock Text="📧 Kontakt oss" Classes="setting-title"/>
 
