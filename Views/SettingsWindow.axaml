@@ -358,6 +358,52 @@
 			<Setter Property="Foreground" Value="#5DB3FF" />
 		</Style>
 
+		<Style Selector="Button.privacypolicy-link">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="#3B9EFF" />
+		</Style>
+
+		<Style Selector="Button.privacypolicy-link:pointerover">
+			<Setter Property="Foreground" Value="#5DB3FF" />
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
+		<Style Selector="Button.privacypolicy-link /template/ ContentPresenter">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+
+		<Style Selector="Button.privacypolicy-link:pointerover /template/ ContentPresenter">
+			<Setter Property="Foreground" Value="#5DB3FF" />
+		</Style>
+
+		<Style Selector="Button.termsofuse-link">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Cursor" Value="Hand" />
+			<Setter Property="Foreground" Value="#3B9EFF" />
+		</Style>
+
+		<Style Selector="Button.termsofuse-link:pointerover">
+			<Setter Property="Foreground" Value="#5DB3FF" />
+			<Setter Property="Background" Value="Transparent" />
+		</Style>
+
+		<Style Selector="Button.termsofuse-link /template/ ContentPresenter">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+
+		<Style Selector="Button.termsofuse-link:pointerover /template/ ContentPresenter">
+			<Setter Property="Foreground" Value="#5DB3FF" />
+		</Style>		
+
 		<!-- Icon Styles for Navigation -->
 		<Style Selector="TextBlock.nav-icon">
 			<Setter Property="FontSize" Value="16"/>
@@ -1034,11 +1080,27 @@
 										   FontWeight="SemiBold"
 										   FontSize="15"
 										   Foreground="#007ACC"/>
+								
 								<TextBlock Text="{Binding ApplicationInfo.NameAndDescription}"
 										   FontSize="14"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 										   TextWrapping="Wrap"
 										   LineHeight="22"/>
+
+								<TextBlock Text="Hvis du vil lese privacy policy eller bruksvilkår, besøk:"
+											   Classes="setting-description"
+											   VerticalAlignment="Center"
+											   Margin="0,1,0,0"/>
+
+								<Button Content="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
+											Command="{Binding OpenPrivacyPolicyCommand}"
+											Classes="privacypolicy-link"
+											VerticalAlignment="Center"/>
+											
+								<Button Content="https://cybergutta.github.io/AkademietTrack/terms-of-use.html"
+											Command="{Binding OpenTermsofUseCommand}"
+											Classes="termsofuse-link"
+											VerticalAlignment="Center"/>
 							</StackPanel>
 						</Border>
 

@@ -531,6 +531,9 @@ Terminal=false
         public ICommand ToggleAutoStartAutomationCommand { get; }
         public ICommand OpenContactFormCommand { get; }
         public ICommand OpenEmailCommand { get; }
+        public ICommand OpenPrivacyPolicyCommand { get; }
+        public ICommand OpenTermsofUseCommand { get; }
+
         public ICommand CheckForUpdatesCommand { get; }
         public ICommand DownloadAndInstallUpdateCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
@@ -626,6 +629,8 @@ Terminal=false
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
             OpenContactFormCommand = new RelayCommand(OpenContactForm);
             OpenEmailCommand = new RelayCommand(OpenEmail);
+            OpenPrivacyPolicyCommand = new RelayCommand(OpenPrivacyPolicy);
+            OpenTermsofUseCommand = new RelayCommand(OpenTermsOfUse);
             CheckForUpdatesCommand = new RelayCommand(async () => await CheckForUpdatesAsync());
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
@@ -1593,6 +1598,18 @@ Terminal=false
         {
             try { Process.Start(new ProcessStartInfo { FileName = "mailto:cyberbrothershq@gmail.com", UseShellExecute = true }); }
             catch (Exception ex) { Debug.WriteLine($"Error opening email: {ex.Message}"); }
+        }
+
+        private void OpenPrivacyPolicy()
+        {
+            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/privacy-policy.html", UseShellExecute = true }); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening form: {ex.Message}"); }
+        }
+
+        private void OpenTermsOfUse()
+        {
+            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/terms-of-use.html", UseShellExecute = true }); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening form: {ex.Message}"); }
         }
 
         private void OpenContactForm()
