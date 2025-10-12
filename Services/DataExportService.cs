@@ -45,7 +45,7 @@ namespace AkademiTrack.Services
 
             var localData = new LocalData
             {
-                Settings = new Dictionary<string, object>(),
+                Settings = new Dictionary<string, object?>(),
                 Credentials = new Dictionary<string, string>(),
                 Activation = new Dictionary<string, string>(),
                 Files = new List<FileInfo>(),
@@ -235,7 +235,7 @@ namespace AkademiTrack.Services
                 case JsonValueKind.False:
                     return false;
                 case JsonValueKind.Null:
-                    return null;
+                    return null!;
                 default:
                     return element.ToString();
             }
@@ -387,7 +387,7 @@ namespace AkademiTrack.Services
     public class LocalData
     {
         [JsonPropertyName("settings")]
-        public Dictionary<string, object> Settings { get; set; } = new();
+        public Dictionary<string, object?> Settings { get; set; } = new();
 
         [JsonPropertyName("credentials")]
         public Dictionary<string, string> Credentials { get; set; } = new();

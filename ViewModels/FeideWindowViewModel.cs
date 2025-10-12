@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace AkademiTrack.ViewModels
@@ -18,10 +19,10 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler<FeideSetupCompletedEventArgs> SetupCompleted;
+        public new event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler<FeideSetupCompletedEventArgs>? SetupCompleted;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -154,7 +155,7 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                string userEmail = await GetUserEmailFromActivationAsync();
+                string? userEmail = await GetUserEmailFromActivationAsync();
 
                 if (string.IsNullOrEmpty(userEmail))
                 {
@@ -183,7 +184,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async System.Threading.Tasks.Task<string> GetUserEmailFromActivationAsync()
+        private async Task<string?> GetUserEmailFromActivationAsync()
         {
             try
             {
@@ -202,9 +203,14 @@ namespace AkademiTrack.ViewModels
                 var json = await File.ReadAllTextAsync(activationPath);
                 var activationData = JsonSerializer.Deserialize<ActivationData>(json);
 
-                System.Diagnostics.Debug.WriteLine($"Retrieved email from activation.json: {activationData?.Email}");
+                if (activationData?.Email == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Email field missing in activation.json");
+                    return null;
+                }
 
-                return activationData?.Email;
+                System.Diagnostics.Debug.WriteLine($"Retrieved email from activation.json: {activationData.Email}");
+                return activationData.Email;
             }
             catch (Exception ex)
             {
@@ -223,7 +229,7 @@ namespace AkademiTrack.ViewModels
 
                 var settingsPath = Path.Combine(appFolderPath, "settings.json");
 
-                AppSettings settings = null;
+                AppSettings? settings = null;
 
                 if (File.Exists(settingsPath))
                 {
@@ -304,14 +310,14 @@ namespace AkademiTrack.ViewModels
         {
             public bool IsActivated { get; set; }
             public DateTime ActivatedAt { get; set; }
-            public string Email { get; set; }
-            public string ActivationKey { get; set; }
+            public required string Email { get; set; }
+            public required string ActivationKey { get; set; }
         }
     }
 
     public class FeideSetupCompletedEventArgs : EventArgs
     {
         public bool Success { get; set; }
-        public string UserEmail { get; set; }
+        public required string UserEmail { get; set; }
     }
 }

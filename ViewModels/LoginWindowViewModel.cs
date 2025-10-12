@@ -23,10 +23,10 @@ namespace AkademiTrack.ViewModels
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler<LoginCompletedEventArgs> LoginCompleted;
+        public new event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler<LoginCompletedEventArgs>? LoginCompleted;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null!)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -96,7 +96,7 @@ namespace AkademiTrack.ViewModels
             {
                 var result = await ValidateActivationKeyAsync(ActivationKey);
 
-                if (result.IsValid)
+                if (result.IsValid && result.FoundRecord != null)
                 {
                     await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
                     await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
@@ -132,7 +132,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                string cleanKey = activationKey?.Trim();
+                string cleanKey = activationKey.Trim();
 
                 System.Diagnostics.Debug.WriteLine($"=== ACTIVATION VALIDATION START ===");
                 System.Diagnostics.Debug.WriteLine($"Input Key: '{cleanKey}'");
@@ -304,7 +304,7 @@ namespace AkademiTrack.ViewModels
     public class LoginCompletedEventArgs : EventArgs
     {
         public bool Success { get; set; }
-        public string UserEmail { get; set; }
+        public required string UserEmail { get; set; }
         public bool NeedsPrivacyAcceptance { get; set; }
     }
 
@@ -313,17 +313,17 @@ namespace AkademiTrack.ViewModels
         private readonly Action _execute;
         private readonly Func<bool> _canExecute;
 
-        public InlineCommand(Action execute, Func<bool> canExecute = null)
+        public InlineCommand(Action execute, Func<bool> canExecute = null!)
         {
             _execute = execute ?? throw new ArgumentNullException(nameof(execute));
             _canExecute = canExecute;
         }
 
-        public event EventHandler CanExecuteChanged;
+        public event EventHandler? CanExecuteChanged;
 
-        public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
 
-        public void Execute(object parameter) => _execute();
+        public void Execute(object? parameter) => _execute();
 
         public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -331,7 +331,7 @@ namespace AkademiTrack.ViewModels
     public class ValidationResult
     {
         public bool IsValid { get; set; }
-        public ActivationKeyRecord FoundRecord { get; set; }
+        public ActivationKeyRecord? FoundRecord { get; set; }
     }
 
     public class ActivationKeyRecord
@@ -339,10 +339,10 @@ namespace AkademiTrack.ViewModels
         public int Id { get; set; }
 
         [JsonPropertyName("user_email")]
-        public string UserEmail { get; set; }
+        public required string UserEmail { get; set; }
 
         [JsonPropertyName("activation_key")]
-        public string ActivationKey { get; set; }
+        public required string ActivationKey { get; set; }
 
         [JsonPropertyName("is_activated")]
         public bool IsActivated { get; set; }

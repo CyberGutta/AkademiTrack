@@ -12,12 +12,12 @@ namespace AkademiTrack.Services
 
     public class ChristmasThemeManager : INotifyPropertyChanged
     {
-        private static ChristmasThemeManager _instance;
+        private static ChristmasThemeManager ?_instance;
         private Season _currentSeason;
 
         public static ChristmasThemeManager Instance => _instance ??= new ChristmasThemeManager();
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         private ChristmasThemeManager()
         {
@@ -60,7 +60,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

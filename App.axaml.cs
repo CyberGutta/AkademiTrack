@@ -252,7 +252,7 @@ namespace AkademiTrack
             }
         }
 
-        private ActivationData GetLocalActivationData()
+        private ActivationData? GetLocalActivationData()
         {
             try
             {
@@ -283,7 +283,7 @@ namespace AkademiTrack
             if (string.IsNullOrEmpty(activationKey))
                 return false;
 
-            HttpClient httpClient = null;
+            HttpClient? httpClient = null;
             try
             {
                 httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };

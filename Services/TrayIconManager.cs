@@ -38,7 +38,7 @@ namespace AkademiTrack.Services
                             Debug.WriteLine($"✓ Successfully loaded tray icon from: {path}");
                             break;
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             Debug.WriteLine($"⚠️ Could not load icon from: {path}");
                         }

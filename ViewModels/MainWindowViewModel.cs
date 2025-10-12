@@ -32,7 +32,7 @@ namespace AkademiTrack.ViewModels
         private readonly string _level;
 
         public ThemeManager ThemeManager => Services.ThemeManager.Instance;
-        public NotificationOverlayWindow(string title, string message, string level = "INFO", string imageUrl = null, string customColor = null)
+        public NotificationOverlayWindow(string title, string message, string level = "INFO", string imageUrl = null!, string customColor = null!)
         {
             _level = level;
 
@@ -51,7 +51,7 @@ namespace AkademiTrack.ViewModels
             _autoCloseTimer = new Timer(AutoClose, null, autoCloseSeconds * 1000, Timeout.Infinite);
         }
 
-        private void CreateModernContent(string title, string message, string level, string imageUrl = null, string customColor = null)
+        private void CreateModernContent(string title, string message, string level, string imageUrl = null!, string customColor = null!)
         {
             string displayTitle = title;
             bool isAdminNotification = false;
@@ -368,7 +368,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private void AutoClose(object state)
+        private void AutoClose(object? state)
         {
             Dispatcher.UIThread.Post(() =>
             {
@@ -387,17 +387,17 @@ namespace AkademiTrack.ViewModels
     public class LogEntry
     {
         public DateTime Timestamp { get; set; }
-        public string Message { get; set; }
-        public string Level { get; set; } // INFO, SUCCESS, ERROR, DEBUG
+        public string? Message { get; set; }
+        public string? Level { get; set; } // INFO, SUCCESS, ERROR, DEBUG
         public string FormattedMessage => $"[{Timestamp:HH:mm:ss}] [{Level}] {Message}";
     }
 
     public class NotificationEntry
     {
         public DateTime Timestamp { get; set; }
-        public string Title { get; set; }
-        public string Message { get; set; }
-        public string Level { get; set; } // INFO, SUCCESS, ERROR, WARNING
+        public string? Title { get; set; }
+        public string? Message { get; set; }
+        public string? Level { get; set; } // INFO, SUCCESS, ERROR, WARNING
         public bool IsVisible { get; set; } = true;
         public int Id { get; set; }
     }
@@ -408,17 +408,17 @@ namespace AkademiTrack.ViewModels
         private readonly Func<bool> _canExecute;
         private bool _isExecuting;
 
-        public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null)
+        public SimpleCommand(Func<Task> execute, Func<bool> canExecute = null!)
         {
             _execute = execute;
             _canExecute = canExecute ?? (() => true);
         }
 
-        public event EventHandler CanExecuteChanged;
+        public event EventHandler? CanExecuteChanged;
 
-        public bool CanExecute(object parameter) => !_isExecuting && _canExecute();
+        public bool CanExecute(object? parameter) => !_isExecuting && _canExecute();
 
-        public async void Execute(object parameter)
+        public async void Execute(object? parameter)
         {
             if (!CanExecute(parameter)) return;
 
@@ -442,14 +442,14 @@ namespace AkademiTrack.ViewModels
     public partial class MainWindowViewModel : ViewModelBase, INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
-        private CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource? _cancellationTokenSource;
         private bool _isAutomationRunning;
         private string _statusMessage = "Ready";
-        private IWebDriver _webDriver;
+        private IWebDriver? _webDriver;
         private ObservableCollection<LogEntry> _logEntries;
         private ObservableCollection<NotificationEntry> _notifications;
         private bool _showDetailedLogs = true;
-        private NotificationEntry _currentNotification;
+        private NotificationEntry? _currentNotification;
         private int _notificationIdCounter = 0;
         private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
         private Timer _updateCheckTimer;
@@ -457,7 +457,7 @@ namespace AkademiTrack.ViewModels
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
         private readonly ApplicationInfo _applicationInfo;
 
-        private List<ScheduleItem> _cachedScheduleData;
+        private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
         private Timer _adminNotificationTimer;
@@ -472,7 +472,7 @@ namespace AkademiTrack.ViewModels
         private bool _isProcessingQueue = false;
         private readonly object _queueLock = new object();
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public new event PropertyChangedEventHandler? PropertyChanged;
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; 
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
@@ -485,11 +485,11 @@ namespace AkademiTrack.ViewModels
 
         public class NotificationQueueItem
         {
-            public string Title { get; set; }
-            public string Message { get; set; }
-            public string Level { get; set; }
-            public string ImageUrl { get; set; }
-            public string CustomColor { get; set; }
+            public string? Title { get; set; }
+            public string? Message { get; set; }
+            public string? Level { get; set; }
+            public string? ImageUrl { get; set; }
+            public string? CustomColor { get; set; }
             public bool IsHighPriority { get; set; }
             public DateTime QueuedAt { get; set; } = DateTime.Now;
             public string UniqueId { get; set; } = Guid.NewGuid().ToString();
@@ -497,15 +497,15 @@ namespace AkademiTrack.ViewModels
 
         public class UpdateInfo
         {
-            public string latest_version { get; set; }
-            public string download_url { get; set; }
-            public string notes { get; set; }
-            public string published_at { get; set; }
-            public string timestamp { get; set; }
+            public string? latest_version { get; set; }
+            public string? download_url { get; set; }
+            public string? notes { get; set; }
+            public string? published_at { get; set; }
+            public string? timestamp { get; set; }
         }
 
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null!)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -646,7 +646,7 @@ namespace AkademiTrack.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception )
             {
             }
         }
@@ -659,7 +659,7 @@ namespace AkademiTrack.ViewModels
                 var json = JsonSerializer.Serialize(_processedNotificationIds.ToArray());
                 await File.WriteAllTextAsync(filePath, json);
             }
-            catch (Exception ex)
+            catch (Exception )
             {
             }
         }
@@ -670,7 +670,7 @@ namespace AkademiTrack.ViewModels
             {
                 await CheckForNewAdminNotificationsAsync();
             }
-            catch (Exception ex)
+            catch (Exception )
             {
             }
         }
@@ -697,7 +697,7 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug($"Fetching admin notifications for: {userEmail}");
 
-                HttpResponseMessage response = null;
+                HttpResponseMessage response = null!;
                 try
                 {
                     response = await _httpClient.SendAsync(request, cts.Token);
@@ -745,7 +745,7 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                EnhancedAdminNotification[] notifications = null;
+                EnhancedAdminNotification[]? notifications = null!;
                 try
                 {
                     notifications = JsonSerializer.Deserialize<EnhancedAdminNotification[]>(json, new JsonSerializerOptions
@@ -828,35 +828,35 @@ namespace AkademiTrack.ViewModels
         }
         public class EnhancedAdminNotification
         {
-            public string Id { get; set; }
-            public string Title { get; set; }
-            public string Message { get; set; }
-            public string Priority { get; set; }
-            public string Target_Email { get; set; }
-            public string Image_Url { get; set; }    
-            public string Custom_Color { get; set; }  
+            public string? Id { get; set; }
+            public string? Title { get; set; }
+            public string? Message { get; set; }
+            public string? Priority { get; set; }
+            public string? Target_Email { get; set; }
+            public string? Image_Url { get; set; }    
+            public string? Custom_Color { get; set; }  
             public DateTime Created_At { get; set; }
         }        
 
         public class AdminNotification
         {
-            public string Id { get; set; }
-            public string Title { get; set; }
-            public string Message { get; set; }
-            public string Priority { get; set; }
-            public string Target_Email { get; set; }
+            public string? Id { get; set; }
+            public string? Title { get; set; }
+            public string? Message { get; set; }
+            public string? Priority { get; set; }
+            public string? Target_Email { get; set; }
             public DateTime Created_At { get; set; }
         }
 
         public class AdminNotificationWithDelivery : AdminNotification
         {
-            public List<NotificationDelivery> Notification_Deliveries { get; set; }
+            public List<NotificationDelivery>? Notification_Deliveries { get; set; }
         }
 
         public class NotificationDelivery
         {
-            public string User_Email { get; set; }
-            public string Status { get; set; }
+            public string? User_Email { get; set; }
+            public string? Status { get; set; }
             public DateTime Delivered_At { get; set; }
         }
 
@@ -912,6 +912,7 @@ namespace AkademiTrack.ViewModels
 
         private async Task ToggleThemeAsync()
         {
+
             Services.ThemeManager.Instance.ToggleTheme();
             LogInfo($"Theme changed to {(Services.ThemeManager.Instance.IsDarkMode ? "dark" : "light")} mode");
         }
@@ -947,7 +948,6 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
 
-        public ICommand TestSupabaseCommand { get; }
 
         private void ShowNotification(string title, string message, string level = "INFO")
         {
@@ -1002,7 +1002,7 @@ namespace AkademiTrack.ViewModels
         }
 
         private async Task QueueNotificationAsync(string title, string message, string level,
-    string imageUrl = null, string customColor = null, bool isHighPriority = false)
+    string imageUrl = null!, string customColor = null!, bool isHighPriority = false)
         {
             var queueItem = new NotificationQueueItem
             {
@@ -1057,7 +1057,7 @@ namespace AkademiTrack.ViewModels
 
                 while (true)
                 {
-                    NotificationQueueItem nextNotification = null;
+                    NotificationQueueItem nextNotification = null!;
 
                     lock (_queueLock)
                     {
@@ -1135,11 +1135,11 @@ namespace AkademiTrack.ViewModels
                 try
                 {
                     overlayWindow = new NotificationOverlayWindow(
-                        item.Title,
-                        item.Message,
-                        item.Level,
-                        item.ImageUrl,
-                        item.CustomColor
+                        item.Title!,
+                        item.Message!,
+                        item.Level!,
+                        item.ImageUrl!,
+                        item.CustomColor!
                     );
                 }
                 catch (Exception createEx)
@@ -1242,7 +1242,7 @@ namespace AkademiTrack.ViewModels
         }
         private async Task DismissCurrentNotificationAsync()
         {
-            CurrentNotification = null;
+            CurrentNotification = null!;
         }
 
         private void LogInfo(string message)
@@ -1473,7 +1473,7 @@ namespace AkademiTrack.ViewModels
                     ShowNotification("Manuell pålogging kreves", "Ingen lagrede innloggingsopplysninger - åpner nettleser for manuell innlogging", "INFO");
                 }
 
-                Dictionary<string, string> cookies = null;
+                Dictionary<string, string> cookies = null!;
                 bool needsFreshLogin = false;
 
                 LogDebug("Laster eksisterende cookies fra fil...");
@@ -1502,7 +1502,7 @@ namespace AkademiTrack.ViewModels
                         {
                             LogInfo("Parametere krever ny innlogging - cookies slettet");
                             needsFreshLogin = true;
-                            cookies = null;
+                            cookies = null!;
                         }
                     }
                     else
@@ -1671,7 +1671,7 @@ namespace AkademiTrack.ViewModels
                 if (!File.Exists(cookiesPath))
                 {
                     LogDebug($"No cookies.json file found at: {cookiesPath}");
-                    return null;
+                    return null!;
                 }
 
                 var json = await File.ReadAllTextAsync(cookiesPath);
@@ -1686,7 +1686,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Failed to load cookies: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -1700,7 +1700,7 @@ namespace AkademiTrack.ViewModels
 
                 if (isValid)
                 {
-                    LogDebug($"Cookie test successful - found {scheduleData.Items.Count} schedule items");
+                    LogDebug($"Cookie test successful - found {scheduleData!.Items.Count} schedule items");
                 }
                 else
                 {
@@ -1719,7 +1719,7 @@ namespace AkademiTrack.ViewModels
 
         private async Task<Dictionary<string, string>> GetCookiesViaBrowserAsync()
         {
-            IWebDriver localWebDriver = null;
+            IWebDriver localWebDriver = null!;
 
             try
             {
@@ -1795,7 +1795,7 @@ namespace AkademiTrack.ViewModels
                         if (!targetReached)
                         {
                             LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
-                            return null;
+                            return null!;
                         }
                     }
                 }
@@ -1806,7 +1806,7 @@ namespace AkademiTrack.ViewModels
                     if (!targetReached)
                     {
                         LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
-                        return null;
+                        return null!;
                     }
                 }
 
@@ -1820,7 +1820,7 @@ namespace AkademiTrack.ViewModels
                 {
                     LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
                     ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                    return null;
+                    return null!;
                 }
 
                 var seleniumCookies = _webDriver.Manage().Cookies.AllCookies;
@@ -1841,7 +1841,7 @@ namespace AkademiTrack.ViewModels
                 LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
                 ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
-                return null;
+                return null!;
             }
             catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
                                                         invEx.Message.Contains("no such session"))
@@ -1849,7 +1849,7 @@ namespace AkademiTrack.ViewModels
                 LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
                 ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
                 await ForceStopAutomationAsync();
-                return null;
+                return null!;
             }
             catch (Exception ex)
             {
@@ -1857,7 +1857,7 @@ namespace AkademiTrack.ViewModels
                 LogDebug($"Exception type: {ex.GetType().Name}");
                 ShowNotification("Automatisering stoppet", "Innlogging feilet - automatisering stoppet", "ERROR");
                 await ForceStopAutomationAsync();
-                return null;
+                return null!;
             }
             finally
             {
@@ -1947,7 +1947,7 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug("Fast organization selection check...");
 
-                IWebElement orgSearchField = null;
+                IWebElement orgSearchField = null!;
                 try
                 {
                     orgSearchField = wait.Until(driver =>
@@ -2052,9 +2052,9 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug("Fast Feide form detection...");
 
-                IWebElement usernameField = null;
-                IWebElement passwordField = null;
-                IWebElement loginButton = null;
+                IWebElement usernameField = null!;
+                IWebElement passwordField = null!;
+                IWebElement loginButton = null!;
 
                 try
                 {
@@ -2103,7 +2103,7 @@ namespace AkademiTrack.ViewModels
                         {
                             loginButton = _webDriver.FindElement(By.XPath(selector));
                             if (loginButton.Displayed && loginButton.Enabled) break;
-                            loginButton = null;
+                            loginButton = null!;
                         }
                         catch { continue; }
                     }
@@ -2288,13 +2288,13 @@ namespace AkademiTrack.ViewModels
                 else
                 {
                     LogDebug("Ingen nettverkstrafikk funnet med parametere");
-                    return null;
+                    return null!;
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Parameter capture feilet: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -2443,14 +2443,14 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                _webDriver = null;
+                _webDriver = null!;
                 LogDebug("Nettleser opprydding fullført");
             }
             catch (Exception ex)
             {
                 LogDebug($"Feil under opprydding av nettleser: {ex.Message}");
 
-                _webDriver = null;
+                _webDriver = null!;
             }
 
             await Task.Delay(500);
@@ -2721,7 +2721,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Error getting full day schedule data: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -2819,7 +2819,7 @@ namespace AkademiTrack.ViewModels
                     LogError($"HTTP request failed with status {response.StatusCode}");
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogDebug($"Error response: {errorContent}");
-                    return null;
+                    return null!;
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
@@ -2831,12 +2831,12 @@ namespace AkademiTrack.ViewModels
                 });
 
                 LogDebug("JSON deserialized successfully");
-                return scheduleResponse;
+                return scheduleResponse!;
             }
             catch (Exception ex)
             {
                 LogError($"Error getting schedule data: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -2854,7 +2854,7 @@ namespace AkademiTrack.ViewModels
                 if (!System.IO.File.Exists(activationPath))
                 {
                     LogError("Activation file not found. Please log in first.");
-                    return null;
+                    return null!;
                 }
 
                 string json = await System.IO.File.ReadAllTextAsync(activationPath);
@@ -2866,27 +2866,27 @@ namespace AkademiTrack.ViewModels
                 }
 
                 LogError("Email not found in activation file.");
-                return null;
+                return null!;
             }
             catch (Exception ex)
             {
                 LogError($"Failed to load email from activation file: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
        public class UserParameters
         {
-            public string FylkeId { get; set; }
-            public string PlanPeri { get; set; }
-            public string SkoleId { get; set; }
+            public string? FylkeId { get; set; }
+            public string? PlanPeri { get; set; }
+            public string? SkoleId { get; set; }
             
             public bool IsComplete => !string.IsNullOrEmpty(FylkeId) && 
                                       !string.IsNullOrEmpty(PlanPeri) && 
                                       !string.IsNullOrEmpty(SkoleId);
         }
 
-        private UserParameters _userParameters;
+        private UserParameters? _userParameters;
 
         private async Task<UserParameters> ExtractUserParametersAsync(Dictionary<string, string> cookies)
         {
@@ -2969,7 +2969,7 @@ namespace AkademiTrack.ViewModels
                 if (!File.Exists(filePath))
                 {
                     LogDebug("Ingen lagrede parametere funnet");
-                    return null;
+                    return null!;
                 }
 
                 var json = await File.ReadAllTextAsync(filePath);
@@ -2981,7 +2981,7 @@ namespace AkademiTrack.ViewModels
                 if (savedData?.Parameters == null)
                 {
                     LogDebug("Ugyldig parameterdata");
-                    return null;
+                    return null!;
                 }
 
                 var age = DateTime.Now - savedData.SavedAt;
@@ -2990,7 +2990,7 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo($"Lagrede parametere er for gammelt skoleår ({savedData.Parameters.PlanPeri}) - trenger oppdatering");
                     File.Delete(filePath);
-                    return null;
+                    return null!;
                 }
 
                 LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalDays:F0} dager, skoleår: {savedData.Parameters.PlanPeri})");
@@ -3000,7 +3000,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogDebug($"Feil ved lasting av parametere: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -3054,9 +3054,9 @@ namespace AkademiTrack.ViewModels
 
         public class SavedParameterData
         {
-            public UserParameters Parameters { get; set; }
+            public UserParameters? Parameters { get; set; }
             public DateTime SavedAt { get; set; }
-            public string SchoolYear { get; set; } 
+            public string? SchoolYear { get; set; } 
         }
         private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
         {
@@ -3393,32 +3393,32 @@ namespace AkademiTrack.ViewModels
 
     public class Cookie
     {
-        public string Name { get; set; }
-        public string Value { get; set; }
+        public string? Name { get; set; }
+        public string? Value { get; set; }
     }
 
     public class ScheduleResponse
     {
-        public List<ScheduleItem> Items { get; set; }
+        public List<ScheduleItem>? Items { get; set; }
     }
 
     public class ScheduleItem
     {
         public int Id { get; set; }
-        public string Fag { get; set; }
-        public string Stkode { get; set; }
-        public string KlTrinn { get; set; }
-        public string KlId { get; set; }
-        public string KNavn { get; set; }
-        public string GruppeNr { get; set; }
-        public string Dato { get; set; }
-        public string StartKl { get; set; }
-        public string SluttKl { get; set; }
+        public string? Fag { get; set; }
+        public string? Stkode { get; set; }
+        public string? KlTrinn { get; set; }
+        public string? KlId { get; set; }
+        public string? KNavn { get; set; }
+        public string? GruppeNr { get; set; }
+        public string? Dato { get; set; }
+        public string? StartKl { get; set; }
+        public string? SluttKl { get; set; }
         public int UndervisningPaagaar { get; set; }
-        public string Typefravaer { get; set; }
+        public string? Typefravaer { get; set; }
         public int ElevForerTilstedevaerelse { get; set; }
         public int Kollisjon { get; set; }
-        public string TidsromTilstedevaerelse { get; set; }
+        public string? TidsromTilstedevaerelse { get; set; }
         public int Timenr { get; set; }
     }
 }
