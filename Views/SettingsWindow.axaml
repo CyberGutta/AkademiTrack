@@ -642,6 +642,23 @@
 
 						<Border Classes="setting-card">
 							<StackPanel Spacing="12">
+								<TextBlock Text="Start minimert til systemstatusfeltet" Classes="setting-title"/>
+								<TextBlock Classes="setting-description">
+									<Run Text="Start applikasjonen minimert i systemstatusfeltet når datamaskinen starter."/>
+									<LineBreak/>
+									<Run Text="Krever at 'Åpne appen automatisk ved oppstart' er aktivert."/>
+								</TextBlock>
+								<Button Content="{Binding StartMinimized, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+										Classes="toggle-button"
+										Classes.enabled="{Binding StartMinimized}"
+										Classes.disabled="{Binding !StartMinimized}"
+										Command="{Binding ToggleStartMinimizedCommand}"
+										IsEnabled="{Binding StartWithSystem}"/>
+							</StackPanel>
+						</Border>
+
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
 								<TextBlock Text="Programfiler" Classes="setting-title"/>
 								<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
 										   Classes="setting-description"/>

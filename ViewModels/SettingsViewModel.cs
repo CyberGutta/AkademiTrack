@@ -32,6 +32,8 @@ namespace AkademiTrack.ViewModels
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true;
         public bool AutoStartAutomation { get; set; } = false;
+
+        public bool StartMinimized { get; set; } = false;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
 
         // Encrypted credentials
@@ -493,6 +495,22 @@ Terminal=false
         private string _availableVersion = "";
         private bool _isDeleting = false;
 
+        private bool _startMinimized = false;
+
+        public bool StartMinimized
+        {
+            get => _startMinimized;
+            set
+            {
+                if (_startMinimized != value)
+                {
+                    _startMinimized = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         public bool IsDeleting
         {
             get => _isDeleting;
@@ -540,6 +558,8 @@ Terminal=false
         public ICommand DeleteAccountCompletelyCommand { get; }
         public ICommand ExportDataAsJsonCommand { get; }
         public ICommand ExportDataAsCsvCommand { get; }
+        public ICommand ToggleStartMinimizedCommand { get; }
+
 
         // Properties
         public string UpdateStatus
@@ -637,9 +657,13 @@ Terminal=false
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
+            ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
+
 
             _ = LoadSettingsAsync();
         }
+
+        private void ToggleStartMinimized() => StartMinimized = !StartMinimized;
 
         private async Task ExportDataAsync(string format)
         {
@@ -1646,6 +1670,7 @@ Terminal=false
                 _showDetailedLogs = settings.ShowDetailedLogs;
                 _startWithSystem = settings.StartWithSystem;
                 _autoStartAutomation = settings.AutoStartAutomation;
+                _startMinimized = settings.StartMinimized;
                 _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
                 _loginPassword = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
                 _schoolName = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
@@ -1654,6 +1679,7 @@ Terminal=false
                 OnPropertyChanged(nameof(ShowDetailedLogs));
                 OnPropertyChanged(nameof(StartWithSystem));
                 OnPropertyChanged(nameof(AutoStartAutomation));
+                OnPropertyChanged(nameof(StartMinimized));
                 OnPropertyChanged(nameof(LoginEmail));
                 OnPropertyChanged(nameof(LoginPassword));
                 OnPropertyChanged(nameof(SchoolName));
@@ -1674,6 +1700,7 @@ Terminal=false
                     ShowDetailedLogs = _showDetailedLogs,
                     StartWithSystem = _startWithSystem,
                     AutoStartAutomation = _autoStartAutomation,
+                    StartMinimized = _startMinimized,
                     EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail),
                     EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword),
                     EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName),

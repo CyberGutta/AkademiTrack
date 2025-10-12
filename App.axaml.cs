@@ -137,28 +137,67 @@ namespace AkademiTrack
             privacyWindow.Show();
         }
 
-        private void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
+        private async void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
         {
             System.Diagnostics.Debug.WriteLine("ContinueNormalFlow called");
 
-            // Check Feide credentials
             bool hasFeideCredentials = CheckFeideCredentials();
-
             System.Diagnostics.Debug.WriteLine($"Has Feide credentials: {hasFeideCredentials}");
+
+            bool startMinimized = await ShouldStartMinimized();
+            System.Diagnostics.Debug.WriteLine($"Should start minimized: {startMinimized}");
 
             if (!hasFeideCredentials)
             {
-                // Show Feide setup window after activation and privacy
                 var feideWindow = new FeideWindow();
                 desktop.MainWindow = feideWindow;
                 feideWindow.Show();
             }
             else
             {
-                // Standard flow – go directly to main window
                 var mainWindow = new MainWindow();
                 desktop.MainWindow = mainWindow;
-                mainWindow.Show();
+
+                AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
+
+                if (startMinimized)
+                {
+                    System.Diagnostics.Debug.WriteLine("Starting minimized to tray (invisible initialization)...");
+
+                    mainWindow.Opacity = 0;
+                    mainWindow.ShowInTaskbar = false;
+
+                    mainWindow.Show();
+
+                    await Task.Delay(100);
+
+                    mainWindow.Hide();
+
+                    mainWindow.Opacity = 1;
+                    mainWindow.ShowInTaskbar = true;
+
+                    AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+
+                    System.Diagnostics.Debug.WriteLine("App started in tray - no visual flash");
+                }
+                else
+                {
+                    mainWindow.Show();
+                }
+            }
+        }
+
+        private async Task<bool> ShouldStartMinimized()
+        {
+            try
+            {
+                var settings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                return settings.StartMinimized && settings.StartWithSystem;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking start minimized: {ex.Message}");
+                return false;
             }
         }
 
