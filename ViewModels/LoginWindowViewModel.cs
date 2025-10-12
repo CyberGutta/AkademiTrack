@@ -20,7 +20,6 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
 
-        // Supabase configuration
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
         private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
@@ -37,7 +36,6 @@ namespace AkademiTrack.ViewModels
             _httpClient = new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-            // Use inline command implementations
             LoginCommand = new InlineCommand(async () => await LoginAsync(), () => CanLogin);
             ExitCommand = new InlineCommand(() => ExitAsync());
         }
@@ -100,17 +98,14 @@ namespace AkademiTrack.ViewModels
 
                 if (result.IsValid)
                 {
-                    // Mark the key as used and save activation status locally
                     await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
                     await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
 
-                    // Check if user needs to accept privacy policy
                     System.Diagnostics.Debug.WriteLine($"Checking privacy policy for: {result.FoundRecord.UserEmail}");
                     bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(result.FoundRecord.UserEmail);
 
                     System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
 
-                    // Notify success on UI thread - pass both success status and privacy info
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         LoginCompleted?.Invoke(this, new LoginCompletedEventArgs
@@ -121,7 +116,6 @@ namespace AkademiTrack.ViewModels
                         });
                     });
                 }
-                // ErrorMessage is already set in ValidateActivationKeyAsync if invalid
             }
             catch (Exception ex)
             {
@@ -191,7 +185,6 @@ namespace AkademiTrack.ViewModels
                     return new ValidationResult { IsValid = false };
                 }
 
-                // Check if already activated
                 if (exactMatch.IsActivated)
                 {
                     System.Diagnostics.Debug.WriteLine($"Key already activated at: {exactMatch.ActivatedAt}");

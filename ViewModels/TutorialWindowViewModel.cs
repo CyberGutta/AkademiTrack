@@ -57,14 +57,11 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Get the AppData\Roaming folder path
                 var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
 
-                // Create the directory if it doesn't exist
                 Directory.CreateDirectory(appFolderPath);
 
-                // Create the full file path
                 var filePath = Path.Combine(appFolderPath, "tutorial_settings.json");
 
                 var settings = new TutorialSettings
@@ -78,7 +75,6 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
-                // Silently fail - not critical
                 System.Diagnostics.Debug.WriteLine($"Failed to save tutorial settings: {ex.Message}");
             }
         }

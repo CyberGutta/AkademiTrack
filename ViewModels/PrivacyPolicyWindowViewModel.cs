@@ -20,13 +20,11 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = string.Empty;
         private string _userEmail;
 
-        // Privacy Policy
         private string _latestPrivacyVersion = "1.0";
         private string _userCurrentPrivacyVersion = null;
         private List<string> _privacyChangelogItems = new List<string>();
         private bool _isPrivacyUpgrade = false;
 
-        // Terms of Use
         private string _latestTermsVersion = "1.0";
         private string _userCurrentTermsVersion = null;
         private List<string> _termsChangelogItems = new List<string>();
@@ -45,12 +43,11 @@ namespace AkademiTrack.ViewModels
         {
             _userEmail = userEmail;
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            _isLoading = true; // Start in loading state
+            _isLoading = true; 
 
             AcceptCommand = new InlineCommand(async () => await AcceptBothAsync(), () => CanAccept);
             ExitCommand = new InlineCommand(() => Exit());
 
-            // Load versions and check for upgrades
             _ = LoadVersionsAndCheckUpgradesAsync();
 
             System.Diagnostics.Debug.WriteLine($"=== VIEWMODEL CREATED ===");
@@ -179,7 +176,7 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanAccept));
                 OnPropertyChanged(nameof(AcceptButtonText));
-                OnPropertyChanged(nameof(IsContentReady)); // NEW!
+                OnPropertyChanged(nameof(IsContentReady));
                 (AcceptCommand as InlineCommand)?.NotifyCanExecuteChanged();
             }
         }
@@ -201,11 +198,9 @@ namespace AkademiTrack.ViewModels
         {
             get
             {
-                // If user has never accepted (null/empty), they need to accept
                 if (string.IsNullOrEmpty(_userCurrentPrivacyVersion))
                     return true;
 
-                // If user has accepted but version is outdated, they need to accept
                 return _userCurrentPrivacyVersion != _latestPrivacyVersion;
             }
         }
@@ -214,18 +209,16 @@ namespace AkademiTrack.ViewModels
         {
             get
             {
-                // If user has never accepted (null/empty), they need to accept
                 if (string.IsNullOrEmpty(_userCurrentTermsVersion))
                     return true;
 
-                // If user has accepted but version is outdated, they need to accept
                 return _userCurrentTermsVersion != _latestTermsVersion;
             }
         }
 
         public bool ShowBothSections => NeedsPrivacyConsent && NeedsTermsConsent;
 
-        public bool IsContentReady => !IsLoading; // NEW PROPERTY!
+        public bool IsContentReady => !IsLoading;
 
         public bool CanAccept
         {
@@ -233,7 +226,6 @@ namespace AkademiTrack.ViewModels
             {
                 if (IsLoading) return false;
 
-                // Only require consent for documents that need it
                 bool privacyOk = !NeedsPrivacyConsent || HasAcceptedPrivacy;
                 bool termsOk = !NeedsTermsConsent || HasAcceptedTerms;
 
@@ -255,20 +247,17 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Get user's current versions from database
                 await GetUserCurrentVersionsAsync();
 
                 System.Diagnostics.Debug.WriteLine($"=== AFTER DB CHECK ===");
                 System.Diagnostics.Debug.WriteLine($"User Privacy Version: '{_userCurrentPrivacyVersion}'");
                 System.Diagnostics.Debug.WriteLine($"User Terms Version: '{_userCurrentTermsVersion}'");
 
-                // Load privacy policy version
                 await LoadPrivacyVersionAsync();
 
                 System.Diagnostics.Debug.WriteLine($"Latest Privacy Version: '{_latestPrivacyVersion}'");
                 System.Diagnostics.Debug.WriteLine($"Needs Privacy Consent: {NeedsPrivacyConsent}");
 
-                // Load terms of use version
                 await LoadTermsVersionAsync();
 
                 System.Diagnostics.Debug.WriteLine($"Latest Terms Version: '{_latestTermsVersion}'");
@@ -281,7 +270,6 @@ namespace AkademiTrack.ViewModels
             }
             finally
             {
-                // CRITICAL: Finish loading and refresh UI
                 IsLoading = false;
                 OnPropertyChanged(nameof(NeedsPrivacyConsent));
                 OnPropertyChanged(nameof(NeedsTermsConsent));
@@ -307,7 +295,6 @@ namespace AkademiTrack.ViewModels
                     LatestPrivacyVersion = versionInfo.Version.Trim();
                     System.Diagnostics.Debug.WriteLine($"Latest privacy policy version: {_latestPrivacyVersion}");
 
-                    // Check if this is an upgrade
                     if (!string.IsNullOrEmpty(_userCurrentPrivacyVersion) && _userCurrentPrivacyVersion != _latestPrivacyVersion)
                     {
                         IsPrivacyUpgrade = true;
@@ -338,7 +325,6 @@ namespace AkademiTrack.ViewModels
                     LatestTermsVersion = versionInfo.Version.Trim();
                     System.Diagnostics.Debug.WriteLine($"Latest terms of use version: {_latestTermsVersion}");
 
-                    // Check if this is an upgrade
                     if (!string.IsNullOrEmpty(_userCurrentTermsVersion) && _userCurrentTermsVersion != _latestTermsVersion)
                     {
                         IsTermsUpgrade = true;
@@ -404,10 +390,7 @@ namespace AkademiTrack.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Error getting user's current versions: {ex.Message}");
             }
         }
-
-        /// <summary>
-        /// Checks if the user needs to accept the privacy policy or terms of use
-        /// </summary>
+ 
         public static async Task<bool> NeedsPrivacyPolicyAcceptance(string userEmail)
         {
             try
@@ -424,7 +407,6 @@ namespace AkademiTrack.ViewModels
 
                 using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
                 {
-                    // Get latest versions
                     string latestPrivacyVersion = "1.0";
                     string latestTermsVersion = "1.0";
 
@@ -449,7 +431,6 @@ namespace AkademiTrack.ViewModels
                         System.Diagnostics.Debug.WriteLine($"Error loading latest versions: {ex.Message}");
                     }
 
-                    // Check user's current acceptance status
                     var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_accepted,privacy_policy_version,terms_of_use_accepted,terms_of_use_version";
 
                     var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
@@ -472,9 +453,7 @@ namespace AkademiTrack.ViewModels
 
                     var profile = profiles[0];
 
-                    // User needs to accept if either:
-                    // 1. Privacy policy not accepted or outdated
-                    // 2. Terms of use not accepted or outdated
+                   
                     bool needsPrivacy = !profile.PrivacyPolicyAccepted || profile.PrivacyPolicyVersion != latestPrivacyVersion;
                     bool needsTerms = !profile.TermsOfUseAccepted || profile.TermsOfUseVersion != latestTermsVersion;
 
@@ -485,7 +464,6 @@ namespace AkademiTrack.ViewModels
                     System.Diagnostics.Debug.WriteLine($"Needs acceptance: {needsAcceptance}");
                     System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacy}");
 
-                    // Reset acceptance for outdated versions
                     if (needsPrivacy && profile.PrivacyPolicyAccepted)
                     {
                         await ResetPrivacyAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
@@ -560,7 +538,6 @@ namespace AkademiTrack.ViewModels
 
         private async Task AcceptBothAsync()
         {
-            // Only validate the checkboxes that need to be checked
             if (NeedsPrivacyConsent && !HasAcceptedPrivacy)
             {
                 ErrorMessage = "Du må godta personvernserklæringen for å fortsette.";
@@ -578,7 +555,6 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Only save what needs to be saved
                 bool success = await SaveAcceptances(_userEmail);
 
                 if (success)
@@ -620,7 +596,6 @@ namespace AkademiTrack.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Needs Privacy: {NeedsPrivacyConsent}");
                 System.Diagnostics.Debug.WriteLine($"Needs Terms: {NeedsTermsConsent}");
 
-                // Build update data dynamically based on what needs updating
                 var updateDict = new Dictionary<string, object>();
 
                 if (NeedsPrivacyConsent)

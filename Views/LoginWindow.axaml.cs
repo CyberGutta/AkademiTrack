@@ -36,7 +36,6 @@ namespace AkademiTrack.Views
                     {
                         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                         {
-                            // Check if user needs to accept privacy policy
                             if (e.NeedsPrivacyAcceptance)
                             {
                                 System.Diagnostics.Debug.WriteLine("User needs to accept privacy policy, showing privacy window...");

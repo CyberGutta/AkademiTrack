@@ -39,10 +39,8 @@ namespace AkademiTrack.Services
             }
         }
 
-        // Boolean properties for XAML binding
         public bool IsChristmas => _currentSeason == Season.Christmas;
 
-        // Visibility helpers
         public bool ChristmasLightsVisible => IsChristmas;
 
         public void UpdateCurrentSeason()

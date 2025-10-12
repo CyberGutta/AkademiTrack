@@ -25,7 +25,6 @@ using Velopack.Sources;
 
 namespace AkademiTrack.ViewModels
 {
-    // Settings data class
     public class AppSettings
     {
         public bool ShowActivityLog { get; set; } = false;
@@ -36,14 +35,12 @@ namespace AkademiTrack.ViewModels
         public bool StartMinimized { get; set; } = false;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
 
-        // Encrypted credentials
         public string EncryptedLoginEmail { get; set; } = "";
         public string EncryptedLoginPassword { get; set; } = "";
         public string EncryptedSchoolName { get; set; } = "";
         public bool InitialSetupCompleted { get; set; } = false;
     }
 
-    // Simple encryption helper class
     public static class CredentialEncryption
     {
         private static readonly string EncryptionKey = GenerateKey();
@@ -139,7 +136,6 @@ namespace AkademiTrack.ViewModels
         }
     }
 
-    // Auto-start manager (keeping existing implementation)
     public static class AutoStartManager
     {
         private static readonly string AppName = "AkademiTrack";
@@ -315,7 +311,6 @@ Terminal=false
         }
     }
 
-    // Converters (keeping existing)
     public class BoolToStringConverter : IValueConverter
     {
         public static readonly BoolToStringConverter Instance = new();
@@ -410,7 +405,7 @@ Terminal=false
         public string Name { get; }
         public string Version { get; }
         public string Description { get; }
-        public string NameAndDescription { get; } // New property for "Om" section
+        public string NameAndDescription { get; } 
 
         public ApplicationInfo()
         {
@@ -419,13 +414,12 @@ Terminal=false
             var version = assembly.GetName().Version;
             Version = version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
             Description = "Akademiet automatisk fremmøte registerings program";
-            NameAndDescription = $"{Name}\n{Description}"; // Without version
+            NameAndDescription = $"{Name}\n{Description}"; 
         }
 
         public override string ToString() => $"{Name} v{Version}\n{Description}";
     }
 
-    // Safe Settings Loader (keeping existing implementation, truncated for space)
     public static class SafeSettingsLoader
     {
         public static string GetSettingsFilePath()
@@ -475,7 +469,6 @@ Terminal=false
         }
     }
 
-    // ViewModel
     public class SettingsViewModel : INotifyPropertyChanged
     {
         private bool _showActivityLog = false;
@@ -488,7 +481,6 @@ Terminal=false
         private string _loginPassword = "";
         private string _schoolName = "";
 
-        // Update properties
         private string _updateStatus = "Klikk for å sjekke etter oppdateringer";
         private bool _isCheckingForUpdates = false;
         private bool _updateAvailable = false;
@@ -539,7 +531,6 @@ Terminal=false
         public ApplicationInfo ApplicationInfo { get; }
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
 
-        // Commands
         public ICommand CloseCommand { get; }
         public ICommand OpenProgramFolderCommand { get; }
         public ICommand ClearLogsCommand { get; }
@@ -561,7 +552,6 @@ Terminal=false
         public ICommand ToggleStartMinimizedCommand { get; }
 
 
-        // Properties
         public string UpdateStatus
         {
             get => _updateStatus;
@@ -583,7 +573,7 @@ Terminal=false
                 {
                     _updateAvailable = value;
                     OnPropertyChanged();
-                    // Notify the command to re-evaluate CanExecute
+
                     (DownloadAndInstallUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
@@ -674,12 +664,10 @@ Terminal=false
                 IsExporting = true;
                 Debug.WriteLine($"=== STARTING LOCAL DATA EXPORT ({format.ToUpper()}) ===");
 
-                // Get user email from credentials or activation
                 string userEmail = LoginEmail;
 
                 if (string.IsNullOrEmpty(userEmail))
                 {
-                    // Try to get from activation file
                     var activationData = GetLocalActivationData();
                     userEmail = activationData?.Email ?? "";
                 }
@@ -693,7 +681,6 @@ Terminal=false
                     return;
                 }
 
-                // Show confirmation dialog with updated message
                 var proceed = await ShowConfirmationDialog(
                     "Eksporter lokal data",
                     $"Dette vil eksportere all LOKAL data som {format.ToUpper()}.\n\n" +
@@ -714,7 +701,6 @@ Terminal=false
                     return;
                 }
 
-                // Collect all data (local only now)
                 Debug.WriteLine("Collecting local user data...");
                 var exportData = await AkademiTrack.Services.DataExportService.CollectAllDataAsync(
                     userEmail,
@@ -738,7 +724,6 @@ Terminal=false
                 LastExportPath = filePath;
                 Debug.WriteLine($"✓ Export completed: {filePath}");
 
-                // Show success dialog with database reminder
                 var openFolder = await ShowConfirmationDialog(
                     "Lokal eksport fullført! ✓",
                     $"Din LOKALE data er eksportert til:\n\n{filePath}\n\n" +
@@ -793,7 +778,6 @@ Terminal=false
 
             try
             {
-                // Show confirmation dialog BEFORE deletion
                 var result = await ShowConfirmationDialog(
                     "Slett lokal data",
                     "Er du sikker på at du vil slette all lokal data?\n\n" +
@@ -829,13 +813,11 @@ Terminal=false
                     return;
                 }
 
-                // Get all files and directories
                 var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
                 var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
 
                 Debug.WriteLine($"Found {allFiles.Length} files and {allDirectories.Length} directories to delete");
 
-                // Delete ALL files
                 foreach (var file in allFiles)
                 {
                     try
@@ -849,7 +831,6 @@ Terminal=false
                     }
                 }
 
-                // Delete ALL subdirectories (deepest first)
                 foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
                 {
                     try
@@ -866,7 +847,6 @@ Terminal=false
                     }
                 }
 
-                // Delete main directory
                 try
                 {
                     if (Directory.Exists(appDataDir))
@@ -882,13 +862,11 @@ Terminal=false
 
                 Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
 
-                // Close settings window
                 CloseRequested?.Invoke(this, EventArgs.Empty);
 
                 // Small delay
                 await Task.Delay(300);
 
-                // RESTART THE APP
                 RestartApplication();
             }
             catch (Exception ex)
@@ -912,7 +890,6 @@ Terminal=false
             {
                 Debug.WriteLine("=== RESTARTING APPLICATION ===");
 
-                // Get current executable path
                 var exePath = Environment.ProcessPath;
                 if (string.IsNullOrEmpty(exePath))
                 {
@@ -923,7 +900,6 @@ Terminal=false
 
                 if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
                 {
-                    // Start new instance
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = exePath,
@@ -938,7 +914,6 @@ Terminal=false
                     Debug.WriteLine("Could not find executable path");
                 }
 
-                // Shutdown current instance
                 if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     desktop.Shutdown(0);
@@ -949,7 +924,6 @@ Terminal=false
                 Debug.WriteLine($"Error restarting application: {ex.Message}");
                 Debug.WriteLine($"Falling back to simple shutdown...");
 
-                // Fallback: just shutdown
                 if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     desktop.Shutdown(0);
@@ -963,7 +937,6 @@ Terminal=false
 
             try
             {
-                // First confirmation - SHORTER TEXT
                 var result = await ShowConfirmationDialog(
                     "⚠️ SLETT KONTO PERMANENT",
                     "ADVARSEL: Dette sletter kontoen din permanent!\n\n" +
@@ -977,7 +950,6 @@ Terminal=false
 
                 if (!result) return;
 
-                // Second confirmation - SHORTER TEXT
                 var doubleCheck = await ShowConfirmationDialog(
                     "Siste bekreftelse",
                     "Dette er din siste sjanse!\n\n" +
@@ -991,12 +963,10 @@ Terminal=false
                 IsDeleting = true;
                 Debug.WriteLine("=== DELETING ACCOUNT COMPLETELY ===");
 
-                // Get activation data
                 var activationData = GetLocalActivationData();
                 string activationKey = activationData?.ActivationKey ?? "";
                 string email = activationData?.Email ?? "";
 
-                // Delete from Supabase FIRST
                 if (!string.IsNullOrEmpty(activationKey) && !string.IsNullOrEmpty(email))
                 {
                     bool remoteDeleted = await DeleteFromSupabase(activationKey, email);
@@ -1006,7 +976,6 @@ Terminal=false
                     }
                 }
 
-                // Delete local data
                 var appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
@@ -1035,11 +1004,9 @@ Terminal=false
 
                 Debug.WriteLine("=== ACCOUNT COMPLETELY DELETED ===");
 
-                // Close settings window
                 CloseRequested?.Invoke(this, EventArgs.Empty);
                 await Task.Delay(300);
 
-                // Restart the app
                 RestartApplication();
             }
             catch (Exception ex)
@@ -1070,7 +1037,6 @@ Terminal=false
                 var edgeFunctionUrl = $"{supabaseUrl}/functions/v1/delete-user-by-activation-key";
                 var request = new HttpRequestMessage(HttpMethod.Post, edgeFunctionUrl);
 
-                // ADD BOTH HEADERS
                 request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
                 request.Headers.Add("apikey", supabaseKey);
 
@@ -1203,12 +1169,10 @@ Terminal=false
             }
         }
 
-        // Helper methods for dialogs (Avalonia doesn't have built-in MessageBox, so we'll use a simple approach)
         private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
         {
             try
             {
-                // Get the current window (Settings window)
                 var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
                     ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
                     : null;
@@ -1239,7 +1203,6 @@ Terminal=false
         }
 
 
-        // Update Methods
         private async Task CheckForUpdatesAsync()
         {
             try
@@ -1248,7 +1211,6 @@ Terminal=false
                 UpdateStatus = "Sjekker etter oppdateringer...";
                 UpdateAvailable = false;
 
-                // Check custom JSON for version info
                 using var httpClient = new System.Net.Http.HttpClient();
                 var jsonResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/update.json");
                 var updateInfo = JsonSerializer.Deserialize<JsonElement>(jsonResponse);
@@ -1263,10 +1225,8 @@ Terminal=false
                     return;
                 }
 
-                // Remove 'v' prefix if present for comparison
                 var latestVersionClean = latestVersion.TrimStart('v');
 
-                // Compare versions
                 if (IsNewerVersion(currentVersion, latestVersionClean))
                 {
                     AvailableVersion = latestVersionClean;
@@ -1317,14 +1277,11 @@ Terminal=false
                 UpdateStatus = "Forbereder oppdatering...";
                 LogInfo("=== UPDATE PROCESS STARTED ===");
 
-                // Log environment info
                 LogInfo($"Current app location: {Environment.ProcessPath}");
                 LogInfo($"Current version: {ApplicationInfo.Version}");
                 LogInfo($"Target version: {AvailableVersion}");
 
-                // Determine platform-specific package suffix
-
-                // Determine platform-specific package suffix
+                
                 string platformSuffix = "";
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
@@ -1338,7 +1295,7 @@ Terminal=false
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    platformSuffix = ""; // Windows uses base package name
+                    platformSuffix = "";
                     LogInfo("Platform detected: Windows");
                 }
 
@@ -1346,7 +1303,7 @@ Terminal=false
                 UpdateInfo? updateInfo = null;
                 bool updateFound = false;
 
-                // Strategy 1: Try GithubSource (recommended approach)
+                // Strategy 1: Try GithubSource
                 try
                 {
                     LogInfo("Strategy 1: Attempting GithubSource...");
@@ -1591,7 +1548,6 @@ Terminal=false
             await CheckForUpdatesAsync();
         }
 
-        // Existing methods (keeping all your original methods)
         public (string email, string password, string school) GetDecryptedCredentials() => (_loginEmail, _loginPassword, _schoolName);
 
         public void SetLogEntries(ObservableCollection<LogEntry> logEntries)

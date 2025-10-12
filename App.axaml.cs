@@ -24,8 +24,8 @@ namespace AkademiTrack
         public override void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+
             {
-                // First check if user is activated
                 bool isActivated = CheckActivationStatus();
                 if (isActivated)
                 {
@@ -35,12 +35,10 @@ namespace AkademiTrack
                     System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
                     System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
 
-                    // DON'T set MainWindow yet - wait for privacy check
                     Task.Run(async () =>
                     {
                         try
                         {
-                            // USE THE CORRECT METHOD THAT CHECKS VERSION AND AUTO-RESETS
                             bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
 
                             System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
@@ -50,13 +48,12 @@ namespace AkademiTrack
                                 if (needsPrivacyAcceptance)
                                 {
                                     System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
-                                    // Show privacy policy window
                                     ShowPrivacyPolicyWindow(desktop, userEmail);
                                 }
                                 else
                                 {
                                     System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
-                                    // Continue with normal flow
+
                                     ContinueNormalFlow(desktop);
                                 }
                             });
@@ -72,7 +69,6 @@ namespace AkademiTrack
                         }
                     });
 
-                    // Start async verification of activation key in background
                     _ = Task.Run(async () =>
                     {
                         try
@@ -103,7 +99,6 @@ namespace AkademiTrack
                 }
                 else
                 {
-                    // User must log in first
                     desktop.MainWindow = new LoginWindow();
                     desktop.MainWindow.Show();
                 }
@@ -121,7 +116,7 @@ namespace AkademiTrack
             privacyViewModel.Accepted += (s, e) =>
             {
                 System.Diagnostics.Debug.WriteLine("Privacy accepted in App.axaml.cs, continuing normal flow...");
-                // When accepted, continue with normal flow
+
                 ContinueNormalFlow(desktop);
                 privacyWindow.Close();
             };

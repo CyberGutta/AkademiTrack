@@ -52,7 +52,6 @@ namespace AkademiTrack.Services
                 FileContents = new Dictionary<string, string>()
             };
 
-            // Load settings
             var settingsPath = Path.Combine(appDataDir, "settings.json");
             if (File.Exists(settingsPath))
             {
@@ -83,7 +82,6 @@ namespace AkademiTrack.Services
                 }
             }
 
-            // Load activation info
             var activationPath = Path.Combine(appDataDir, "activation.json");
             if (File.Exists(activationPath))
             {
@@ -113,7 +111,6 @@ namespace AkademiTrack.Services
                 }
             }
 
-            // Credential metadata (NOT actual values)
             localData.Credentials["Note"] = "Credentials are encrypted for security. Original values not exported.";
             if (localData.Settings.ContainsKey("EncryptedLoginEmail"))
                 localData.Credentials["HasEmail"] = (!string.IsNullOrEmpty(localData.Settings["EncryptedLoginEmail"]?.ToString())).ToString();
@@ -124,7 +121,6 @@ namespace AkademiTrack.Services
 
             Debug.WriteLine("✓ Credential metadata collected");
 
-            // Collect file information AND CONTENTS
             if (Directory.Exists(appDataDir))
             {
                 var files = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
@@ -144,7 +140,6 @@ namespace AkademiTrack.Services
                             ModifiedDate = fileInfo.LastWriteTime
                         });
 
-                        // Read file contents (for text files) - SANITIZED FOR GDPR
                         try
                         {
                             var extension = fileInfo.Extension.ToLower();
@@ -152,7 +147,6 @@ namespace AkademiTrack.Services
                             {
                                 var content = await File.ReadAllTextAsync(file);
 
-                                // GDPR: Sanitize sensitive data before export
                                 content = SanitizeSensitiveData(content, fileInfo.Name);
 
                                 localData.FileContents[relativePath] = content;
@@ -177,19 +171,16 @@ namespace AkademiTrack.Services
             return localData;
         }
 
-        // GDPR: Sanitize sensitive information from file contents
         private static string SanitizeSensitiveData(string content, string fileName)
         {
             try
             {
-                // Parse as JSON to sanitize structured data
                 var json = JsonSerializer.Deserialize<JsonElement>(content);
                 var sanitized = SanitizeJsonElement(json);
                 return JsonSerializer.Serialize(sanitized, new JsonSerializerOptions { WriteIndented = true });
             }
             catch
             {
-                // Not JSON or parse error - return redacted message
                 return "[File content redacted for privacy - contains sensitive information]";
             }
         }
@@ -204,14 +195,12 @@ namespace AkademiTrack.Services
                     {
                         var key = prop.Name.ToLower();
 
-                        // Redact sensitive fields
                         if (key.Contains("password") || key.Contains("token") || key.Contains("secret") ||
                             key.Contains("cookie") || key.Contains("session") || key.Contains("auth") ||
                             key == "value" || key == "jsessionid" || key.Contains("encrypted"))
                         {
                             obj[prop.Name] = "[REDACTED FOR PRIVACY]";
                         }
-                        // Partially mask emails and activation keys
                         else if (key.Contains("email"))
                         {
                             var email = prop.Value.GetString() ?? "";
@@ -263,7 +252,6 @@ namespace AkademiTrack.Services
             var localPart = parts[0];
             var domain = parts[1];
 
-            // Show first 2 and last 2 chars of local part
             if (localPart.Length <= 4)
                 return $"{localPart[0]}***@{domain}";
 
@@ -275,7 +263,6 @@ namespace AkademiTrack.Services
         {
             if (string.IsNullOrEmpty(key)) return "[REDACTED]";
 
-            // Format: XXXX-XXXX-XXXX-XXXX -> XX**-****-****-**XX
             var parts = key.Split('-');
             if (parts.Length != 4) return "[REDACTED]";
 
@@ -318,7 +305,6 @@ namespace AkademiTrack.Services
 
             var csv = new StringBuilder();
 
-            // Metadata
             csv.AppendLine("=== EXPORT METADATA ===");
             csv.AppendLine($"Export Date,{data.ExportMetadata.ExportDate:yyyy-MM-dd HH:mm:ss}");
             csv.AppendLine($"App Version,{data.ExportMetadata.AppVersion}");
@@ -326,7 +312,6 @@ namespace AkademiTrack.Services
             csv.AppendLine($"Machine Name,{data.ExportMetadata.MachineName}");
             csv.AppendLine();
 
-            // Important Notice
             csv.AppendLine("=== IMPORTANT NOTICE ===");
             csv.AppendLine("\"This export contains ONLY local data stored on your computer.\"");
             csv.AppendLine();
@@ -339,7 +324,6 @@ namespace AkademiTrack.Services
             csv.AppendLine("\"3. Scroll down to find the data export option\"");
             csv.AppendLine();
 
-            // Local Settings
             csv.AppendLine("=== LOCAL SETTINGS ===");
             csv.AppendLine("Setting,Value");
             foreach (var setting in data.Local.Settings)
@@ -348,7 +332,6 @@ namespace AkademiTrack.Services
             }
             csv.AppendLine();
 
-            // Activation Info
             csv.AppendLine("=== ACTIVATION INFO ===");
             csv.AppendLine("Field,Value");
             foreach (var item in data.Local.Activation)
@@ -357,7 +340,6 @@ namespace AkademiTrack.Services
             }
             csv.AppendLine();
 
-            // Local Files
             csv.AppendLine("=== LOCAL FILES ===");
             csv.AppendLine($"Total Files,{data.Local.Files.Count}");
             csv.AppendLine("File Name,Size (KB),Created,Modified");
@@ -375,7 +357,6 @@ namespace AkademiTrack.Services
         }
     }
 
-    // Data Models
     public class ExportData
     {
         [JsonPropertyName("export_metadata")]

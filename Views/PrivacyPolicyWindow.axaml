@@ -18,7 +18,6 @@
         CanResize="true">
 
 	<Window.Styles>
-		<!-- Force all buttons to always be visible -->
 		<Style Selector="Button">
 			<Setter Property="IsVisible" Value="True"/>
 			<Setter Property="Focusable" Value="True"/>
@@ -28,7 +27,6 @@
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
-		<!-- Remove focus outlines globally -->
 		<Style Selector="Button:focus /template/ Border">
 			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="0"/>
@@ -39,7 +37,6 @@
 			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
 
-		<!-- Primary Button Style -->
 		<Style Selector="Button.primary">
 			<Setter Property="Background" Value="#007ACC"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -93,7 +90,6 @@
 			<Setter Property="TextBlock.Foreground" Value="#888888"/>
 		</Style>
 
-		<!-- Secondary Button Style -->
 		<Style Selector="Button.secondary">
 			<Setter Property="Background" Value="#6C757D"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -136,7 +132,6 @@
 			<Setter Property="BorderBrush" Value="Transparent"/>
 		</Style>
 
-		<!-- CheckBox Styles with Full Template -->
 		<Style Selector="CheckBox">
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="Foreground" Value="#212529"/>
@@ -185,7 +180,6 @@
 			<Setter Property="Stroke" Value="White"/>
 		</Style>
 
-		<!-- Text Styles -->
 		<Style Selector="TextBlock.content">
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="Foreground" Value="#495057"/>
@@ -202,7 +196,6 @@
 	</Window.Styles>
 
 	<Grid RowDefinitions="Auto,*,Auto" Margin="0" MaxHeight="750">
-		<!-- Header -->
 		<Border Grid.Row="0" Background="#007ACC" Padding="30,16">
 			<StackPanel Spacing="3">
 				<TextBlock Text="Personvern og brukervilkår"
@@ -215,14 +208,11 @@
 			</StackPanel>
 		</Border>
 
-		<!-- Content -->
 		<ScrollViewer Grid.Row="1"
 					  VerticalScrollBarVisibility="Visible"
 					  HorizontalScrollBarVisibility="Disabled"
 					  Padding="20,15,20,15">
-			<!-- WRAP EVERYTHING IN A GRID -->
 			<Grid>
-				<!-- Loading Indicator -->
 				<TextBlock Text="Laster inn..."
 						   FontSize="14"
 						   Foreground="#6C757D"
@@ -231,10 +221,8 @@
 						   Margin="0,50"
 						   IsVisible="{Binding IsLoading}"/>
 
-				<!-- Actual Content - Only show when loaded -->
 				<StackPanel Spacing="16" IsVisible="{Binding IsContentReady}">
 
-					<!-- Privacy Policy Upgrade Changelog (only visible for existing users with outdated privacy) -->
 					<Border Background="#FFF4E5"
 							BorderBrush="#FF9800"
 							BorderThickness="2"
@@ -275,7 +263,6 @@
 								<Run>:</Run>
 							</TextBlock>
 
-							<!-- Privacy Changelog bullet points -->
 							<ItemsControl ItemsSource="{Binding PrivacyChangelogItems, FallbackValue={x:Null}}">
 								<ItemsControl.ItemTemplate>
 									<DataTemplate x:DataType="x:String">
@@ -298,7 +285,6 @@
 						</StackPanel>
 					</Border>
 
-					<!-- Terms of Use Upgrade Changelog (only visible for existing users with outdated terms) -->
 					<Border Background="#E3F2FD"
 							BorderBrush="#2196F3"
 							BorderThickness="2"
@@ -339,7 +325,6 @@
 								<Run>:</Run>
 							</TextBlock>
 
-							<!-- Terms Changelog bullet points -->
 							<ItemsControl ItemsSource="{Binding TermsChangelogItems, FallbackValue={x:Null}}">
 								<ItemsControl.ItemTemplate>
 									<DataTemplate x:DataType="x:String">
@@ -362,7 +347,6 @@
 						</StackPanel>
 					</Border>
 
-					<!-- Section: Personvernserklæring (only show if needs consent) -->
 					<StackPanel Spacing="8" IsVisible="{Binding NeedsPrivacyConsent}">
 						<TextBlock Text="📜 Personvernserklæring"
 								   FontSize="15"
@@ -399,11 +383,9 @@
 						</StackPanel>
 					</StackPanel>
 
-					<!-- Separator - only show if BOTH sections are visible -->
 					<Separator Background="#DEE2E6" Height="1" Margin="0,4"
 							   IsVisible="{Binding ShowBothSections}"/>
 
-					<!-- Section: Brukervilkår (only show if needs consent) -->
 					<StackPanel Spacing="8" IsVisible="{Binding NeedsTermsConsent}">
 						<TextBlock Text="📋 Brukervilkår"
 								   FontSize="15"
@@ -440,9 +422,8 @@
 						</StackPanel>
 					</StackPanel>
 
-					<!-- Consent Checkboxes -->
 					<StackPanel Spacing="12" Margin="0,8,0,55">
-						<!-- Privacy Policy Checkbox - ONLY if needs privacy consent -->
+						
 						<Border Background="#F8F9FA"
 								BorderBrush="#FF9800"
 								BorderThickness="2"
@@ -458,7 +439,6 @@
 							</CheckBox>
 						</Border>
 
-						<!-- Terms of Use Checkbox - ONLY if needs terms consent -->
 						<Border Background="#F8F9FA"
 								BorderBrush="#2196F3"
 								BorderThickness="2"
@@ -475,7 +455,6 @@
 						</Border>
 					</StackPanel>
 
-					<!-- Error Message -->
 					<TextBlock Text="{Binding ErrorMessage}"
 							   Foreground="#DC3545"
 							   FontSize="12"
@@ -487,7 +466,6 @@
 			</Grid>
 		</ScrollViewer>
 
-		<!-- Footer (ALWAYS VISIBLE) -->
 		<Border Grid.Row="2"
                 Background="White"
                 BorderBrush="#DEE2E6"
@@ -496,14 +474,12 @@
                 BoxShadow="0 -2 8 0 #10000000">
 			<Grid ColumnDefinitions="*,Auto">
 
-				<!-- Exit Button -->
 				<Button Grid.Column="0"
                         Content="Avslutt"
                         Command="{Binding ExitCommand}"
                         Classes="secondary"
                         HorizontalAlignment="Left"/>
 
-				<!-- Accept Button -->
 				<Button Grid.Column="1"
                         Content="{Binding AcceptButtonText}"
                         Command="{Binding AcceptCommand}"

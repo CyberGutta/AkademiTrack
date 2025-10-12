@@ -17,12 +17,10 @@ namespace AkademiTrack.Services
 
             try
             {
-                // Try to get the icon from the main window first (best approach)
                 Avalonia.Controls.WindowIcon? windowIcon = mainWindow.Icon;
 
                 if (windowIcon == null)
                 {
-                    // If no window icon, try to load from assets
                     var possiblePaths = new[]
                     {
                         "avares://AkademiTrack/Assets/AT-1024.ico",
@@ -51,15 +49,13 @@ namespace AkademiTrack.Services
                     Debug.WriteLine("✓ Using window icon for tray");
                 }
 
-                // Create the tray icon
                 _trayIcon = new TrayIcon
                 {
                     Icon = windowIcon,
                     ToolTipText = "AkademiTrack",
-                    IsVisible = false // Start hidden, show when minimized
+                    IsVisible = false 
                 };
 
-                // Create context menu
                 var menu = new NativeMenu();
 
                 var showItem = new NativeMenuItem("Vis vindu");
@@ -74,7 +70,6 @@ namespace AkademiTrack.Services
 
                 _trayIcon.Menu = menu;
 
-                // Double-click to show window
                 _trayIcon.Clicked += (s, e) => ShowMainWindow();
 
                 Debug.WriteLine("✓ System tray icon initialized successfully");
@@ -98,8 +93,7 @@ namespace AkademiTrack.Services
         {
             if (_trayIcon != null)
             {
-                // DON'T hide - keep it always visible
-                // _trayIcon.IsVisible = false;
+               
                 Debug.WriteLine("Tray icon kept visible");
             }
         }
@@ -109,7 +103,7 @@ namespace AkademiTrack.Services
             if (_mainWindow != null)
             {
                 _mainWindow.Hide();
-                ShowTrayIcon(); // Ensure it's visible
+                ShowTrayIcon(); 
                 Debug.WriteLine("Application minimized to tray");
             }
         }
@@ -121,8 +115,7 @@ namespace AkademiTrack.Services
                 _mainWindow.Show();
                 _mainWindow.WindowState = WindowState.Normal;
                 _mainWindow.Activate();
-                // DON'T hide tray icon - keep it visible
-                // HideTrayIcon();
+               
                 Debug.WriteLine("Main window restored from tray (tray icon still visible)");
             }
         }

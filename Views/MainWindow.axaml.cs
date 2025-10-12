@@ -19,7 +19,6 @@ namespace AkademiTrack.Views
             this.Closing += MainWindow_Closing;
             this.WindowState = WindowState.Normal;
 
-            // Set initial position to center - this will be refined after loading
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
@@ -27,15 +26,12 @@ namespace AkademiTrack.Views
         {
             try
             {
-                // Check if should minimize to tray instead of closing
                 var settings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
 
                 if (settings.StartMinimized && settings.StartWithSystem)
                 {
-                    // User has tray enabled - ask if they want to minimize to tray
-                    e.Cancel = true; // Cancel the close
+                    e.Cancel = true;
 
-                    // Show confirmation dialog
                     var result = await AkademiTrack.Views.ConfirmationDialog.ShowAsync(
                         this,
                         "Minimer til systemstatusfeltet?",
@@ -46,12 +42,10 @@ namespace AkademiTrack.Views
 
                     if (result)
                     {
-                        // Minimize to tray
                         AkademiTrack.Services.TrayIconManager.MinimizeToTray();
                     }
                     else
                     {
-                        // Actually exit
                         AkademiTrack.Services.TrayIconManager.Dispose();
 
                         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -62,14 +56,13 @@ namespace AkademiTrack.Views
                 }
                 else
                 {
-                    // Normal close - clean up tray icon
                     AkademiTrack.Services.TrayIconManager.Dispose();
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error in MainWindow_Closing: {ex.Message}");
-                // On error, allow normal close
+
                 AkademiTrack.Services.TrayIconManager.Dispose();
             }
         }
@@ -84,7 +77,7 @@ namespace AkademiTrack.Views
 
                 if (newState == WindowState.Minimized)
                 {
-                    // Check if should minimize to tray
+
                     Task.Run(async () =>
                     {
                         try
@@ -111,7 +104,7 @@ namespace AkademiTrack.Views
         private void OnWindowLoaded(object sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             CenterWindowManually();
-            this.Loaded -= OnWindowLoaded; // Remove event handler
+            this.Loaded -= OnWindowLoaded;
         }
 
         private void CenterWindowManually()
@@ -124,11 +117,9 @@ namespace AkademiTrack.Views
                 var screenX = screen.WorkingArea.X;
                 var screenY = screen.WorkingArea.Y;
 
-                // Get actual window size
                 var windowWidth = this.Width;
                 var windowHeight = this.Height;
 
-                // Calculate center position
                 var centerX = screenX + (screenWidth - windowWidth) / 2;
                 var centerY = screenY + (screenHeight - windowHeight) / 2;
 

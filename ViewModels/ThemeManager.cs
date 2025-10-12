@@ -57,7 +57,6 @@ namespace AkademiTrack.Services
 
         public IBrush ThemeIconColor => new SolidColorBrush(_isDarkMode ? Color.Parse("#FFD700") : Color.Parse("#FFA500"));
 
-        // Color getters for dark/light mode
         public IBrush WindowBackground => new SolidColorBrush(_isDarkMode ? Color.Parse("#1E1E1E") : Color.Parse("#F8F9FA"));
         public IBrush TextPrimary => new SolidColorBrush(_isDarkMode ? Color.Parse("#E0E0E0") : Color.Parse("#212529"));
         public IBrush TextSecondary => new SolidColorBrush(_isDarkMode ? Color.Parse("#A0A0A0") : Color.Parse("#6C757D"));
@@ -86,7 +85,7 @@ namespace AkademiTrack.Services
             }
             catch
             {
-                _isDarkMode = false; // Default to light mode
+                _isDarkMode = false; 
             }
         }
 
@@ -100,7 +99,6 @@ namespace AkademiTrack.Services
             }
             catch
             {
-                // Silently fail if we can't save settings
             }
         }
 

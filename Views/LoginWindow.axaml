@@ -164,7 +164,7 @@
 
 	<Grid Margin="25,20">
 		<StackPanel Spacing="16" MaxWidth="350">
-			<!-- Header -->
+			
 			<StackPanel Spacing="0">
 				<TextBlock Text="Aktiver AkademiTrack"
                           Classes="title"/>
@@ -172,14 +172,13 @@
                           Classes="subtitle"/>
 			</StackPanel>
 
-			<!-- Activation Key Form -->
 			<Border Background="White"
                    CornerRadius="8"
                    Padding="18"
                    BorderThickness="1"
                    BorderBrush="#E9ECEF">
 				<StackPanel Spacing="12">
-					<!-- Activation Key Field -->
+					
 					<StackPanel Spacing="0">
 						<TextBlock Text="Aktiveringsnøkkel"
                                   Classes="label"/>
@@ -188,14 +187,12 @@
                                 IsEnabled="{Binding !IsLoading}"/>
 					</StackPanel>
 
-					<!-- Error Message with reserved space -->
 					<StackPanel MinHeight="20">
 						<TextBlock Text="{Binding ErrorMessage}"
                                   Classes="error"
                                   IsVisible="{Binding HasError}"/>
 					</StackPanel>
 
-					<!-- Login Button -->
 					<Button Content="{Binding LoginButtonText}"
                            Classes="primary"
                            Command="{Binding LoginCommand}"
@@ -205,7 +202,6 @@
 				</StackPanel>
 			</Border>
 
-			<!-- Create Account Link -->
 			<StackPanel Spacing="4">
 				<TextBlock Text="Trenger du en aktiveringsnøkkel?"
                           FontSize="12"
@@ -216,7 +212,6 @@
                           Tapped="OnCreateAccountTapped"/>
 			</StackPanel>
 
-			<!-- Exit Button -->
 			<Button Content="Avslutt"
                    Classes="secondary"
                    Command="{Binding ExitCommand}"

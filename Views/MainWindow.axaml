@@ -20,12 +20,12 @@
 	</Design.DataContext>
 
 	<Window.Resources>
-		<!-- String Equality Converter -->
+		
 		<vm:StringEqualityConverter x:Key="StringEqualityConverter"/>
 	</Window.Resources>
 
 	<Window.Styles>
-		<!-- Force all buttons to always be visible -->
+		
 		<Style Selector="Button">
 			<Setter Property="IsVisible" Value="True"/>
 			<Setter Property="Focusable" Value="True"/>
@@ -35,7 +35,6 @@
 			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 
-		<!-- Remove focus outlines globally -->
 		<Style Selector="Button:focus /template/ Border">
 			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="0"/>
@@ -46,9 +45,7 @@
 			<Setter Property="BorderThickness" Value="0"/>
 		</Style>
 
-		<!-- Theme Toggle Button Style -->
-		<!-- Theme Toggle Button Style -->
-		<!-- Theme Toggle Button Style -->
+		
 		<Style Selector="Button.theme-toggle">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
 			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
@@ -67,7 +64,7 @@
 							Width="{TemplateBinding Width}"
 							Height="{TemplateBinding Height}">
 						<Grid>
-							<!-- Hover overlay -->
+							
 							<Border Name="PART_HoverOverlay"
 									CornerRadius="{TemplateBinding CornerRadius}"
 									Background="#000000"
@@ -78,7 +75,7 @@
 									</Transitions>
 								</Border.Transitions>
 							</Border>
-							<!-- Icon -->
+							
 							<Viewbox Width="24"
 									 Height="24"
 									 Stretch="Uniform"
@@ -97,7 +94,6 @@
 			</Setter>
 		</Style>
 
-		<!-- Subtle hover effect using opacity (works for both themes) -->
 		<Style Selector="Button.theme-toggle:pointerover /template/ Border#PART_HoverOverlay">
 			<Setter Property="Opacity" Value="0.12"/>
 		</Style>
@@ -106,7 +102,6 @@
 			<Setter Property="Opacity" Value="0.20"/>
 		</Style>
 
-		<!-- Start Button Styles -->
 		<Style Selector="Button.start-button">
 			<Setter Property="Background" Value="#007ACC"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -160,7 +155,6 @@
 			<Setter Property="TextBlock.Foreground" Value="#888888"/>
 		</Style>
 
-		<!-- Stop Button Styles -->
 		<Style Selector="Button.stop-button">
 			<Setter Property="Background" Value="#DC3545"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -293,7 +287,6 @@
 			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
 
-		<!-- Notification Styles -->
 		<Style Selector="Border.notification">
 			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Padding" Value="16,12"/>
@@ -382,8 +375,8 @@
 	</Window.Styles>
 
 	<Grid>
-		<!-- Theme Toggle Button (Top Right) -->
-		<!-- Theme Toggle Button (Top Right) -->
+		
+		
 		<Button Classes="theme-toggle"
 				Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
 				Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
@@ -398,11 +391,9 @@
 				Cursor="Hand"
 				ZIndex="1000"/>
 
-		<!-- Main Content -->
 		<Grid Margin="30,25">
 			<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
 
-				<!-- App Title -->
 				<TextBlock Text="AkademiTrack"
 	                      Classes="title"
 	                      HorizontalAlignment="Center"/>
@@ -411,26 +402,22 @@
 	                      Classes="subtitle"
 	                      HorizontalAlignment="Center"/>
 
-				<!-- Info Text -->
 				<TextBlock Text="Klikk start for å begynne automatisk overvåking av oppmøte.&#x0a;Systemet håndterer innlogging automatisk."
 	                      Classes="info"
 	                      HorizontalAlignment="Center"
 	                      TextWrapping="Wrap"
 	                      MaxWidth="450"/>
 
-				<!-- Main Control Buttons -->
 				<StackPanel Orientation="Horizontal"
 	                       HorizontalAlignment="Center"
 	                       Spacing="12">
 
-					<!-- Start button -->
 					<Button Content="Start automatisering"
 	                       Classes="start-button"
 	                       Command="{Binding StartAutomationCommand}"
 	                       IsEnabled="{Binding !IsAutomationRunning}"
 	                       ToolTip.Tip="Starter automatisering med automatisk innlogging"/>
 
-					<!-- Stop button -->
 					<Button Content="Stopp automatisering"
 	                       Classes="stop-button"
 	                       Command="{Binding StopAutomationCommand}"
@@ -442,7 +429,6 @@
 
 
 
-				<!-- Settings Button -->
 				<StackPanel HorizontalAlignment="Center">
 					<Button Content="Innstillinger"
 	                       Classes="settings"
@@ -450,7 +436,6 @@
 	                       ToolTip.Tip="Åpne innstillinger og vis aktivitetslogger"/>
 				</StackPanel>
 
-				<!-- Current Status Display -->
 				<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 	                   CornerRadius="6"
 	                   Padding="16,12"
@@ -474,7 +459,6 @@
 			</StackPanel>
 		</Grid>
 
-		<!-- Notification Popup (Top-Right Corner) -->
 		<Border IsVisible="{Binding HasCurrentNotification}"
 		        HorizontalAlignment="Right"
 		        VerticalAlignment="Top"

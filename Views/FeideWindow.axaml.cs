@@ -17,14 +17,12 @@ namespace AkademiTrack.Views
             InitializeComponent();
             var viewModel = new FeideWindowViewModel();
 
-            // Handle setup completion
             viewModel.SetupCompleted += async (s, e) =>
             {
                 if (e.Success)
                 {
                     System.Diagnostics.Debug.WriteLine($"Feide setup completed for email: {e.UserEmail}");
 
-                    // Check if user needs to accept privacy policy
                     bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(e.UserEmail);
 
                     System.Diagnostics.Debug.WriteLine($"Privacy check result - Needs acceptance: {needsPrivacyAcceptance}");
@@ -59,7 +57,7 @@ namespace AkademiTrack.Views
                     else
                     {
                         System.Diagnostics.Debug.WriteLine("Privacy policy already up-to-date, showing MainWindow directly...");
-                        // Privacy already accepted with correct version, go to MainWindow
+
                         var mainWindow = new MainWindow();
                         mainWindow.Show();
                         this.Close();

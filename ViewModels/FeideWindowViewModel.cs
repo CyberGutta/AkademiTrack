@@ -31,7 +31,6 @@ namespace AkademiTrack.ViewModels
             SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
             ExitCommand = new RelayCommand(() => ExitApplication());
 
-            // Initialize the schools list
             Schools = new ObservableCollection<string>
             {
                 "Akademiet Drammen AS",
@@ -137,7 +136,6 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Validate input
                 if (string.IsNullOrWhiteSpace(SchoolName))
                 {
                     ErrorMessage = "Vennligst velg en skole";
@@ -156,7 +154,6 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                // Get the user's email from activation.json
                 string userEmail = await GetUserEmailFromActivationAsync();
 
                 if (string.IsNullOrEmpty(userEmail))
@@ -165,12 +162,10 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                // Save credentials encrypted in settings
                 await SaveCredentialsToSettingsAsync();
 
                 System.Diagnostics.Debug.WriteLine($"Feide credentials saved successfully for user: {userEmail}");
 
-                // Notify completion with user email
                 SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
                 {
                     Success = true,
@@ -228,7 +223,6 @@ namespace AkademiTrack.ViewModels
 
                 var settingsPath = Path.Combine(appFolderPath, "settings.json");
 
-                // Load existing settings or create new
                 AppSettings settings = null;
 
                 if (File.Exists(settingsPath))
@@ -242,7 +236,6 @@ namespace AkademiTrack.ViewModels
                     }
                     catch (JsonException jsonEx)
                     {
-                        // JSON is corrupted - log the error and delete the file
                         System.Diagnostics.Debug.WriteLine($"Corrupted settings.json detected: {jsonEx.Message}");
                         System.Diagnostics.Debug.WriteLine("Deleting corrupted file and creating fresh settings");
 
@@ -256,11 +249,10 @@ namespace AkademiTrack.ViewModels
                             System.Diagnostics.Debug.WriteLine($"Warning: Could not delete corrupted file: {deleteEx.Message}");
                         }
 
-                        settings = null; // Force creation of new settings
+                        settings = null; 
                     }
                 }
 
-                // Create new settings if file doesn't exist or was corrupted
                 if (settings == null)
                 {
                     settings = new AppSettings
@@ -272,16 +264,13 @@ namespace AkademiTrack.ViewModels
                     System.Diagnostics.Debug.WriteLine("Created fresh settings object");
                 }
 
-                // Update with encrypted credentials
                 settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(FeideUsername);
                 settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(FeidePassword);
                 settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
                 settings.LastUpdated = DateTime.Now;
 
-                // Set InitialSetupCompleted to true
                 settings.InitialSetupCompleted = true;
 
-                // Save settings with error handling
                 try
                 {
                     var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
@@ -320,7 +309,6 @@ namespace AkademiTrack.ViewModels
         }
     }
 
-    // Event args for Feide setup completion
     public class FeideSetupCompletedEventArgs : EventArgs
     {
         public bool Success { get; set; }
