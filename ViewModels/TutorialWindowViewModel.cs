@@ -11,11 +11,11 @@ namespace AkademiTrack.ViewModels
     {
         private bool _dontShowAgain;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler ContinueRequested;
-        public event EventHandler ExitRequested;
+        public new event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler? ContinueRequested;
+        public event EventHandler? ExitRequested;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -48,9 +48,10 @@ namespace AkademiTrack.ViewModels
             ContinueRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        private async Task ExitAsync()
+        private Task ExitAsync()
         {
             ExitRequested?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
         }
 
         private async Task SaveTutorialSettingsAsync()

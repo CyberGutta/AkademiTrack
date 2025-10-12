@@ -527,10 +527,9 @@ namespace AkademiTrack.ViewModels
 
             LogInfo("Applikasjon er klar");
 
-            _processedNotificationsFile = Path.Combine(
-                Path.GetDirectoryName(GetCookiesFilePath()),
-                "processed_notifications.json"
-            );
+            var directory = Path.GetDirectoryName(GetCookiesFilePath()) ?? Environment.CurrentDirectory;
+            _processedNotificationsFile = Path.Combine(directory, "processed_notifications.json");
+
 
             _ = Task.Run(LoadProcessedNotificationIdsAsync);
 
@@ -664,7 +663,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async void CheckForAdminNotifications(object state)
+        private async void CheckForAdminNotifications(object? state)
         {
             try
             {
@@ -793,8 +792,8 @@ namespace AkademiTrack.ViewModels
 
                         try
                         {
-                            ShowSystemOverlayNotification(adminTitle, notification.Message, notificationLevel,
-                                notification.Image_Url, notification.Custom_Color);
+                            ShowSystemOverlayNotification(adminTitle, notification.Message!, notificationLevel,
+                                notification.Image_Url!, notification.Custom_Color!);
 
                             LogInfo($"Enhanced admin notification displayed: {notification.Title}");
                         }
@@ -910,14 +909,14 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task ToggleThemeAsync()
+        private Task ToggleThemeAsync()
         {
-
             Services.ThemeManager.Instance.ToggleTheme();
             LogInfo($"Theme changed to {(Services.ThemeManager.Instance.IsDarkMode ? "dark" : "light")} mode");
+            return Task.CompletedTask;
         }
 
-        public NotificationEntry CurrentNotification
+        public NotificationEntry? CurrentNotification
         {
             get => _currentNotification;
             private set
@@ -973,7 +972,7 @@ namespace AkademiTrack.ViewModels
 
                 bool isHighPriority = DetermineNotificationPriority(title, level);
 
-                _ = Task.Run(() => QueueNotificationAsync(title, message, level, null, null, isHighPriority));
+                _ = Task.Run(() => QueueNotificationAsync(title, message, level, null!, null!, isHighPriority));
             }
             else
             {
@@ -1001,16 +1000,16 @@ namespace AkademiTrack.ViewModels
             return false;
         }
 
-        private async Task QueueNotificationAsync(string title, string message, string level,
-    string imageUrl = null!, string customColor = null!, bool isHighPriority = false)
+        private Task QueueNotificationAsync(string title, string message, string level,
+    string? imageUrl = null, string? customColor = null, bool isHighPriority = false)
         {
             var queueItem = new NotificationQueueItem
             {
                 Title = title,
                 Message = message,
                 Level = level,
-                ImageUrl = imageUrl,
-                CustomColor = customColor,
+                ImageUrl = imageUrl ?? "",
+                CustomColor = customColor ?? "",
                 IsHighPriority = isHighPriority
             };
 
@@ -1040,6 +1039,8 @@ namespace AkademiTrack.ViewModels
             {
                 _ = Task.Run(ProcessNotificationQueueAsync);
             }
+
+            return Task.CompletedTask;
         }
 
         private async Task ProcessNotificationQueueAsync()
@@ -1122,16 +1123,14 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task CreateAndShowNotificationAsync(NotificationQueueItem item, CancellationToken cancellationToken)
+        private Task CreateAndShowNotificationAsync(NotificationQueueItem item, CancellationToken cancellationToken)
         {
             try
             {
                 CleanupOldWindows();
-
                 LogDebug($"Creating notification window: {item.Title}");
 
                 NotificationOverlayWindow overlayWindow;
-
                 try
                 {
                     overlayWindow = new NotificationOverlayWindow(
@@ -1146,7 +1145,7 @@ namespace AkademiTrack.ViewModels
                 {
                     LogError($"Failed to create notification window: {createEx.Message}");
                     LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                    return;
+                    return Task.CompletedTask;
                 }
 
                 var windowClosed = false;
@@ -1166,8 +1165,6 @@ namespace AkademiTrack.ViewModels
                 {
                     overlayWindow.Show();
                     LogDebug($"✓ Notification shown successfully: {item.Title}");
-
-                    
                 }
                 catch (Exception showEx)
                 {
@@ -1181,6 +1178,8 @@ namespace AkademiTrack.ViewModels
                 LogError($"Complete failure in notification display: {ex.Message}");
                 LogInfo($"NOTIFICATION (emergency fallback): {item.Title} - {item.Message}");
             }
+
+            return Task.CompletedTask;
         }
 
         private void AddToActiveWindows(NotificationOverlayWindow window)
@@ -1236,13 +1235,14 @@ namespace AkademiTrack.ViewModels
         }
 
 
-        private void ShowSystemOverlayNotification(string title, string message, string level, string imageUrl = null, string customColor = null)
+        private void ShowSystemOverlayNotification(string title, string message, string level, string? imageUrl = null, string? customColor = null)
         {
             ShowNotification(title, message, level);
         }
-        private async Task DismissCurrentNotificationAsync()
+        private Task DismissCurrentNotificationAsync()
         {
             CurrentNotification = null!;
+            return Task.CompletedTask;
         }
 
         private void LogInfo(string message)
@@ -1432,16 +1432,18 @@ namespace AkademiTrack.ViewModels
         }
 
 
-        private async Task ClearLogsAsync()
+        private Task ClearLogsAsync()
         {
             LogEntries.Clear();
             LogInfo("Logger tømt");
+            return Task.CompletedTask;
         }
 
-        private async Task ToggleDetailedLogsAsync()
+        private Task ToggleDetailedLogsAsync()
         {
             ShowDetailedLogs = !ShowDetailedLogs;
             LogInfo($"Detaljert logging {(ShowDetailedLogs ? "aktivert" : "deaktivert")}");
+            return Task.CompletedTask;
         }
 
         private async Task StartAutomationAsync()
@@ -1579,7 +1581,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task StopAutomationAsync()
+        private Task StopAutomationAsync()
         {
             if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
@@ -1587,6 +1589,7 @@ namespace AkademiTrack.ViewModels
                 LogInfo("Stopp forespurt - stopper automatisering...");
                 ShowNotification("Automatisering stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
             }
+            return Task.CompletedTask;
         }
 
         private async Task OpenSettingsAsync()
@@ -1681,7 +1684,10 @@ namespace AkademiTrack.ViewModels
                 });
 
                 LogDebug($"Loaded {cookieArray?.Length ?? 0} cookies from file: {cookiesPath}");
-                return cookieArray?.ToDictionary(c => c.Name, c => c.Value);
+                return cookieArray?.ToDictionary(
+                    c => c.Name ?? "",         
+                    c => c.Value ?? ""         
+                ) ?? new Dictionary<string, string>();
             }
             catch (Exception ex)
             {
@@ -1700,7 +1706,7 @@ namespace AkademiTrack.ViewModels
 
                 if (isValid)
                 {
-                    LogDebug($"Cookie test successful - found {scheduleData!.Items.Count} schedule items");
+                    LogDebug($"Cookie test successful - found {scheduleData?.Items?.Count} schedule items");
                 }
                 else
                 {
@@ -1869,7 +1875,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if (!IsWebDriverValid(_webDriver))
+                if (_webDriver == null || !IsWebDriverValid(_webDriver))
                 {
                     LogDebug("WebDriver not valid for automatic login");
                     return false;
@@ -1947,7 +1953,7 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug("Fast organization selection check...");
 
-                IWebElement orgSearchField = null!;
+                IWebElement? orgSearchField = null;
                 try
                 {
                     orgSearchField = wait.Until(driver =>
@@ -1966,6 +1972,11 @@ namespace AkademiTrack.ViewModels
                 catch (WebDriverTimeoutException)
                 {
                     LogDebug("Organization selection not needed");
+                    return true;
+                }
+                if (orgSearchField == null)
+                {
+                    LogDebug("Organization search field not found");
                     return true;
                 }
 
@@ -2014,7 +2025,7 @@ namespace AkademiTrack.ViewModels
 
                             try
                             {
-                                var continueButton = _webDriver.FindElement(By.Id("selectorg_button"));
+                                var continueButton = _webDriver?.FindElement(By.Id("selectorg_button"));
                                 if (continueButton?.Enabled == true)
                                 {
                                     continueButton.Click();
@@ -2052,9 +2063,9 @@ namespace AkademiTrack.ViewModels
 
                 LogDebug("Fast Feide form detection...");
 
-                IWebElement usernameField = null!;
-                IWebElement passwordField = null!;
-                IWebElement loginButton = null!;
+                IWebElement? usernameField = null;
+                IWebElement? passwordField = null;
+                IWebElement? loginButton = null;
 
                 try
                 {
@@ -2079,6 +2090,12 @@ namespace AkademiTrack.ViewModels
 
                     try
                     {
+                        if (_webDriver == null)
+                        {
+                            LogError("WebDriver is null, cannot find password field");
+                            return false;
+                        }
+
                         passwordField = _webDriver.FindElement(By.Id("password"));
                         if (!passwordField.Displayed)
                         {
@@ -2099,13 +2116,20 @@ namespace AkademiTrack.ViewModels
 
                     foreach (var selector in buttonSelectors)
                     {
+
                         try
                         {
-                            loginButton = _webDriver.FindElement(By.XPath(selector));
-                            if (loginButton.Displayed && loginButton.Enabled) break;
-                            loginButton = null!;
+                            var button = _webDriver?.FindElement(By.XPath(selector));
+                            if (button != null && button.Displayed && button.Enabled)
+                            {
+                                loginButton = button;
+                                break;
+                            }
                         }
-                        catch { continue; }
+                        catch (NoSuchElementException)
+                        {
+                            loginButton = null;
+                        }
                     }
                 }
                 catch (WebDriverTimeoutException)
@@ -2145,7 +2169,14 @@ namespace AkademiTrack.ViewModels
                         {
                             await Task.Delay(200);
 
-                            var currentUrl = _webDriver.Url;
+
+
+                            var currentUrl = _webDriver?.Url;
+                            if (string.IsNullOrEmpty(currentUrl))
+                            {
+                                LogDebug("Current URL is null or empty, cannot verify login success");
+                                return false;
+                            }
 
                             if (currentUrl.Contains("isFeideinnlogget=true") ||
                                 currentUrl.Contains("ojr=timeplan") ||
@@ -2156,7 +2187,13 @@ namespace AkademiTrack.ViewModels
                             }
                         }
 
-                        var finalUrl = _webDriver.Url;
+                        var finalUrl = _webDriver?.Url;
+                        if (string.IsNullOrEmpty(finalUrl))
+                        {
+                            LogDebug("Final URL is null or empty, cannot verify login success");
+                            return false;
+                        }
+
                         if (finalUrl.Contains("isFeideinnlogget=true") ||
                             finalUrl.Contains("ojr=timeplan") ||
                             (!finalUrl.Contains("login") && !finalUrl.Contains("feide") && !finalUrl.Contains("org_selector")))
@@ -2188,19 +2225,18 @@ namespace AkademiTrack.ViewModels
                 return false;
             }
         }
-        private async Task<UserParameters> QuickParameterCapture()
+        private async Task<UserParameters?> QuickParameterCapture()
         {
             try
             {
-                if (!IsWebDriverValid(_webDriver)) return null;
-
+                if (_webDriver == null || !IsWebDriverValid(_webDriver))
+                    return null;
                 LogDebug("Fanger parametere fra nettverkstrafikk...");
 
                 var jsExecutor = (IJavaScriptExecutor)_webDriver;
 
                 var result = jsExecutor.ExecuteScript(@"
             try {
-                // Get all network requests from performance API
                 var entries = performance.getEntries();
                 
                 for (var i = 0; i < entries.length; i++) {
@@ -2224,7 +2260,6 @@ namespace AkademiTrack.ViewModels
                     }
                 }
                 
-                // If no network requests found yet, wait and check again
                 return { waiting: true };
                 
             } catch (e) {
@@ -2313,7 +2348,7 @@ namespace AkademiTrack.ViewModels
         private async Task<bool> WaitForTargetUrlAsync()
         {
             var timeout = DateTime.Now.AddMinutes(10);
-            var targetUrl = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan";
+            // var targetUrl = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan";
             int checkCount = 0;
 
             while (DateTime.Now < timeout && !_cancellationTokenSource?.Token.IsCancellationRequested == true)
@@ -2326,7 +2361,7 @@ namespace AkademiTrack.ViewModels
                         return false;
                     }
 
-                    if (!IsWebDriverValid(_webDriver))
+                    if (_webDriver == null || !IsWebDriverValid(_webDriver))
                     {
                         LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
                         ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
@@ -2367,10 +2402,14 @@ namespace AkademiTrack.ViewModels
                 {
                     LogDebug($"Error checking URL: {ex.Message}");
 
-                    if (!IsWebDriverValid(_webDriver))
+                    if (_webDriver == null || !IsWebDriverValid(_webDriver))
                     {
                         LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                        ShowNotification("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
+                        ShowNotification(
+                            "Automatisering stoppet",
+                            "Innlogging avbrutt av bruker - automatisering stoppet",
+                            "WARNING"
+                        );
                         return false;
                     }
                 }
@@ -2443,20 +2482,20 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                _webDriver = null!;
+                _webDriver = null;
                 LogDebug("Nettleser opprydding fullført");
             }
             catch (Exception ex)
             {
                 LogDebug($"Feil under opprydding av nettleser: {ex.Message}");
 
-                _webDriver = null!;
+                _webDriver = null;
             }
 
             await Task.Delay(500);
         }
 
-        private async Task ForceStopAutomationAsync()
+        private Task ForceStopAutomationAsync()
         {
             try
             {
@@ -2476,6 +2515,7 @@ namespace AkademiTrack.ViewModels
             {
                 LogDebug($"Feil ved tvungen stopp av automatisering: {ex.Message}");
             }
+            return Task.CompletedTask;
         }
 
         private async Task SaveCookiesAsync(Cookie[] cookies)
@@ -2862,7 +2902,7 @@ namespace AkademiTrack.ViewModels
 
                 if (activationData.TryGetProperty("Email", out JsonElement emailElement))
                 {
-                    return emailElement.GetString();
+                    return emailElement.GetString() ?? string.Empty;
                 }
 
                 LogError("Email not found in activation file.");
@@ -2901,7 +2941,7 @@ namespace AkademiTrack.ViewModels
                     return cachedParams;
                 }
 
-                if (IsWebDriverValid(_webDriver))
+                if (_webDriver != null && IsWebDriverValid(_webDriver))
                 {
                     LogInfo("Ingen gyldige cached parametere - utvinner fra nettleser...");
                     var extractedParams = await QuickParameterCapture();
@@ -2934,7 +2974,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task DeleteCookiesAsync()
+        private Task DeleteCookiesAsync()
         {
             try
             {
@@ -2949,6 +2989,7 @@ namespace AkademiTrack.ViewModels
             {
                 LogDebug($"Kunne ikke slette cookies: {ex.Message}");
             }
+            return Task.CompletedTask;
         }
 
         private string GetUserParametersFilePath()
@@ -2961,7 +3002,7 @@ namespace AkademiTrack.ViewModels
             return Path.Combine(appDataDir, "user_parameters.json");
         }
 
-        private async Task<UserParameters> LoadValidParametersAsync()
+        private async Task<UserParameters?> LoadValidParametersAsync()
         {
             try
             {
@@ -2969,7 +3010,7 @@ namespace AkademiTrack.ViewModels
                 if (!File.Exists(filePath))
                 {
                     LogDebug("Ingen lagrede parametere funnet");
-                    return null!;
+                    return null;
                 }
 
                 var json = await File.ReadAllTextAsync(filePath);
@@ -2981,16 +3022,17 @@ namespace AkademiTrack.ViewModels
                 if (savedData?.Parameters == null)
                 {
                     LogDebug("Ugyldig parameterdata");
-                    return null!;
+                    return null;
                 }
 
                 var age = DateTime.Now - savedData.SavedAt;
 
-                if (!IsCurrentSchoolYear(savedData.Parameters.PlanPeri))
+                if (savedData.Parameters.PlanPeri != null &&
+    !IsCurrentSchoolYear(savedData.Parameters.PlanPeri))
                 {
                     LogInfo($"Lagrede parametere er for gammelt skoleår ({savedData.Parameters.PlanPeri}) - trenger oppdatering");
                     File.Delete(filePath);
-                    return null!;
+                    return null;
                 }
 
                 LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalDays:F0} dager, skoleår: {savedData.Parameters.PlanPeri})");
@@ -3058,7 +3100,7 @@ namespace AkademiTrack.ViewModels
             public DateTime SavedAt { get; set; }
             public string? SchoolYear { get; set; } 
         }
-        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string userEmail = null)
+        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string? userEmail = null)
         {
             try
             {
@@ -3077,7 +3119,9 @@ namespace AkademiTrack.ViewModels
                 var payload = new
                 {
                     user_email = userEmail,
-                    session_date = DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd"),
+                    session_date = !string.IsNullOrEmpty(stuSession.Dato)
+    ? DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd")
+    : string.Empty,
                     session_start = stuSession.StartKl,
                     session_end = stuSession.SluttKl,
                     course_name = stuSession.KNavn,
@@ -3211,7 +3255,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<bool> CheckForNetworkErrorInResponse(string responseContent, ScheduleItem stuTime)
+        private Task<bool> CheckForNetworkErrorInResponse(string responseContent, ScheduleItem stuTime)
         {
             try
             {
@@ -3222,19 +3266,22 @@ namespace AkademiTrack.ViewModels
                     LogError($"NETTVERKSFEIL: Må være tilkoblet skolens nettverk for å registrere STU-økt {stuTime.StartKl}-{stuTime.SluttKl}");
                     LogInfo("Automatiseringen fortsetter å kjøre - koble til skolens WiFi for å registrere");
 
-                    ShowNotification("Koble til Skolens Nettverk", 
+                    ShowNotification(
+                        "Koble til Skolens Nettverk",
                         $"Du må være tilkoblet skolens WiFi for å registrere STU {stuTime.StartKl}-{stuTime.SluttKl}. " +
-                        $"Automatiseringen fortsetter å kjøre - koble til skolens nettverk så prøver den igjen.", "WARNING");
+                        "Automatiseringen fortsetter å kjøre - koble til skolens nettverk så prøver den igjen.",
+                        "WARNING"
+                    );
 
-                    return true;
+                    return Task.FromResult(true);
                 }
 
-                return false;
+                return Task.FromResult(false);
             }
             catch (Exception ex)
             {
                 LogDebug($"Error checking for network error in response: {ex.Message}");
-                return false;
+                return Task.FromResult(false);
             }
         }
 
@@ -3254,7 +3301,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async void CheckForUpdatesAutomatically(object state)
+        private async void CheckForUpdatesAutomatically(object? state)
         {
             try
             {

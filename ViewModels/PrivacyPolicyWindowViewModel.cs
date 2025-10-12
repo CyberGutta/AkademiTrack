@@ -20,21 +20,21 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = string.Empty;
         private string _userEmail;
 
-        private string _latestPrivacyVersion = "1.0";
-        private string _userCurrentPrivacyVersion = null;
+        private string _latestPrivacyVersion = "1.1";
+        private string? _userCurrentPrivacyVersion = null;
         private List<string> _privacyChangelogItems = new List<string>();
         private bool _isPrivacyUpgrade = false;
 
-        private string _latestTermsVersion = "1.0";
-        private string _userCurrentTermsVersion = null;
+        private string _latestTermsVersion = "1.1";
+        private string? _userCurrentTermsVersion = null;
         private List<string> _termsChangelogItems = new List<string>();
         private bool _isTermsUpgrade = false;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public event EventHandler Accepted;
-        public event EventHandler Exited;
+        public new event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler? Accepted;
+        public event EventHandler? Exited;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -90,7 +90,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        public string UserCurrentPrivacyVersion
+        public string? UserCurrentPrivacyVersion
         {
             get => _userCurrentPrivacyVersion;
             set
@@ -145,7 +145,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        public string UserCurrentTermsVersion
+        public string? UserCurrentTermsVersion
         {
             get => _userCurrentTermsVersion;
             set
@@ -350,7 +350,7 @@ namespace AkademiTrack.ViewModels
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
                 string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
-                string normalizedEmail = _userEmail?.Trim().ToLowerInvariant();
+                string? normalizedEmail = _userEmail?.Trim().ToLowerInvariant();
 
                 if (string.IsNullOrEmpty(normalizedEmail))
                     return;
@@ -398,7 +398,7 @@ namespace AkademiTrack.ViewModels
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
                 string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
-                string normalizedEmail = userEmail?.Trim().ToLowerInvariant();
+                string? normalizedEmail = userEmail?.Trim().ToLowerInvariant();
 
                 if (string.IsNullOrEmpty(normalizedEmail))
                 {
@@ -491,7 +491,7 @@ namespace AkademiTrack.ViewModels
                 var resetData = new
                 {
                     privacy_policy_accepted = false,
-                    privacy_policy_accepted_at = (string)null
+                    privacy_policy_accepted_at = (string?)null
                 };
 
                 var jsonContent = JsonSerializer.Serialize(resetData);
@@ -517,7 +517,7 @@ namespace AkademiTrack.ViewModels
                 var resetData = new
                 {
                     terms_of_use_accepted = false,
-                    terms_of_use_accepted_at = (string)null
+                    terms_of_use_accepted_at = (string?)null
                 };
 
                 var jsonContent = JsonSerializer.Serialize(resetData);
@@ -584,7 +584,7 @@ namespace AkademiTrack.ViewModels
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
                 string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
-                string normalizedEmail = email?.Trim().ToLowerInvariant();
+                string? normalizedEmail = email?.Trim().ToLowerInvariant();
 
                 if (string.IsNullOrEmpty(normalizedEmail))
                 {
@@ -662,22 +662,22 @@ namespace AkademiTrack.ViewModels
         public class VersionInfo
         {
             [JsonPropertyName("version")]
-            public string Version { get; set; }
+            public string? Version { get; set; }
 
             [JsonPropertyName("lastUpdated")]
-            public string LastUpdated { get; set; }
+            public string? LastUpdated { get; set; }
 
             [JsonPropertyName("effectiveDate")]
-            public string EffectiveDate { get; set; }
+            public string? EffectiveDate { get; set; }
 
             [JsonPropertyName("url")]
-            public string Url { get; set; }
+            public string? Url { get; set; }
 
             [JsonPropertyName("markdownUrl")]
-            public string MarkdownUrl { get; set; }
+            public string? MarkdownUrl { get; set; }
 
             [JsonPropertyName("changelog")]
-            public Dictionary<string, List<string>> Changelog { get; set; }
+            public Dictionary<string, List<string>> Changelog { get; set; } = new Dictionary<string, List<string>>();
         }
 
         public class UserProfile
@@ -686,25 +686,25 @@ namespace AkademiTrack.ViewModels
             public int Id { get; set; }
 
             [JsonPropertyName("user_id")]
-            public string UserId { get; set; }
+            public string? UserId { get; set; }
 
             [JsonPropertyName("privacy_policy_accepted")]
             public bool PrivacyPolicyAccepted { get; set; }
 
             [JsonPropertyName("privacy_policy_version")]
-            public string PrivacyPolicyVersion { get; set; }
+            public string? PrivacyPolicyVersion { get; set; }
 
             [JsonPropertyName("privacy_policy_accepted_at")]
-            public string PrivacyPolicyAcceptedAt { get; set; }
+            public string? PrivacyPolicyAcceptedAt { get; set; }
 
             [JsonPropertyName("terms_of_use_accepted")]
             public bool TermsOfUseAccepted { get; set; }
 
             [JsonPropertyName("terms_of_use_version")]
-            public string TermsOfUseVersion { get; set; }
+            public string? TermsOfUseVersion { get; set; }
 
             [JsonPropertyName("terms_of_use_accepted_at")]
-            public string TermsOfUseAcceptedAt { get; set; }
+            public string? TermsOfUseAcceptedAt { get; set; }
         }
     }
 }

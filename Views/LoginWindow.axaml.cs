@@ -26,7 +26,7 @@ namespace AkademiTrack.Views
             Closing += OnWindowClosing;
         }
 
-        private async void OnLoginCompleted(object sender, LoginCompletedEventArgs e)
+        private async void OnLoginCompleted(object? sender, LoginCompletedEventArgs e)
         {
             if (e.Success)
             {
@@ -116,7 +116,7 @@ namespace AkademiTrack.Views
             }
         }
 
-        private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             if (_viewModel != null)
             {

@@ -101,7 +101,7 @@ namespace AkademiTrack.Views
             }
         }
 
-        private void OnWindowLoaded(object sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private void OnWindowLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             CenterWindowManually();
             this.Loaded -= OnWindowLoaded;

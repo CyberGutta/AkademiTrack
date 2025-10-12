@@ -9,13 +9,13 @@ namespace AkademiTrack.Services
 {
     public class ThemeManager : INotifyPropertyChanged
     {
-        private static ThemeManager _instance;
+        private static ThemeManager? _instance;
         private bool _isDarkMode;
         private readonly string _settingsFilePath;
 
         public static ThemeManager Instance => _instance ??= new ThemeManager();
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         private ThemeManager()
         {
@@ -102,7 +102,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

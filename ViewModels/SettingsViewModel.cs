@@ -176,37 +176,49 @@ namespace AkademiTrack.ViewModels
             return false;
         }
 
+#if WINDOWS
+using Microsoft.Win32;
+#endif
+
         private static bool IsAutoStartEnabledWindows()
         {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
-                var value = key?.GetValue(AppName)?.ToString();
-                return !string.IsNullOrEmpty(value);
-            }
-            catch { return false; }
+#if WINDOWS
+    try
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
+        var value = key?.GetValue(AppName)?.ToString();
+        return !string.IsNullOrEmpty(value);
+    }
+    catch { return false; }
+#else
+            return false; // Not supported on non-Windows
+#endif
         }
 
         private static bool SetAutoStartWindows(bool enable)
         {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-                if (key == null) return false;
+#if WINDOWS
+    try
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
+        if (key == null) return false;
 
-                if (enable)
-                {
-                    var exePath = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
-                    if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath)) return false;
-                    key.SetValue(AppName, $"\"{exePath}\"", RegistryValueKind.String);
-                }
-                else
-                {
-                    key.DeleteValue(AppName, false);
-                }
-                return true;
-            }
-            catch { return false; }
+        if (enable)
+        {
+            var exePath = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath)) return false;
+            key.SetValue(AppName, $"\"{exePath}\"", RegistryValueKind.String);
+        }
+        else
+        {
+            key.DeleteValue(AppName, false);
+        }
+        return true;
+    }
+    catch { return false; }
+#else
+            return false;
+#endif
         }
 
         private static bool IsAutoStartEnabledMacOS()
@@ -314,7 +326,8 @@ Terminal=false
     public class BoolToStringConverter : IValueConverter
     {
         public static readonly BoolToStringConverter Instance = new();
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool boolValue && parameter is string paramString)
             {
@@ -323,41 +336,54 @@ Terminal=false
             }
             return value?.ToString() ?? string.Empty;
         }
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 
     public class StringEqualityConverter : IValueConverter
     {
         public static readonly StringEqualityConverter Instance = new();
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is string stringValue && parameter is string paramString)
                 return string.Equals(stringValue, paramString, StringComparison.OrdinalIgnoreCase);
             return false;
         }
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 
     public class BoolToIntConverter : IValueConverter
     {
         public static readonly BoolToIntConverter Instance = new();
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool boolValue && parameter is string paramString)
             {
                 var parts = paramString.Split('|');
-                if (parts.Length == 2 && int.TryParse(parts[0], out int falseValue) && int.TryParse(parts[1], out int trueValue))
+                if (parts.Length == 2 &&
+                    int.TryParse(parts[0], out int falseValue) &&
+                    int.TryParse(parts[1], out int trueValue))
+                {
                     return boolValue ? trueValue : falseValue;
+                }
             }
             return 600;
         }
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 
     public class BoolToGridLengthConverter : IValueConverter
     {
         public static readonly BoolToGridLengthConverter Instance = new();
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool boolValue && parameter is string paramString)
             {
@@ -380,7 +406,9 @@ Terminal=false
             }
             return new Avalonia.Controls.GridLength(1, Avalonia.Controls.GridUnitType.Star);
         }
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 
     public class RelayCommand : ICommand
