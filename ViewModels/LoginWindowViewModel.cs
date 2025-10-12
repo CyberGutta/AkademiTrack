@@ -134,8 +134,7 @@ namespace AkademiTrack.ViewModels
             {
                 string cleanKey = activationKey.Trim();
 
-                System.Diagnostics.Debug.WriteLine($"=== ACTIVATION VALIDATION START ===");
-                System.Diagnostics.Debug.WriteLine($"Input Key: '{cleanKey}'");
+                
 
                 var url = $"{_supabaseUrl}/rest/v1/activation_keys?select=*";
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -161,7 +160,6 @@ namespace AkademiTrack.ViewModels
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 });
 
-                System.Diagnostics.Debug.WriteLine($"Total records in database: {allRecords?.Length ?? 0}");
 
                 if (allRecords == null || allRecords.Length == 0)
                 {
@@ -169,38 +167,29 @@ namespace AkademiTrack.ViewModels
                     return new ValidationResult { IsValid = false };
                 }
 
-                System.Diagnostics.Debug.WriteLine("=== ALL DATABASE RECORDS ===");
-                foreach (var record in allRecords)
-                {
-                    System.Diagnostics.Debug.WriteLine($"ID: {record.Id}, Email: '{record.UserEmail}', Key: '{record.ActivationKey}', IsActivated: {record.IsActivated}");
-                }
+                
 
                 var exactMatch = allRecords.FirstOrDefault(r =>
                     string.Equals(r.ActivationKey?.Trim(), cleanKey, StringComparison.OrdinalIgnoreCase));
 
                 if (exactMatch == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"No activation key match found for: '{cleanKey}'");
                     ErrorMessage = "Aktiveringsnøkkelen finnes ikke i systemet";
                     return new ValidationResult { IsValid = false };
                 }
 
                 if (exactMatch.IsActivated)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Key already activated at: {exactMatch.ActivatedAt}");
                     ErrorMessage = "Denne aktiveringsnøkkelen er allerede brukt";
                     return new ValidationResult { IsValid = false };
                 }
 
-                System.Diagnostics.Debug.WriteLine($"SUCCESS: Valid unused activation key found!");
-                System.Diagnostics.Debug.WriteLine($"Associated email: {exactMatch.UserEmail}");
-                System.Diagnostics.Debug.WriteLine($"=== ACTIVATION VALIDATION END ===");
+                
 
                 return new ValidationResult { IsValid = true, FoundRecord = exactMatch };
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"VALIDATION ERROR: {ex}");
                 ErrorMessage = $"Valideringsfeil: {ex.Message}";
                 return new ValidationResult { IsValid = false };
             }
