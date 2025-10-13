@@ -33,6 +33,9 @@ namespace AkademiTrack
                     var activationData = GetLocalActivationData();
                     string userEmail = activationData?.Email ?? string.Empty;
 
+                    System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
+                    System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
+
                     Task.Run(async () =>
                     {
                         try
@@ -53,7 +56,7 @@ namespace AkademiTrack
                                             loginWindow.Show();
                                         }
                                     });
-                                    return; 
+                                    return;
                                 }
                             }
 
@@ -153,23 +156,32 @@ namespace AkademiTrack
 
                 if (startMinimized)
                 {
-                    System.Diagnostics.Debug.WriteLine("Starting minimized to tray (invisible initialization)...");
+                    System.Diagnostics.Debug.WriteLine("Starting minimized to tray...");
 
-                    mainWindow.Opacity = 0;
-                    mainWindow.ShowInTaskbar = false;
+                    if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+                    {
+                        mainWindow.ShowInTaskbar = false;
+                        AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+                        System.Diagnostics.Debug.WriteLine("macOS: Window not shown, started in tray");
+                    }
+                    else
+                    {
+                        mainWindow.Opacity = 0;
+                        mainWindow.ShowInTaskbar = false;
 
-                    mainWindow.Show();
+                        mainWindow.Show();
 
-                    await Task.Delay(100);
+                        await Task.Delay(100);
 
-                    mainWindow.Hide();
+                        mainWindow.Hide();
 
-                    mainWindow.Opacity = 1;
-                    mainWindow.ShowInTaskbar = true;
+                        mainWindow.Opacity = 1;
+                        mainWindow.ShowInTaskbar = true;
 
-                    AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+                        AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
 
-                    System.Diagnostics.Debug.WriteLine("App started in tray - no visual flash");
+                        System.Diagnostics.Debug.WriteLine("Windows/Linux: App started in tray - no visual flash");
+                    }
                 }
                 else
                 {
