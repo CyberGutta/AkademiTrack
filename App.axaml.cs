@@ -16,6 +16,8 @@ namespace AkademiTrack
 {
     public partial class App : Application
     {
+        private bool _isShuttingDown = false;
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -24,7 +26,6 @@ namespace AkademiTrack
         public override void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-
             {
                 bool isActivated = CheckActivationStatus();
                 if (isActivated)
@@ -32,44 +33,7 @@ namespace AkademiTrack
                     var activationData = GetLocalActivationData();
                     string userEmail = activationData?.Email ?? string.Empty;
 
-                    System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
-                    System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
-
                     Task.Run(async () =>
-                    {
-                        try
-                        {
-                            bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
-
-                            System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
-
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                if (needsPrivacyAcceptance)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
-                                    ShowPrivacyPolicyWindow(desktop, userEmail);
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
-
-                                    ContinueNormalFlow(desktop);
-                                }
-                            });
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error checking privacy policy: {ex.Message}");
-                            // On error, show privacy window to be safe
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                ShowPrivacyPolicyWindow(desktop, userEmail);
-                            });
-                        }
-                    });
-
-                    _ = Task.Run(async () =>
                     {
                         try
                         {
@@ -78,22 +42,51 @@ namespace AkademiTrack
                                 bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
                                 if (!keyStillExists)
                                 {
+                                    System.Diagnostics.Debug.WriteLine("Activation key no longer exists remotely - showing login");
                                     DeleteActivationFile();
                                     await Dispatcher.UIThread.InvokeAsync(() =>
                                     {
-                                        var currentWindow = desktop.MainWindow;
-                                        var loginWindow = new LoginWindow();
-                                        desktop.MainWindow = loginWindow;
-                                        loginWindow.Show();
-                                        currentWindow?.Close();
+                                        if (!_isShuttingDown)
+                                        {
+                                            var loginWindow = new LoginWindow();
+                                            desktop.MainWindow = loginWindow;
+                                            loginWindow.Show();
+                                        }
                                     });
-                                    return;
+                                    return; 
                                 }
                             }
+
+                            bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
+
+                            System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
+
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                if (_isShuttingDown) return;
+
+                                if (needsPrivacyAcceptance)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
+                                    ShowPrivacyPolicyWindow(desktop, userEmail);
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
+                                    ContinueNormalFlow(desktop);
+                                }
+                            });
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Remote verification error: {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"Error during startup validation: {ex.Message}");
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                if (!_isShuttingDown)
+                                {
+                                    ShowPrivacyPolicyWindow(desktop, userEmail);
+                                }
+                            });
                         }
                     });
                 }
@@ -124,6 +117,7 @@ namespace AkademiTrack
             privacyViewModel.Exited += (s, e) =>
             {
                 System.Diagnostics.Debug.WriteLine("Privacy declined, shutting down...");
+                _isShuttingDown = true;
                 desktop.Shutdown();
             };
 
@@ -134,6 +128,8 @@ namespace AkademiTrack
 
         private async void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
         {
+            if (_isShuttingDown) return;
+
             System.Diagnostics.Debug.WriteLine("ContinueNormalFlow called");
 
             bool hasFeideCredentials = CheckFeideCredentials();
