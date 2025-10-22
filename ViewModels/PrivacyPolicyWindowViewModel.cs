@@ -252,9 +252,8 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Load the latest versions from GitHub
-                string latestPrivacyVersion = "1.0";
-                string latestTermsVersion = "1.0";
+                string latestPrivacyVersion = "1.1";
+                string latestTermsVersion = "1.1";
 
                 using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
                 {
@@ -276,7 +275,6 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // Read stored acceptance from local file
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 string folder = Path.Combine(appData, "AkademiTrack");
                 string filePath = Path.Combine(folder, "user_acceptance.json");
@@ -284,7 +282,7 @@ namespace AkademiTrack.ViewModels
                 if (!File.Exists(filePath))
                 {
                     System.Diagnostics.Debug.WriteLine("No local acceptance file found — user must accept.");
-                    return true; // user hasn’t accepted anything yet
+                    return true;
                 }
 
                 var json = await File.ReadAllTextAsync(filePath);
@@ -307,7 +305,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking local acceptance: {ex.Message}");
-                return true; // default to requiring acceptance if something goes wrong
+                return true;
             }
         }
 
@@ -509,8 +507,6 @@ namespace AkademiTrack.ViewModels
                 IsLoading = false;
             }
         }
-
-        
 
         private void Exit()
         {

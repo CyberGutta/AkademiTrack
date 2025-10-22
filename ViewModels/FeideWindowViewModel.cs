@@ -154,7 +154,6 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                // Use FeideUsername as the user email
                 string userEmail = FeideUsername;
 
                 await SaveCredentialsToSettingsAsync();

@@ -916,7 +916,7 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        public NotificationEntry? CurrentNotification
+         public NotificationEntry? CurrentNotification
         {
             get => _currentNotification;
             private set
@@ -925,7 +925,7 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasCurrentNotification));
             }
-        }
+        } 
 
         public bool HasCurrentNotification => _currentNotification != null;
 

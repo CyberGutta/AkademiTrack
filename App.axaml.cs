@@ -82,7 +82,6 @@ namespace AkademiTrack
             {
                 System.Diagnostics.Debug.WriteLine("Privacy accepted, continuing normal flow...");
 
-                // Determine the next window (Feide or MainWindow)
                 Window nextWindow;
                 if (!CheckFeideCredentials())
                 {
@@ -94,14 +93,11 @@ namespace AkademiTrack
                     AkademiTrack.Services.TrayIconManager.Initialize(nextWindow);
                 }
 
-                // Set it as the MainWindow BEFORE closing the privacy window
                 var desktop = (IClassicDesktopStyleApplicationLifetime)Application.Current.ApplicationLifetime!;
                 desktop.MainWindow = nextWindow;
 
-                // Show the next window
                 nextWindow.Show();
 
-                // Now safe to close the privacy window
                 privacyWindow.Close();
             };
 
