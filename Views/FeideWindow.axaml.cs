@@ -23,7 +23,7 @@ namespace AkademiTrack.Views
                 {
                     System.Diagnostics.Debug.WriteLine($"Feide setup completed for email: {e.UserEmail}");
 
-                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(e.UserEmail);
+                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.CheckIfNeedsPrivacyAcceptanceLocalAsync(e.UserEmail);
 
                     System.Diagnostics.Debug.WriteLine($"Privacy check result - Needs acceptance: {needsPrivacyAcceptance}");
 
@@ -32,7 +32,7 @@ namespace AkademiTrack.Views
                         System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
 
                         var privacyWindow = new PrivacyPolicyWindow();
-                        var privacyViewModel = new PrivacyPolicyWindowViewModel(e.UserEmail);
+                        var privacyViewModel = new PrivacyPolicyWindowViewModel();
 
                         privacyViewModel.Accepted += (sender, args) =>
                         {

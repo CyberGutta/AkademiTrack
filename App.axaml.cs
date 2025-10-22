@@ -1,16 +1,15 @@
-﻿using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Threading;
-using AkademiTrack.ViewModels;
+﻿using AkademiTrack.ViewModels;
 using AkademiTrack.Views;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using System;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Avalonia.Markup.Xaml;
 
 namespace AkademiTrack
 {
@@ -27,77 +26,47 @@ namespace AkademiTrack
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                bool isActivated = CheckActivationStatus();
-                if (isActivated)
+                string userEmail = GetUserEmail();
+
+                System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
+                System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
+
+                Task.Run(async () =>
                 {
-                    var activationData = GetLocalActivationData();
-                    string userEmail = activationData?.Email ?? string.Empty;
-
-                    System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
-                    System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
-
-                    Task.Run(async () =>
+                    try
                     {
-                        try
+                        bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.CheckIfNeedsPrivacyAcceptanceLocalAsync(userEmail);
+
+                        System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
                         {
-                            if (activationData != null && !string.IsNullOrEmpty(activationData.ActivationKey))
+                            if (_isShuttingDown) return;
+
+                            if (needsPrivacyAcceptance)
                             {
-                                bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
-                                if (!keyStillExists)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Activation key no longer exists remotely - showing login");
-                                    DeleteActivationFile();
-                                    await Dispatcher.UIThread.InvokeAsync(() =>
-                                    {
-                                        if (!_isShuttingDown)
-                                        {
-                                            var loginWindow = new LoginWindow();
-                                            desktop.MainWindow = loginWindow;
-                                            loginWindow.Show();
-                                        }
-                                    });
-                                    return;
-                                }
+                                System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
+                                ShowPrivacyPolicyWindow(desktop, userEmail);
                             }
-
-                            bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
-
-                            System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
-
-                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            else
                             {
-                                if (_isShuttingDown) return;
-
-                                if (needsPrivacyAcceptance)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
-                                    ShowPrivacyPolicyWindow(desktop, userEmail);
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
-                                    ContinueNormalFlow(desktop);
-                                }
-                            });
-                        }
-                        catch (Exception ex)
+                                System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
+                                ContinueNormalFlow(desktop);
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error during startup validation: {ex.Message}");
+                        await Dispatcher.UIThread.InvokeAsync(() =>
                         {
-                            System.Diagnostics.Debug.WriteLine($"Error during startup validation: {ex.Message}");
-                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            if (!_isShuttingDown)
                             {
-                                if (!_isShuttingDown)
-                                {
-                                    ShowPrivacyPolicyWindow(desktop, userEmail);
-                                }
-                            });
-                        }
-                    });
-                }
-                else
-                {
-                    desktop.MainWindow = new LoginWindow();
-                    desktop.MainWindow.Show();
-                }
+                                ShowPrivacyPolicyWindow(desktop, userEmail);
+                            }
+                        });
+                    }
+                });
             }
             base.OnFrameworkInitializationCompleted();
         }
@@ -107,13 +76,32 @@ namespace AkademiTrack
             System.Diagnostics.Debug.WriteLine($"ShowPrivacyPolicyWindow called for: {userEmail}");
 
             var privacyWindow = new PrivacyPolicyWindow();
-            var privacyViewModel = new PrivacyPolicyWindowViewModel(userEmail);
+            var privacyViewModel = new PrivacyPolicyWindowViewModel();
 
-            privacyViewModel.Accepted += (s, e) =>
+            privacyViewModel.Accepted += async (s, e) =>
             {
-                System.Diagnostics.Debug.WriteLine("Privacy accepted in App.axaml.cs, continuing normal flow...");
+                System.Diagnostics.Debug.WriteLine("Privacy accepted, continuing normal flow...");
 
-                ContinueNormalFlow(desktop);
+                // Determine the next window (Feide or MainWindow)
+                Window nextWindow;
+                if (!CheckFeideCredentials())
+                {
+                    nextWindow = new FeideWindow();
+                }
+                else
+                {
+                    nextWindow = new MainWindow();
+                    AkademiTrack.Services.TrayIconManager.Initialize(nextWindow);
+                }
+
+                // Set it as the MainWindow BEFORE closing the privacy window
+                var desktop = (IClassicDesktopStyleApplicationLifetime)Application.Current.ApplicationLifetime!;
+                desktop.MainWindow = nextWindow;
+
+                // Show the next window
+                nextWindow.Show();
+
+                // Now safe to close the privacy window
                 privacyWindow.Close();
             };
 
@@ -204,33 +192,6 @@ namespace AkademiTrack
             }
         }
 
-        private bool CheckActivationStatus()
-        {
-            try
-            {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-                string activationPath = Path.Combine(appDataDir, "activation.json");
-                if (File.Exists(activationPath))
-                {
-                    string json = File.ReadAllText(activationPath);
-                    var activationData = JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-                    return activationData?.IsActivated == true;
-                }
-                return false;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error checking activation status: {ex.Message}");
-                return false;
-            }
-        }
-
         private bool CheckFeideCredentials()
         {
             try
@@ -260,7 +221,7 @@ namespace AkademiTrack
             }
         }
 
-        private ActivationData? GetLocalActivationData()
+        private string GetUserEmail()
         {
             try
             {
@@ -268,124 +229,33 @@ namespace AkademiTrack
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
                 );
-                string activationPath = Path.Combine(appDataDir, "activation.json");
-                if (File.Exists(activationPath))
+                string settingsPath = Path.Combine(appDataDir, "settings.json");
+
+                if (File.Exists(settingsPath))
                 {
-                    string json = File.ReadAllText(activationPath);
-                    return JsonSerializer.Deserialize<ActivationData>(json, new JsonSerializerOptions
+                    string json = File.ReadAllText(settingsPath);
+                    var settings = JsonSerializer.Deserialize<AppSettings>(json, new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     });
+
+                    return settings?.UserEmail ?? string.Empty;
                 }
-                return null;
+                return string.Empty;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error reading activation data: {ex.Message}");
-                return null;
+                System.Diagnostics.Debug.WriteLine($"Error reading user email: {ex.Message}");
+                return string.Empty;
             }
         }
-
-        private async Task<bool> VerifyActivationKeyExists(string activationKey)
-        {
-            if (string.IsNullOrEmpty(activationKey))
-                return false;
-
-            HttpClient? httpClient = null;
-            try
-            {
-                httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-
-                string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
-                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
-
-                var url = $"{supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}&select=id,is_activated";
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("apikey", supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
-                request.Headers.Add("Accept", "application/json");
-
-                var response = await httpClient.SendAsync(request);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to check activation key - HTTP {response.StatusCode}");
-                    return false;
-                }
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var records = JsonSerializer.Deserialize<RemoteKeyRecord[]>(responseContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                });
-
-                return records?.Any(r => r.IsActivated) == true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error checking activation key: {ex.Message}");
-                return false;
-            }
-            finally
-            {
-                httpClient?.Dispose();
-            }
-        }
-
-        private void DeleteActivationFile()
-        {
-            try
-            {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-                string activationPath = Path.Combine(appDataDir, "activation.json");
-
-                if (File.Exists(activationPath))
-                {
-                    File.Delete(activationPath);
-                    System.Diagnostics.Debug.WriteLine("Activation file deleted - key no longer exists remotely");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error deleting activation file: {ex.Message}");
-            }
-        }
-    }
-
-    public class ActivationData
-    {
-        [JsonPropertyName("activationKey")]
-        public string ActivationKey { get; set; } = "";
-
-        [JsonPropertyName("email")]
-        public string Email { get; set; } = "";
-
-        [JsonPropertyName("activatedAt")]
-        public DateTime? ActivatedAt { get; set; }
-
-        [JsonPropertyName("deviceId")]
-        public string? DeviceId { get; set; }
-
-        [JsonPropertyName("deviceName")]
-        public string? DeviceName { get; set; }
-
-        [JsonPropertyName("isActivated")]
-        public bool IsActivated { get; set; }
-    }
-
-    public class RemoteKeyRecord
-    {
-        public int Id { get; set; }
-
-        [JsonPropertyName("is_activated")]
-        public bool IsActivated { get; set; }
     }
 
     public class AppSettings
     {
         public bool InitialSetupCompleted { get; set; }
+
+        [JsonPropertyName("userEmail")]
+        public string? UserEmail { get; set; }
     }
 }

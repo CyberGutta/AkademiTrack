@@ -475,7 +475,7 @@ namespace AkademiTrack.ViewModels
         public new event PropertyChangedEventHandler? PropertyChanged;
 
         private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; 
-        private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
+        private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
 
         private string _loginEmail = "";
@@ -533,7 +533,7 @@ namespace AkademiTrack.ViewModels
 
             _ = Task.Run(LoadProcessedNotificationIdsAsync);
 
-            _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
+            // _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
 
             LogInfo("Admin notification system initialized");
 
@@ -663,7 +663,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async void CheckForAdminNotifications(object? state)
+        /* private async void CheckForAdminNotifications(object? state)
         {
             try
             {
@@ -672,9 +672,9 @@ namespace AkademiTrack.ViewModels
             catch (Exception )
             {
             }
-        }
+        } */
 
-        private async Task CheckForNewAdminNotificationsAsync()
+        /* private async Task CheckForNewAdminNotificationsAsync()
         {
             try
             {
@@ -824,7 +824,7 @@ namespace AkademiTrack.ViewModels
                     LogDebug($"Stack trace: {ex.StackTrace}");
                 }
             }
-        }
+        } */
         public class EnhancedAdminNotification
         {
             public string? Id { get; set; }
@@ -3098,9 +3098,9 @@ namespace AkademiTrack.ViewModels
         {
             public UserParameters? Parameters { get; set; }
             public DateTime SavedAt { get; set; }
-            public string? SchoolYear { get; set; } 
+            public string? SchoolYear { get; set; }
         }
-        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string? userEmail = null)
+        /*  private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string? userEmail = null)
         {
             try
             {
@@ -3160,6 +3160,8 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        */
+ 
         private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
             try
@@ -3221,7 +3223,7 @@ namespace AkademiTrack.ViewModels
                     }
 
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
-                    var userEmail = await GetUserEmailFromActivationAsync();
+                    /* var userEmail = await GetUserEmailFromActivationAsync();
 
                     if (!string.IsNullOrEmpty(userEmail))
                     {
@@ -3231,7 +3233,7 @@ namespace AkademiTrack.ViewModels
                     else
                     {
                         LogError("Could not send to Supabase - no user email found");
-                    }
+                    } */
 
                     return true; 
                 }

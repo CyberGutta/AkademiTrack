@@ -1,7 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -128,7 +127,7 @@ namespace AkademiTrack.ViewModels
         public ICommand SaveCommand { get; }
         public ICommand ExitCommand { get; }
 
-        private async System.Threading.Tasks.Task SaveFeideCredentialsAsync()
+        private async Task SaveFeideCredentialsAsync()
         {
             if (!CanSave) return;
 
@@ -155,13 +154,8 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                string? userEmail = await GetUserEmailFromActivationAsync();
-
-                if (string.IsNullOrEmpty(userEmail))
-                {
-                    ErrorMessage = "Kunne ikke finne brukerens e-post. Vennligst logg inn på nytt.";
-                    return;
-                }
+                // Use FeideUsername as the user email
+                string userEmail = FeideUsername;
 
                 await SaveCredentialsToSettingsAsync();
 
@@ -184,42 +178,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<string?> GetUserEmailFromActivationAsync()
-        {
-            try
-            {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-                string activationPath = Path.Combine(appDataDir, "activation.json");
-
-                if (!File.Exists(activationPath))
-                {
-                    System.Diagnostics.Debug.WriteLine("activation.json not found");
-                    return null;
-                }
-
-                var json = await File.ReadAllTextAsync(activationPath);
-                var activationData = JsonSerializer.Deserialize<ActivationData>(json);
-
-                if (activationData?.Email == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("Email field missing in activation.json");
-                    return null;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"Retrieved email from activation.json: {activationData.Email}");
-                return activationData.Email;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error reading activation.json: {ex.Message}");
-                return null;
-            }
-        }
-
-        private async System.Threading.Tasks.Task SaveCredentialsToSettingsAsync()
+        private async Task SaveCredentialsToSettingsAsync()
         {
             try
             {
@@ -243,8 +202,6 @@ namespace AkademiTrack.ViewModels
                     catch (JsonException jsonEx)
                     {
                         System.Diagnostics.Debug.WriteLine($"Corrupted settings.json detected: {jsonEx.Message}");
-                        System.Diagnostics.Debug.WriteLine("Deleting corrupted file and creating fresh settings");
-
                         try
                         {
                             File.Delete(settingsPath);
@@ -254,8 +211,7 @@ namespace AkademiTrack.ViewModels
                         {
                             System.Diagnostics.Debug.WriteLine($"Warning: Could not delete corrupted file: {deleteEx.Message}");
                         }
-
-                        settings = null; 
+                        settings = null;
                     }
                 }
 
@@ -274,22 +230,13 @@ namespace AkademiTrack.ViewModels
                 settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(FeidePassword);
                 settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
                 settings.LastUpdated = DateTime.Now;
-
                 settings.InitialSetupCompleted = true;
 
-                try
-                {
-                    var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(settingsPath, json);
+                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(settingsPath, json);
 
-                    System.Diagnostics.Debug.WriteLine($"Credentials saved successfully to: {settingsPath}");
-                    System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
-                }
-                catch (Exception writeEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to write settings file: {writeEx.Message}");
-                    throw new Exception($"Kunne ikke lagre innstillinger: {writeEx.Message}", writeEx);
-                }
+                System.Diagnostics.Debug.WriteLine($"Credentials saved successfully to: {settingsPath}");
+                System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
             }
             catch (Exception ex)
             {
@@ -304,14 +251,6 @@ namespace AkademiTrack.ViewModels
             {
                 desktop.Shutdown();
             }
-        }
-
-        private class ActivationData
-        {
-            public bool IsActivated { get; set; }
-            public DateTime ActivatedAt { get; set; }
-            public required string Email { get; set; }
-            public required string ActivationKey { get; set; }
         }
     }
 
