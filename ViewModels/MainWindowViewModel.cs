@@ -2889,11 +2889,11 @@ namespace AkademiTrack.ViewModels
                     "AkademiTrack"
                 );
 
-                string activationPath = System.IO.Path.Combine(appDataDir, "activation.json");
+                string activationPath = System.IO.Path.Combine(appDataDir, "login.json");
 
                 if (!System.IO.File.Exists(activationPath))
                 {
-                    LogError("Activation file not found. Please log in first.");
+                    LogError("Login file not found. Please log in first. Close the app");
                     return null!;
                 }
 
@@ -2905,12 +2905,12 @@ namespace AkademiTrack.ViewModels
                     return emailElement.GetString() ?? string.Empty;
                 }
 
-                LogError("Email not found in activation file.");
+                LogError("Email not found in login file.");
                 return null!;
             }
             catch (Exception ex)
             {
-                LogError($"Failed to load email from activation file: {ex.Message}");
+                LogError($"Failed to load email from login file: {ex.Message}");
                 return null!;
             }
         }

@@ -128,7 +128,7 @@ namespace AkademiTrack.ViewModels
         public ICommand SaveCommand { get; }
         public ICommand ExitCommand { get; }
 
-        private async System.Threading.Tasks.Task SaveFeideCredentialsAsync()
+        private async Task SaveFeideCredentialsAsync()
         {
             if (!CanSave) return;
 
@@ -155,22 +155,14 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                string? userEmail = await GetUserEmailFromActivationAsync();
-
-                if (string.IsNullOrEmpty(userEmail))
-                {
-                    ErrorMessage = "Kunne ikke finne brukerens e-post. Vennligst logg inn på nytt.";
-                    return;
-                }
-
                 await SaveCredentialsToSettingsAsync();
 
-                System.Diagnostics.Debug.WriteLine($"Feide credentials saved successfully for user: {userEmail}");
+                System.Diagnostics.Debug.WriteLine($"Feide credentials saved successfully for user: {FeideUsername}");
 
                 SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
                 {
                     Success = true,
-                    UserEmail = userEmail
+                    UserEmail = FeideUsername
                 });
             }
             catch (Exception ex)
@@ -192,29 +184,25 @@ namespace AkademiTrack.ViewModels
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
                 );
-                string activationPath = Path.Combine(appDataDir, "activation.json");
 
-                if (!File.Exists(activationPath))
+                string loginPath = Path.Combine(appDataDir, "login.json");
+                if (File.Exists(loginPath))
                 {
-                    System.Diagnostics.Debug.WriteLine("activation.json not found");
-                    return null;
+                    var json = await File.ReadAllTextAsync(loginPath);
+                    var loginData = JsonSerializer.Deserialize<LoginSession>(json);
+                    if (!string.IsNullOrEmpty(loginData?.Email))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Retrieved email from login.json: {loginData.Email}");
+                        return loginData.Email;
+                    }
                 }
 
-                var json = await File.ReadAllTextAsync(activationPath);
-                var activationData = JsonSerializer.Deserialize<ActivationData>(json);
-
-                if (activationData?.Email == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("Email field missing in activation.json");
-                    return null;
-                }
-
-                System.Diagnostics.Debug.WriteLine($"Retrieved email from activation.json: {activationData.Email}");
-                return activationData.Email;
+                System.Diagnostics.Debug.WriteLine("login.json not found, cannot retrieve email");
+                return null;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error reading activation.json: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error reading login.json: {ex.Message}");
                 return null;
             }
         }

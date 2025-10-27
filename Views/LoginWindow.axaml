@@ -9,10 +9,10 @@
         Icon="/Assets/AT-Transparrent.png"
         Title="Aktiver AkademiTrack"
         Background="#F8F9FA"
-        Height="420"
+        Height="500"
         Width="420"
         MinWidth="400"
-        MinHeight="440"
+        MinHeight="500"
         WindowStartupLocation="CenterScreen"
         CanResize="false">
 
@@ -137,7 +137,7 @@
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Foreground" Value="#495057"/>
-			<Setter Property="Margin" Value="0,0,0,6"/>
+			<Setter Property="Margin" Value="0,10,20,6"/>
 		</Style>
 
 		<Style Selector="TextBlock.error">
@@ -168,7 +168,7 @@
 			<StackPanel Spacing="0">
 				<TextBlock Text="Aktiver AkademiTrack"
                           Classes="title"/>
-				<TextBlock Text="Skriv inn din aktiveringsnøkkel for å aktivere programmet"
+				<TextBlock Text="Skriv inn brukernavn og passord for å aktivere programmet"
                           Classes="subtitle"/>
 			</StackPanel>
 
@@ -180,11 +180,16 @@
 				<StackPanel Spacing="12">
 					
 					<StackPanel Spacing="0">
-						<TextBlock Text="Aktiveringsnøkkel"
-                                  Classes="label"/>
-						<TextBox Text="{Binding ActivationKey}"
-                                Watermark="XXXXX-XXXXX-XXXXX-XXXXX"
-                                IsEnabled="{Binding !IsLoading}"/>
+						<TextBlock Text="Brukernavn" Classes="label"/>
+						<TextBox Text="{Binding Email}"
+								 Watermark="eksempel@stud.akademiet.no"
+								 IsEnabled="{Binding !IsLoading}"/>
+
+						<TextBlock Text="Passord" Classes="label"/>
+						<TextBox Text="{Binding Password}"
+								 Watermark="*******"
+								 IsEnabled="{Binding !IsLoading}"
+								 PasswordChar="*"/>
 					</StackPanel>
 
 					<StackPanel MinHeight="20">
@@ -198,16 +203,16 @@
                            Command="{Binding LoginCommand}"
                            IsEnabled="{Binding CanLogin}"
                            HorizontalAlignment="Stretch"
-                           Margin="0,6,0,0"/>
+                           Margin="0,-6,0,0"/>
 				</StackPanel>
 			</Border>
 
 			<StackPanel Spacing="4">
-				<TextBlock Text="Trenger du en aktiveringsnøkkel?"
+				<TextBlock Text="Trenger du en bruker eller har du glemt pasordet?"
                           FontSize="12"
                           Foreground="#6C757D"
                           TextAlignment="Center"/>
-				<TextBlock Text="Få aktiveringsnøkkel på vår nettside"
+				<TextBlock Text="Besøk nettsiden vår"
                           Classes="link"
                           Tapped="OnCreateAccountTapped"/>
 			</StackPanel>

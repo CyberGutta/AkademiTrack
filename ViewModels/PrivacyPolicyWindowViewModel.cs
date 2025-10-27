@@ -390,97 +390,86 @@ namespace AkademiTrack.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Error getting user's current versions: {ex.Message}");
             }
         }
- 
+
         public static async Task<bool> NeedsPrivacyPolicyAcceptance(string userEmail)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(userEmail))
+                    return true; // no email, assume not accepted
+
+                string normalizedEmail = userEmail.Trim().ToLowerInvariant();
+
                 string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
                 string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
 
-                string? normalizedEmail = userEmail?.Trim().ToLowerInvariant();
-
-                if (string.IsNullOrEmpty(normalizedEmail))
-                {
-                    return true;
-                }
+                // 1️⃣ Load latest policy versions
+                string latestPrivacyVersion = "1.1";
+                string latestTermsVersion = "1.1";
 
                 using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
                 {
-                    string latestPrivacyVersion = "1.0";
-                    string latestTermsVersion = "1.0";
-
                     try
                     {
                         var privacyResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/privacy-policy.json");
                         var privacyInfo = JsonSerializer.Deserialize<VersionInfo>(privacyResponse);
-                        if (privacyInfo != null && !string.IsNullOrEmpty(privacyInfo.Version))
-                        {
+                        if (privacyInfo?.Version != null)
                             latestPrivacyVersion = privacyInfo.Version.Trim();
-                        }
 
                         var termsResponse = await httpClient.GetStringAsync("https://cybergutta.github.io/AkademietTrack/terms-of-use.json");
                         var termsInfo = JsonSerializer.Deserialize<VersionInfo>(termsResponse);
-                        if (termsInfo != null && !string.IsNullOrEmpty(termsInfo.Version))
-                        {
+                        if (termsInfo?.Version != null)
                             latestTermsVersion = termsInfo.Version.Trim();
-                        }
                     }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"Error loading latest versions: {ex.Message}");
                     }
 
-                    var checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_accepted,privacy_policy_version,terms_of_use_accepted,terms_of_use_version";
+                    // 2️⃣ Query Supabase for user's accepted versions
+                    string checkUrl = $"{supabaseUrl}/rest/v1/user_profiles?user_email=eq.{Uri.EscapeDataString(normalizedEmail)}&select=privacy_policy_accepted,privacy_policy_version,terms_of_use_accepted,terms_of_use_version";
 
-                    var checkRequest = new HttpRequestMessage(HttpMethod.Get, checkUrl);
-                    checkRequest.Headers.Add("apikey", supabaseKey);
-                    checkRequest.Headers.Add("Authorization", $"Bearer {supabaseKey}");
+                    var request = new HttpRequestMessage(HttpMethod.Get, checkUrl);
+                    request.Headers.Add("apikey", supabaseKey);
+                    request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
 
-                    var checkResponse = await httpClient.SendAsync(checkRequest);
-                    var checkContent = await checkResponse.Content.ReadAsStringAsync();
+                    var response = await httpClient.SendAsync(request);
+                    var content = await response.Content.ReadAsStringAsync();
 
-                    if (!checkResponse.IsSuccessStatusCode || string.IsNullOrEmpty(checkContent) || checkContent == "[]")
-                    {
-                        return true;
-                    }
+                    if (!response.IsSuccessStatusCode || string.IsNullOrWhiteSpace(content) || content == "[]")
+                        return true; // no record, assume not accepted
 
-                    var profiles = JsonSerializer.Deserialize<UserProfile[]>(checkContent);
+                    var profiles = JsonSerializer.Deserialize<UserProfile[]>(content);
                     if (profiles == null || profiles.Length == 0)
-                    {
                         return true;
-                    }
 
                     var profile = profiles[0];
 
-                   
-                    bool needsPrivacy = !profile.PrivacyPolicyAccepted || profile.PrivacyPolicyVersion != latestPrivacyVersion;
-                    bool needsTerms = !profile.TermsOfUseAccepted || profile.TermsOfUseVersion != latestTermsVersion;
+                    // 3️⃣ Normalize versions for comparison
+                    string dbPrivacyVersion = profile.PrivacyPolicyVersion?.Trim() ?? "";
+                    string dbTermsVersion = profile.TermsOfUseVersion?.Trim() ?? "";
 
-                    bool needsAcceptance = needsPrivacy || needsTerms;
+                    bool needsPrivacy = !profile.PrivacyPolicyAccepted || !string.Equals(dbPrivacyVersion, latestPrivacyVersion, StringComparison.OrdinalIgnoreCase);
+                    bool needsTerms = !profile.TermsOfUseAccepted || !string.Equals(dbTermsVersion, latestTermsVersion, StringComparison.OrdinalIgnoreCase);
 
-                    System.Diagnostics.Debug.WriteLine($"Privacy accepted: {profile.PrivacyPolicyAccepted}, version: {profile.PrivacyPolicyVersion}, latest: {latestPrivacyVersion}");
-                    System.Diagnostics.Debug.WriteLine($"Terms accepted: {profile.TermsOfUseAccepted}, version: {profile.TermsOfUseVersion}, latest: {latestTermsVersion}");
-                    System.Diagnostics.Debug.WriteLine($"Needs acceptance: {needsAcceptance}");
-                    System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacy}");
-
-                    if (needsPrivacy && profile.PrivacyPolicyAccepted)
+                    // 4️⃣ Reset acceptance if the user previously accepted an older version
+                    if (needsPrivacy && profile.PrivacyPolicyAccepted && !string.Equals(dbPrivacyVersion, latestPrivacyVersion, StringComparison.OrdinalIgnoreCase))
                     {
                         await ResetPrivacyAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
                     }
 
-                    if (needsTerms && profile.TermsOfUseAccepted)
+                    if (needsTerms && profile.TermsOfUseAccepted && !string.Equals(dbTermsVersion, latestTermsVersion, StringComparison.OrdinalIgnoreCase))
                     {
                         await ResetTermsAcceptance(normalizedEmail, httpClient, supabaseUrl, supabaseKey);
                     }
 
-                    return needsAcceptance;
+                    return needsPrivacy || needsTerms;
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking acceptance status: {ex.Message}");
-                return true;
+                return true; // fallback to show privacy
             }
         }
 

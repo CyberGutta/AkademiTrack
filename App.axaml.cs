@@ -23,82 +23,80 @@ namespace AkademiTrack
             AvaloniaXamlLoader.Load(this);
         }
 
-        public override void OnFrameworkInitializationCompleted()
+        private LoginSession? LoadLoginSession()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string loginPath = Path.Combine(appDataDir, "login.json");
+
+                if (!File.Exists(loginPath))
+                    return null;
+
+                string json = File.ReadAllText(loginPath);
+                var session = JsonSerializer.Deserialize<LoginSession>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return session;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load login session: {ex.Message}");
+                return null;
+            }
+        }
+
+        public override async void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                bool isActivated = CheckActivationStatus();
-                if (isActivated)
+                string userEmail = string.Empty;
+
+                var loginSession = LoadLoginSession();
+                if (loginSession != null)
+                    userEmail = loginSession.Email;
+                else
                 {
                     var activationData = GetLocalActivationData();
-                    string userEmail = activationData?.Email ?? string.Empty;
-
-                    System.Diagnostics.Debug.WriteLine($"=== APP STARTUP - PRIVACY CHECK ===");
-                    System.Diagnostics.Debug.WriteLine($"User email: {userEmail}");
-
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            if (activationData != null && !string.IsNullOrEmpty(activationData.ActivationKey))
-                            {
-                                bool keyStillExists = await VerifyActivationKeyExists(activationData.ActivationKey);
-                                if (!keyStillExists)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Activation key no longer exists remotely - showing login");
-                                    DeleteActivationFile();
-                                    await Dispatcher.UIThread.InvokeAsync(() =>
-                                    {
-                                        if (!_isShuttingDown)
-                                        {
-                                            var loginWindow = new LoginWindow();
-                                            desktop.MainWindow = loginWindow;
-                                            loginWindow.Show();
-                                        }
-                                    });
-                                    return;
-                                }
-                            }
-
-                            bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
-
-                            System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
-
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                if (_isShuttingDown) return;
-
-                                if (needsPrivacyAcceptance)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
-                                    ShowPrivacyPolicyWindow(desktop, userEmail);
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Privacy up-to-date, continuing normal flow...");
-                                    ContinueNormalFlow(desktop);
-                                }
-                            });
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error during startup validation: {ex.Message}");
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                if (!_isShuttingDown)
-                                {
-                                    ShowPrivacyPolicyWindow(desktop, userEmail);
-                                }
-                            });
-                        }
-                    });
+                    if (activationData != null)
+                        userEmail = activationData.Email;
                 }
-                else
+
+                if (string.IsNullOrEmpty(userEmail))
                 {
                     desktop.MainWindow = new LoginWindow();
                     desktop.MainWindow.Show();
+                    base.OnFrameworkInitializationCompleted();
+                    return;
+                }
+
+                bool needsAcceptance = false;
+                try
+                {
+                    needsAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(userEmail);
+                    System.Diagnostics.Debug.WriteLine($"User '{userEmail}' needs privacy/terms acceptance: {needsAcceptance}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error checking privacy/terms: {ex.Message}");
+                    needsAcceptance = true; 
+                }
+
+                if (needsAcceptance)
+                {
+                    ShowPrivacyPolicyWindow(desktop, userEmail);
+                }
+                else
+                {
+                    ContinueNormalFlow(desktop);
                 }
             }
+
             base.OnFrameworkInitializationCompleted();
         }
 

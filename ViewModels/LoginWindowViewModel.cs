@@ -3,7 +3,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using System;
 using System.ComponentModel;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +15,8 @@ namespace AkademiTrack.ViewModels
     public class LoginWindowViewModel : ViewModelBase, INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
-        private string _activationKey = string.Empty;
+        private string _email = string.Empty;
+        private string _password = string.Empty;
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
 
@@ -40,12 +40,24 @@ namespace AkademiTrack.ViewModels
             ExitCommand = new InlineCommand(() => ExitAsync());
         }
 
-        public string ActivationKey
+        public string Email
         {
-            get => _activationKey;
+            get => _email;
             set
             {
-                _activationKey = value;
+                _email = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanLogin));
+                (LoginCommand as InlineCommand)?.NotifyCanExecuteChanged();
+            }
+        }
+
+        public string Password
+        {
+            get => _password;
+            set
+            {
+                _password = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanLogin));
                 (LoginCommand as InlineCommand)?.NotifyCanExecuteChanged();
@@ -78,9 +90,9 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        public bool CanLogin => !IsLoading && !string.IsNullOrWhiteSpace(ActivationKey);
+        public bool CanLogin => !IsLoading && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Password);
 
-        public string LoginButtonText => IsLoading ? "Aktiverer..." : "Aktiver";
+        public string LoginButtonText => IsLoading ? "Logger inn..." : "Logg inn";
 
         public ICommand LoginCommand { get; }
         public ICommand ExitCommand { get; }
@@ -94,24 +106,20 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                var result = await ValidateActivationKeyAsync(ActivationKey);
+                var result = await ValidateUserAsync(Email, Password);
 
                 if (result.IsValid && result.FoundRecord != null)
                 {
-                    await MarkActivationKeyAsUsedAsync(result.FoundRecord.ActivationKey);
-                    await SaveActivationStatusAsync(result.FoundRecord.UserEmail);
+                    await SaveLoginStatusAsync(result.FoundRecord.Email);
 
-                    System.Diagnostics.Debug.WriteLine($"Checking privacy policy for: {result.FoundRecord.UserEmail}");
-                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(result.FoundRecord.UserEmail);
-
-                    System.Diagnostics.Debug.WriteLine($"Needs privacy acceptance: {needsPrivacyAcceptance}");
+                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(result.FoundRecord.Email);
 
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         LoginCompleted?.Invoke(this, new LoginCompletedEventArgs
                         {
                             Success = true,
-                            UserEmail = result.FoundRecord.UserEmail,
+                            UserEmail = result.FoundRecord.Email,
                             NeedsPrivacyAcceptance = needsPrivacyAcceptance
                         });
                     });
@@ -120,7 +128,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 ErrorMessage = $"Feil: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Activation error: {ex}");
+                System.Diagnostics.Debug.WriteLine($"Login error: {ex}");
             }
             finally
             {
@@ -128,160 +136,104 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<ValidationResult> ValidateActivationKeyAsync(string activationKey)
+        private async Task<LoginValidationResult> ValidateUserAsync(string email, string password)
         {
             try
             {
-                string cleanKey = activationKey.Trim();
-
-                
-
-                var url = $"{_supabaseUrl}/rest/v1/activation_keys?select=*";
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("apikey", _supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-                request.Headers.Add("Accept", "application/json");
-
-                var response = await _httpClient.SendAsync(request);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                System.Diagnostics.Debug.WriteLine($"Database Response Status: {response.StatusCode}");
-
-                if (!response.IsSuccessStatusCode)
+                var url = $"{_supabaseUrl}/auth/v1/token?grant_type=password";
+                var payload = new
                 {
-                    System.Diagnostics.Debug.WriteLine($"Database Error: {responseContent}");
-                    ErrorMessage = "Kunne ikke koble til database";
-                    return new ValidationResult { IsValid = false };
-                }
-
-                var allRecords = JsonSerializer.Deserialize<ActivationKeyRecord[]>(responseContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                });
-
-
-                if (allRecords == null || allRecords.Length == 0)
-                {
-                    ErrorMessage = "Ingen aktiveringsnøkler funnet i systemet";
-                    return new ValidationResult { IsValid = false };
-                }
-
-                
-
-                var exactMatch = allRecords.FirstOrDefault(r =>
-                    string.Equals(r.ActivationKey?.Trim(), cleanKey, StringComparison.OrdinalIgnoreCase));
-
-                if (exactMatch == null)
-                {
-                    ErrorMessage = "Aktiveringsnøkkelen finnes ikke i systemet";
-                    return new ValidationResult { IsValid = false };
-                }
-
-                if (exactMatch.IsActivated)
-                {
-                    ErrorMessage = "Denne aktiveringsnøkkelen er allerede brukt";
-                    return new ValidationResult { IsValid = false };
-                }
-
-                
-
-                return new ValidationResult { IsValid = true, FoundRecord = exactMatch };
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = $"Valideringsfeil: {ex.Message}";
-                return new ValidationResult { IsValid = false };
-            }
-        }
-
-        private async Task MarkActivationKeyAsUsedAsync(string activationKey)
-        {
-            try
-            {
-                var updateData = new
-                {
-                    is_activated = true,
-                    activated_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    email = email,
+                    password = password
                 };
-
-                var json = JsonSerializer.Serialize(updateData);
+                var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var url = $"{_supabaseUrl}/rest/v1/activation_keys?activation_key=eq.{Uri.EscapeDataString(activationKey.Trim())}";
-
-                var request = new HttpRequestMessage(HttpMethod.Patch, url)
+                var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Content = content
                 };
-
                 request.Headers.Add("apikey", _supabaseKey);
                 request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-                request.Headers.Add("Prefer", "return=minimal");
-
-                System.Diagnostics.Debug.WriteLine($"Marking activation key as used: {url}");
-                System.Diagnostics.Debug.WriteLine($"Update payload: {json}");
 
                 var response = await _httpClient.SendAsync(request);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                System.Diagnostics.Debug.WriteLine($"Mark as used Response Status: {response.StatusCode}");
-                System.Diagnostics.Debug.WriteLine($"Mark as used Response Content: {responseContent}");
+                System.Diagnostics.Debug.WriteLine($"Auth Response Status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"Auth Response Content: {responseContent}");
 
-                if (response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Successfully marked activation key as used");
+                    ErrorMessage = "Feil brukernavn eller passord.";
+                    return new LoginValidationResult { IsValid = false };
                 }
-                else
+
+                var result = JsonSerializer.Deserialize<LoginResponse>(responseContent,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return new LoginValidationResult
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to mark activation key as used: {response.StatusCode}");
-                    
-                }
+                    IsValid = true,
+                    FoundRecord = new UserRecord
+                    {
+                        Email = result?.User?.Email ?? ""
+                    }
+                };
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error marking activation key as used: {ex.Message}");
+                ErrorMessage = $"Feil ved pålogging: {ex.Message}";
+                return new LoginValidationResult { IsValid = false };
             }
         }
 
-        private async Task SaveActivationStatusAsync(string associatedEmail)
+        public class LoginResponse
+        {
+            [JsonPropertyName("access_token")]
+            public string AccessToken { get; set; }
+
+            [JsonPropertyName("user")]
+            public SupabaseUser User { get; set; }
+        }
+
+        public class SupabaseUser
+        {
+            [JsonPropertyName("id")]
+            public string Id { get; set; }
+
+            [JsonPropertyName("email")]
+            public string Email { get; set; }
+        }
+
+        private async Task SaveLoginStatusAsync(string email)
         {
             try
             {
-                var activationData = new
+                var loginData = new
                 {
-                    IsActivated = true,
-                    ActivatedAt = DateTime.UtcNow,
-                    Email = associatedEmail, 
-                    ActivationKey = ActivationKey 
+                    IsLoggedIn = true,
+                    Email = email,
+                    LoggedInAt = DateTime.UtcNow
                 };
 
-                var json = JsonSerializer.Serialize(activationData, new JsonSerializerOptions { WriteIndented = true });
-
-                string appDataDir = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-
+                var json = JsonSerializer.Serialize(loginData, new JsonSerializerOptions { WriteIndented = true });
+                string appDataDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AkademiTrack");
                 System.IO.Directory.CreateDirectory(appDataDir);
-                string activationPath = System.IO.Path.Combine(appDataDir, "activation.json");
+                string loginPath = System.IO.Path.Combine(appDataDir, "login.json");
 
-                await System.IO.File.WriteAllTextAsync(activationPath, json);
-
-                System.Diagnostics.Debug.WriteLine($"Activation status saved to: {activationPath}");
+                await System.IO.File.WriteAllTextAsync(loginPath, json);
+                System.Diagnostics.Debug.WriteLine($"Login status saved to: {loginPath}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to save activation status: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to save login status: {ex.Message}");
             }
         }
 
         private void ExitAsync()
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
                 desktop.Shutdown();
-            }
         }
 
         public void Dispose()
@@ -295,6 +247,20 @@ namespace AkademiTrack.ViewModels
         public bool Success { get; set; }
         public required string UserEmail { get; set; }
         public bool NeedsPrivacyAcceptance { get; set; }
+    }
+
+
+
+    public class LoginSession
+    {
+        [JsonPropertyName("email")]
+        public string Email { get; set; } = "";
+
+        [JsonPropertyName("accessToken")]
+        public string? AccessToken { get; set; }
+
+        [JsonPropertyName("loggedInAt")]
+        public DateTime LoggedInAt { get; set; }
     }
 
     public class InlineCommand : ICommand
@@ -317,29 +283,16 @@ namespace AkademiTrack.ViewModels
         public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public class ValidationResult
+    public class LoginValidationResult
     {
         public bool IsValid { get; set; }
-        public ActivationKeyRecord? FoundRecord { get; set; }
+        public UserRecord? FoundRecord { get; set; }
     }
 
-    public class ActivationKeyRecord
+    public class UserRecord
     {
-        public int Id { get; set; }
+        [JsonPropertyName("email")]
+        public required string Email { get; set; }
 
-        [JsonPropertyName("user_email")]
-        public required string UserEmail { get; set; }
-
-        [JsonPropertyName("activation_key")]
-        public required string ActivationKey { get; set; }
-
-        [JsonPropertyName("is_activated")]
-        public bool IsActivated { get; set; }
-
-        [JsonPropertyName("created_at")]
-        public DateTime CreatedAt { get; set; }
-
-        [JsonPropertyName("activated_at")]
-        public DateTime? ActivatedAt { get; set; }
     }
 }

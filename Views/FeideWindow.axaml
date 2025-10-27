@@ -255,9 +255,9 @@
 				<StackPanel Spacing="8">
 					<TextBlock Text="Feide Brukernavn" Classes="label"/>
 					<TextBox Name="UsernameTextBox"
-                             Watermark="F.eks: fornavn.etternavn@skole.no"
+                             Watermark="F.eks: fornavn@skole.no"
                              Text="{Binding FeideUsername}"/>
-					<TextBlock Text="Din fulle Feide e-postadresse"
+					<TextBlock Text="Din Feide brukernavn. Fornavnet skal skrives inn her."
                                FontSize="11"
                                Foreground="#666666"
                                Margin="0,2,0,0"/>
