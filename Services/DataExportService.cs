@@ -26,7 +26,6 @@ namespace AkademiTrack.Services
                     MachineName = Environment.MachineName
                 },
                 Local = await CollectLocalDataAsync(),
-                RemoteDataMessage = "For database data (STU registrations, profile, etc.), please visit:\nhttps://cybergutta.github.io/AkademietTrack/index.html\n\nLog in with your credentials, go to Settings, and scroll down to find the data export option."
             };
 
             Debug.WriteLine($"✓ Local data collection complete. Files: {exportData.Local.Files.Count}");
@@ -79,35 +78,6 @@ namespace AkademiTrack.Services
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"⚠️ Error loading settings: {ex.Message}");
-                }
-            }
-
-            var activationPath = Path.Combine(appDataDir, "activation.json");
-            if (File.Exists(activationPath))
-            {
-                try
-                {
-                    var json = await File.ReadAllTextAsync(activationPath);
-                    var activation = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
-                    if (activation != null)
-                    {
-                        foreach (var kvp in activation)
-                        {
-                            localData.Activation[kvp.Key] = kvp.Value.ValueKind switch
-                            {
-                                JsonValueKind.String => kvp.Value.GetString() ?? "",
-                                JsonValueKind.True => "True",
-                                JsonValueKind.False => "False",
-                                JsonValueKind.Null => "",
-                                _ => kvp.Value.ToString()
-                            };
-                        }
-                    }
-                    Debug.WriteLine("✓ Activation info collected");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"⚠️ Error loading activation: {ex.Message}");
                 }
             }
 
@@ -206,11 +176,6 @@ namespace AkademiTrack.Services
                             var email = prop.Value.GetString() ?? "";
                             obj[prop.Name] = MaskEmail(email);
                         }
-                        else if (key.Contains("activationkey") || key.Contains("activation_key"))
-                        {
-                            var key_val = prop.Value.GetString() ?? "";
-                            obj[prop.Name] = MaskActivationKey(key_val);
-                        }
                         else
                         {
                             obj[prop.Name] = SanitizeJsonElement(prop.Value);
@@ -259,16 +224,6 @@ namespace AkademiTrack.Services
             return masked;
         }
 
-        private static string MaskActivationKey(string key)
-        {
-            if (string.IsNullOrEmpty(key)) return "[REDACTED]";
-
-            var parts = key.Split('-');
-            if (parts.Length != 4) return "[REDACTED]";
-
-            return $"{parts[0].Substring(0, 2)}**-****-****-**{parts[3].Substring(parts[3].Length - 2)}";
-        }
-
         public static async Task<string> ExportAsJsonAsync(ExportData data)
         {
             var downloadsPath = Path.Combine(
@@ -312,18 +267,6 @@ namespace AkademiTrack.Services
             csv.AppendLine($"Machine Name,{data.ExportMetadata.MachineName}");
             csv.AppendLine();
 
-            csv.AppendLine("=== IMPORTANT NOTICE ===");
-            csv.AppendLine("\"This export contains ONLY local data stored on your computer.\"");
-            csv.AppendLine();
-            csv.AppendLine("\"For database data (STU registrations, profile information, etc.), please visit:\"");
-            csv.AppendLine("\"https://cybergutta.github.io/AkademietTrack/index.html\"");
-            csv.AppendLine();
-            csv.AppendLine("\"Instructions:\"");
-            csv.AppendLine("\"1. Log in with your credentials\"");
-            csv.AppendLine("\"2. Go to Settings\"");
-            csv.AppendLine("\"3. Scroll down to find the data export option\"");
-            csv.AppendLine();
-
             csv.AppendLine("=== LOCAL SETTINGS ===");
             csv.AppendLine("Setting,Value");
             foreach (var setting in data.Local.Settings)
@@ -365,8 +308,7 @@ namespace AkademiTrack.Services
         [JsonPropertyName("local_data")]
         public LocalData Local { get; set; } = new();
 
-        [JsonPropertyName("database_data_instructions")]
-        public string RemoteDataMessage { get; set; } = "";
+        
     }
 
     public class ExportMetadata
@@ -418,20 +360,5 @@ namespace AkademiTrack.Services
 
         [JsonPropertyName("modified_date")]
         public DateTime ModifiedDate { get; set; }
-    }
-
-    public class ActivationData
-    {
-        [JsonPropertyName("IsActivated")]
-        public bool IsActivated { get; set; }
-
-        [JsonPropertyName("ActivatedAt")]
-        public string? ActivatedAt { get; set; }
-
-        [JsonPropertyName("Email")]
-        public string Email { get; set; } = "";
-
-        [JsonPropertyName("ActivationKey")]
-        public string ActivationKey { get; set; } = "";
     }
 }

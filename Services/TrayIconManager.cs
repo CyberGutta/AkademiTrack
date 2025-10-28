@@ -1,5 +1,6 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -112,11 +113,22 @@ namespace AkademiTrack.Services
         {
             if (_mainWindow != null)
             {
-                _mainWindow.Show();
-                _mainWindow.WindowState = WindowState.Normal;
-                _mainWindow.Activate();
-               
-                Debug.WriteLine("Main window restored from tray (tray icon still visible)");
+                Debug.WriteLine("Restoring window from tray...");
+                
+                try
+                {
+                    // Simple and reliable approach
+                    _mainWindow.ShowInTaskbar = true;
+                    _mainWindow.Show();
+                    _mainWindow.WindowState = WindowState.Normal;
+                    _mainWindow.Activate();
+                    
+                    Debug.WriteLine("✓ Main window restored from tray");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error restoring window: {ex.Message}");
+                }
             }
         }
 

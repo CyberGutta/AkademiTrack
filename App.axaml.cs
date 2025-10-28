@@ -27,6 +27,9 @@ namespace AkademiTrack
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                // Prevent app from closing when all windows are closed (for tray functionality)
+                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
+                
                 ContinueNormalFlow(desktop);
             }
 
@@ -70,21 +73,19 @@ namespace AkademiTrack
                     }
                     else
                     {
-                        mainWindow.Opacity = 0;
-                        mainWindow.ShowInTaskbar = false;
-
+                        // Show window normally first to ensure proper initialization
                         mainWindow.Show();
-
-                        await Task.Delay(100);
-
+                        
+                        // Give it a moment to render
+                        await Task.Delay(50);
+                        
+                        // Then hide it for tray mode
                         mainWindow.Hide();
-
-                        mainWindow.Opacity = 1;
-                        mainWindow.ShowInTaskbar = true;
+                        mainWindow.ShowInTaskbar = false;
 
                         AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
 
-                        System.Diagnostics.Debug.WriteLine("Windows/Linux: App started in tray - no visual flash");
+                        System.Diagnostics.Debug.WriteLine("Windows/Linux: App started in tray");
                     }
                 }
                 else
