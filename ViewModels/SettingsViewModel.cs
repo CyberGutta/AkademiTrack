@@ -696,12 +696,6 @@ Terminal=false
 
                 if (string.IsNullOrEmpty(userEmail))
                 {
-                    var activationData = GetLocalActivationData();
-                    userEmail = activationData?.Email ?? "";
-                }
-
-                if (string.IsNullOrEmpty(userEmail))
-                {
                     await ShowErrorDialog(
                         "Eksport feilet",
                         "Kunne ikke finne bruker-e-post. Vennligst logg inn på nytt."
@@ -991,18 +985,6 @@ Terminal=false
                 IsDeleting = true;
                 Debug.WriteLine("=== DELETING ACCOUNT COMPLETELY ===");
 
-                var activationData = GetLocalActivationData();
-                string activationKey = activationData?.ActivationKey ?? "";
-                string email = activationData?.Email ?? "";
-
-                if (!string.IsNullOrEmpty(activationKey) && !string.IsNullOrEmpty(email))
-                {
-                    bool remoteDeleted = await DeleteFromSupabase(activationKey, email);
-                    if (!remoteDeleted)
-                    {
-                        Debug.WriteLine("⚠️ Remote deletion failed, but continuing with local deletion");
-                    }
-                }
 
                 var appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -1047,156 +1029,7 @@ Terminal=false
                 IsDeleting = false;
             }
         }
-
-        private async Task<bool> DeleteFromSupabase(string activationKey, string email)
-        {
-            HttpClient? httpClient = null;
-            try
-            {
-                httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-
-                string supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co";
-                string supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k";
-
-                Debug.WriteLine("=== CALLING SUPABASE EDGE FUNCTION ===");
-                Debug.WriteLine($"User email: {email}");
-                Debug.WriteLine($"Activation key: {activationKey}");
-
-                var edgeFunctionUrl = $"{supabaseUrl}/functions/v1/delete-user-by-activation-key";
-                var request = new HttpRequestMessage(HttpMethod.Post, edgeFunctionUrl);
-
-                request.Headers.Add("Authorization", $"Bearer {supabaseKey}");
-                request.Headers.Add("apikey", supabaseKey);
-
-                var requestBody = new
-                {
-                    activationKey = activationKey,
-                    email = email
-                };
-
-                var jsonBody = JsonSerializer.Serialize(requestBody);
-                request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-                Debug.WriteLine($"Sending request to: {edgeFunctionUrl}");
-
-                var response = await httpClient.SendAsync(request);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                Debug.WriteLine($"Response Status: {response.StatusCode}");
-                Debug.WriteLine($"Response: {responseContent}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    try
-                    {
-                        var result = JsonSerializer.Deserialize<EdgeFunctionResponse>(responseContent);
-                        if (result?.Success == true)
-                        {
-                            Debug.WriteLine($"✓ Deleted {result.RecordsDeleted} records from Supabase");
-                            return true;
-                        }
-                    }
-                    catch (JsonException jsonEx)
-                    {
-                        Debug.WriteLine($"Parse error: {jsonEx.Message}");
-                    }
-                }
-
-                return false;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error: {ex.Message}");
-                return false;
-            }
-            finally
-            {
-                httpClient?.Dispose();
-            }
-        }
-
-        private class EdgeFunctionResponse
-        {
-            [JsonPropertyName("success")]
-            public bool Success { get; set; }
-
-            [JsonPropertyName("recordsDeleted")]
-            public int RecordsDeleted { get; set; }
-
-            [JsonPropertyName("errors")]
-            public string[]? Errors { get; set; }
-
-            [JsonPropertyName("message")]
-            public string? Message { get; set; }
-
-            [JsonPropertyName("error")]
-            public string? Error { get; set; }
-        }
-
-        private ActivationData? GetLocalActivationData()
-        {
-            try
-            {
-                var appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-                var activationPath = Path.Combine(appDataDir, "activation.json");
-
-                if (File.Exists(activationPath))
-                {
-                    string json = File.ReadAllText(activationPath);
-                    Debug.WriteLine($"[SETTINGS] Activation JSON: {json}");
-
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = null
-                    };
-
-                    var data = JsonSerializer.Deserialize<ActivationData>(json, options);
-
-                    if (data != null)
-                    {
-                        Debug.WriteLine($"[SETTINGS] ✓ Found activation key: {data.ActivationKey}");
-                        Debug.WriteLine($"[SETTINGS] ✓ Email: {data.Email}");
-                    }
-
-                    return data;
-                }
-
-                Debug.WriteLine("[SETTINGS] ✗ activation.json not found");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[SETTINGS] Error reading activation data: {ex.Message}");
-                return null;
-            }
-        }
-
-        private void RestartToLogin()
-        {
-            try
-            {
-                // Get the application instance
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    // Close current window and show login
-                    var loginWindow = new LoginWindow();
-                    desktop.MainWindow = loginWindow;
-                    loginWindow.Show();
-
-                    // Close settings window
-                    CloseRequested?.Invoke(this, EventArgs.Empty);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error restarting to login: {ex.Message}");
-            }
-        }
-
+        
         private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
         {
             try

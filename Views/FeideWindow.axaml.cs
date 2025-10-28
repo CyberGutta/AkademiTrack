@@ -22,46 +22,11 @@ namespace AkademiTrack.Views
                 if (e.Success)
                 {
                     System.Diagnostics.Debug.WriteLine($"Feide setup completed for email: {e.UserEmail}");
+                    System.Diagnostics.Debug.WriteLine("Showing MainWindow directly...");
 
-                    bool needsPrivacyAcceptance = await PrivacyPolicyWindowViewModel.NeedsPrivacyPolicyAcceptance(e.UserEmail);
-
-                    System.Diagnostics.Debug.WriteLine($"Privacy check result - Needs acceptance: {needsPrivacyAcceptance}");
-
-                    if (needsPrivacyAcceptance)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Showing privacy policy window...");
-
-                        var privacyWindow = new PrivacyPolicyWindow();
-                        var privacyViewModel = new PrivacyPolicyWindowViewModel(e.UserEmail);
-
-                        privacyViewModel.Accepted += (sender, args) =>
-                        {
-                            System.Diagnostics.Debug.WriteLine("Privacy policy accepted, showing MainWindow...");
-                            privacyWindow.Close();
-                            var mainWindow = new MainWindow();
-                            mainWindow.Show();
-                            this.Close();
-                        };
-
-                        privacyViewModel.Exited += (sender, args) =>
-                        {
-                            System.Diagnostics.Debug.WriteLine("User declined privacy policy, closing app...");
-                            privacyWindow.Close();
-                            this.Close();
-                        };
-
-                        privacyWindow.DataContext = privacyViewModel;
-                        privacyWindow.Show();
-                        this.Close();
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("Privacy policy already up-to-date, showing MainWindow directly...");
-
-                        var mainWindow = new MainWindow();
-                        mainWindow.Show();
-                        this.Close();
-                    }
+                    var mainWindow = new MainWindow();
+                    mainWindow.Show();
+                    this.Close();
                 }
             };
 

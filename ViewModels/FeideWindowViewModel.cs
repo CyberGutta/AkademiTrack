@@ -176,37 +176,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<string?> GetUserEmailFromActivationAsync()
-        {
-            try
-            {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-
-                string loginPath = Path.Combine(appDataDir, "login.json");
-                if (File.Exists(loginPath))
-                {
-                    var json = await File.ReadAllTextAsync(loginPath);
-                    var loginData = JsonSerializer.Deserialize<LoginSession>(json);
-                    if (!string.IsNullOrEmpty(loginData?.Email))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Retrieved email from login.json: {loginData.Email}");
-                        return loginData.Email;
-                    }
-                }
-
-                System.Diagnostics.Debug.WriteLine("login.json not found, cannot retrieve email");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error reading login.json: {ex.Message}");
-                return null;
-            }
-        }
-
         private async System.Threading.Tasks.Task SaveCredentialsToSettingsAsync()
         {
             try
@@ -292,14 +261,6 @@ namespace AkademiTrack.ViewModels
             {
                 desktop.Shutdown();
             }
-        }
-
-        private class ActivationData
-        {
-            public bool IsActivated { get; set; }
-            public DateTime ActivatedAt { get; set; }
-            public required string Email { get; set; }
-            public required string ActivationKey { get; set; }
         }
     }
 
