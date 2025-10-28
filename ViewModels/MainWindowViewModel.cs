@@ -525,7 +525,6 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new SimpleCommand(ToggleThemeAsync);
 
-            NativeNotificationService.Initialize();
 
 
             LogInfo("Applikasjon er klar");
