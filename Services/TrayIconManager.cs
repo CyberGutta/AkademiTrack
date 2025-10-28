@@ -103,8 +103,16 @@ namespace AkademiTrack.Services
         {
             if (_mainWindow != null)
             {
-                _mainWindow.Hide();
-                ShowTrayIcon(); 
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _mainWindow.WindowState = WindowState.Minimized;
+                }
+                else
+                {
+                    _mainWindow.Hide();
+                }
+
+                ShowTrayIcon();
                 Debug.WriteLine("Application minimized to tray");
             }
         }
