@@ -53,22 +53,25 @@ namespace AkademiTrack.Services
         {
             try
             {
-                // Escape single quotes and backslashes for AppleScript
-                title = title.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                message = message.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                // Clean the strings - remove problematic characters
+                title = title.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
+                message = message.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
 
-                // Use osascript (AppleScript) - this ALWAYS works on macOS
-                var script = $@"display notification ""{message}"" with title ""AkademiTrack"" subtitle ""{title}""";
-
+                // Use osascript with proper argument passing (not string interpolation)
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "/usr/bin/osascript",
-                    Arguments = $"-e '{script}'",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
+
+                // Pass script as separate arguments to avoid quote issues
+                startInfo.ArgumentList.Add("-e");
+                startInfo.ArgumentList.Add($"display notification \"{message}\" with title \"AkademiTrack\" subtitle \"{title}\"");
+
+                Console.WriteLine($"Running osascript with title: {title}, message: {message}");
 
                 using var process = Process.Start(startInfo);
                 if (process != null)
@@ -79,6 +82,9 @@ namespace AkademiTrack.Services
                     {
                         var error = await process.StandardError.ReadToEndAsync();
                         Console.WriteLine($"osascript error: {error}");
+
+                        // Try simpler version without subtitle if it fails
+                        await ShowSimpleMacNotificationAsync(title + ": " + message);
                     }
                     else
                     {
@@ -89,6 +95,41 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"macOS notification failed: {ex.Message}");
+            }
+        }
+
+        private static async Task ShowSimpleMacNotificationAsync(string text)
+        {
+            try
+            {
+                text = text.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "/usr/bin/osascript",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                startInfo.ArgumentList.Add("-e");
+                startInfo.ArgumentList.Add($"display notification \"{text}\" with title \"AkademiTrack\"");
+
+                using var process = Process.Start(startInfo);
+                if (process != null)
+                {
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode == 0)
+                    {
+                        Console.WriteLine($"✓ Simple macOS notification shown");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Simple notification also failed: {ex.Message}");
             }
         }
 
