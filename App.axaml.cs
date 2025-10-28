@@ -23,8 +23,6 @@ namespace AkademiTrack
             AvaloniaXamlLoader.Load(this);
         }
 
-
-
         public override async void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
