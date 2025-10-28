@@ -23,13 +23,15 @@ namespace AkademiTrack
             AvaloniaXamlLoader.Load(this);
         }
 
+
+
         public override async void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Prevent app from closing when all windows are closed (for tray functionality)
-                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
-                
+                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose;
+
+
                 ContinueNormalFlow(desktop);
             }
 

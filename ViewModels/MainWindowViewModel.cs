@@ -533,9 +533,7 @@ namespace AkademiTrack.ViewModels
 
             _ = Task.Run(LoadProcessedNotificationIdsAsync);
 
-            _adminNotificationTimer = new Timer(CheckForAdminNotifications, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
 
-            LogInfo("Admin notification system initialized");
 
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
@@ -662,169 +660,7 @@ namespace AkademiTrack.ViewModels
             {
             }
         }
-
-        private async void CheckForAdminNotifications(object? state)
-        {
-            try
-            {
-                await CheckForNewAdminNotificationsAsync();
-            }
-            catch (Exception )
-            {
-            }
-        }
-
-        private async Task CheckForNewAdminNotificationsAsync()
-        {
-            try
-            {
-                var userEmail = await GetUserEmailFromActivationAsync();
-                if (string.IsNullOrEmpty(userEmail))
-                {
-                    LogDebug("No user email found for admin notifications");
-                    return;
-                }
-
-                var since = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-                var url = $"{_supabaseUrl}/rest/v1/admin_notifications?or=(target_email.eq.{userEmail},target_email.eq.all)&created_at=gte.{since}&order=created_at.desc&limit=20";
-
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("apikey", _supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-
-                LogDebug($"Fetching admin notifications for: {userEmail}");
-
-                HttpResponseMessage response = null!;
-                try
-                {
-                    response = await _httpClient.SendAsync(request, cts.Token);
-                }
-                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || cts.Token.IsCancellationRequested)
-                {
-                    LogDebug("Admin notification request timed out after 30 seconds - skipping this check");
-                    return;
-                }
-                catch (HttpRequestException ex) when (ex.Message.Contains("nodename") || ex.Message.Contains("servname") || ex.Message.Contains("not known"))
-                {
-                    LogDebug($"DNS resolution failed for Supabase: {ex.Message} - checking network connectivity");
-
-                    try
-                    {
-                        using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                        await _httpClient.GetAsync("https://www.google.com", testCts.Token);
-                        LogDebug("Internet connectivity OK - Supabase DNS issue");
-                    }
-                    catch
-                    {
-                        LogDebug("No internet connectivity detected");
-                    }
-                    return;
-                }
-                catch (HttpRequestException ex)
-                {
-                    LogDebug($"Network error fetching admin notifications: {ex.Message}");
-                    return;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    LogDebug($"Failed to fetch admin notifications: {response.StatusCode}");
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    LogDebug($"Error response: {errorContent}");
-                    return;
-                }
-
-                var json = await response.Content.ReadAsStringAsync();
-
-                if (string.IsNullOrWhiteSpace(json) || json == "[]")
-                {
-                    LogDebug("No admin notifications returned");
-                    return;
-                }
-
-                EnhancedAdminNotification[]? notifications = null!;
-                try
-                {
-                    notifications = JsonSerializer.Deserialize<EnhancedAdminNotification[]>(json, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-                }
-                catch (JsonException ex)
-                {
-                    LogError($"Failed to parse admin notifications JSON: {ex.Message}");
-                    LogDebug($"JSON content: {json.Substring(0, Math.Min(200, json.Length))}...");
-                    return;
-                }
-
-                if (notifications == null || notifications.Length == 0)
-                {
-                    LogDebug("No valid admin notifications found");
-                    return;
-                }
-
-                bool hasNewNotifications = false;
-
-                foreach (var notification in notifications)
-                {
-                    if (string.IsNullOrEmpty(notification.Id))
-                    {
-                        LogDebug("Skipping notification with empty ID");
-                        continue;
-                    }
-
-                    if (!_processedNotificationIds.Contains(notification.Id))
-                    {
-                        _processedNotificationIds.Add(notification.Id);
-                        hasNewNotifications = true;
-
-                        var notificationLevel = notification.Priority?.ToUpper() switch
-                        {
-                            "HIGH" => "ERROR",
-                            "MEDIUM" => "WARNING",
-                            "LOW" => "SUCCESS",
-                            _ => "INFO"
-                        };
-
-                        var adminTitle = $"[ADMIN]{notification.Title}";
-
-                        try
-                        {
-                            ShowSystemOverlayNotification(adminTitle, notification.Message!, notificationLevel,
-                                notification.Image_Url!, notification.Custom_Color!);
-
-                            LogInfo($"Enhanced admin notification displayed: {notification.Title}");
-                        }
-                        catch (Exception showEx)
-                        {
-                            LogError($"Failed to show admin notification: {showEx.Message}");
-                        }
-                    }
-                }
-
-                if (hasNewNotifications)
-                {
-                    try
-                    {
-                        await SaveProcessedNotificationIdsAsync();
-                    }
-                    catch (Exception saveEx)
-                    {
-                        LogError($"Failed to save processed notification IDs: {saveEx.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error in CheckForNewAdminNotificationsAsync: {ex.Message}");
-                if (ShowDetailedLogs)
-                {
-                    LogDebug($"Stack trace: {ex.StackTrace}");
-                }
-            }
-        }
+        
         public class EnhancedAdminNotification
         {
             public string? Id { get; set; }
@@ -2880,40 +2716,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<string> GetUserEmailFromActivationAsync()
-        {
-            try
-            {
-                string appDataDir = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-
-                string activationPath = System.IO.Path.Combine(appDataDir, "login.json");
-
-                if (!System.IO.File.Exists(activationPath))
-                {
-                    LogError("Login file not found. Please log in first. Close the app");
-                    return null!;
-                }
-
-                string json = await System.IO.File.ReadAllTextAsync(activationPath);
-                var activationData = JsonSerializer.Deserialize<JsonElement>(json);
-
-                if (activationData.TryGetProperty("Email", out JsonElement emailElement))
-                {
-                    return emailElement.GetString() ?? string.Empty;
-                }
-
-                LogError("Email not found in login file.");
-                return null!;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to load email from login file: {ex.Message}");
-                return null!;
-            }
-        }
+        
 
        public class UserParameters
         {
@@ -3100,65 +2903,7 @@ namespace AkademiTrack.ViewModels
             public DateTime SavedAt { get; set; }
             public string? SchoolYear { get; set; } 
         }
-        private async Task SendStuRegistrationToSupabaseAsync(ScheduleItem stuSession, string registrationTime, string? userEmail = null)
-        {
-            try
-            {
-                LogInfo("Sending STU registration to Supabase...");
-
-                if (string.IsNullOrEmpty(userEmail))
-                {
-                    userEmail = await GetUserEmailFromActivationAsync();
-                    if (string.IsNullOrEmpty(userEmail))
-                    {
-                        LogError("Cannot send STU registration - no email found");
-                        return;
-                    }
-                }
-
-                var payload = new
-                {
-                    user_email = userEmail,
-                    session_date = !string.IsNullOrEmpty(stuSession.Dato)
-    ? DateTime.ParseExact(stuSession.Dato, "yyyyMMdd", null).ToString("yyyy-MM-dd")
-    : string.Empty,
-                    session_start = stuSession.StartKl,
-                    session_end = stuSession.SluttKl,
-                    course_name = stuSession.KNavn,
-                    registration_time = registrationTime,
-                    registration_window = stuSession.TidsromTilstedevaerelse,
-                    created_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-                };
-
-                var json = JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_supabaseUrl}/rest/v1/stu_registrations")
-                {
-                    Content = content
-                };
-
-                request.Headers.Add("apikey", _supabaseKey);
-                request.Headers.Add("Authorization", $"Bearer {_supabaseKey}");
-                request.Headers.Add("Prefer", "return=minimal");
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    LogSuccess($"STU registration sent to Supabase successfully for {userEmail}");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    LogError($"Failed to send to Supabase: {response.StatusCode} - {errorContent}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Supabase request failed: {ex.Message}");
-            }
-        }
+        
 
         private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
@@ -3221,17 +2966,6 @@ namespace AkademiTrack.ViewModels
                     }
 
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
-                    var userEmail = await GetUserEmailFromActivationAsync();
-
-                    if (!string.IsNullOrEmpty(userEmail))
-                    {
-                        LogDebug($"Sending Supabase registration for email: {userEmail}");
-                        await SendStuRegistrationToSupabaseAsync(stuTime, registrationTime, userEmail);
-                    }
-                    else
-                    {
-                        LogError("Could not send to Supabase - no user email found");
-                    }
 
                     return true; 
                 }
