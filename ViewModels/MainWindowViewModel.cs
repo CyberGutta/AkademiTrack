@@ -1303,7 +1303,7 @@ namespace AkademiTrack.ViewModels
                 if (hasCredentials)
                 {
                     LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
-                    NotificationService.Show("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
+                    ShowNotification("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
                 }
                 else
                 {
