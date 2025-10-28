@@ -125,7 +125,6 @@ namespace AkademiTrack.Services
                 
                 try
                 {
-                    // Simple and reliable approach
                     _mainWindow.ShowInTaskbar = true;
                     _mainWindow.Show();
                     _mainWindow.WindowState = WindowState.Normal;
