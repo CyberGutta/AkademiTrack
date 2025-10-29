@@ -1,4 +1,5 @@
-﻿using AkademiTrack.Views;
+﻿using AkademiTrack.Services;
+using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Converters;
 using Avalonia.Threading;
@@ -804,7 +805,7 @@ Terminal=false
                     "Slett lokal data",
                     "Er du sikker på at du vil slette all lokal data?\n\n" +
                     "Dette vil fjerne:\n" +
-                    "• Lagrede innloggingsopplysninger\n" +
+                    "• Lagrede innloggingsopplysninger (fra sikker lagring)\n" +
                     "• Cookies og tokens\n" +
                     "• Appinnstillinger\n" +
                     "• Cache-data\n\n" +
@@ -812,93 +813,70 @@ Terminal=false
                     false
                 );
 
-                if (!result)
-                {
-                    Debug.WriteLine("User cancelled deletion");
-                    return;
-                }
+                if (!result) return;
 
                 IsDeleting = true;
                 Debug.WriteLine("=== DELETING LOCAL DATA ===");
 
+                // Delete from secure storage first
+                Debug.WriteLine("Deleting credentials from secure storage...");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
+                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
+                Debug.WriteLine("✓ Secure storage cleared");
+
+                // Then delete local files
                 var appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
                 );
 
-                Debug.WriteLine($"App data directory: {appDataDir}");
-
-                if (!Directory.Exists(appDataDir))
+                if (Directory.Exists(appDataDir))
                 {
-                    Debug.WriteLine("App data directory doesn't exist - nothing to delete");
-                    IsDeleting = false;
-                    return;
-                }
+                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
 
-                var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
-
-                Debug.WriteLine($"Found {allFiles.Length} files and {allDirectories.Length} directories to delete");
-
-                foreach (var file in allFiles)
-                {
-                    try
+                    foreach (var file in allFiles)
                     {
-                        File.Delete(file);
-                        Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"⚠️ Could not delete file {Path.GetFileName(file)}: {ex.Message}");
-                    }
-                }
-
-                foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
-                {
-                    try
-                    {
-                        if (Directory.Exists(dir))
+                        try
                         {
-                            Directory.Delete(dir, true);
-                            Debug.WriteLine($"✓ Deleted directory: {Path.GetFileName(dir)}");
+                            File.Delete(file);
+                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"⚠️ Could not delete directory {Path.GetFileName(dir)}: {ex.Message}");
-                    }
-                }
 
-                try
-                {
-                    if (Directory.Exists(appDataDir))
+                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
                     {
-                        Directory.Delete(appDataDir, true);
-                        Debug.WriteLine("✓ Main app data directory deleted");
+                        try
+                        {
+                            if (Directory.Exists(dir))
+                                Directory.Delete(dir, true);
+                        }
+                        catch { }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"⚠️ Could not delete main directory: {ex.Message}");
+
+                    try
+                    {
+                        if (Directory.Exists(appDataDir))
+                            Directory.Delete(appDataDir, true);
+                    }
+                    catch { }
                 }
 
                 Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
 
                 CloseRequested?.Invoke(this, EventArgs.Empty);
-
-                // Small delay
                 await Task.Delay(300);
-
                 RestartApplication();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error deleting local data: {ex.Message}");
-                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                await ShowErrorDialog(
-                    "Feil ved sletting",
-                    $"Kunne ikke slette all data: {ex.Message}"
-                );
+                Debug.WriteLine($"Error: {ex.Message}");
+                await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
             }
             finally
             {
@@ -1488,23 +1466,41 @@ Terminal=false
                 _startWithSystem = settings.StartWithSystem;
                 _autoStartAutomation = settings.AutoStartAutomation;
                 _startMinimized = settings.StartMinimized;
-                _loginEmail = CredentialEncryption.Decrypt(settings.EncryptedLoginEmail);
-                _loginPassword = CredentialEncryption.Decrypt(settings.EncryptedLoginPassword);
-                _schoolName = CredentialEncryption.Decrypt(settings.EncryptedSchoolName);
 
-                OnPropertyChanged(nameof(ShowActivityLog));
-                OnPropertyChanged(nameof(ShowDetailedLogs));
-                OnPropertyChanged(nameof(StartWithSystem));
-                OnPropertyChanged(nameof(AutoStartAutomation));
-                OnPropertyChanged(nameof(StartMinimized));
-                OnPropertyChanged(nameof(LoginEmail));
-                OnPropertyChanged(nameof(LoginPassword));
-                OnPropertyChanged(nameof(SchoolName));
+                var loadedEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
+                var loadedPassword = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
+                var loadedSchool = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
+
+               
+
+                Debug.WriteLine($"Loaded from secure storage - Email: {(!string.IsNullOrEmpty(loadedEmail) ? "✓" : "✗")}, Password: {(!string.IsNullOrEmpty(loadedPassword) ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(loadedSchool) ? "✓" : "✗")}");
+
+                _loginEmail = loadedEmail;
+                _loginPassword = loadedPassword;
+                _schoolName = loadedSchool;
+
+                
+
+                // IMPORTANT: Notify UI on the UI thread
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    OnPropertyChanged(nameof(ShowActivityLog));
+                    OnPropertyChanged(nameof(ShowDetailedLogs));
+                    OnPropertyChanged(nameof(StartWithSystem));
+                    OnPropertyChanged(nameof(AutoStartAutomation));
+                    OnPropertyChanged(nameof(StartMinimized));
+                    OnPropertyChanged(nameof(_loginEmail));
+                    OnPropertyChanged(nameof(_loginPassword));
+                    OnPropertyChanged(nameof(_schoolName));
+                });
 
                 RefreshDisplayedLogs();
                 _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
             }
-            catch (Exception ex) { Debug.WriteLine($"Error loading settings: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading settings: {ex.Message}");
+            }
         }
 
         private async Task SaveSettingsAsync()
@@ -1518,15 +1514,27 @@ Terminal=false
                     StartWithSystem = _startWithSystem,
                     AutoStartAutomation = _autoStartAutomation,
                     StartMinimized = _startMinimized,
-                    EncryptedLoginEmail = CredentialEncryption.Encrypt(_loginEmail),
-                    EncryptedLoginPassword = CredentialEncryption.Encrypt(_loginPassword),
-                    EncryptedSchoolName = CredentialEncryption.Encrypt(_schoolName),
+                    EncryptedLoginEmail = "",
+                    EncryptedLoginPassword = "",
+                    EncryptedSchoolName = "",
                     InitialSetupCompleted = true
                 };
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
+
+                if (!string.IsNullOrEmpty(_loginEmail))
+                    await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
+
+                if (!string.IsNullOrEmpty(_loginPassword))
+                    await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", _loginPassword);
+
+                if (!string.IsNullOrEmpty(_schoolName))
+                    await SecureCredentialStorage.SaveCredentialAsync("SchoolName", _schoolName);
             }
-            catch (Exception ex) { Debug.WriteLine($"Error saving: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error saving: {ex.Message}");
+            }
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
