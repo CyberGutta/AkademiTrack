@@ -19,6 +19,11 @@
 	  <Content Include="Assets\AT-Transparrent72.ico" />
 	</ItemGroup>
 	<ItemGroup>
+  <Content Include="Assets/Helpers/AkademiAuth">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </Content>
+</ItemGroup>
+	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.0" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
