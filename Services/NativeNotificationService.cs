@@ -53,11 +53,9 @@ namespace AkademiTrack.Services
         {
             try
             {
-                // Clean the strings - remove problematic characters
                 title = title.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
                 message = message.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
 
-                // Use osascript with proper argument passing (not string interpolation)
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "/usr/bin/osascript",
@@ -67,28 +65,26 @@ namespace AkademiTrack.Services
                     CreateNoWindow = true
                 };
 
-                // Pass script as separate arguments to avoid quote issues
+                // ✅ Use your bundle identifier so macOS ties notification to your .app
                 startInfo.ArgumentList.Add("-e");
-                startInfo.ArgumentList.Add($"display notification \"{message}\" with title \"AkademiTrack\" subtitle \"{title}\"");
-
-                Console.WriteLine($"Running osascript with title: {title}, message: {message}");
+                startInfo.ArgumentList.Add($@"
+        tell application id ""com.CyberBrothers.akademitrack""
+            display notification ""{message}"" with title ""{title}"" subtitle ""AkademiTrack""
+        end tell
+        ");
 
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
-
                     if (process.ExitCode != 0)
                     {
                         var error = await process.StandardError.ReadToEndAsync();
                         Console.WriteLine($"osascript error: {error}");
-
-                        // Try simpler version without subtitle if it fails
-                        await ShowSimpleMacNotificationAsync(title + ": " + message);
                     }
                     else
                     {
-                        Console.WriteLine($"✓ macOS notification shown: {title}");
+                        Console.WriteLine($"✅ macOS notification shown for {title}");
                     }
                 }
             }
@@ -97,6 +93,7 @@ namespace AkademiTrack.Services
                 Console.WriteLine($"macOS notification failed: {ex.Message}");
             }
         }
+
 
         private static async Task ShowSimpleMacNotificationAsync(string text)
         {
