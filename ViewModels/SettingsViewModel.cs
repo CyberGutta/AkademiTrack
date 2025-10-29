@@ -1460,7 +1460,6 @@ Terminal=false
         {
             try
             {
-                Debug.WriteLine("LoadSettingsAsync triggered");
                 var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
                 _showActivityLog = settings.ShowActivityLog;
                 _showDetailedLogs = settings.ShowDetailedLogs;
@@ -1472,17 +1471,10 @@ Terminal=false
                 var loadedPassword = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
                 var loadedSchool = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
 
-               
-
-                Debug.WriteLine($"Loaded from secure storage - Email: {(!string.IsNullOrEmpty(loadedEmail) ? "✓" : "✗")}, Password: {(!string.IsNullOrEmpty(loadedPassword) ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(loadedSchool) ? "✓" : "✗")}");
-
                 LoginEmail = loadedEmail;
                 LoginPassword = loadedPassword;
                 SchoolName = loadedSchool;
 
-                
-
-                // IMPORTANT: Notify UI on the UI thread
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     OnPropertyChanged(nameof(ShowActivityLog));
