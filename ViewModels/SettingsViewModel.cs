@@ -31,9 +31,9 @@ namespace AkademiTrack.ViewModels
         public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true;
-        public bool AutoStartAutomation { get; set; } = false;
+        public bool AutoStartAutomation { get; set; } = true;
 
-        public bool StartMinimized { get; set; } = false;
+        public bool StartMinimized { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
 
         public string EncryptedLoginEmail { get; set; } = "";

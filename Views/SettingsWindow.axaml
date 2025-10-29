@@ -760,163 +760,16 @@
 							</Grid>
 						</Border>
 
-						<!-- DATA EXPORT SECTION (GDPR) -->
-						<TextBlock Text="Dataeksport (GDPR)"
-           Classes="section-header"
-           Margin="0,24,0,12"/>
-
-						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-								BorderBrush="#007ACC"
-								BorderThickness="1.5"
-								CornerRadius="8"
-								Padding="14"
-								Margin="0,0,0,12">
-							<StackPanel Spacing="6">
-								<TextBlock Text="📋 Dine rettigheter (GDPR)"
-										   FontWeight="SemiBold"
-										   FontSize="13"
-										   Foreground="#007ACC"/>
-								<TextBlock FontSize="12"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="18">
-									<Run Text="Du har rett til å få en kopi av data lagret på din maskin."/>
-									<LineBreak/>
-									<Run Text="For STU-registreringer og database-data, besøk nettportalen."/>
-								</TextBlock>
-							</StackPanel>
-						</Border>
-
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Eksporter lokal data" Classes="setting-title"/>
-								<TextBlock Classes="setting-description">
-									<Run Text="Last ned en kopi av data lagret lokalt på denne maskinen."/>
-									<LineBreak/>
-									<Run Text="Dette inkluderer IKKE STU-registreringer eller database-data."/>
-								</TextBlock>
-
-								<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-										BorderThickness="1"
-										CornerRadius="8"
-										Padding="12"
-										Margin="0,8,0,0">
-									<StackPanel Spacing="8">
-										<TextBlock Text="📦 Hva inkluderes (lokal maskin):"
-												   FontWeight="SemiBold"
-												   FontSize="13"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="• Appinnstillinger og preferanser"/>
-											<LineBreak/>
-											<Run Text="• Aktiviseringsinformasjon (delvis maskert)"/>
-											<LineBreak/>
-											<Run Text="• Metadata om lokale filer"/>
-											<LineBreak/>
-											<Run Text="• Systemkonfigurasjon"/>
-											<LineBreak/>
-											<LineBreak/>
-											<Run Text="⚠️ Sensitive data (passord, tokens, cookies) er"/>
-											<LineBreak/>
-											<Run Text="automatisk redaktert av sikkerhetshensyn."/>
-										</TextBlock>
-									</StackPanel>
-								</Border>
-
-								<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-										BorderBrush="#FF9800"
-										BorderThickness="1.5"
-										CornerRadius="8"
-										Padding="12"
-										Margin="0,12,0,0">
-									<StackPanel Spacing="6">
-										<TextBlock Text="ℹ️ For database-data (STU-registreringer)"
-												   FontWeight="SemiBold"
-												   FontSize="13"
-												   Foreground="#FF9800"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="Besøk:"/>
-											<Run Text="https://cybergutta.github.io/AkademietTrack/index.html" FontWeight="SemiBold"/>
-											<LineBreak/>
-											<Run Text="Logg inn → Gå til Innstillinger → Eksporter data"/>
-										</TextBlock>
-									</StackPanel>
-								</Border>
-
-								<!-- Export buttons -->
-								<StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
-									<Button Content="📄 Eksporter som JSON"
-											Classes="settings-action"
-											Command="{Binding ExportDataAsJsonCommand}"
-											IsEnabled="{Binding !IsExporting}"
-											MinWidth="180"/>
-
-									<Button Content="📊 Eksporter som CSV"
-											Classes="settings-action"
-											Command="{Binding ExportDataAsCsvCommand}"
-											IsEnabled="{Binding !IsExporting}"
-											Background="#28A745"
-											MinWidth="180"/>
-								</StackPanel>
-
-								<!-- Export status -->
-								<StackPanel IsVisible="{Binding LastExportPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-											Margin="0,8,0,0">
-									<TextBlock FontSize="12"
-											   Foreground="#28A745"
-											   TextWrapping="Wrap">
-										<Run Text="✓ Lokal data eksportert til:"/>
-									</TextBlock>
-									<TextBlock Text="{Binding LastExportPath}"
-											   FontSize="11"
-											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-											   TextWrapping="Wrap"
-											   Margin="0,4,0,0"/>
-								</StackPanel>
-							</StackPanel>
-						</Border>
-
-						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-								BorderBrush="#FFC107"
-								BorderThickness="1.5"
-								CornerRadius="8"
-								Padding="12"
-								Margin="0,0,0,16">
-							<StackPanel Spacing="6">
-								<TextBlock Text="💡 Tips"
-										   FontWeight="SemiBold"
-										   FontSize="13"
-										   Foreground="#FFC107"/>
-								<TextBlock FontSize="12"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="18">
-									<Run Text="• JSON-format: Maskinlesbart, perfekt for backup eller overføring til andre systemer"/>
-									<LineBreak/>
-									<Run Text="• CSV-format: Åpnes i Excel/Google Sheets, lettere å lese for mennesker"/>
-									<LineBreak/>
-									<Run Text="• Filen lagres automatisk i Nedlastinger-mappen"/>
-									<LineBreak/>
-									<Run Text="• Du kan eksportere data når som helst, så ofte du vil"/>
-								</TextBlock>
-							</StackPanel>
-						</Border>
+						
 
 						<!-- DATA MANAGEMENT SECTION -->
 						<TextBlock Text="Databehandling"
 								   Classes="section-header"
-								   Margin="0,24,0,12"/>
+								   Margin="0,0,0,12"/>
 
 						<!-- Delete Local Data -->
 						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
+							<StackPanel Spacing="5">
 								<TextBlock Text="Slett lokal data" Classes="setting-title"/>
 								<TextBlock Classes="setting-description">
 									<Run Text="Fjern all lagret data fra denne maskinen, inkludert innloggingsopplysninger,"/>
@@ -950,62 +803,10 @@
 										Command="{Binding DeleteLocalDataCommand}"
 										IsEnabled="{Binding !IsDeleting}"
 										Background="#FF9800"
-										Margin="0,8,0,0"/>
+										Margin="0,8,0,20"/>
 							</StackPanel>
 						</Border>
-
-						<!-- Delete Account Completely -->
-						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-								BorderBrush="#DC3545"
-								BorderThickness="1.5"
-								CornerRadius="10"
-								Padding="16"
-								Margin="0,0,0,200">
-							<StackPanel Spacing="12">
-								<TextBlock Text="⚠️ Faresone"
-										   Classes="setting-title"
-										   Foreground="#DC3545"/>
-
-								<TextBlock Classes="setting-description">
-									<Run Text="ADVARSEL: Dette vil permanent slette kontoen din fra systemet."/>
-									<LineBreak/>
-									<Run Text="Denne handlingen kan ikke angres!"/>
-								</TextBlock>
-
-								<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-										BorderBrush="#DC3545"
-										BorderThickness="1.5"
-										CornerRadius="8"
-										Padding="12"
-										Margin="0,8,0,0">
-									<StackPanel Spacing="6">
-										<TextBlock Text="🗑️ Dette sletter PERMANENT:"
-												   FontWeight="SemiBold"
-												   FontSize="13"
-												   Foreground="#DC3545"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="• All lokal data på denne maskinen"/>
-											<LineBreak/>
-											<Run Text="• Din aktivering i databasen"/>
-											<LineBreak/>
-											<Run Text="• All tilknyttet brukerdata"/>
-											<LineBreak/>
-											<Run Text="• Aktiviseringsnøkkelen blir ugyldig"/>
-										</TextBlock>
-									</StackPanel>
-								</Border>
-
-								<Button Content="Slett konto permanent"
-										Classes="settings-action"
-										Command="{Binding DeleteAccountCompletelyCommand}"
-										IsEnabled="{Binding !IsDeleting}"
-										Background="#DC3545"
-										Margin="0,8,0,0"/>
-							</StackPanel>
-						</Border>
+						<Rectangle Height="140" Fill="Transparent"/>
 					</StackPanel>
 
 					<!-- Updates Category -->
@@ -1146,7 +947,7 @@
 											   FontSize="13"
 											   FontWeight="SemiBold"
 											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-									<TextBlock Text="Logg inn på dashboard, gå til nedre høyre hjørne og klikk på chat-boblen. Deretter trykker du på boblen, og velger hva du trenger hjelp med så er det bare å skrive."
+									<TextBlock Text="Gå til nettsiden vår og deretter gå til kontakt oss siden. Fyll ut skjemaet om du behøver hjelp."
 											   Classes="setting-description"
 											   Margin="0,0,0,0"/>
 								</StackPanel>
@@ -1162,7 +963,7 @@
 											VerticalAlignment="Center"/>
 								</StackPanel>
 
-								<Button Content="Åpne kontaktskjema"
+								<Button Content="Besøk nettsiden"
 										Classes="settings-action"
 										Command="{Binding OpenContactFormCommand}"/>
 							</StackPanel>

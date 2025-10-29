@@ -8,7 +8,7 @@
         x:Class="AkademiTrack.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
-        Title="AkademiTrack - Akademiet Drammen Sundland"
+        Title="AkademiTrack - Akademiet"
         Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
 		Height="500"
 		Width="600"
@@ -398,7 +398,7 @@
 	                      Classes="title"
 	                      HorizontalAlignment="Center"/>
 
-				<TextBlock Text="Automatisk oppmøte-system - Akademiet Drammen Sundland"
+				<TextBlock Text="Automatisk oppmøte-system - Akademiet"
 	                      Classes="subtitle"
 	                      HorizontalAlignment="Center"/>
 

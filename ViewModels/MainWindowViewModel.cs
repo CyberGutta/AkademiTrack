@@ -460,7 +460,6 @@ namespace AkademiTrack.ViewModels
         private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
-        private Timer _adminNotificationTimer;
         private HashSet<string> _processedNotificationIds = new HashSet<string>();
         private string _processedNotificationsFile;
 
@@ -474,8 +473,7 @@ namespace AkademiTrack.ViewModels
 
         public new event PropertyChangedEventHandler? PropertyChanged;
 
-        private string _supabaseUrl = "https://eghxldvyyioolnithndr.supabase.co"; 
-        private string _supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnaHhsZHZ5eWlvb2xuaXRobmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NjAyNzYsImV4cCI6MjA3MzIzNjI3Nn0.NAP799HhYrNkKRpSzXFXT0vyRd_OD-hkW8vH4VbOE8k"; // Replace with your actual anon key
+        
 
 
         private string _loginEmail = "";
@@ -3177,7 +3175,6 @@ namespace AkademiTrack.ViewModels
                 _activeOverlayWindows.Clear();
             }
 
-            _adminNotificationTimer?.Dispose();
             _isProcessingQueue = false;
             _notificationSemaphore?.Dispose();
             _cancellationTokenSource?.Cancel();
