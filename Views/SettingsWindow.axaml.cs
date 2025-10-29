@@ -19,11 +19,12 @@ namespace AkademiTrack.Views
             var viewModel = new SettingsViewModel();
             DataContext = viewModel;
 
-            // Handle close request from ViewModel
             viewModel.CloseRequested += (sender, args) => Close();
 
             SetupCategoryButtons();
             UpdateCategorySelection();
+
+            this.Opened += async (_, _) => await viewModel.LoadSettingsAsync();
         }
 
         public SettingsWindow(Window owner) : this()

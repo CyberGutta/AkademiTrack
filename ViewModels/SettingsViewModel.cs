@@ -1456,10 +1456,11 @@ Terminal=false
 
         private void ToggleDetailedLogs() => ShowDetailedLogs = !ShowDetailedLogs;
 
-        private async Task LoadSettingsAsync()
+        public async Task LoadSettingsAsync()
         {
             try
             {
+                Debug.WriteLine("LoadSettingsAsync triggered");
                 var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
                 _showActivityLog = settings.ShowActivityLog;
                 _showDetailedLogs = settings.ShowDetailedLogs;
@@ -1475,9 +1476,9 @@ Terminal=false
 
                 Debug.WriteLine($"Loaded from secure storage - Email: {(!string.IsNullOrEmpty(loadedEmail) ? "✓" : "✗")}, Password: {(!string.IsNullOrEmpty(loadedPassword) ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(loadedSchool) ? "✓" : "✗")}");
 
-                _loginEmail = loadedEmail;
-                _loginPassword = loadedPassword;
-                _schoolName = loadedSchool;
+                LoginEmail = loadedEmail;
+                LoginPassword = loadedPassword;
+                SchoolName = loadedSchool;
 
                 
 

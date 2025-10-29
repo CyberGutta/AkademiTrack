@@ -27,6 +27,7 @@
 		<PackageReference Include="Selenium.WebDriver" Version="4.15.0" />
 		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="140.0.7339.8000" />
 		<PackageReference Include="Supabase" Version="1.1.1" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.10" />
 		<PackageReference Include="Velopack" Version="0.0.1298" />
 		<PackageReference Include="WebDriverManager" Version="2.16.2" />
 		<PackageReference Include="System.Text.Json" Version="9.0.9" />

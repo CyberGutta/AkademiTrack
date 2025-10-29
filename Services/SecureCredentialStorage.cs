@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -222,114 +223,54 @@ namespace AkademiTrack.Services
 
         private static bool SaveToWindowsCredentialManager(string key, string value)
         {
-#if WINDOWS
             try
             {
-                var valueBytes = Encoding.UTF8.GetBytes(value);
-                var dataIn = new DATA_BLOB();
-                var dataOut = new DATA_BLOB();
+                byte[] userData = Encoding.UTF8.GetBytes(value);
+                byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy"); // Optional but must match on decrypt
+                byte[] encryptedData = ProtectedData.Protect(userData, entropy, DataProtectionScope.CurrentUser);
 
-                var handle = GCHandle.Alloc(valueBytes, GCHandleType.Pinned);
-                try
-                {
-                    dataIn.pbData = handle.AddrOfPinnedObject();
-                    dataIn.cbData = valueBytes.Length;
+                using var regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                    $@"SOFTWARE\{ServiceName}\Credentials");
 
-                    bool success = CryptProtectData(
-                        ref dataIn,
-                        $"{ServiceName}:{key}",
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        0,
-                        ref dataOut);
-
-                    if (success && dataOut.pbData != IntPtr.Zero)
-                    {
-                        var encryptedBytes = new byte[dataOut.cbData];
-                        Marshal.Copy(dataOut.pbData, encryptedBytes, 0, dataOut.cbData);
-                        Marshal.FreeHGlobal(dataOut.pbData);
-
-                        // Store in registry
-                        using var regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
-                            $@"SOFTWARE\{ServiceName}\Credentials");
-                        
-                        regKey?.SetValue(key, Convert.ToBase64String(encryptedBytes));
-                        return true;
-                    }
-
-                    return false;
-                }
-                finally
-                {
-                    handle.Free();
-                }
+                regKey?.SetValue(key, Convert.ToBase64String(encryptedData));
+                return true;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Windows credential save error: {ex.Message}");
                 return false;
             }
-#else
-            return false;
-#endif
         }
 
         private static string? GetFromWindowsCredentialManager(string key)
         {
-#if WINDOWS
             try
             {
                 using var regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                     $@"SOFTWARE\{ServiceName}\Credentials");
-                
-                var encryptedBase64 = regKey?.GetValue(key) as string;
-                if (string.IsNullOrEmpty(encryptedBase64))
-                    return null;
 
-                var encryptedBytes = Convert.FromBase64String(encryptedBase64);
-                var dataIn = new DATA_BLOB();
-                var dataOut = new DATA_BLOB();
+                if (regKey == null) return null;
 
-                var handle = GCHandle.Alloc(encryptedBytes, GCHandleType.Pinned);
-                try
-                {
-                    dataIn.pbData = handle.AddrOfPinnedObject();
-                    dataIn.cbData = encryptedBytes.Length;
+                var base64 = regKey.GetValue(key) as string;
+                if (string.IsNullOrEmpty(base64)) return null;
 
-                    bool success = CryptUnprotectData(
-                        ref dataIn,
-                        null,
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        IntPtr.Zero,
-                        0,
-                        ref dataOut);
 
-                    if (success && dataOut.pbData != IntPtr.Zero)
-                    {
-                        var decryptedBytes = new byte[dataOut.cbData];
-                        Marshal.Copy(dataOut.pbData, decryptedBytes, 0, dataOut.cbData);
-                        Marshal.FreeHGlobal(dataOut.pbData);
+                byte[] encryptedData = Convert.FromBase64String(base64);
+                byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
+                Debug.WriteLine($"Registry value for '{key}': {base64}");
 
-                        return Encoding.UTF8.GetString(decryptedBytes);
-                    }
+                byte[] decryptedData = ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.CurrentUser);
+                Debug.WriteLine($"Registry value for '{key}': {base64}");
 
-                    return null;
-                }
-                finally
-                {
-                    handle.Free();
-                }
+                return Encoding.UTF8.GetString(decryptedData);
+
+
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Windows credential get error: {ex.Message}");
                 return null;
             }
-#else
-            return null;
-#endif
         }
 
         private static bool DeleteFromWindowsCredentialManager(string key)
