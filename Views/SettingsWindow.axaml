@@ -532,7 +532,6 @@
 						</Border>
 
 						<!-- Password Field -->
-						<!-- Password Field -->
 						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="Passord" Classes="setting-title"/>

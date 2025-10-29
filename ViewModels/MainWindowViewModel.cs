@@ -1574,7 +1574,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
         private async Task<Dictionary<string, string>> GetCookiesViaBrowserAsync()
         {
             IWebDriver localWebDriver = null!;

@@ -16,10 +16,6 @@ namespace AkademiTrack.Services
     public static class SecureCredentialStorage
     {
         private const string ServiceName = "AkademiTrack";
-
-        /// <summary>
-        /// Stores a credential securely using the platform's credential manager
-        /// </summary>
         public static async Task<bool> SaveCredentialAsync(string key, string value)
         {
             try
@@ -60,10 +56,6 @@ namespace AkademiTrack.Services
                 return null;
             }
         }
-
-        /// <summary>
-        /// Deletes a credential from the platform's credential manager
-        /// </summary>
         public static async Task<bool> DeleteCredentialAsync(string key)
         {
             try
@@ -226,7 +218,7 @@ namespace AkademiTrack.Services
             try
             {
                 byte[] userData = Encoding.UTF8.GetBytes(value);
-                byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy"); // Optional but must match on decrypt
+                byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
                 byte[] encryptedData = ProtectedData.Protect(userData, entropy, DataProtectionScope.CurrentUser);
 
                 using var regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
@@ -257,10 +249,8 @@ namespace AkademiTrack.Services
 
                 byte[] encryptedData = Convert.FromBase64String(base64);
                 byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
-                Debug.WriteLine($"Registry value for '{key}': {base64}");
 
                 byte[] decryptedData = ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.CurrentUser);
-                Debug.WriteLine($"Registry value for '{key}': {base64}");
 
                 return Encoding.UTF8.GetString(decryptedData);
 
@@ -302,7 +292,6 @@ namespace AkademiTrack.Services
         {
             try
             {
-                // Using secret-tool (part of libsecret)
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
