@@ -110,19 +110,22 @@ namespace AkademiTrack.Views
 
             if (passwordTextBox == null || eyeIcon == null) return;
 
-            var authService = PlatformAuthFactory.Create();
-            bool verified = await authService.AuthenticateAsync("Bekreft identitet for å vise passord");
-
-            if (!verified)
+            if (!_isPasswordVisible)
             {
-                var box = MessageBoxManager
-                    .GetMessageBoxStandard(
-                        "Sikkerhet",
-                        "Autentisering mislyktes",
-                        ButtonEnum.Ok);
+                var authService = PlatformAuthFactory.Create();
+                bool verified = await authService.AuthenticateAsync("Bekreft identitet for å vise passord");
 
-                await box.ShowAsync();
-                return;
+                if (!verified)
+                {
+                    var box = MessageBoxManager
+                        .GetMessageBoxStandard(
+                            "Sikkerhet",
+                            "Autentisering mislyktes",
+                            ButtonEnum.Ok);
+
+                    await box.ShowAsync();
+                    return;
+                }
             }
 
             _isPasswordVisible = !_isPasswordVisible;
