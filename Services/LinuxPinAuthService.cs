@@ -15,15 +15,13 @@ namespace AkademiTrack.Services
         {
             string fullPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ConfigPath);
 
-            Console.WriteLine("🔐 Dette er en terminalbasert PIN-sjekk.");
-            Console.WriteLine("💡 For en ekte grafisk passordopplevelse, installer zenity og bruk GUI-modus.");
-            Console.WriteLine("   👉 sudo apt install zenity");
+            bool zenityAvailable = IsZenityInstalled();
 
             if (!File.Exists(fullPath))
             {
-                Console.WriteLine("🔐 Første gang? Sett en PIN for å beskytte tilgang.");
-                Console.Write("Ny PIN: ");
-                string newPin = ReadHiddenInput();
+                string newPin = zenityAvailable
+                    ? await PromptWithZenity("Sett en ny PIN for AkademiTrack")
+                    : PromptInTerminal("🔐 Første gang? Sett en PIN for å beskytte tilgang.");
 
                 if (string.IsNullOrWhiteSpace(newPin))
                 {
@@ -38,9 +36,9 @@ namespace AkademiTrack.Services
                 return true;
             }
 
-            Console.WriteLine($"🔐 {reason}");
-            Console.Write("Enter PIN: ");
-            string inputPin = ReadHiddenInput();
+            string inputPin = zenityAvailable
+                ? await PromptWithZenity(reason)
+                : PromptInTerminal($"🔐 {reason}");
 
             string storedHash = File.ReadAllText(fullPath);
             if (Hash(inputPin) == storedHash)
@@ -51,6 +49,63 @@ namespace AkademiTrack.Services
             Console.WriteLine("❌ Feil PIN. Tilgang nektet.");
             Console.WriteLine("💣 For å tilbakestille PIN, slett: " + fullPath);
             return false;
+        }
+
+        private bool IsZenityInstalled()
+        {
+            try
+            {
+                var check = new ProcessStartInfo
+                {
+                    FileName = "which",
+                    Arguments = "zenity",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = Process.Start(check);
+                string result = process?.StandardOutput.ReadToEnd().Trim() ?? "";
+                return !string.IsNullOrEmpty(result);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<string> PromptWithZenity(string message)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "zenity",
+                    Arguments = $"--entry --hide-text --title=\"AkademiTrack\" --text=\"{message}\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(psi);
+                if (process == null)
+                    return "";
+
+                string pin = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                return pin.Trim();
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private string PromptInTerminal(string message)
+        {
+            Console.WriteLine(message);
+            Console.WriteLine("💡 For grafisk PIN-dialog, installer zenity: sudo apt install zenity");
+            Console.Write("Enter PIN: ");
+            return ReadHiddenInput();
         }
 
         private string ReadHiddenInput()
