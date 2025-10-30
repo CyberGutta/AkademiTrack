@@ -1504,7 +1504,7 @@ namespace AkademiTrack.ViewModels
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    var json = MacKeychain.Load("cookies");
+                    var json = await KeychainService.LoadFromKeychain();
                     if (string.IsNullOrEmpty(json)) return null!;
 
                     var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
@@ -2355,8 +2355,8 @@ namespace AkademiTrack.ViewModels
                 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    MacKeychain.Save("cookies", json);
-                    LogDebug("Cookies saved to macOS Keychain (native)");
+                    await KeychainService.SaveToKeychain(json);
+                    LogDebug("Cookies saved to macOS Keychain (via security command)");
                 }
                 else
                 {
@@ -2778,13 +2778,14 @@ namespace AkademiTrack.ViewModels
         }
 
         // MainWindowViewModel.cs - REPLACE DeleteCookiesAsync
-        private Task DeleteCookiesAsync()
+        private async Task DeleteCookiesAsync()
         {
             try
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    MacKeychain.Delete("cookies");
+                    await KeychainService.DeleteFromKeychain();
+                    LogDebug("Cookies deleted from macOS Keychain");
                 }
                 else
                 {
@@ -2792,9 +2793,10 @@ namespace AkademiTrack.ViewModels
                     if (File.Exists(path)) File.Delete(path);
                 }
             }
-            catch { }
-            
-            return Task.CompletedTask;
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to delete cookies: {ex.Message}");
+            }
         }
         private string GetUserParametersFilePath()
         {

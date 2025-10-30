@@ -76,47 +76,46 @@ namespace AkademiTrack.Services
             }
         }
 
-        #region macOS Keychain (Native via MacKeychain.cs)
+        #region macOS Keychain (via /usr/bin/security)
 
-        private static Task<bool> SaveToMacOSKeychainAsync(string key, string value)
+        private static async Task<bool> SaveToMacOSKeychainAsync(string key, string value)
         {
             try
             {
-                MacKeychain.Save(key, value);
-                return Task.FromResult(true);
+                await KeychainService.SaveToKeychain(key, value);
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MacKeychain save error: {ex.Message}");
-                return Task.FromResult(false);
+                Debug.WriteLine($"Keychain save error ({key}): {ex.Message}");
+                return false;
             }
         }
 
-        private static Task<string?> GetFromMacOSKeychainAsync(string key)
+        private static async Task<string?> GetFromMacOSKeychainAsync(string key)
         {
             try
             {
-                var value = MacKeychain.Load(key);
-                return Task.FromResult(value);
+                return await KeychainService.LoadFromKeychain(key);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MacKeychain load error: {ex.Message}");
-                return Task.FromResult<string?>(null);
+                Debug.WriteLine($"Keychain load error ({key}): {ex.Message}");
+                return null;
             }
         }
 
-        private static Task<bool> DeleteFromMacOSKeychainAsync(string key)
+        private static async Task<bool> DeleteFromMacOSKeychainAsync(string key)
         {
             try
             {
-                MacKeychain.Delete(key);
-                return Task.FromResult(true);
+                await KeychainService.DeleteFromKeychain(key);
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MacKeychain delete error: {ex.Message}");
-                return Task.FromResult(false);
+                Debug.WriteLine($"Keychain delete error ({key}): {ex.Message}");
+                return false;
             }
         }
 
