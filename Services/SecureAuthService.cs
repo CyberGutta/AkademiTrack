@@ -12,9 +12,9 @@ public static class PlatformAuthFactory
     public static ISecureAuthService Create()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return new WindowsHelloAuthService(); // Implement this
+            return new WindowsHelloAuthService(); 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return new MacOSAuthService(); // Implement this
-        return new LinuxPinAuthService(); // Implement this
+            return new MacOSAuthService(); 
+        return new LinuxPinAuthService(); 
     }
 }
