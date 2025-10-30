@@ -1,51 +1,52 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace AkademiTrack.Services
 {
     public class LinuxPinAuthService : ISecureAuthService
     {
+        private const string ConfigPath = ".akademitrack/pin.cfg";
+
         public async Task<bool> AuthenticateAsync(string reason)
         {
-            try
-            {
-                // Try zenity first
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "zenity",
-                    Arguments = $"--entry --hide-text --title=\"AkademiTrack\" --text=\"{reason}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+            string fullPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ConfigPath);
 
-                using var process = Process.Start(psi);
-                if (process != null)
-                {
-                    string pin = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-                    return !string.IsNullOrWhiteSpace(pin);
-                }
-            }
-            catch
+            if (!File.Exists(fullPath))
             {
-                // Fallback to terminal prompt
-                try
+                Console.WriteLine("🔐 Første gang? Sett en PIN for å beskytte tilgang.");
+                Console.Write("Ny PIN: ");
+                string newPin = ReadHiddenInput();
+
+                if (string.IsNullOrWhiteSpace(newPin))
                 {
-                    Console.WriteLine($"🔐 {reason}");
-                    Console.Write("Enter PIN: ");
-                    string pin = ReadHiddenInput();
-                    return !string.IsNullOrWhiteSpace(pin);
-                }
-                catch
-                {
+                    Console.WriteLine("❌ PIN kan ikke være tom.");
                     return false;
                 }
+
+                string hashed = Hash(newPin);
+                Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                File.WriteAllText(fullPath, hashed);
+                Console.WriteLine("✅ PIN lagret. Neste gang må du bekrefte identitet.");
+                return true;
             }
 
+            Console.WriteLine($"🔐 {reason}");
+            Console.Write("Enter PIN: ");
+            string inputPin = ReadHiddenInput();
+
+            string storedHash = File.ReadAllText(fullPath);
+            if (Hash(inputPin) == storedHash)
+            {
+                return true;
+            }
+
+            Console.WriteLine("❌ Feil PIN. Tilgang nektet.");
+            Console.WriteLine("💡 Hvis du vil bruke en grafisk PIN-dialog, installer zenity og bruk GUI-modus.");
+            Console.WriteLine("💣 For å tilbakestille PIN, slett: " + fullPath);
             return false;
         }
 
@@ -72,6 +73,13 @@ namespace AkademiTrack.Services
 
             Console.WriteLine();
             return input;
+        }
+
+        private string Hash(string input)
+        {
+            using var sha = SHA256.Create();
+            byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+            return Convert.ToHexString(bytes);
         }
     }
 }
