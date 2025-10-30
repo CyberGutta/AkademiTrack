@@ -1257,7 +1257,6 @@ namespace AkademiTrack.ViewModels
                 "Disposing resources...",
                 "vindu åpnet",
                 "window opened",
-                "HTTP request failed with status"
             };
 
             foreach (var skip in skipMessages)
