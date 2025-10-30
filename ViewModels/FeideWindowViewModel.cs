@@ -20,6 +20,7 @@ namespace AkademiTrack.ViewModels
         private string _feidePassword = string.Empty;
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
+        private bool _isPasswordVisible = false;
 
         public new event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler<FeideSetupCompletedEventArgs>? SetupCompleted;
@@ -33,6 +34,7 @@ namespace AkademiTrack.ViewModels
         {
             SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
             ExitCommand = new RelayCommand(() => ExitApplication());
+            TogglePasswordCommand = new RelayCommand(TogglePasswordVisibility);
 
             Schools = new ObservableCollection<string>
             {
@@ -55,7 +57,6 @@ namespace AkademiTrack.ViewModels
                 "Akademiet vgs Ålesund"
             };
         }
-
         public ObservableCollection<string> Schools { get; }
 
         public string SchoolName
@@ -120,6 +121,21 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        public bool IsPasswordVisible
+        {
+            get => _isPasswordVisible;
+            set
+            {
+                _isPasswordVisible = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PasswordChar));
+            }
+        }
+
+        public char PasswordChar => IsPasswordVisible ? '\0' : '•';
+
+        public ICommand TogglePasswordCommand { get; }
+
         public bool CanSave => !IsLoading &&
                                !string.IsNullOrWhiteSpace(SchoolName) &&
                                !string.IsNullOrWhiteSpace(FeideUsername) &&
@@ -183,9 +199,9 @@ namespace AkademiTrack.ViewModels
             try
             {
                 // 1. Store credentials in the platform-specific secure store
-                await SecureCredentialStorage.SaveCredentialAsync("LoginEmail",   FeideUsername);
+                await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", FeideUsername);
                 await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", FeidePassword);
-                await SecureCredentialStorage.SaveCredentialAsync("SchoolName",   SchoolName);
+                await SecureCredentialStorage.SaveCredentialAsync("SchoolName", SchoolName);
 
                 // 2. Write only the “setup completed” flag to settings.json
                 var settings = new AppSettings
@@ -212,7 +228,13 @@ namespace AkademiTrack.ViewModels
                 desktop.Shutdown();
             }
         }
+        private void TogglePasswordVisibility()
+        {
+            IsPasswordVisible = !IsPasswordVisible;
+        }
     }
+    
+    
 
     public class FeideSetupCompletedEventArgs : EventArgs
     {

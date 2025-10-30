@@ -450,8 +450,6 @@ namespace AkademiTrack.ViewModels
         private ObservableCollection<NotificationEntry> _notifications;
         private bool _showDetailedLogs = true;
         private NotificationEntry? _currentNotification;
-        private int _notificationIdCounter = 0;
-        private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
         private Timer _updateCheckTimer;
         private DateTime _lastUpdateCheck = DateTime.MinValue;
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
@@ -460,11 +458,13 @@ namespace AkademiTrack.ViewModels
         private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
+        private readonly List<NotificationOverlayWindow> _activeOverlayWindows = new();
+        private readonly object _activeOverlayWindowsLock = new();
+
         private HashSet<string> _processedNotificationIds = new HashSet<string>();
         private string _processedNotificationsFile;
 
         private readonly Queue<NotificationQueueItem> _notificationQueue = new Queue<NotificationQueueItem>();
-        private bool _isShowingNotification = false;
         private readonly object _notificationLock = new object();
 
         private readonly SemaphoreSlim _notificationSemaphore = new SemaphoreSlim(1, 1);
@@ -531,17 +531,19 @@ namespace AkademiTrack.ViewModels
             _processedNotificationsFile = Path.Combine(directory, "processed_notifications.json");
 
 
-            _ = Task.Run(LoadProcessedNotificationIdsAsync);
+            _ = LoadProcessedNotificationIdsAsync();
 
 
 
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
-            _updateCheckTimer = new Timer(CheckForUpdatesAutomatically, null,
-                TimeSpan.FromMinutes(1),
-                TimeSpan.FromMinutes(30));
-            LogInfo("Automatisk oppdateringssjekker startet (sjekker hver 30. minutt)");
-        }
+            _updateCheckTimer = new Timer(
+                CheckForUpdatesAutomatically,
+                null,
+                (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
+                (int)TimeSpan.FromMinutes(30).TotalMilliseconds
+            );
+        }   
 
         private async Task CheckAutoStartAutomationAsync()
         {
@@ -1034,7 +1036,7 @@ namespace AkademiTrack.ViewModels
 
         private void AddToActiveWindows(NotificationOverlayWindow window)
         {
-            lock (_activeOverlayWindows)
+            lock (_activeOverlayWindowsLock)
             {
                 _activeOverlayWindows.Add(window);
                 LogDebug($"Added window to tracking. Total active: {_activeOverlayWindows.Count}");
@@ -1043,7 +1045,7 @@ namespace AkademiTrack.ViewModels
 
         private void RemoveFromActiveWindows(NotificationOverlayWindow window)
         {
-            lock (_activeOverlayWindows)
+            lock (_activeOverlayWindowsLock)
             {
                 _activeOverlayWindows.Remove(window);
                 LogDebug($"Removed window from tracking. Total active: {_activeOverlayWindows.Count}");
@@ -1052,34 +1054,16 @@ namespace AkademiTrack.ViewModels
 
         private void CleanupOldWindows()
         {
-            try
+            lock (_activeOverlayWindowsLock)
             {
-                lock (_activeOverlayWindows)
+                for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
                 {
-                    for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
+                    var w = _activeOverlayWindows[i];
+                    if (!w.IsVisible)
                     {
-                        try
-                        {
-                            if (!_activeOverlayWindows[i].IsVisible)
-                            {
-                                _activeOverlayWindows.RemoveAt(i);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            LogDebug($"Error checking window visibility: {ex.Message}");
-                            _activeOverlayWindows.RemoveAt(i);
-                        }
+                        try { w.Close(); } catch { }
+                        _activeOverlayWindows.RemoveAt(i);
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Error during window cleanup: {ex.Message}");
-
-                lock (_activeOverlayWindows)
-                {
-                    _activeOverlayWindows.Clear();
                 }
             }
         }
@@ -2793,6 +2777,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        // MainWindowViewModel.cs - REPLACE DeleteCookiesAsync
         private async Task DeleteCookiesAsync()
         {
             try
@@ -3053,23 +3038,14 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if ((DateTime.Now - _lastUpdateCheck).TotalMinutes < 25)
-                {
-                    LogDebug("Hopper over oppdateringssjekk - for tidlig siden forrige sjekk");
-                    return;
-                }
+                if ((DateTime.Now - _lastUpdateCheck).TotalMinutes < 25) return;
 
                 _lastUpdateCheck = DateTime.Now;
-                LogDebug($"Sjekker automatisk etter oppdateringer fra {UPDATE_JSON_URL}");
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 var response = await _httpClient.GetAsync(UPDATE_JSON_URL, cts.Token);
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    LogDebug($"Kunne ikke hente oppdateringsinfo: {response.StatusCode}");
-                    return;
-                }
+                if (!response.IsSuccessStatusCode) return;
 
                 var json = await response.Content.ReadAsStringAsync();
                 var updateInfo = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
@@ -3077,43 +3053,20 @@ namespace AkademiTrack.ViewModels
                     PropertyNameCaseInsensitive = true
                 });
 
-                if (updateInfo == null || string.IsNullOrEmpty(updateInfo.latest_version))
-                {
-                    LogDebug("Ugyldig oppdateringsinfo mottatt");
-                    return;
-                }
+                if (updateInfo == null || string.IsNullOrEmpty(updateInfo.latest_version)) return;
 
                 var latestVersion = updateInfo.latest_version.TrimStart('v');
                 var currentVersion = _applicationInfo.Version.TrimStart('v');
 
-                LogDebug($"Nåværende versjon: {currentVersion}, Siste versjon: {latestVersion}");
-
                 if (IsNewerVersion(latestVersion, currentVersion))
                 {
-                    LogSuccess($"Ny versjon tilgjengelig: v{latestVersion}");
-
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         ShowUpdateNotification(updateInfo);
                     });
                 }
-                else
-                {
-                    LogDebug("Ingen nye oppdateringer tilgjengelig");
-                }
             }
-            catch (TaskCanceledException)
-            {
-                LogDebug("Oppdateringssjekk tidsavbrudd - hopper over");
-            }
-            catch (HttpRequestException ex)
-            {
-                LogDebug($"Nettverksfeil ved oppdateringssjekk: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil ved automatisk oppdateringssjekk: {ex.Message}");
-            }
+            catch { }
         }
 
         private bool IsNewerVersion(string latestVersion, string currentVersion)
@@ -3157,26 +3110,15 @@ namespace AkademiTrack.ViewModels
 
             _isProcessingQueue = false;
 
-            lock (_activeOverlayWindows)
+            lock (_activeOverlayWindowsLock)
             {
-                foreach (var window in _activeOverlayWindows.ToList())
+                foreach (var w in _activeOverlayWindows.ToList())
                 {
-                    try
-                    {
-                        if (window.IsVisible)
-                        {
-                            window.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogDebug($"Error closing window during disposal: {ex.Message}");
-                    }
+                    try { if (w.IsVisible) w.Close(); } catch { }
                 }
                 _activeOverlayWindows.Clear();
             }
 
-            _isProcessingQueue = false;
             _notificationSemaphore?.Dispose();
             _cancellationTokenSource?.Cancel();
             _webDriver?.Quit();

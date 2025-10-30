@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
+#if WINDOWS
+using Microsoft.Win32;
+using System.Security.Cryptography;
+#endif
+
 namespace AkademiTrack.Services
 {
-    /// <summary>
-    /// Secure credential storage using platform-specific APIs:
-    /// - macOS: Native Keychain (MacKeychain.cs)
-    /// - Windows: DPAPI
-    /// - Linux: Secret Service (secret-tool)
-    /// </summary>
     public static class SecureCredentialStorage
     {
         private const string ServiceName = "AkademiTrack";
@@ -126,6 +124,7 @@ namespace AkademiTrack.Services
 
         #region Windows Credential Manager (DPAPI)
 
+#if WINDOWS
         private static bool SaveToWindowsCredentialManager(string key, string value)
         {
             try
@@ -134,7 +133,7 @@ namespace AkademiTrack.Services
                 byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
                 byte[] encryptedData = ProtectedData.Protect(userData, entropy, DataProtectionScope.CurrentUser);
 
-                using var regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                using var regKey = Registry.CurrentUser.CreateSubKey(
                     $@"SOFTWARE\{ServiceName}\Credentials");
 
                 regKey?.SetValue(key, Convert.ToBase64String(encryptedData));
@@ -151,7 +150,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                using var regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                using var regKey = Registry.CurrentUser.OpenSubKey(
                     $@"SOFTWARE\{ServiceName}\Credentials");
 
                 if (regKey == null) return null;
@@ -177,7 +176,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                using var regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                using var regKey = Registry.CurrentUser.OpenSubKey(
                     $@"SOFTWARE\{ServiceName}\Credentials", true);
                 
                 regKey?.DeleteValue(key, false);
@@ -189,6 +188,11 @@ namespace AkademiTrack.Services
                 return false;
             }
         }
+#else
+        private static bool SaveToWindowsCredentialManager(string key, string value) => false;
+        private static string? GetFromWindowsCredentialManager(string key) => null;
+        private static bool DeleteFromWindowsCredentialManager(string key) => false;
+#endif
 
         #endregion
 
