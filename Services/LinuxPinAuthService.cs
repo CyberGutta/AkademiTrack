@@ -15,6 +15,10 @@ namespace AkademiTrack.Services
         {
             string fullPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ConfigPath);
 
+            Console.WriteLine("🔐 Dette er en terminalbasert PIN-sjekk.");
+            Console.WriteLine("💡 For en ekte grafisk passordopplevelse, installer zenity og bruk GUI-modus.");
+            Console.WriteLine("   👉 sudo apt install zenity");
+
             if (!File.Exists(fullPath))
             {
                 Console.WriteLine("🔐 Første gang? Sett en PIN for å beskytte tilgang.");
@@ -45,7 +49,6 @@ namespace AkademiTrack.Services
             }
 
             Console.WriteLine("❌ Feil PIN. Tilgang nektet.");
-            Console.WriteLine("💡 Hvis du vil bruke en grafisk PIN-dialog, installer zenity og bruk GUI-modus.");
             Console.WriteLine("💣 For å tilbakestille PIN, slett: " + fullPath);
             return false;
         }
