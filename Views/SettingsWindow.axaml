@@ -527,7 +527,7 @@
 										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginEmail}"
 										 Classes="credential-input"
-										 Watermark="78abcdef"/>
+										 Watermark="F.eks: 78abcdef"/>
 							</StackPanel>
 						</Border>
 
