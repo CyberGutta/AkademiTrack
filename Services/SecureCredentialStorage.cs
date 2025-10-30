@@ -9,13 +9,14 @@ namespace AkademiTrack.Services
 {
     /// <summary>
     /// Secure credential storage using platform-specific APIs:
-    /// - macOS: Keychain
-    /// - Windows: DPAPI (Data Protection API)
-    /// - Linux: Secret Service API (libsecret)
+    /// - macOS: Native Keychain (MacKeychain.cs)
+    /// - Windows: DPAPI
+    /// - Linux: Secret Service (secret-tool)
     /// </summary>
     public static class SecureCredentialStorage
     {
         private const string ServiceName = "AkademiTrack";
+
         public static async Task<bool> SaveCredentialAsync(string key, string value)
         {
             try
@@ -56,6 +57,7 @@ namespace AkademiTrack.Services
                 return null;
             }
         }
+
         public static async Task<bool> DeleteCredentialAsync(string key)
         {
             try
@@ -76,142 +78,53 @@ namespace AkademiTrack.Services
             }
         }
 
-        #region macOS Keychain
+        #region macOS Keychain (Native via MacKeychain.cs)
 
-        private static async Task<bool> SaveToMacOSKeychainAsync(string key, string value)
+        private static Task<bool> SaveToMacOSKeychainAsync(string key, string value)
         {
             try
             {
-                await DeleteFromMacOSKeychainAsync(key);
-
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "security",
-                        Arguments = $"add-generic-password -s \"{ServiceName}\" -a \"{key}\" -w \"{value}\" -U",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                await process.WaitForExitAsync();
-
-                var success = process.ExitCode == 0;
-                if (!success)
-                {
-                    var error = await process.StandardError.ReadToEndAsync();
-                    Debug.WriteLine($"Keychain save failed: {error}");
-                }
-
-                return success;
+                MacKeychain.Save(key, value);
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"macOS Keychain save error: {ex.Message}");
-                return false;
+                Debug.WriteLine($"MacKeychain save error: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
 
-        private static async Task<string?> GetFromMacOSKeychainAsync(string key)
+        private static Task<string?> GetFromMacOSKeychainAsync(string key)
         {
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "security",
-                        Arguments = $"find-generic-password -s \"{ServiceName}\" -a \"{key}\" -w",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
-                {
-                    return output.Trim();
-                }
-
-                return null;
+                var value = MacKeychain.Load(key);
+                return Task.FromResult(value);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"macOS Keychain get error: {ex.Message}");
-                return null;
+                Debug.WriteLine($"MacKeychain load error: {ex.Message}");
+                return Task.FromResult<string?>(null);
             }
         }
 
-        private static async Task<bool> DeleteFromMacOSKeychainAsync(string key)
+        private static Task<bool> DeleteFromMacOSKeychainAsync(string key)
         {
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "security",
-                        Arguments = $"delete-generic-password -s \"{ServiceName}\" -a \"{key}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                await process.WaitForExitAsync();
-
-                return process.ExitCode == 0 || process.ExitCode == 44;
+                MacKeychain.Delete(key);
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"macOS Keychain delete error: {ex.Message}");
-                return false;
+                Debug.WriteLine($"MacKeychain delete error: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
 
         #endregion
 
         #region Windows Credential Manager (DPAPI)
-
-#if WINDOWS
-        [DllImport("Crypt32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern bool CryptProtectData(
-            ref DATA_BLOB pDataIn,
-            string? szDataDescr,
-            IntPtr pOptionalEntropy,
-            IntPtr pvReserved,
-            IntPtr pPromptStruct,
-            int dwFlags,
-            ref DATA_BLOB pDataOut);
-
-        [DllImport("Crypt32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern bool CryptUnprotectData(
-            ref DATA_BLOB pDataIn,
-            StringBuilder? szDataDescr,
-            IntPtr pOptionalEntropy,
-            IntPtr pvReserved,
-            IntPtr pPromptStruct,
-            int dwFlags,
-            ref DATA_BLOB pDataOut);
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct DATA_BLOB
-        {
-            public int cbData;
-            public IntPtr pbData;
-        }
-#endif
 
         private static bool SaveToWindowsCredentialManager(string key, string value)
         {
@@ -246,15 +159,12 @@ namespace AkademiTrack.Services
                 var base64 = regKey.GetValue(key) as string;
                 if (string.IsNullOrEmpty(base64)) return null;
 
-
                 byte[] encryptedData = Convert.FromBase64String(base64);
                 byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
 
                 byte[] decryptedData = ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.CurrentUser);
 
                 return Encoding.UTF8.GetString(decryptedData);
-
-
             }
             catch (Exception ex)
             {
@@ -265,7 +175,6 @@ namespace AkademiTrack.Services
 
         private static bool DeleteFromWindowsCredentialManager(string key)
         {
-#if WINDOWS
             try
             {
                 using var regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
@@ -279,9 +188,6 @@ namespace AkademiTrack.Services
                 Debug.WriteLine($"Windows credential delete error: {ex.Message}");
                 return false;
             }
-#else
-            return false;
-#endif
         }
 
         #endregion

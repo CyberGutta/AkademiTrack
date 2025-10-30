@@ -27,115 +27,18 @@ using Velopack.Sources;
 namespace AkademiTrack.ViewModels
 {
     public class AppSettings
-    {
-        public bool ShowActivityLog { get; set; } = false;
-        public bool ShowDetailedLogs { get; set; } = true;
-        public bool StartWithSystem { get; set; } = true;
-        public bool AutoStartAutomation { get; set; } = true;
+{
+    public bool ShowActivityLog { get; set; } = false;
+    public bool ShowDetailedLogs { get; set; } = true;
+    public bool StartWithSystem { get; set; } = true;
+    public bool AutoStartAutomation { get; set; } = true;
 
-        public bool StartMinimized { get; set; } = true;
-        public DateTime LastUpdated { get; set; } = DateTime.Now;
+    public bool StartMinimized { get; set; } = true;
+    public DateTime LastUpdated { get; set; } = DateTime.Now;
+    
+    public bool InitialSetupCompleted { get; set; } = false;
+}
 
-        public string EncryptedLoginEmail { get; set; } = "";
-        public string EncryptedLoginPassword { get; set; } = "";
-        public string EncryptedSchoolName { get; set; } = "";
-        public bool InitialSetupCompleted { get; set; } = false;
-    }
-
-    public static class CredentialEncryption
-    {
-        private static readonly string EncryptionKey = GenerateKey();
-
-        private static string GenerateKey()
-        {
-            try
-            {
-                var machineInfo = Environment.MachineName + Environment.UserName + "AkademiTrack2025";
-                using (var sha256 = SHA256.Create())
-                {
-                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(machineInfo));
-                    var base64 = Convert.ToBase64String(hash);
-                    var key = base64.Length >= 32 ? base64.Substring(0, 32) : base64.PadRight(32, '0');
-                    Debug.WriteLine($"Generated encryption key length: {key.Length}");
-                    return key;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error generating encryption key: {ex.Message}");
-                return "AkademiTrack2025DefaultKey12345";
-            }
-        }
-
-        public static string Encrypt(string plainText)
-        {
-            if (string.IsNullOrEmpty(plainText)) return "";
-
-            try
-            {
-                using (var aes = Aes.Create())
-                {
-                    aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
-                    aes.GenerateIV();
-
-                    using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
-                    using (var msEncrypt = new MemoryStream())
-                    {
-                        msEncrypt.Write(aes.IV, 0, aes.IV.Length);
-
-                        using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-                        using (var swEncrypt = new StreamWriter(csEncrypt))
-                        {
-                            swEncrypt.Write(plainText);
-                        }
-
-                        return Convert.ToBase64String(msEncrypt.ToArray());
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Encryption failed: {ex.Message}");
-                return "";
-            }
-        }
-
-        public static string Decrypt(string encryptedText)
-        {
-            if (string.IsNullOrEmpty(encryptedText)) return "";
-
-            try
-            {
-                var fullCipher = Convert.FromBase64String(encryptedText);
-
-                using (var aes = Aes.Create())
-                {
-                    aes.Key = Encoding.UTF8.GetBytes(EncryptionKey);
-
-                    var iv = new byte[aes.BlockSize / 8];
-                    var cipher = new byte[fullCipher.Length - iv.Length];
-
-                    Array.Copy(fullCipher, 0, iv, 0, iv.Length);
-                    Array.Copy(fullCipher, iv.Length, cipher, 0, cipher.Length);
-
-                    aes.IV = iv;
-
-                    using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
-                    using (var msDecrypt = new MemoryStream(cipher))
-                    using (var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-                    using (var srDecrypt = new StreamReader(csDecrypt))
-                    {
-                        return srDecrypt.ReadToEnd();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Decryption failed: {ex.Message}");
-                return "";
-            }
-        }
-    }
 
     public static class AutoStartManager
     {
@@ -472,12 +375,11 @@ Terminal=false
             try
             {
                 var json = await File.ReadAllTextAsync(filePath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? defaultSettings;
-                return settings;
+                return JsonSerializer.Deserialize<AppSettings>(json) ?? defaultSettings;
             }
             catch
             {
-                return defaultSettings;
+                return defaultSettings;   // corrupt file → use defaults, will be overwritten later
             }
         }
 
@@ -485,7 +387,7 @@ Terminal=false
         {
             try
             {
-                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var appDataPath   = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
                 Directory.CreateDirectory(appFolderPath);
 
@@ -796,93 +698,108 @@ Terminal=false
         }
 
         private async Task DeleteLocalDataAsync()
+    {
+        if (IsDeleting) return;
+
+        try
         {
-            if (IsDeleting) return;
+            var result = await ShowConfirmationDialog(
+                "Slett lokal data",
+                "Er du sikker på at du vil slette all lokal data?\n\n" +
+                "Dette vil fjerne:\n" +
+                "• Lagrede innloggingsopplysninger (fra sikker lagring)\n" +
+                "• Cookies og tokens\n" +
+                "• Appinnstillinger\n" +
+                "• Cache-data\n\n" +
+                "Programmet starter på nytt etter sletting.",
+                false
+            );
 
-            try
+            if (!result) return;
+
+            IsDeleting = true;
+            Debug.WriteLine("=== DELETING LOCAL DATA ===");
+
+            // Delete from secure storage first
+            Debug.WriteLine("Deleting credentials from secure storage...");
+            await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
+            await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
+            await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
+            Debug.WriteLine("✓ Secure storage cleared");
+
+            // Delete cookies from macOS Keychain (if on macOS)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                var result = await ShowConfirmationDialog(
-                    "Slett lokal data",
-                    "Er du sikker på at du vil slette all lokal data?\n\n" +
-                    "Dette vil fjerne:\n" +
-                    "• Lagrede innloggingsopplysninger (fra sikker lagring)\n" +
-                    "• Cookies og tokens\n" +
-                    "• Appinnstillinger\n" +
-                    "• Cache-data\n\n" +
-                    "Programmet starter på nytt etter sletting.",
-                    false
-                );
-
-                if (!result) return;
-
-                IsDeleting = true;
-                Debug.WriteLine("=== DELETING LOCAL DATA ===");
-
-                // Delete from secure storage first
-                Debug.WriteLine("Deleting credentials from secure storage...");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
-                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
-                Debug.WriteLine("✓ Secure storage cleared");
-
-                // Then delete local files
-                var appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "AkademiTrack"
-                );
-
-                if (Directory.Exists(appDataDir))
+                try
                 {
-                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+                    Debug.WriteLine("Deleting cookies from macOS Keychain...");
+                    await KeychainService.DeleteFromKeychain();
+                    Debug.WriteLine("✓ Keychain cookies cleared");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
+                }
+            }
 
-                    foreach (var file in allFiles)
-                    {
-                        try
-                        {
-                            File.Delete(file);
-                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
-                        }
-                    }
+            // Then delete local files
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
 
-                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
-                    {
-                        try
-                        {
-                            if (Directory.Exists(dir))
-                                Directory.Delete(dir, true);
-                        }
-                        catch { }
-                    }
+            if (Directory.Exists(appDataDir))
+            {
+                var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
 
+                foreach (var file in allFiles)
+                {
                     try
                     {
-                        if (Directory.Exists(appDataDir))
-                            Directory.Delete(appDataDir, true);
+                        File.Delete(file);
+                        Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
+                    }
+                }
+
+                foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                {
+                    try
+                    {
+                        if (Directory.Exists(dir))
+                            Directory.Delete(dir, true);
                     }
                     catch { }
                 }
 
-                Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
+                try
+                {
+                    if (Directory.Exists(appDataDir))
+                        Directory.Delete(appDataDir, true);
+                }
+                catch { }
+            }
 
-                CloseRequested?.Invoke(this, EventArgs.Empty);
-                await Task.Delay(300);
-                RestartApplication();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error: {ex.Message}");
-                await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
-            }
-            finally
-            {
-                IsDeleting = false;
-            }
+            Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
+
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+            await Task.Delay(300);
+            RestartApplication();
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error: {ex.Message}");
+            await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
+        }
+        finally
+        {
+            IsDeleting = false;
+        }
+    }
 
         private void RestartApplication()
         {
@@ -1461,19 +1378,21 @@ Terminal=false
             try
             {
                 var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
-                _showActivityLog = settings.ShowActivityLog;
-                _showDetailedLogs = settings.ShowDetailedLogs;
-                _startWithSystem = settings.StartWithSystem;
-                _autoStartAutomation = settings.AutoStartAutomation;
-                _startMinimized = settings.StartMinimized;
 
-                var loadedEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
-                var loadedPassword = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
-                var loadedSchool = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
+                _showActivityLog      = settings.ShowActivityLog;
+                _showDetailedLogs     = settings.ShowDetailedLogs;
+                _startWithSystem      = settings.StartWithSystem;
+                _autoStartAutomation  = settings.AutoStartAutomation;
+                _startMinimized       = settings.StartMinimized;
 
-                LoginEmail = loadedEmail;
-                LoginPassword = loadedPassword;
-                SchoolName = loadedSchool;
+                // ---- CREDENTIALS FROM SECURE STORAGE ----
+                var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")   ?? "";
+                var pass    = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
+                var school  = await SecureCredentialStorage.GetCredentialAsync("SchoolName")   ?? "";
+
+                LoginEmail   = email;
+                LoginPassword = pass;
+                SchoolName   = school;
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -1482,9 +1401,9 @@ Terminal=false
                     OnPropertyChanged(nameof(StartWithSystem));
                     OnPropertyChanged(nameof(AutoStartAutomation));
                     OnPropertyChanged(nameof(StartMinimized));
-                    OnPropertyChanged(nameof(_loginEmail));
-                    OnPropertyChanged(nameof(_loginPassword));
-                    OnPropertyChanged(nameof(_schoolName));
+                    OnPropertyChanged(nameof(LoginEmail));
+                    OnPropertyChanged(nameof(LoginPassword));
+                    OnPropertyChanged(nameof(SchoolName));
                 });
 
                 RefreshDisplayedLogs();
@@ -1502,19 +1421,18 @@ Terminal=false
             {
                 var settings = new AppSettings
                 {
-                    ShowActivityLog = _showActivityLog,
-                    ShowDetailedLogs = _showDetailedLogs,
-                    StartWithSystem = _startWithSystem,
-                    AutoStartAutomation = _autoStartAutomation,
-                    StartMinimized = _startMinimized,
-                    EncryptedLoginEmail = "",
-                    EncryptedLoginPassword = "",
-                    EncryptedSchoolName = "",
-                    InitialSetupCompleted = true
+                    ShowActivityLog      = _showActivityLog,
+                    ShowDetailedLogs     = _showDetailedLogs,
+                    StartWithSystem      = _startWithSystem,
+                    AutoStartAutomation  = _autoStartAutomation,
+                    StartMinimized       = _startMinimized,
+                    InitialSetupCompleted = true,
+                    LastUpdated          = DateTime.Now
                 };
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
 
+                // ---- CREDENTIALS TO SECURE STORAGE ----
                 if (!string.IsNullOrEmpty(_loginEmail))
                     await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
 
@@ -1526,7 +1444,7 @@ Terminal=false
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error saving: {ex.Message}");
+                Debug.WriteLine($"Error saving settings: {ex.Message}");
             }
         }
 

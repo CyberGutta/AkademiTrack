@@ -13,7 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
+using System.Diagnostics;           // ADD
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -1518,25 +1518,22 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                string cookiesPath = GetCookiesFilePath();
-                
-                if (!File.Exists(cookiesPath))
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    LogDebug($"No cookies.json file found at: {cookiesPath}");
-                    return null!;
+                    var json = MacKeychain.Load("cookies");
+                    if (string.IsNullOrEmpty(json)) return null!;
+
+                    var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
+                    return cookieArray?.ToDictionary(c => c.Name ?? "", c => c.Value ?? "") ?? new();
                 }
-
-                var json = await File.ReadAllTextAsync(cookiesPath);
-                var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json, new JsonSerializerOptions
+                else
                 {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                LogDebug($"Loaded {cookieArray?.Length ?? 0} cookies from file: {cookiesPath}");
-                return cookieArray?.ToDictionary(
-                    c => c.Name ?? "",         
-                    c => c.Value ?? ""         
-                ) ?? new Dictionary<string, string>();
+                    string path = GetCookiesFilePath();
+                    if (!File.Exists(path)) return null!;
+                    var json = await File.ReadAllTextAsync(path);
+                    var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
+                    return cookieArray?.ToDictionary(c => c.Name ?? "", c => c.Value ?? "") ?? new();
+                }
             }
             catch (Exception ex)
             {
@@ -2370,12 +2367,19 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                string cookiesPath = GetCookiesFilePath();
-                
                 var json = JsonSerializer.Serialize(cookies, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(cookiesPath, json);
                 
-                LogDebug($"Cookies saved to: {cookiesPath}");
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    MacKeychain.Save("cookies", json);
+                    LogDebug("Cookies saved to macOS Keychain (native)");
+                }
+                else
+                {
+                    string cookiesPath = GetCookiesFilePath();
+                    await File.WriteAllTextAsync(cookiesPath, json);
+                    LogDebug($"Cookies saved to: {cookiesPath}");
+                }
             }
             catch (Exception ex)
             {
@@ -2789,24 +2793,22 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private Task DeleteCookiesAsync()
+        private async Task DeleteCookiesAsync()
         {
             try
             {
-                var cookiesPath = GetCookiesFilePath();
-                if (File.Exists(cookiesPath))
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    File.Delete(cookiesPath);
-                    LogDebug("Slettet cookies for å tvinge ny innlogging");
+                    MacKeychain.Delete("cookies");
+                }
+                else
+                {
+                    var path = GetCookiesFilePath();
+                    if (File.Exists(path)) File.Delete(path);
                 }
             }
-            catch (Exception ex)
-            {
-                LogDebug($"Kunne ikke slette cookies: {ex.Message}");
-            }
-            return Task.CompletedTask;
+            catch { }
         }
-
         private string GetUserParametersFilePath()
         {
             string appDataDir = Path.Combine(
@@ -3188,6 +3190,124 @@ namespace AkademiTrack.ViewModels
         public string? Name { get; set; }
         public string? Value { get; set; }
     }
+
+    public static class KeychainService
+{
+    private const string SERVICE_NAME = "AkademiTrack";
+    private const string COOKIES_ACCOUNT = "cookies";
+
+    public static async Task SaveToKeychain(string data)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            try
+            {
+                // Delete existing entry first
+                await DeleteFromKeychain();
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "/usr/bin/security",
+                        Arguments = $"add-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\" -w \"{data}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    throw new Exception($"Keychain save failed: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to save to macOS Keychain: {ex.Message}");
+            }
+        }
+        else
+        {
+            throw new PlatformNotSupportedException("Keychain is only available on macOS");
+        }
+    }
+
+    public static async Task<string?> LoadFromKeychain()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "/usr/bin/security",
+                        Arguments = $"find-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\" -w",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    return output.Trim();
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        else
+        {
+            throw new PlatformNotSupportedException("Keychain is only available on macOS");
+        }
+    }
+
+    public static async Task DeleteFromKeychain()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "/usr/bin/security",
+                        Arguments = $"delete-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                await process.WaitForExitAsync();
+            }
+            catch
+            {
+                // Ignore errors when deleting (item might not exist)
+            }
+        }
+    }
+}
 
     public class ScheduleResponse
     {

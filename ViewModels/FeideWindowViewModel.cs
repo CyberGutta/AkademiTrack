@@ -8,6 +8,8 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using AkademiTrack.Services;      
+using System.Diagnostics;
 
 namespace AkademiTrack.ViewModels
 {
@@ -176,81 +178,29 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async System.Threading.Tasks.Task SaveCredentialsToSettingsAsync()
+        private async Task SaveCredentialsToSettingsAsync()
         {
             try
             {
-                var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var appFolderPath = Path.Combine(appDataPath, "AkademiTrack");
-                Directory.CreateDirectory(appFolderPath);
+                // 1. Store credentials in the platform-specific secure store
+                await SecureCredentialStorage.SaveCredentialAsync("LoginEmail",   FeideUsername);
+                await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", FeidePassword);
+                await SecureCredentialStorage.SaveCredentialAsync("SchoolName",   SchoolName);
 
-                var settingsPath = Path.Combine(appFolderPath, "settings.json");
-
-                AppSettings? settings = null;
-
-                if (File.Exists(settingsPath))
+                // 2. Write only the “setup completed” flag to settings.json
+                var settings = new AppSettings
                 {
-                    try
-                    {
-                        var existingJson = await File.ReadAllTextAsync(settingsPath);
-                        settings = JsonSerializer.Deserialize<AppSettings>(existingJson);
+                    InitialSetupCompleted = true,
+                    LastUpdated = DateTime.Now
+                };
 
-                        System.Diagnostics.Debug.WriteLine("Successfully loaded existing settings");
-                    }
-                    catch (JsonException jsonEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Corrupted settings.json detected: {jsonEx.Message}");
-                        System.Diagnostics.Debug.WriteLine("Deleting corrupted file and creating fresh settings");
+                await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
 
-                        try
-                        {
-                            File.Delete(settingsPath);
-                            System.Diagnostics.Debug.WriteLine("Corrupted settings file deleted successfully");
-                        }
-                        catch (Exception deleteEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Warning: Could not delete corrupted file: {deleteEx.Message}");
-                        }
-
-                        settings = null; 
-                    }
-                }
-
-                if (settings == null)
-                {
-                    settings = new AppSettings
-                    {
-                        ShowActivityLog = false,
-                        ShowDetailedLogs = true,
-                        StartWithSystem = true
-                    };
-                    System.Diagnostics.Debug.WriteLine("Created fresh settings object");
-                }
-
-                settings.EncryptedLoginEmail = CredentialEncryption.Encrypt(FeideUsername);
-                settings.EncryptedLoginPassword = CredentialEncryption.Encrypt(FeidePassword);
-                settings.EncryptedSchoolName = CredentialEncryption.Encrypt(SchoolName);
-                settings.LastUpdated = DateTime.Now;
-
-                settings.InitialSetupCompleted = true;
-
-                try
-                {
-                    var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(settingsPath, json);
-
-                    System.Diagnostics.Debug.WriteLine($"Credentials saved successfully to: {settingsPath}");
-                    System.Diagnostics.Debug.WriteLine($"InitialSetupCompleted set to: true");
-                }
-                catch (Exception writeEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to write settings file: {writeEx.Message}");
-                    throw new Exception($"Kunne ikke lagre innstillinger: {writeEx.Message}", writeEx);
-                }
+                System.Diagnostics.Debug.WriteLine("Credentials saved to secure storage + minimal settings updated.");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to save credentials: {ex.Message}");
+                Debug.WriteLine($"Failed to save credentials: {ex}");
                 throw;
             }
         }
