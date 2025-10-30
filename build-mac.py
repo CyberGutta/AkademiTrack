@@ -149,42 +149,33 @@ def create_vpk_package(version, build_dir):
 
     return True
 
+import os, shutil, subprocess, zipfile
+from pathlib import Path
+
 def create_avalonia_macos_bundle(version):
     """Create .app bundle for macOS"""
-    # Configuration for AkademiTrack
     PROJECT_PATH = "./AkademiTrack.csproj"
     BUILD_DIR = "./build"
     APP_NAME = "AkademiTrack"
     BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
     ICON_PATH = "./Assets/AT-1024.icns"
-    
+    HELPER_APP_SOURCE = Path("./Assets/helper/AkademiTrackHelper.app")
+    ENTITLEMENTS_PATH = Path("./entitlements.plist")
+    SIGNING_IDENTITY = "Apple Development: Andreas Nilsen (673WFZN2KZ)"
+
     print("\n🏗️  Building AkademiTrack app for macOS Apple Silicon...")
     print("=" * 50)
 
-    # Verify icon exists before building
     if not os.path.exists(ICON_PATH):
         print(f"❌ Icon file not found: {ICON_PATH}")
-        print("\n📁 Looking for icon files in Assets directory...")
-        assets_dir = Path("./Assets")
-        if assets_dir.exists():
-            icon_files = list(assets_dir.glob("*.icns"))
-            if icon_files:
-                print(f"Found {len(icon_files)} .icns file(s):")
-                for icon in icon_files:
-                    print(f"  - {icon.name} ({icon.stat().st_size} bytes)")
-            else:
-                print("  No .icns files found in Assets directory")
         return False
     else:
-        icon_size = Path(ICON_PATH).stat().st_size
-        print(f"✅ Icon file found: {ICON_PATH} ({icon_size} bytes)")
-    
-    # Clean build directory
+        print(f"✅ Icon file found: {ICON_PATH} ({Path(ICON_PATH).stat().st_size} bytes)")
+
     if os.path.exists(BUILD_DIR):
         print(f"🧹 Cleaning existing build directory: {BUILD_DIR}")
         shutil.rmtree(BUILD_DIR)
-    
-    # Build the application
+
     build_cmd = [
         "dotnet", "publish", PROJECT_PATH,
         "--configuration", "Release",
@@ -195,25 +186,17 @@ def create_avalonia_macos_bundle(version):
         "-p:PublishTrimmed=false",
         "-p:PublishSingleFile=false"
     ]
-    
+
     print(f"🔨 Building...")
     result = subprocess.run(build_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"❌ Build failed: {result.stderr}")
         return False
-    
     print("✅ Build completed successfully")
-    
-    # Check what was built
-    build_path = Path(BUILD_DIR)
-    if not build_path.exists():
-        print(f"❌ Build directory doesn't exist: {build_path}")
-        return False
 
-    # Find the executable
+    build_path = Path(BUILD_DIR)
     executable_path = build_path / APP_NAME
     if not executable_path.exists():
-        print(f"⚠️  Executable not found at expected path, searching...")
         executables = [f for f in build_path.iterdir() if f.is_file() and os.access(f, os.X_OK)]
         if executables:
             executable_path = executables[0]
@@ -222,53 +205,36 @@ def create_avalonia_macos_bundle(version):
         else:
             print("❌ No executables found!")
             return False
-    
+
     print("📦 Creating app bundle...")
-    
-    # Create app bundle structure
     bundle_dir = build_path / f"{APP_NAME}.app"
     contents_dir = bundle_dir / "Contents"
     macos_dir = contents_dir / "MacOS"
     resources_dir = contents_dir / "Resources"
-    
-    # Create directories
     macos_dir.mkdir(parents=True, exist_ok=True)
     resources_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Copy files to bundle
-    files_to_bundle = [item for item in build_path.iterdir() if not item.name.endswith('.app')]
 
+    files_to_bundle = [item for item in build_path.iterdir() if not item.name.endswith('.app')]
     print(f"📋 Copying {len(files_to_bundle)} items to bundle...")
     for item in files_to_bundle:
         dest_path = macos_dir / item.name
         try:
-
             if item.is_file():
                 shutil.copy2(item, dest_path)
             elif item.is_dir():
                 shutil.copytree(item, dest_path)
         except Exception as e:
             print(f"  ⚠️  Failed to copy {item.name}: {e}")
-    
-    # Handle icon file - CRITICAL: Use correct filename
+
     icon_filename = "AppIcon.icns"
     icon_dest = resources_dir / icon_filename
-    
     try:
         shutil.copy2(ICON_PATH, icon_dest)
-        copied_size = icon_dest.stat().st_size
-        print(f"✅ Added app icon: {icon_filename} ({copied_size} bytes)")
-
-        # Verify it was copied correctly
-        if copied_size < 1000:
-            print(f"⚠️  Warning: Icon file seems too small ({copied_size} bytes)")
-
+        print(f"✅ Added app icon: {icon_filename} ({icon_dest.stat().st_size} bytes)")
     except Exception as e:
         print(f"❌ Failed to copy icon: {e}")
-
         return False
 
-    # Create Info.plist with version
     info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -304,84 +270,83 @@ def create_avalonia_macos_bundle(version):
     <key>LSRequiresNativeExecution</key>
     <true/>
     <key>LSArchitecturePriority</key>
-    <array>
-        <string>arm64</string>
-    </array>
+    <array><string>arm64</string></array>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>LSUIElement</key>
     <false/>
 </dict>
 </plist>"""
-    
-    # Write Info.plist
     plist_path = contents_dir / "Info.plist"
     with open(plist_path, "w") as f:
         f.write(info_plist_content)
     print(f"✅ Created Info.plist with version {version}")
-    
-    # Set executable permissions
+
     executable_in_bundle = macos_dir / APP_NAME
     if executable_in_bundle.exists():
         os.chmod(executable_in_bundle, 0o755)
-    
-    # Set permissions for native libraries
-    dylib_count = sum(1 for _ in macos_dir.rglob("*.dylib"))
-    so_count = sum(1 for _ in macos_dir.rglob("*.so"))
-    
-    for dylib in macos_dir.rglob("*.dylib"):
-        os.chmod(dylib, 0o755)
-    for so_file in macos_dir.rglob("*.so"):
-        os.chmod(so_file, 0o755)
-    
-    if dylib_count + so_count > 0:
-        print(f"✅ Set permissions for {dylib_count} .dylib and {so_count} .so files")
-    
-    # Remove quarantine attributes
+
+    for lib in macos_dir.rglob("*.[ds]o"):
+        os.chmod(lib, 0o755)
+    print("✅ Set permissions for native libraries")
+
     try:
-        subprocess.run(["xattr", "-cr", str(bundle_dir)], check=True, capture_output=True)
+        subprocess.run(["xattr", "-cr", str(bundle_dir)], check=True)
         print("✅ Removed quarantine attributes")
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except:
         pass
-    
-    # Force icon cache refresh
+
     try:
-        subprocess.run(["touch", str(bundle_dir)], capture_output=True)
-        subprocess.run(["killall", "Finder"], capture_output=True, stderr=subprocess.DEVNULL)
-        subprocess.run(["killall", "Dock"], capture_output=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["touch", str(bundle_dir)])
+        subprocess.run(["killall", "Finder"], stderr=subprocess.DEVNULL)
+        subprocess.run(["killall", "Dock"], stderr=subprocess.DEVNULL)
         print("✅ Refreshed icon cache")
     except:
         pass
-    
-    # Create zip file
+
+    # ✅ Bundle AkademiTrackHelper.app
+    helper_dest = macos_dir / "AkademiTrackHelper.app"
+    if HELPER_APP_SOURCE.exists():
+        try:
+            shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
+            print("✅ AkademiTrackHelper.app bundled")
+        except Exception as e:
+            print(f"❌ Failed to bundle helper: {e}")
+            return False
+    else:
+        print("⚠️ AkademiTrackHelper.app not found")
+
+    # ✅ Sign both apps
+    def sign_app(app_path, identity, entitlements_path=None):
+        cmd = ["codesign", "--force", "--deep", "--sign", identity]
+        if entitlements_path and entitlements_path.exists():
+            cmd += ["--entitlements", str(entitlements_path)]
+        cmd.append(str(app_path))
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"✅ Signed: {app_path.name}")
+        else:
+            print(f"❌ Failed to sign {app_path.name}: {result.stderr}")
+
+    sign_app(bundle_dir, SIGNING_IDENTITY, ENTITLEMENTS_PATH)
+    sign_app(helper_dest, SIGNING_IDENTITY, ENTITLEMENTS_PATH)
+
     zip_path = Path(f"AkademiTrack-macOS-v{version}.zip").absolute()
     if zip_path.exists():
         zip_path.unlink()
-    
-    print(f"📦 Creating zip archive...")
+
+    print("📦 Creating zip archive...")
     try:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            file_count = 0
             for file_path in bundle_dir.rglob('*'):
                 if file_path.is_file():
                     arc_name = file_path.relative_to(build_path)
                     zipf.write(file_path, arc_name)
-                    file_count += 1
-            print(f"✅ Added {file_count} files to zip")
+        print(f"✅ Zip archive created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
     except Exception as e:
         print(f"❌ Failed to create zip: {e}")
         return False
 
-    print(f"✅ App bundle created: {bundle_dir}")
-    print(f"✅ Zip archive created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
-    
-    # Verify icon is in bundle
-    final_icon_path = resources_dir / "AppIcon.icns"
-    if final_icon_path.exists():
-        print(f"✅ Icon verified in bundle: {final_icon_path.stat().st_size} bytes")
-    else:
-        print(f"⚠️  Warning: Icon not found in final bundle!")
-    
     return True
 
 def main():

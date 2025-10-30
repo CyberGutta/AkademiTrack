@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace AkademiTrack.Services
 {
@@ -53,80 +54,37 @@ namespace AkademiTrack.Services
         {
             try
             {
-                title = title.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
-                message = message.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
+                string helperPath;
+
+                var bundledPath = Path.Combine(AppContext.BaseDirectory, "AkademiTrackHelper.app", "Contents", "MacOS", "AkademiTrackHelper");
+                var devPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Helpers", "AkademiTrackHelper.app", "Contents", "MacOS", "AkademiTrackHelper");
+
+                helperPath = File.Exists(bundledPath) ? bundledPath : devPath;
+
+                if (!File.Exists(helperPath))
+                {
+                    Console.WriteLine("❌ AkademiTrackHelper not found");
+                    return;
+                }
 
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = "/usr/bin/osascript",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    FileName = helperPath,
+                    Arguments = $"\"{title}\" \"{message}\"",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-
-                // ✅ Use your bundle identifier so macOS ties notification to your .app
-                startInfo.ArgumentList.Add("-e");
-                startInfo.ArgumentList.Add($@"
-        tell application id ""com.CyberBrothers.akademitrack""
-            display notification ""{message}"" with title ""{title}"" subtitle ""AkademiTrack""
-        end tell
-        ");
 
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
-                    if (process.ExitCode != 0)
-                    {
-                        var error = await process.StandardError.ReadToEndAsync();
-                        Console.WriteLine($"osascript error: {error}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"✅ macOS notification shown for {title}");
-                    }
+                    Console.WriteLine("✅ Launched AkademiTrackHelper for native macOS notification");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"macOS notification failed: {ex.Message}");
-            }
-        }
-
-
-        private static async Task ShowSimpleMacNotificationAsync(string text)
-        {
-            try
-            {
-                text = text.Replace("\"", "'").Replace("\n", " ").Replace("\r", " ");
-
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "/usr/bin/osascript",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                startInfo.ArgumentList.Add("-e");
-                startInfo.ArgumentList.Add($"display notification \"{text}\" with title \"AkademiTrack\"");
-
-                using var process = Process.Start(startInfo);
-                if (process != null)
-                {
-                    await process.WaitForExitAsync();
-
-                    if (process.ExitCode == 0)
-                    {
-                        Console.WriteLine($"✓ Simple macOS notification shown");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Simple notification also failed: {ex.Message}");
+                Console.WriteLine($"❌ Failed to launch AkademiTrackHelper: {ex.Message}");
             }
         }
 
