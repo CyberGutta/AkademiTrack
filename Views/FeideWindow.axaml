@@ -51,7 +51,7 @@
 			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
-		<!-- ComboBox Styles -->
+		<!-- FIXED ComboBox Styles -->
 		<Style Selector="ComboBox">
 			<Setter Property="Padding" Value="12,10"/>
 			<Setter Property="FontSize" Value="14"/>
@@ -81,12 +81,32 @@
 			<Setter Property="BorderBrush" Value="#999999"/>
 		</Style>
 
-		<!-- ComboBox Dropdown Items -->
+		<!-- FIXED: ComboBox Dropdown Popup - Style the popup border -->
+		<Style Selector="ComboBox /template/ Popup > Border">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<!-- FIXED: Style the ScrollViewer inside the popup -->
+		<Style Selector="ComboBox /template/ Popup ScrollViewer">
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
+		<!-- FIXED: ComboBox Dropdown Items - Now with proper dark text -->
 		<Style Selector="ComboBoxItem">
 			<Setter Property="Foreground" Value="#333333"/>
 			<Setter Property="Background" Value="White"/>
 			<Setter Property="Padding" Value="12,10"/>
 			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinHeight" Value="36"/>
+		</Style>
+
+		<!-- CRITICAL FIX: Ensure ContentPresenter has dark text -->
+		<Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="White"/>
 		</Style>
 
 		<Style Selector="ComboBoxItem:pointerover">
@@ -94,32 +114,28 @@
 			<Setter Property="Background" Value="#E8F0F8"/>
 		</Style>
 
-		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
-			<Setter Property="Background" Value="#E8F0F8"/>
-			<Setter Property="Foreground" Value="#333333"/>
-		</Style>
-
 		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#E8F0F8"/>
 			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
 		<Style Selector="ComboBoxItem:selected">
 			<Setter Property="Foreground" Value="#333333"/>
-			<Setter Property="Background" Value="#E8F0F8"/>
+			<Setter Property="Background" Value="#D0E7FF"/>
 		</Style>
 
-		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
-			<Setter Property="Background" Value="#E8F0F8"/>
+		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#D0E7FF"/>
 			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
 		<Style Selector="ComboBoxItem:selected:pointerover">
 			<Setter Property="Foreground" Value="#333333"/>
-			<Setter Property="Background" Value="#D0E7FF"/>
+			<Setter Property="Background" Value="#B8D8FF"/>
 		</Style>
 
-		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter">
-			<Setter Property="Background" Value="#D0E7FF"/>
+		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#B8D8FF"/>
 			<Setter Property="Foreground" Value="#333333"/>
 		</Style>
 
@@ -244,7 +260,8 @@
                               ItemsSource="{Binding Schools}"
                               SelectedItem="{Binding SchoolName}"
                               PlaceholderText="Velg din skole"
-                              HorizontalAlignment="Stretch"/>
+                              HorizontalAlignment="Stretch"
+							  MaxDropDownHeight="300"/>
 					<TextBlock Text="Velg din skole eller utdanningsinstitusjon"
                                FontSize="11"
                                Foreground="#666666"
@@ -280,7 +297,7 @@
 								Margin="0,0,4,0"
 								Command="{Binding TogglePasswordCommand}"
 								ToolTip.Tip="Vis/skjul passord">
-								<Path Name="EyeIcon"
+							<Path Name="EyeIcon"
 									Fill="#666666"
 									Data="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
 									Stretch="Uniform"

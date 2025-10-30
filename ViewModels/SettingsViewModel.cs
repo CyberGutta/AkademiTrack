@@ -27,17 +27,16 @@ using Velopack.Sources;
 namespace AkademiTrack.ViewModels
 {
     public class AppSettings
-{
-    public bool ShowActivityLog { get; set; } = false;
-    public bool ShowDetailedLogs { get; set; } = true;
-    public bool StartWithSystem { get; set; } = true;
-    public bool AutoStartAutomation { get; set; } = true;
+    {
+        public bool ShowActivityLog { get; set; } = false;
+        public bool ShowDetailedLogs { get; set; } = true;
+        public bool StartWithSystem { get; set; } = true;
+        public bool AutoStartAutomation { get; set; } = false;
+        public bool StartMinimized { get; set; } = false;
+        public DateTime LastUpdated { get; set; } = DateTime.Now;
+        public bool InitialSetupCompleted { get; set; } = false;
+    }
 
-    public bool StartMinimized { get; set; } = true;
-    public DateTime LastUpdated { get; set; } = DateTime.Now;
-    
-    public bool InitialSetupCompleted { get; set; } = false;
-}
 
 
     public static class AutoStartManager
@@ -406,6 +405,7 @@ Terminal=false
         private bool _showDetailedLogs = true;
         private bool _startWithSystem = true;
         private bool _autoStartAutomation = false;
+        
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
         private string _loginEmail = "";
@@ -417,7 +417,6 @@ Terminal=false
         private bool _updateAvailable = false;
         private string _availableVersion = "";
         private bool _isDeleting = false;
-
         private bool _startMinimized = false;
 
         public bool StartMinimized

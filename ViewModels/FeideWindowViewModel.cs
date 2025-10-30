@@ -1,14 +1,11 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using AkademiTrack.Services;      
+using AkademiTrack.Services;
 using System.Diagnostics;
 
 namespace AkademiTrack.ViewModels
@@ -24,6 +21,7 @@ namespace AkademiTrack.ViewModels
 
         public new event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler<FeideSetupCompletedEventArgs>? SetupCompleted;
+        public event EventHandler? CloseRequested; // NEW: Event to close window
 
         protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
@@ -57,6 +55,7 @@ namespace AkademiTrack.ViewModels
                 "Akademiet vgs Ålesund"
             };
         }
+        
         public ObservableCollection<string> Schools { get; }
 
         public string SchoolName
@@ -155,6 +154,7 @@ namespace AkademiTrack.ViewModels
 
             try
             {
+                // Validate inputs
                 if (string.IsNullOrWhiteSpace(SchoolName))
                 {
                     ErrorMessage = "Vennligst velg en skole";
@@ -173,20 +173,28 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
+                Debug.WriteLine($"[FeideWindow] Saving credentials for user: {FeideUsername}");
+                
+                // Save credentials
                 await SaveCredentialsToSettingsAsync();
 
-                System.Diagnostics.Debug.WriteLine($"Feide credentials saved successfully for user: {FeideUsername}");
+                Debug.WriteLine("[FeideWindow] Credentials saved successfully!");
 
+                // Notify success
                 SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
                 {
                     Success = true,
                     UserEmail = FeideUsername
                 });
+
+                // Close this window and show main window
+                Debug.WriteLine("[FeideWindow] Requesting window close...");
+                CloseRequested?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
                 ErrorMessage = $"Feil ved lagring: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Error saving Feide credentials: {ex}");
+                Debug.WriteLine($"[FeideWindow] Error saving credentials: {ex}");
             }
             finally
             {
@@ -198,12 +206,19 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // 1. Store credentials in the platform-specific secure store
+                Debug.WriteLine("[FeideWindow] Starting credential save process...");
+                
+                // 1. Save to secure storage
                 await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", FeideUsername);
+                Debug.WriteLine($"[FeideWindow] ✓ Saved LoginEmail: {FeideUsername}");
+                
                 await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", FeidePassword);
+                Debug.WriteLine("[FeideWindow] ✓ Saved LoginPassword (hidden)");
+                
                 await SecureCredentialStorage.SaveCredentialAsync("SchoolName", SchoolName);
+                Debug.WriteLine($"[FeideWindow] ✓ Saved SchoolName: {SchoolName}");
 
-                // 2. Write only the “setup completed” flag to settings.json
+                // 2. Update settings.json to mark setup as complete
                 var settings = new AppSettings
                 {
                     InitialSetupCompleted = true,
@@ -211,31 +226,33 @@ namespace AkademiTrack.ViewModels
                 };
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
-
-                System.Diagnostics.Debug.WriteLine("Credentials saved to secure storage + minimal settings updated.");
+                Debug.WriteLine("[FeideWindow] ✓ Updated settings.json - setup marked complete");
+                
+                Debug.WriteLine("[FeideWindow] All credentials saved successfully!");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to save credentials: {ex}");
+                Debug.WriteLine($"[FeideWindow] FAILED to save credentials: {ex}");
                 throw;
             }
         }
 
         private void ExitApplication()
         {
+            Debug.WriteLine("[FeideWindow] User requested application exit");
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.Shutdown();
             }
         }
+        
         private void TogglePasswordVisibility()
         {
             IsPasswordVisible = !IsPasswordVisible;
+            Debug.WriteLine($"[FeideWindow] Password visibility toggled: {IsPasswordVisible}");
         }
     }
     
-    
-
     public class FeideSetupCompletedEventArgs : EventArgs
     {
         public bool Success { get; set; }
