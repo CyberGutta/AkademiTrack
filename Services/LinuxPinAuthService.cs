@@ -54,15 +54,16 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var check = new ProcessStartInfo
+                var psi = new ProcessStartInfo
                 {
-                    FileName = "which",
-                    Arguments = "zenity",
+                    FileName = "bash",
+                    Arguments = "-c \"command -v zenity\"",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                using var process = Process.Start(check);
+
+                using var process = Process.Start(psi);
                 string result = process?.StandardOutput.ReadToEnd().Trim() ?? "";
                 return !string.IsNullOrEmpty(result);
             }
