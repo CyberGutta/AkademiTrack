@@ -1385,7 +1385,6 @@ Terminal=false
                 _autoStartAutomation  = settings.AutoStartAutomation;
                 _startMinimized       = settings.StartMinimized;
 
-                // ---- CREDENTIALS FROM SECURE STORAGE ----
                 var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")   ?? "";
                 var pass    = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
                 var school  = await SecureCredentialStorage.GetCredentialAsync("SchoolName")   ?? "";
@@ -1432,7 +1431,6 @@ Terminal=false
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
 
-                // ---- CREDENTIALS TO SECURE STORAGE ----
                 if (!string.IsNullOrEmpty(_loginEmail))
                     await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
 

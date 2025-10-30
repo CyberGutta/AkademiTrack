@@ -8,20 +8,17 @@ namespace AkademiTrack.Services
 {
     public static class NativeNotificationService
     {
-        /// <summary>
-        /// Show a native OS notification using the most reliable method for each platform
-        /// </summary>
+
         public static async Task ShowAsync(string title, string message = "", string level = "INFO")
         {
             try
             {
-                // Add emoji based on level
                 string icon = level switch
                 {
-                    "SUCCESS" => "✓",
-                    "ERROR" => "✕",
-                    "WARNING" => "⚠",
-                    _ => "ℹ️"
+                    "SUCCESS" => "",
+                    "ERROR" => "",
+                    "WARNING" => "",
+                    _ => ""
                 };
 
                 string fullTitle = $"{icon} {title}";
@@ -79,7 +76,7 @@ namespace AkademiTrack.Services
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
-                    Console.WriteLine("✅ Launched AkademiTrackHelper for native macOS notification");
+                    //Console.WriteLine("✅ Launched AkademiTrackHelper for native macOS notification");
                 }
             }
             catch (Exception ex)
@@ -92,16 +89,14 @@ namespace AkademiTrack.Services
         {
             try
             {
-                // Use OsNotifications for Windows since it works well there
                 OsNotifications.Notifications.ShowNotification(title, message);
-                await Task.Delay(1000); // Windows needs delay
+                await Task.Delay(1000); 
                 Console.WriteLine($"✓ Windows notification shown: {title}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Windows notification failed, trying PowerShell fallback: {ex.Message}");
 
-                // Fallback: PowerShell toast notification
                 try
                 {
                     var escapedTitle = title.Replace("'", "''");
@@ -113,7 +108,17 @@ namespace AkademiTrack.Services
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
 
 $APP_ID = 'AkademiTrack'
-$template = @""<toast><visual><binding template='ToastText02'><text id='1'>{0}</text><text id='2'>{1}</text></binding></visual></toast>""@
+$template = @""
+<toast>
+  <visual>
+    <binding template='ToastGeneric'>
+      <image placement='appLogoOverride' src='file:///C:/Program Files/AkademiTrack/Assets/AT-1024.png'/>
+      <text>{{0}}</text>
+      <text>{{1}}</text>
+    </binding>
+  </visual>
+</toast>
+""@
 
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
 $xml.LoadXml(($template -f '{escapedTitle}', '{escapedMessage}'))
