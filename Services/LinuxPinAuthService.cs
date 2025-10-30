@@ -91,15 +91,19 @@ namespace AkademiTrack.Services
 
                 using var process = Process.Start(psi);
                 if (process == null)
-                    throw new InvalidOperationException("Zenity process failed to start.");
+                    throw new Exception("Zenity process failed to start.");
 
-                string pin = await process.StandardOutput.ReadToEndAsync();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                string error = await process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (string.IsNullOrWhiteSpace(pin))
-                    throw new InvalidOperationException("Zenity returned empty input.");
+                if (process.ExitCode != 0)
+                    throw new Exception($"Zenity exited with code {process.ExitCode}: {error}");
 
-                return pin.Trim();
+                if (string.IsNullOrWhiteSpace(output))
+                    throw new Exception("Zenity returned empty input.");
+
+                return output.Trim();
             }
             catch (Exception ex)
             {
