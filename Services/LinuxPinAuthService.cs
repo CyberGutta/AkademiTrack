@@ -86,17 +86,25 @@ namespace AkademiTrack.Services
                     CreateNoWindow = true
                 };
 
+                psi.EnvironmentVariables["DISPLAY"] = Environment.GetEnvironmentVariable("DISPLAY") ?? ":0";
+                psi.EnvironmentVariables["XDG_RUNTIME_DIR"] = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR") ?? "/run/user/1000";
+
                 using var process = Process.Start(psi);
                 if (process == null)
-                    return "";
+                    throw new InvalidOperationException("Zenity process failed to start.");
 
                 string pin = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
+
+                if (string.IsNullOrWhiteSpace(pin))
+                    throw new InvalidOperationException("Zenity returned empty input.");
+
                 return pin.Trim();
             }
-            catch
+            catch (Exception ex)
             {
-                Console.WriteLine("⚠️ Zenity GUI mislyktes. Bruker terminal i stedet.");
+                Console.WriteLine($"⚠️ Zenity GUI mislyktes: {ex.Message}");
+                Console.WriteLine("💡 Bruker terminal i stedet.");
                 return PromptInTerminal(message);
             }
         }
