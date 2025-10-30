@@ -1,6 +1,10 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -123,82 +127,127 @@ namespace AkademiTrack.Services
 
         #region Windows Credential Manager (DPAPI)
 
-#if WINDOWS
         private static bool SaveToWindowsCredentialManager(string key, string value)
         {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Debug.WriteLine("⚠️ SaveToWindowsCredentialManager skipped: not running on Windows.");
+                return false;
+            }
+
+            Debug.WriteLine($"🔐 Saving credential: {key}");
+
             try
             {
                 byte[] userData = Encoding.UTF8.GetBytes(value);
                 byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
                 byte[] encryptedData = ProtectedData.Protect(userData, entropy, DataProtectionScope.CurrentUser);
 
-                using var regKey = Registry.CurrentUser.CreateSubKey(
-                    $@"SOFTWARE\{ServiceName}\Credentials");
+                using var regKey = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\AkademiTrack\Credentials");
+                if (regKey == null)
+                {
+                    Debug.WriteLine("❌ Failed to create registry path.");
+                    return false;
+                }
 
-                regKey?.SetValue(key, Convert.ToBase64String(encryptedData));
+                regKey.SetValue(key, Convert.ToBase64String(encryptedData));
+                Debug.WriteLine("✅ Credential saved successfully.");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Windows credential save error: {ex.Message}");
+                Debug.WriteLine($"❌ Windows credential save error: {ex.Message}");
                 return false;
             }
         }
 
         private static string? GetFromWindowsCredentialManager(string key)
         {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Debug.WriteLine("⚠️ GetFromWindowsCredentialManager skipped: not running on Windows.");
+                return null;
+            }
+
+            Debug.WriteLine($"🔍 Retrieving credential: {key}");
+
             try
             {
-                using var regKey = Registry.CurrentUser.OpenSubKey(
-                    $@"SOFTWARE\{ServiceName}\Credentials");
-
-                if (regKey == null) return null;
+                using var regKey = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\AkademiTrack\Credentials");
+                if (regKey == null)
+                {
+                    Debug.WriteLine("❌ Failed to open or create registry path.");
+                    return null;
+                }
 
                 var base64 = regKey.GetValue(key) as string;
-                if (string.IsNullOrEmpty(base64)) return null;
+                if (string.IsNullOrEmpty(base64))
+                {
+                    Debug.WriteLine("⚠️ No credential found for key.");
+                    return null;
+                }
 
                 byte[] encryptedData = Convert.FromBase64String(base64);
                 byte[] entropy = Encoding.UTF8.GetBytes("AkademiTrackEntropy");
-
                 byte[] decryptedData = ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.CurrentUser);
 
-                return Encoding.UTF8.GetString(decryptedData);
+                string result = Encoding.UTF8.GetString(decryptedData);
+                Debug.WriteLine("✅ Credential retrieved successfully.");
+                return result;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Windows credential get error: {ex.Message}");
+                Debug.WriteLine($"❌ Windows credential get error: {ex.Message}");
                 return null;
             }
         }
 
         private static bool DeleteFromWindowsCredentialManager(string key)
         {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Debug.WriteLine("⚠️ DeleteFromWindowsCredentialManager skipped: not running on Windows.");
+                return false;
+            }
+
+            Debug.WriteLine($"🗑️ Deleting credential: {key}");
+
             try
             {
-                using var regKey = Registry.CurrentUser.OpenSubKey(
-                    $@"SOFTWARE\{ServiceName}\Credentials", true);
-                
-                regKey?.DeleteValue(key, false);
+                using var regKey = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\AkademiTrack\Credentials");
+                if (regKey == null)
+                {
+                    Debug.WriteLine("❌ Failed to open or create registry path.");
+                    return false;
+                }
+
+                regKey.DeleteValue(key, false);
+                Debug.WriteLine("✅ Credential deleted.");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Windows credential delete error: {ex.Message}");
+                Debug.WriteLine($"❌ Windows credential delete error: {ex.Message}");
                 return false;
             }
         }
-#else
-        private static bool SaveToWindowsCredentialManager(string key, string value) => false;
-        private static string? GetFromWindowsCredentialManager(string key) => null;
-        private static bool DeleteFromWindowsCredentialManager(string key) => false;
-#endif
 
         #endregion
 
-        #region Linux Secret Service
+        #region Linux Secret Service + Fallback
+
+        private static readonly string FallbackPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".akademitrack", "creds.json");
 
         private static async Task<bool> SaveToLinuxSecretServiceAsync(string key, string value)
         {
+            if (!File.Exists("/usr/bin/secret-tool"))
+            {
+                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
+                return SaveToFallbackFile(key, value);
+            }
+
             try
             {
                 var process = new Process
@@ -219,18 +268,29 @@ namespace AkademiTrack.Services
                 process.StandardInput.Close();
                 await process.WaitForExitAsync();
 
-                return process.ExitCode == 0;
+                if (process.ExitCode != 0)
+                {
+                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
+                    return SaveToFallbackFile(key, value);
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Linux Secret Service save error: {ex.Message}");
-                Debug.WriteLine("Note: libsecret-tools may not be installed");
-                return false;
+                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                return SaveToFallbackFile(key, value);
             }
         }
 
         private static async Task<string?> GetFromLinuxSecretServiceAsync(string key)
         {
+            if (!File.Exists("/usr/bin/secret-tool"))
+            {
+                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
+                return GetFromFallbackFile(key);
+            }
+
             try
             {
                 var process = new Process
@@ -247,25 +307,32 @@ namespace AkademiTrack.Services
                 };
 
                 process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
+                string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
                 {
-                    return output.TrimEnd('\n', '\r');
+                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
+                    return GetFromFallbackFile(key);
                 }
 
-                return null;
+                return output.Trim();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Linux Secret Service get error: {ex.Message}");
-                return null;
+                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                return GetFromFallbackFile(key);
             }
         }
 
         private static async Task<bool> DeleteFromLinuxSecretServiceAsync(string key)
         {
+            if (!File.Exists("/usr/bin/secret-tool"))
+            {
+                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
+                return DeleteFromFallbackFile(key);
+            }
+
             try
             {
                 var process = new Process
@@ -283,11 +350,119 @@ namespace AkademiTrack.Services
                 process.Start();
                 await process.WaitForExitAsync();
 
-                return process.ExitCode == 0;
+                if (process.ExitCode != 0)
+                {
+                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
+                    return DeleteFromFallbackFile(key);
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Linux Secret Service delete error: {ex.Message}");
+                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                return DeleteFromFallbackFile(key);
+            }
+        }
+
+        #endregion
+
+        #region Fallback File Storage (AES)
+
+        private static byte[] Encrypt(string plainText)
+        {
+            using var aes = Aes.Create();
+            aes.Key = DeriveKey();
+            aes.GenerateIV();
+
+            using var encryptor = aes.CreateEncryptor();
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
+            byte[] encrypted = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+
+            // Combine IV + encrypted data
+            byte[] result = new byte[aes.IV.Length + encrypted.Length];
+            Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
+            Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+            return result;
+        }
+
+        private static string Decrypt(byte[] encryptedData)
+        {
+            using var aes = Aes.Create();
+            aes.Key = DeriveKey();
+
+            byte[] iv = new byte[aes.BlockSize / 8];
+            byte[] cipher = new byte[encryptedData.Length - iv.Length];
+
+            Buffer.BlockCopy(encryptedData, 0, iv, 0, iv.Length);
+            Buffer.BlockCopy(encryptedData, iv.Length, cipher, 0, cipher.Length);
+            aes.IV = iv;
+
+            using var decryptor = aes.CreateDecryptor();
+            byte[] decrypted = decryptor.TransformFinalBlock(cipher, 0, cipher.Length);
+            return Encoding.UTF8.GetString(decrypted);
+        }
+
+        private static byte[] DeriveKey()
+        {
+            string baseKey = Environment.MachineName + "-AkademiTrack";
+            using var sha = SHA256.Create();
+            return sha.ComputeHash(Encoding.UTF8.GetBytes(baseKey));
+        }
+
+        private static bool SaveToFallbackFile(string key, string value)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FallbackPath)!);
+                var dict = File.Exists(FallbackPath)
+                    ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath)) ?? new()
+                    : new Dictionary<string, string>();
+
+                dict[key] = Convert.ToBase64String(Encrypt(value));
+                File.WriteAllText(FallbackPath, System.Text.Json.JsonSerializer.Serialize(dict));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Fallback save error: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static string? GetFromFallbackFile(string key)
+        {
+            try
+            {
+                if (!File.Exists(FallbackPath)) return null;
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath));
+                if (dict == null || !dict.ContainsKey(key)) return null;
+
+                return Decrypt(Convert.FromBase64String(dict[key]));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Fallback get error: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static bool DeleteFromFallbackFile(string key)
+        {
+            try
+            {
+                if (!File.Exists(FallbackPath)) return false;
+
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath));
+                if (dict == null || !dict.ContainsKey(key)) return false;
+
+                dict.Remove(key);
+                File.WriteAllText(FallbackPath, System.Text.Json.JsonSerializer.Serialize(dict));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Fallback delete error: {ex.Message}");
                 return false;
             }
         }
