@@ -469,7 +469,7 @@ Terminal=false
         public ICommand ToggleActivityLogCommand { get; }
         public ICommand ToggleAutoStartCommand { get; }
         public ICommand ToggleAutoStartAutomationCommand { get; }
-        public ICommand OpenContactFormCommand { get; }
+        public ICommand OpenWebsiteCommand { get; }
         public ICommand OpenEmailCommand { get; }
         public ICommand OpenPrivacyPolicyCommand { get; }
         public ICommand OpenTermsofUseCommand { get; }
@@ -568,7 +568,7 @@ Terminal=false
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
-            OpenContactFormCommand = new RelayCommand(OpenContactForm);
+            OpenWebsiteCommand = new RelayCommand(OpenWebsite);
             OpenEmailCommand = new RelayCommand(OpenEmail);
             OpenPrivacyPolicyCommand = new RelayCommand(OpenPrivacyPolicy);
             OpenTermsofUseCommand = new RelayCommand(OpenTermsOfUse);
@@ -1339,19 +1339,19 @@ Terminal=false
         private void OpenPrivacyPolicy()
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/privacy-policy.html", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening form: {ex.Message}"); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening privacy policy: {ex.Message}"); }
         }
 
         private void OpenTermsOfUse()
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/terms-of-use.html", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening form: {ex.Message}"); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening terms of use: {ex.Message}"); }
         }
 
-        private void OpenContactForm()
+        private void OpenWebsite()
         {
-            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/dashboard.html", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening form: {ex.Message}"); }
+            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/", UseShellExecute = true }); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening webiste: {ex.Message}"); }
         }
 
         private void OpenProgramFolder()

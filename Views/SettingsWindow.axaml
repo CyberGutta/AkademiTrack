@@ -965,7 +965,7 @@
 
 								<Button Content="Besøk nettsiden"
 										Classes="settings-action"
-										Command="{Binding OpenContactFormCommand}"/>
+										Command="{Binding OpenWebsiteCommand}"/>
 							</StackPanel>
 						</Border>
 					</StackPanel>
