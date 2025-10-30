@@ -14,7 +14,6 @@ namespace AkademiTrack.Services
         public async Task<bool> AuthenticateAsync(string reason)
         {
             string fullPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ConfigPath);
-
             bool zenityAvailable = IsZenityInstalled();
 
             if (!File.Exists(fullPath))
@@ -82,6 +81,7 @@ namespace AkademiTrack.Services
                     FileName = "zenity",
                     Arguments = $"--entry --hide-text --title=\"AkademiTrack\" --text=\"{message}\"",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -96,7 +96,8 @@ namespace AkademiTrack.Services
             }
             catch
             {
-                return "";
+                Console.WriteLine("⚠️ Zenity GUI mislyktes. Bruker terminal i stedet.");
+                return PromptInTerminal(message);
             }
         }
 
