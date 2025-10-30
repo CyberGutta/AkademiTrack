@@ -32,7 +32,7 @@
 		</Content>
 	</ItemGroup>
 	<ItemGroup>
-	<None Include="Assets/Helpers/AkademiTrackHelper.app\**\*">
+	<None Include="Assets/Helpers/AkademiTrack.app\**\*">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
 	</ItemGroup>

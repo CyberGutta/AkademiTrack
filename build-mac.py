@@ -159,7 +159,7 @@ def create_avalonia_macos_bundle(version):
     APP_NAME = "AkademiTrack"
     BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
     ICON_PATH = "./Assets/AT-1024.icns"
-    HELPER_APP_SOURCE = Path("./Assets/helper/AkademiTrackHelper.app")
+    HELPER_APP_SOURCE = Path("./Assets/helper/AkademiTrack.app")
     ENTITLEMENTS_PATH = Path("./entitlements.plist")
     SIGNING_IDENTITY = "Apple Development: Andreas Nilsen (673WFZN2KZ)"
 
@@ -305,16 +305,16 @@ def create_avalonia_macos_bundle(version):
         pass
 
     # ✅ Bundle AkademiTrackHelper.app
-    helper_dest = macos_dir / "AkademiTrackHelper.app"
+    helper_dest = macos_dir / "AkademiTrack.app"
     if HELPER_APP_SOURCE.exists():
         try:
             shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
-            print("✅ AkademiTrackHelper.app bundled")
+            print("✅ AkademiTrack.app bundled")
         except Exception as e:
             print(f"❌ Failed to bundle helper: {e}")
             return False
     else:
-        print("⚠️ AkademiTrackHelper.app not found")
+        print("⚠️ AkademiTrack not found")
 
     # ✅ Sign both apps
     def sign_app(app_path, identity, entitlements_path=None):

@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>AkademiTrack</string>
+    <string>AkademiTrack (Alerts)</string>
     <key>CFBundleDisplayName</key>
-    <string>AkademiTrack</string>
+    <string>AkademiTrack (Alerts)</string>
     <key>CFBundleIdentifier</key>
-    <string>com.cyberbrothershq.akademitrackhelper</string>
+    <string>com.cyberbrothershq.akademitrack.alerts</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleExecutable</key>
@@ -22,6 +22,9 @@
     <true/>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>Icon</string>
+
 </dict>
 </plist>
 

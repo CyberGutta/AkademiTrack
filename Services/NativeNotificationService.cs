@@ -57,7 +57,7 @@ namespace AkademiTrack.Services
                 string helperPath;
 
                 var bundledPath = Path.Combine(AppContext.BaseDirectory, "AkademiTrackHelper.app", "Contents", "MacOS", "AkademiTrackHelper");
-                var devPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Helpers", "AkademiTrackHelper.app", "Contents", "MacOS", "AkademiTrackHelper");
+                var devPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Helpers", "AkademiTrack.app", "Contents", "MacOS", "AkademiTrackHelper");
 
                 helperPath = File.Exists(bundledPath) ? bundledPath : devPath;
 

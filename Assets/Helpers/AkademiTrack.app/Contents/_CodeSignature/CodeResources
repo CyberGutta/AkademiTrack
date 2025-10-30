@@ -3,7 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>files</key>
-	<dict/>
+	<dict>
+		<key>Resources/Icon.icns</key>
+		<data>
+		dl3ybyewpbSkbeQXqOg526wPG2c=
+		</data>
+	</dict>
 	<key>files2</key>
 	<dict>
 		<key>MacOS/MacNotify</key>
@@ -14,6 +19,13 @@
 			</data>
 			<key>requirement</key>
 			<string>identifier MacNotify and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Andreas Nilsen (673WFZN2KZ)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
+		</dict>
+		<key>Resources/Icon.icns</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			2SeqMKXNHlUn6j1ut3Bt4C/hGmhvyDOFjbGvddkwc7M=
+			</data>
 		</dict>
 	</dict>
 	<key>rules</key>
