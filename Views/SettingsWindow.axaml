@@ -522,7 +522,7 @@
 						<!-- Email Field -->
 						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
-								<TextBlock Text="E-post / Brukernavn" Classes="setting-title"/>
+								<TextBlock Text="Brukernavn" Classes="setting-title"/>
 								<TextBlock Text="Ditt brukernavn for FEIDE-innlogging"
 										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginEmail}"
