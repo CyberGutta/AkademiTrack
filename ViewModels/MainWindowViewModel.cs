@@ -538,7 +538,7 @@ namespace AkademiTrack.ViewModels
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
             _updateCheckTimer = new Timer(
-                CheckForUpdatesAutomatically,
+                async (state) => await CheckForUpdatesAutomatically(state),
                 null,
                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
                 (int)TimeSpan.FromMinutes(30).TotalMilliseconds
@@ -2778,7 +2778,7 @@ namespace AkademiTrack.ViewModels
         }
 
         // MainWindowViewModel.cs - REPLACE DeleteCookiesAsync
-        private async Task DeleteCookiesAsync()
+        private Task DeleteCookiesAsync()
         {
             try
             {
@@ -2793,6 +2793,8 @@ namespace AkademiTrack.ViewModels
                 }
             }
             catch { }
+            
+            return Task.CompletedTask;
         }
         private string GetUserParametersFilePath()
         {
@@ -3034,7 +3036,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async void CheckForUpdatesAutomatically(object? state)
+        private async Task CheckForUpdatesAutomatically(object? state)
         {
             try
             {
@@ -3060,7 +3062,7 @@ namespace AkademiTrack.ViewModels
 
                 if (IsNewerVersion(latestVersion, currentVersion))
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    Dispatcher.UIThread.Post(() =>
                     {
                         ShowUpdateNotification(updateInfo);
                     });
