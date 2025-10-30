@@ -159,7 +159,7 @@ def create_avalonia_macos_bundle(version):
     APP_NAME = "AkademiTrack"
     BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
     ICON_PATH = "./Assets/AT-1024.icns"
-    HELPER_APP_SOURCE = Path("./Assets/helper/AkademiTrack.app")
+    HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
     ENTITLEMENTS_PATH = Path("./entitlements.plist")
     SIGNING_IDENTITY = "Apple Development: Andreas Nilsen (673WFZN2KZ)"
 
