@@ -523,11 +523,11 @@
 						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="E-post / Brukernavn" Classes="setting-title"/>
-								<TextBlock Text="Din e-postadresse eller brukernavn for FEIDE-innlogging"
+								<TextBlock Text="Ditt brukernavn for FEIDE-innlogging"
 										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginEmail}"
 										 Classes="credential-input"
-										 Watermark="din.epost@elev.drammen.no"/>
+										 Watermark="78abcdef"/>
 							</StackPanel>
 						</Border>
 
