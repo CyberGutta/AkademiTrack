@@ -470,9 +470,6 @@ Terminal=false
         public ICommand ToggleAutoStartAutomationCommand { get; }
         public ICommand OpenWebsiteCommand { get; }
         public ICommand OpenEmailCommand { get; }
-        public ICommand OpenPrivacyPolicyCommand { get; }
-        public ICommand OpenTermsofUseCommand { get; }
-
         public ICommand CheckForUpdatesCommand { get; }
         public ICommand DownloadAndInstallUpdateCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
@@ -569,8 +566,6 @@ Terminal=false
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
             OpenWebsiteCommand = new RelayCommand(OpenWebsite);
             OpenEmailCommand = new RelayCommand(OpenEmail);
-            OpenPrivacyPolicyCommand = new RelayCommand(OpenPrivacyPolicy);
-            OpenTermsofUseCommand = new RelayCommand(OpenTermsOfUse);
             CheckForUpdatesCommand = new RelayCommand(async () => await CheckForUpdatesAsync());
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
@@ -609,12 +604,10 @@ Terminal=false
                     "Eksporter lokal data",
                     $"Dette vil eksportere all LOKAL data som {format.ToUpper()}.\n\n" +
                     "⚠️ VIKTIG:\n" +
-                    "Dette eksporterer KUN data lagret på din datamaskin:\n" +
+                    "Dette eksporterer data lagret på din datamaskin:\n" +
                     "• Appinnstillinger\n" +
                     "• Aktiveringsinformasjon\n" +
                     "• Lokale filer og cookies\n\n" +
-                    "For DATABASE-data (STU-registreringer, profil, etc.),\n" +
-                    "besøk: https://cybergutta.github.io/AkademietTrack/index.html\n\n" +
                     "Vil du fortsette med lokal eksport?",
                     false
                 );
@@ -651,8 +644,6 @@ Terminal=false
                 var openFolder = await ShowConfirmationDialog(
                     "Lokal eksport fullført! ✓",
                     $"Din LOKALE data er eksportert til:\n\n{filePath}\n\n" +
-                    "📋 HUSK: For database-data (STU-registreringer, etc.),\n" +
-                    "besøk: https://cybergutta.github.io/AkademietTrack/index.html\n\n" +
                     "Vil du åpne mappen der filen er lagret?",
                     false
                 );
@@ -857,7 +848,6 @@ Terminal=false
                     "⚠️ SLETT KONTO PERMANENT",
                     "ADVARSEL: Dette sletter kontoen din permanent!\n\n" +
                     "• All lokal data\n" +
-                    "• Din aktivering i databasen\n" +
                     "• All brukerdata\n\n" +
                     "Dette kan IKKE angres!\n\n" +
                     "Er du sikker?",
@@ -1344,18 +1334,6 @@ Terminal=false
         {
             try { Process.Start(new ProcessStartInfo { FileName = "mailto:cyberbrothershq@gmail.com", UseShellExecute = true }); }
             catch (Exception ex) { Debug.WriteLine($"Error opening email: {ex.Message}"); }
-        }
-
-        private void OpenPrivacyPolicy()
-        {
-            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/privacy-policy.html", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening privacy policy: {ex.Message}"); }
-        }
-
-        private void OpenTermsOfUse()
-        {
-            try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/terms-of-use.html", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening terms of use: {ex.Message}"); }
         }
 
         private void OpenWebsite()

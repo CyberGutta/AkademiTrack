@@ -903,21 +903,7 @@
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 										   TextWrapping="Wrap"
 										   LineHeight="22"/>
-
-								<TextBlock Text="Hvis du vil lese privacy policy eller bruksvilkår, besøk:"
-											   Classes="setting-description"
-											   VerticalAlignment="Center"
-											   Margin="0,1,0,0"/>
-
-								<Button Content="https://cybergutta.github.io/AkademietTrack/privacy-policy.html"
-											Command="{Binding OpenPrivacyPolicyCommand}"
-											Classes="privacypolicy-link"
-											VerticalAlignment="Center"/>
-											
-								<Button Content="https://cybergutta.github.io/AkademietTrack/terms-of-use.html"
-											Command="{Binding OpenTermsofUseCommand}"
-											Classes="termsofuse-link"
-											VerticalAlignment="Center"/>
+								
 							</StackPanel>
 						</Border>
 
