@@ -36,7 +36,7 @@ namespace AkademiTrack.Services
                         try
                         {
                             windowIcon = new Avalonia.Controls.WindowIcon(path);
-                            Debug.WriteLine($"✓ Successfully loaded tray icon from: {path}");
+                            //Debug.WriteLine($"✓ Successfully loaded tray icon from: {path}");
                             break;
                         }
                         catch (Exception)
@@ -73,7 +73,7 @@ namespace AkademiTrack.Services
 
                 _trayIcon.Clicked += (s, e) => ShowMainWindow();
 
-                Debug.WriteLine("✓ System tray icon initialized successfully");
+                //Debug.WriteLine("✓ System tray icon initialized successfully");
             }
             catch (Exception ex)
             {
@@ -86,7 +86,7 @@ namespace AkademiTrack.Services
             if (_trayIcon != null)
             {
                 _trayIcon.IsVisible = true;
-                Debug.WriteLine("Tray icon shown");
+                //Debug.WriteLine("Tray icon shown");
             }
         }
 
@@ -95,7 +95,7 @@ namespace AkademiTrack.Services
             if (_trayIcon != null)
             {
                
-                Debug.WriteLine("Tray icon kept visible");
+                //Debug.WriteLine("Tray icon kept visible");
             }
         }
 
@@ -113,7 +113,7 @@ namespace AkademiTrack.Services
                 }
 
                 ShowTrayIcon();
-                Debug.WriteLine("Application minimized to tray");
+                //Debug.WriteLine("Application minimized to tray");
             }
         }
 
@@ -121,7 +121,7 @@ namespace AkademiTrack.Services
         {
             if (_mainWindow != null)
             {
-                Debug.WriteLine("Restoring window from tray...");
+                //Debug.WriteLine("Restoring window from tray...");
                 
                 try
                 {
@@ -130,7 +130,7 @@ namespace AkademiTrack.Services
                     _mainWindow.WindowState = WindowState.Normal;
                     _mainWindow.Activate();
                     
-                    Debug.WriteLine("✓ Main window restored from tray");
+                    //Debug.WriteLine("✓ Main window restored from tray");
                 }
                 catch (Exception ex)
                 {
