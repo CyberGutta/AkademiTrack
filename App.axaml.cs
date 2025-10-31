@@ -122,15 +122,20 @@ namespace AkademiTrack
 
         private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized)
         {
+            var settingsViewModel = new SettingsViewModel(); 
+            var mainWindowViewModel = new MainWindowViewModel
+            {
+                SettingsViewModel = settingsViewModel
+            };
+
             var mainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel()
+                DataContext = mainWindowViewModel
             };
 
             desktop.MainWindow = mainWindow;
             Debug.WriteLine("[App] Main window set as MainWindow");
 
-            // Initialize tray icon
             AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
             Debug.WriteLine("[App] TrayIconManager initialized");
 
@@ -138,34 +143,21 @@ namespace AkademiTrack
             {
                 Debug.WriteLine("[App] Starting minimized to tray...");
 
-                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
-                {
-                    mainWindow.ShowInTaskbar = false;
-                    AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
-                    Debug.WriteLine("[App] macOS: Window not shown, started in tray");
-                }
-                else
-                {
-                    // Show window normally first to ensure proper initialization
-                    mainWindow.Show();
-                    
-                    // Give it a moment to render
-                    await Task.Delay(50);
-                    
-                    // Then hide it for tray mode
-                    mainWindow.Hide();
-                    mainWindow.ShowInTaskbar = false;
-
-                    AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
-
-                    Debug.WriteLine("[App] Windows/Linux: App started in tray");
-                }
+                mainWindow.Show();
+                await Task.Delay(50);
+                mainWindow.Hide();
+                mainWindow.ShowInTaskbar = false;
+                AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
             }
             else
             {
                 mainWindow.Show();
                 Debug.WriteLine("[App] Main window shown normally");
             }
+
+            // ✅ Trigger update check after window is shown
+            _ = settingsViewModel.CheckForUpdatesAsync();
+
         }
 
         private async Task<bool> ShouldStartMinimized()

@@ -24,6 +24,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
+
 namespace AkademiTrack.ViewModels
 {
     public class NotificationOverlayWindow : Window
@@ -473,7 +474,7 @@ namespace AkademiTrack.ViewModels
 
         public new event PropertyChangedEventHandler? PropertyChanged;
 
-        
+        public SettingsViewModel SettingsViewModel { get; set; }
 
 
         private string _loginEmail = "";

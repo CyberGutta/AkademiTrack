@@ -958,7 +958,9 @@ Terminal=false
         }
 
 
-        private async Task CheckForUpdatesAsync()
+
+
+        public async Task CheckForUpdatesAsync()
         {
             try
             {
@@ -987,6 +989,15 @@ Terminal=false
                     AvailableVersion = latestVersionClean;
                     UpdateStatus = $"Ny versjon tilgjengelig: v{AvailableVersion}";
                     UpdateAvailable = true;
+
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        NativeNotificationService.Show(
+                            "Oppdatering tilgjengelig",
+                            $"En ny versjon ({AvailableVersion}) er klar for nedlasting.",
+                            "INFO"
+                        );
+                    });
                 }
                 else
                 {
