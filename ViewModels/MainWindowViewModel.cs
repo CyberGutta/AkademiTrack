@@ -528,13 +528,6 @@ namespace AkademiTrack.ViewModels
 
             LogInfo("Applikasjon er klar");
 
-            var directory = Path.GetDirectoryName(GetCookiesFilePath()) ?? Environment.CurrentDirectory;
-            _processedNotificationsFile = Path.Combine(directory, "processed_notifications.json");
-
-
-            _ = LoadProcessedNotificationIdsAsync();
-
-
 
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
