@@ -456,6 +456,9 @@ namespace AkademiTrack.ViewModels
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
         private readonly ApplicationInfo _applicationInfo;
 
+        private bool _autoStartTriggered = false;
+        private readonly object _autoStartLock = new object();
+
         private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
@@ -543,6 +546,16 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                lock (_autoStartLock)
+                {
+                    if (_autoStartTriggered)
+                    {
+                        LogDebug("Auto-start already triggered - ignoring duplicate call");
+                        return;
+                    }
+                    _autoStartTriggered = true;
+                }
+
                 await Task.Delay(2000);
 
                 var settingsViewModel = new SettingsViewModel();
@@ -554,8 +567,8 @@ namespace AkademiTrack.ViewModels
 
                     await LoadCredentialsAsync();
                     bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                         !string.IsNullOrEmpty(_loginPassword) &&
-                                         !string.IsNullOrEmpty(_schoolName);
+                                        !string.IsNullOrEmpty(_loginPassword) &&
+                                        !string.IsNullOrEmpty(_schoolName);
 
                     if (hasCredentials)
                     {
@@ -573,10 +586,23 @@ namespace AkademiTrack.ViewModels
                             "WARNING");
                     }
                 }
+                else
+                {
+                    // Reset flag if auto-start is disabled
+                    lock (_autoStartLock)
+                    {
+                        _autoStartTriggered = false;
+                    }
+                }
             }
             catch (Exception ex)
             {
                 LogError($"Feil ved auto-start sjekk: {ex.Message}");
+                // Reset flag on error
+                lock (_autoStartLock)
+                {
+                    _autoStartTriggered = false;
+                }
             }
         }
 
@@ -1275,7 +1301,11 @@ namespace AkademiTrack.ViewModels
 
         private async Task StartAutomationAsync()
         {
-            if (IsAutomationRunning) return;
+            if (IsAutomationRunning)
+            {
+                LogInfo("Automatisering kjører allerede - ignorerer ny startforespørsel");
+                return;
+            }
 
             IsAutomationRunning = true;
             _cancellationTokenSource = new CancellationTokenSource();
