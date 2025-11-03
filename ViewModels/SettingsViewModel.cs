@@ -23,6 +23,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Velopack;
 using Velopack.Sources;
+using System.Security;
 
 namespace AkademiTrack.ViewModels
 {
@@ -405,11 +406,11 @@ Terminal=false
         private bool _showDetailedLogs = true;
         private bool _startWithSystem = true;
         private bool _autoStartAutomation = false;
-        
+
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
         private string _loginEmail = "";
-        private string _loginPassword = "";
+        private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
 
         private string _updateStatus = "Klikk for å sjekke etter oppdateringer";
@@ -526,8 +527,18 @@ Terminal=false
 
         public string LoginPassword
         {
-            get => _loginPassword;
-            set { if (_loginPassword != value) { _loginPassword = value; OnPropertyChanged(); _ = SaveSettingsAsync(); } }
+            get => SecureStringToString(_loginPasswordSecure);
+            set
+            {
+                var currentValue = SecureStringToString(_loginPasswordSecure);
+                if (currentValue != value)
+                {
+                    _loginPasswordSecure?.Dispose();
+                    _loginPasswordSecure = StringToSecureString(value);
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+                }
+            }
         }
 
         public string SchoolName
@@ -917,7 +928,7 @@ Terminal=false
                 IsDeleting = false;
             }
         }
-        
+
         private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
         {
             try
@@ -1041,7 +1052,7 @@ Terminal=false
                 LogInfo($"Current version: {ApplicationInfo.Version}");
                 LogInfo($"Target version: {AvailableVersion}");
 
-                
+
                 string platformSuffix = "";
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
@@ -1308,8 +1319,11 @@ Terminal=false
             await CheckForUpdatesAsync();
         }
 
-        public (string email, string password, string school) GetDecryptedCredentials() => (_loginEmail, _loginPassword, _schoolName);
-
+        public (string email, string password, string school) GetDecryptedCredentials()
+        {
+            var password = SecureStringToString(_loginPasswordSecure);
+            return (_loginEmail, password, _schoolName);
+        }
         public void SetLogEntries(ObservableCollection<LogEntry> logEntries)
         {
             if (_allLogEntries != null) _allLogEntries.CollectionChanged -= OnAllLogEntriesChanged;
@@ -1382,7 +1396,14 @@ Terminal=false
                 var school  = await SecureCredentialStorage.GetCredentialAsync("SchoolName")   ?? "";
 
                 LoginEmail   = email;
-                LoginPassword = pass;
+                
+                // Convert password to SecureString immediately
+                _loginPasswordSecure?.Dispose();
+                _loginPasswordSecure = StringToSecureString(pass);
+                
+                // Clear the plaintext password from memory
+                pass = null;
+                
                 SchoolName   = school;
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
@@ -1426,8 +1447,15 @@ Terminal=false
                 if (!string.IsNullOrEmpty(_loginEmail))
                     await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
 
-                if (!string.IsNullOrEmpty(_loginPassword))
-                    await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", _loginPassword);
+                // Convert SecureString to plain string temporarily for saving
+                var passwordPlain = SecureStringToString(_loginPasswordSecure);
+                if (!string.IsNullOrEmpty(passwordPlain))
+                {
+                    await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", passwordPlain);
+                    
+                    // Clear the temporary plaintext password
+                    passwordPlain = null;
+                }
 
                 if (!string.IsNullOrEmpty(_schoolName))
                     await SecureCredentialStorage.SaveCredentialAsync("SchoolName", _schoolName);
@@ -1442,5 +1470,47 @@ Terminal=false
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-    }
+
+        private static SecureString StringToSecureString(string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return new SecureString();
+
+            var secure = new SecureString();
+            foreach (char c in str)
+            {
+                secure.AppendChar(c);
+            }
+            secure.MakeReadOnly();
+            return secure;
+        }
+
+        private static string SecureStringToString(SecureString? secure)
+        {
+            if (secure == null || secure.Length == 0)
+                return string.Empty;
+
+            IntPtr ptr = IntPtr.Zero;
+            try
+            {
+                ptr = Marshal.SecureStringToBSTR(secure);
+                return Marshal.PtrToStringBSTR(ptr) ?? string.Empty;
+            }
+            finally
+            {
+                if (ptr != IntPtr.Zero)
+                {
+                    Marshal.ZeroFreeBSTR(ptr);
+                }
+            }
+        }
+        public void Dispose()
+        {
+            // Securely dispose of the password
+            _loginPasswordSecure?.Dispose();
+            _loginPasswordSecure = null;
+            
+            Debug.WriteLine("SettingsViewModel disposed - password cleared from memory");
+        }
+    }  
 }

@@ -23,7 +23,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using AkademiTrack.Services;
+using System.Security;
 
 
 namespace AkademiTrack.ViewModels
@@ -485,7 +485,7 @@ namespace AkademiTrack.ViewModels
 
 
         private string _loginEmail = "";
-        private string _loginPassword = "";
+        private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
 
 
@@ -517,7 +517,9 @@ namespace AkademiTrack.ViewModels
         }
 
         public MainWindowViewModel()
-        {
+        {   
+            _processedNotificationsFile = GetProcessedNotificationsFilePath();
+            SettingsViewModel = new SettingsViewModel();
             _httpClient = new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
             _logEntries = new ObservableCollection<LogEntry>();
@@ -573,7 +575,7 @@ namespace AkademiTrack.ViewModels
 
                     await LoadCredentialsAsync();
                     bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                        !string.IsNullOrEmpty(_loginPassword) &&
+                                        _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
                                         !string.IsNullOrEmpty(_schoolName);
 
                     if (hasCredentials)
@@ -621,10 +623,16 @@ namespace AkademiTrack.ViewModels
             try
             {
                 LogDebug("Loading credentials from secure storage...");
-                
-                // Use the SAME storage system and keys as SettingsViewModel
+
                 _loginEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
-                _loginPassword = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
+
+                var passwordPlain = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
+                _loginPasswordSecure?.Dispose();
+                _loginPasswordSecure = StringToSecureString(passwordPlain);
+
+                // Clear plaintext password from memory immediately
+                passwordPlain = null;
+
                 _schoolName = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
 
                 if (!string.IsNullOrEmpty(_loginEmail))
@@ -640,7 +648,8 @@ namespace AkademiTrack.ViewModels
             {
                 LogError($"Failed to load credentials: {ex.Message}");
                 _loginEmail = "";
-                _loginPassword = "";
+                _loginPasswordSecure?.Dispose();
+                _loginPasswordSecure = new SecureString();
                 _schoolName = "";
             }
         }
@@ -670,7 +679,7 @@ namespace AkademiTrack.ViewModels
                     }
                 }
             }
-            catch (Exception )
+            catch (Exception)
             {
             }
         }
@@ -683,11 +692,11 @@ namespace AkademiTrack.ViewModels
                 var json = JsonSerializer.Serialize(_processedNotificationIds.ToArray());
                 await File.WriteAllTextAsync(filePath, json);
             }
-            catch (Exception )
+            catch (Exception)
             {
             }
         }
-        
+
         public class EnhancedAdminNotification
         {
             public string? Id { get; set; }
@@ -695,10 +704,10 @@ namespace AkademiTrack.ViewModels
             public string? Message { get; set; }
             public string? Priority { get; set; }
             public string? Target_Email { get; set; }
-            public string? Image_Url { get; set; }    
-            public string? Custom_Color { get; set; }  
+            public string? Image_Url { get; set; }
+            public string? Custom_Color { get; set; }
             public DateTime Created_At { get; set; }
-        }        
+        }
 
         public class AdminNotification
         {
@@ -1283,10 +1292,10 @@ namespace AkademiTrack.ViewModels
                     return true;
                 }
 
-                return false; 
+                return false;
             }
 
-            return true; 
+            return true;
         }
 
 
@@ -1323,8 +1332,8 @@ namespace AkademiTrack.ViewModels
                 await LoadCredentialsAsync();
 
                 bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                     !string.IsNullOrEmpty(_loginPassword) &&
-                                     !string.IsNullOrEmpty(_schoolName);
+                                    _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
+                                    !string.IsNullOrEmpty(_schoolName);
 
                 if (hasCredentials)
                 {
@@ -1521,9 +1530,9 @@ namespace AkademiTrack.ViewModels
         {
             string appSupportPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string appDataDir = Path.Combine(appSupportPath, "AkademiTrack");
-            
+
             Directory.CreateDirectory(appDataDir);
-            
+
             return Path.Combine(appDataDir, "cookies.json");
         }
 
@@ -1535,7 +1544,7 @@ namespace AkademiTrack.ViewModels
                 {
                     LogDebug("Loading cookies from macOS Keychain...");
                     var json = await Services.KeychainService.LoadFromKeychain("cookies");
-                    
+
                     if (string.IsNullOrEmpty(json))
                     {
                         LogDebug("No cookies found in Keychain");
@@ -1543,17 +1552,17 @@ namespace AkademiTrack.ViewModels
                     }
 
                     LogDebug($"Retrieved cookies JSON ({json.Length} characters)");
-                    
+
                     try
                     {
                         var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-                        
+
                         if (cookieArray == null || cookieArray.Length == 0)
                         {
                             LogDebug("Cookie deserialization returned null or empty array");
                             return null!;
                         }
-                        
+
                         LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from Keychain");
                         return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
                     }
@@ -1568,22 +1577,22 @@ namespace AkademiTrack.ViewModels
                 {
                     // File-based storage for non-macOS
                     string path = GetCookiesFilePath();
-                    
+
                     if (!File.Exists(path))
                     {
                         LogDebug($"Cookie file not found at: {path}");
                         return null!;
                     }
-                    
+
                     LogDebug($"Loading cookies from file: {path}");
                     var json = await File.ReadAllTextAsync(path);
                     var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-                    
+
                     if (cookieArray == null || cookieArray.Length == 0)
                     {
                         return null!;
                     }
-                    
+
                     LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from file");
                     return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
                 }
@@ -1629,9 +1638,10 @@ namespace AkademiTrack.ViewModels
 
             try
             {
+                
                 bool shouldTryAutomatic = !string.IsNullOrEmpty(_loginEmail) &&
-                                         !string.IsNullOrEmpty(_loginPassword) &&
-                                         !string.IsNullOrEmpty(_schoolName);
+                                        _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
+                                        !string.IsNullOrEmpty(_schoolName);
 
                 var options = new ChromeOptions();
                 options.AddArgument("--no-sandbox");
@@ -1886,7 +1896,7 @@ namespace AkademiTrack.ViewModels
 
                     orgSearchField.Clear();
                     orgSearchField.SendKeys(_schoolName);
-                    await Task.Delay(500); 
+                    await Task.Delay(500);
 
                     try
                     {
@@ -2048,9 +2058,19 @@ namespace AkademiTrack.ViewModels
                         usernameField.SendKeys(_loginEmail);
 
                         passwordField.Clear();
-                        passwordField.SendKeys(_loginPassword);
 
-                        await Task.Delay(200); 
+                        var passwordPlain = SecureStringToString(_loginPasswordSecure);
+                        try
+                        {
+                            passwordField.SendKeys(passwordPlain);
+                        }
+                        finally
+                        {
+                            // Clear the temporary plaintext password immediately
+                            passwordPlain = null;
+                        }
+
+                        await Task.Delay(200);
 
                         if (loginButton != null)
                         {
@@ -2238,7 +2258,7 @@ namespace AkademiTrack.ViewModels
             var now = DateTime.Now;
             var currentYear = now.Year;
 
-            
+
             var schoolYearStart = now.Month >= 8 ? currentYear : currentYear - 1;
             var schoolYearEnd = schoolYearStart + 1;
 
@@ -2271,7 +2291,7 @@ namespace AkademiTrack.ViewModels
                     checkCount++;
                     var currentUrl = _webDriver.Url;
 
-                    if (checkCount % 15 == 0) 
+                    if (checkCount % 15 == 0)
                     {
                         var elapsed = checkCount * 2;
                         LogInfo($"Venter på innlogging... ({elapsed} sekunder)");
@@ -2429,15 +2449,15 @@ namespace AkademiTrack.ViewModels
                 }
 
                 var json = JsonSerializer.Serialize(cookies, new JsonSerializerOptions { WriteIndented = true });
-                
+
                 LogDebug($"Serialized {cookies.Length} cookies to JSON ({json.Length} characters)");
-                
+
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     LogDebug("Saving cookies to macOS Keychain...");
                     await Services.KeychainService.SaveToKeychain("cookies", json);
                     LogSuccess("✓ Cookies saved to Keychain");
-                    
+
                     // Verify save
                     var verify = await Services.KeychainService.LoadFromKeychain("cookies");
                     if (verify == json)
@@ -2472,13 +2492,13 @@ namespace AkademiTrack.ViewModels
                     !TimeSpan.TryParse(stuSession.SluttKl, out var stuEndTime))
                 {
                     LogDebug($"Could not parse STU session times: {stuSession.StartKl}-{stuSession.SluttKl}");
-                    return false; 
+                    return false;
                 }
 
                 var conflictingClasses = allScheduleItems
-                    .Where(item => item.Dato == stuSession.Dato && 
-                                  item.KNavn != "STU" && 
-                                  item.Id != stuSession.Id) 
+                    .Where(item => item.Dato == stuSession.Dato &&
+                                  item.KNavn != "STU" &&
+                                  item.Id != stuSession.Id)
                     .ToList();
 
                 foreach (var otherClass in conflictingClasses)
@@ -2487,10 +2507,10 @@ namespace AkademiTrack.ViewModels
                         !TimeSpan.TryParse(otherClass.SluttKl, out var otherEndTime))
                     {
                         LogDebug($"Could not parse class times for {otherClass.KNavn}: {otherClass.StartKl}-{otherClass.SluttKl}");
-                        continue; 
+                        continue;
                     }
 
-                    
+
                     bool hasOverlap = stuStartTime < otherEndTime && otherStartTime < stuEndTime;
 
                     if (hasOverlap)
@@ -2502,7 +2522,7 @@ namespace AkademiTrack.ViewModels
                 }
 
                 LogDebug($"No conflicts found for STU session {stuSession.StartKl}-{stuSession.SluttKl}");
-                return false; 
+                return false;
             }
             catch (Exception ex)
             {
@@ -2746,19 +2766,19 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo("Henter brukerparametere...");
                     _userParameters = await ExtractUserParametersAsync(cookies);
-                    
+
                     if (_userParameters == null || !_userParameters.IsComplete)
                     {
                         LogError("Kunne ikke få brukerparametere - bruker fallback verdier");
                         _userParameters = new UserParameters
                         {
                             FylkeId = "00",
-                            PlanPeri = "2025-26", 
+                            PlanPeri = "2025-26",
                             SkoleId = "312"
                         };
                     }
                 }
-                
+
                 var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId}&onlyData=true&limit=99&offset=0&totalResults=true";
@@ -2808,16 +2828,16 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        
 
-       public class UserParameters
+
+        public class UserParameters
         {
             public string? FylkeId { get; set; }
             public string? PlanPeri { get; set; }
             public string? SkoleId { get; set; }
-            
-            public bool IsComplete => !string.IsNullOrEmpty(FylkeId) && 
-                                      !string.IsNullOrEmpty(PlanPeri) && 
+
+            public bool IsComplete => !string.IsNullOrEmpty(FylkeId) &&
+                                      !string.IsNullOrEmpty(PlanPeri) &&
                                       !string.IsNullOrEmpty(SkoleId);
         }
 
@@ -2858,7 +2878,7 @@ namespace AkademiTrack.ViewModels
             }
             catch (InvalidOperationException)
             {
-                throw; 
+                throw;
             }
             catch (Exception ex)
             {
@@ -2893,7 +2913,7 @@ namespace AkademiTrack.ViewModels
             {
                 LogDebug($"Failed to delete cookies: {ex.Message}");
             }
-}
+        }
         private string GetUserParametersFilePath()
         {
             string appDataDir = Path.Combine(
@@ -3000,9 +3020,9 @@ namespace AkademiTrack.ViewModels
         {
             public UserParameters? Parameters { get; set; }
             public DateTime SavedAt { get; set; }
-            public string? SchoolYear { get; set; } 
+            public string? SchoolYear { get; set; }
         }
-        
+
 
         private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
@@ -3061,12 +3081,12 @@ namespace AkademiTrack.ViewModels
                 {
                     if (await CheckForNetworkErrorInResponse(responseContent, stuTime))
                     {
-                        return false; 
+                        return false;
                     }
 
                     var registrationTime = DateTime.Now.ToString("HH:mm:ss");
 
-                    return true; 
+                    return true;
                 }
                 else
                 {
@@ -3204,8 +3224,11 @@ namespace AkademiTrack.ViewModels
 
         public void Dispose()
         {
-            LogInfo("Disposing notification resources...");
-            
+            LogInfo("Disposing resources...");
+
+            _loginPasswordSecure?.Dispose();
+            _loginPasswordSecure = null;
+
             _updateCheckTimer?.Dispose();
 
             _isProcessingQueue = false;
@@ -3224,6 +3247,40 @@ namespace AkademiTrack.ViewModels
             _webDriver?.Quit();
             _webDriver?.Dispose();
             _httpClient?.Dispose();
+        }
+        
+        private static SecureString StringToSecureString(string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return new SecureString();
+
+            var secure = new SecureString();
+            foreach (char c in str)
+            {
+                secure.AppendChar(c);
+            }
+            secure.MakeReadOnly();
+            return secure;
+        }
+
+        private static string SecureStringToString(SecureString? secure)
+        {
+            if (secure == null || secure.Length == 0)
+                return string.Empty;
+
+            IntPtr ptr = IntPtr.Zero;
+            try
+            {
+                ptr = Marshal.SecureStringToBSTR(secure);
+                return Marshal.PtrToStringBSTR(ptr) ?? string.Empty;
+            }
+            finally
+            {
+                if (ptr != IntPtr.Zero)
+                {
+                    Marshal.ZeroFreeBSTR(ptr);
+                }
+            }
         }
     }
 
