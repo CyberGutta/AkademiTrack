@@ -459,6 +459,9 @@ namespace AkademiTrack.ViewModels
         private bool _autoStartTriggered = false;
         private readonly object _autoStartLock = new object();
 
+        private static bool _globalAutoStartTriggered = false;
+        private static readonly object _globalAutoStartLock = new object();
+
         private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
 
@@ -540,26 +543,28 @@ namespace AkademiTrack.ViewModels
                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
                 (int)TimeSpan.FromMinutes(30).TotalMilliseconds
             );
-        }   
+        }
 
         private async Task CheckAutoStartAutomationAsync()
         {
             try
             {
-                lock (_autoStartLock)
+                // Use a GLOBAL static lock to prevent ANY instance from running this twice
+                lock (_globalAutoStartLock)
                 {
-                    if (_autoStartTriggered)
+                    if (_globalAutoStartTriggered)
                     {
-                        LogDebug("Auto-start already triggered - ignoring duplicate call");
+                        LogDebug("Auto-start already triggered globally - ignoring duplicate call");
                         return;
                     }
-                    _autoStartTriggered = true;
+                    _globalAutoStartTriggered = true;
                 }
 
-                await Task.Delay(2000);
+                // Wait for app to fully initialize
+                await Task.Delay(3000); // Increased from 2000 to ensure full initialization
 
                 var settingsViewModel = new SettingsViewModel();
-                await Task.Delay(300); 
+                await Task.Delay(500); // Increased delay to ensure settings are loaded
 
                 if (settingsViewModel.AutoStartAutomation)
                 {
@@ -573,9 +578,17 @@ namespace AkademiTrack.ViewModels
                     if (hasCredentials)
                     {
                         LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
+
                         await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
-                            await StartAutomationAsync();
+                            if (!IsAutomationRunning)
+                            {
+                                await StartAutomationAsync();
+                            }
+                            else
+                            {
+                                LogInfo("Automatisering kjører allerede - ignorerer auto-start");
+                            }
                         });
                     }
                     else
@@ -588,20 +601,16 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    // Reset flag if auto-start is disabled
-                    lock (_autoStartLock)
-                    {
-                        _autoStartTriggered = false;
-                    }
+                    LogInfo("Auto-start er deaktivert i innstillinger");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Feil ved auto-start sjekk: {ex.Message}");
-                // Reset flag on error
-                lock (_autoStartLock)
+
+                lock (_globalAutoStartLock)
                 {
-                    _autoStartTriggered = false;
+                    _globalAutoStartTriggered = false;
                 }
             }
         }
