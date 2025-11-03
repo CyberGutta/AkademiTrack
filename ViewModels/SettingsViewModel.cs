@@ -688,108 +688,112 @@ Terminal=false
         }
 
         private async Task DeleteLocalDataAsync()
-    {
-        if (IsDeleting) return;
-
-        try
         {
-            var result = await ShowConfirmationDialog(
-                "Slett lokal data",
-                "Er du sikker på at du vil slette all lokal data?\n\n" +
-                "Dette vil fjerne:\n" +
-                "• Lagrede innloggingsopplysninger (fra sikker lagring)\n" +
-                "• Cookies og tokens\n" +
-                "• Appinnstillinger\n" +
-                "• Cache-data\n\n" +
-                "Programmet starter på nytt etter sletting.",
-                false
-            );
+            if (IsDeleting) return;
 
-            if (!result) return;
-
-            IsDeleting = true;
-            Debug.WriteLine("=== DELETING LOCAL DATA ===");
-
-            // Delete from secure storage first
-            Debug.WriteLine("Deleting credentials from secure storage...");
-            await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
-            await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
-            await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
-            Debug.WriteLine("✓ Secure storage cleared");
-
-            // Delete cookies from macOS Keychain (if on macOS)
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            try
             {
-                try
-                {
-                    Debug.WriteLine("Deleting cookies from macOS Keychain...");
-                    await KeychainService.DeleteFromKeychain();
-                    Debug.WriteLine("✓ Keychain cookies cleared");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
-                }
-            }
+                var result = await ShowConfirmationDialog(
+                    "Slett lokal data",
+                    "Er du sikker på at du vil slette all lokal data?\n\n" +
+                    "Dette vil fjerne:\n" +
+                    "• Lagrede innloggingsopplysninger (fra sikker lagring)\n" +
+                    "• Cookies og tokens\n" +
+                    "• Appinnstillinger\n" +
+                    "• Cache-data\n\n" +
+                    "Programmet starter på nytt etter sletting.",
+                    false
+                );
 
-            // Then delete local files
-            var appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "AkademiTrack"
-            );
+                if (!result) return;
 
-            if (Directory.Exists(appDataDir))
-            {
-                var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+                IsDeleting = true;
+                Debug.WriteLine("=== DELETING LOCAL DATA ===");
 
-                foreach (var file in allFiles)
+                // Delete from secure storage first
+                Debug.WriteLine("Deleting credentials from secure storage...");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
+                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
+                Debug.WriteLine("✓ Secure storage cleared");
+
+                // Delete cookies from macOS Keychain (if on macOS)
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     try
                     {
-                        File.Delete(file);
-                        Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                        Debug.WriteLine("Deleting cookies from macOS Keychain...");
+                        // Delete each credential key individually
+                        await KeychainService.DeleteFromKeychain("cookies");
+                        await KeychainService.DeleteFromKeychain("login_email");
+                        await KeychainService.DeleteFromKeychain("login_password");
+                        await KeychainService.DeleteFromKeychain("school_name");
+                        Debug.WriteLine("✓ Keychain cookies and credentials cleared");
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
+                        Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
                     }
                 }
 
-                foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                // Then delete local files
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                if (Directory.Exists(appDataDir))
                 {
+                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+
+                    foreach (var file in allFiles)
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
+                        }
+                    }
+
+                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                    {
+                        try
+                        {
+                            if (Directory.Exists(dir))
+                                Directory.Delete(dir, true);
+                        }
+                        catch { }
+                    }
+
                     try
                     {
-                        if (Directory.Exists(dir))
-                            Directory.Delete(dir, true);
+                        if (Directory.Exists(appDataDir))
+                            Directory.Delete(appDataDir, true);
                     }
                     catch { }
                 }
 
-                try
-                {
-                    if (Directory.Exists(appDataDir))
-                        Directory.Delete(appDataDir, true);
-                }
-                catch { }
+                Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
+
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+                await Task.Delay(300);
+                RestartApplication();
             }
-
-            Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
-
-            CloseRequested?.Invoke(this, EventArgs.Empty);
-            await Task.Delay(300);
-            RestartApplication();
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error: {ex.Message}");
+                await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
+            }
+            finally
+            {
+                IsDeleting = false;
+            }
         }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error: {ex.Message}");
-            await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
-        }
-        finally
-        {
-            IsDeleting = false;
-        }
-    }
 
         private void RestartApplication()
         {

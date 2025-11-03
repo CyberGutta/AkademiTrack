@@ -23,6 +23,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using AkademiTrack.Services;
 
 
 namespace AkademiTrack.ViewModels
@@ -619,30 +620,25 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                var settingsViewModel = new SettingsViewModel();
-
-                await Task.Delay(200);
-
-                var credentials = settingsViewModel.GetDecryptedCredentials();
-
-                _loginEmail = credentials.email;
-                _loginPassword = credentials.password;
-                _schoolName = credentials.school;
+                LogDebug("Loading credentials from secure storage...");
+                
+                // Use the SAME storage system and keys as SettingsViewModel
+                _loginEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
+                _loginPassword = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
+                _schoolName = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
 
                 if (!string.IsNullOrEmpty(_loginEmail))
                 {
-                    LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
+                    LogSuccess($"✓ Credentials loaded for: {_loginEmail}");
                 }
                 else
                 {
-                    LogInfo("Ingen lagrede innloggingsopplysninger funnet");
+                    LogInfo("No saved credentials found in secure storage");
                 }
             }
             catch (Exception ex)
             {
-                LogError($"Kunne ikke laste innloggingsopplysninger: {ex.Message}");
-                LogInfo("Fortsetter uten lagrede innloggingsopplysninger");
-
+                LogError($"Failed to load credentials: {ex.Message}");
                 _loginEmail = "";
                 _loginPassword = "";
                 _schoolName = "";
@@ -1538,7 +1534,7 @@ namespace AkademiTrack.ViewModels
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     LogDebug("Loading cookies from macOS Keychain...");
-                    var json = await KeychainService.LoadFromKeychain();
+                    var json = await Services.KeychainService.LoadFromKeychain("cookies");
                     
                     if (string.IsNullOrEmpty(json))
                     {
@@ -1546,9 +1542,7 @@ namespace AkademiTrack.ViewModels
                         return null!;
                     }
 
-                    // Add debugging to see what we actually got
-                    LogDebug($"Raw Keychain data length: {json.Length} characters");
-                    LogDebug($"First 100 chars: {(json.Length > 100 ? json.Substring(0, 100) : json)}");
+                    LogDebug($"Retrieved cookies JSON ({json.Length} characters)");
                     
                     try
                     {
@@ -1560,22 +1554,19 @@ namespace AkademiTrack.ViewModels
                             return null!;
                         }
                         
-                        LogSuccess($"Successfully loaded {cookieArray.Length} cookies from Keychain");
+                        LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from Keychain");
                         return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
                     }
                     catch (JsonException jsonEx)
                     {
                         LogError($"JSON deserialization failed: {jsonEx.Message}");
-                        LogDebug($"Problematic JSON: {json}");
-                        
-                        // Clean up corrupted keychain entry
-                        LogDebug("Deleting corrupted keychain entry...");
-                        await KeychainService.DeleteFromKeychain();
+                        await Services.KeychainService.DeleteFromKeychain("cookies");
                         return null!;
                     }
                 }
                 else
                 {
+                    // File-based storage for non-macOS
                     string path = GetCookiesFilePath();
                     
                     if (!File.Exists(path))
@@ -1586,26 +1577,20 @@ namespace AkademiTrack.ViewModels
                     
                     LogDebug($"Loading cookies from file: {path}");
                     var json = await File.ReadAllTextAsync(path);
-                    
-                    LogDebug($"File content length: {json.Length} characters");
-                    
                     var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
                     
                     if (cookieArray == null || cookieArray.Length == 0)
                     {
-                        LogDebug("Cookie file deserialization returned null or empty");
                         return null!;
                     }
                     
-                    LogSuccess($"Successfully loaded {cookieArray.Length} cookies from file");
+                    LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from file");
                     return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Failed to load cookies: {ex.Message}");
-                LogDebug($"Exception type: {ex.GetType().Name}");
-                LogDebug($"Stack trace: {ex.StackTrace}");
                 return null!;
             }
         }
@@ -2446,40 +2431,34 @@ namespace AkademiTrack.ViewModels
                 var json = JsonSerializer.Serialize(cookies, new JsonSerializerOptions { WriteIndented = true });
                 
                 LogDebug($"Serialized {cookies.Length} cookies to JSON ({json.Length} characters)");
-                LogDebug($"Sample cookie names: {string.Join(", ", cookies.Take(3).Select(c => c.Name))}");
                 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    LogDebug("Saving to macOS Keychain...");
-                    await KeychainService.SaveToKeychain(json);
-                    LogSuccess("Cookies saved to macOS Keychain");
+                    LogDebug("Saving cookies to macOS Keychain...");
+                    await Services.KeychainService.SaveToKeychain("cookies", json);
+                    LogSuccess("✓ Cookies saved to Keychain");
                     
-                    // Verify the save by reading back
-                    LogDebug("Verifying Keychain save...");
-                    var verifyJson = await KeychainService.LoadFromKeychain();
-                    
-                    if (verifyJson == json)
+                    // Verify save
+                    var verify = await Services.KeychainService.LoadFromKeychain("cookies");
+                    if (verify == json)
                     {
-                        LogSuccess("✓ Keychain save verified successfully");
+                        LogSuccess("✓ Keychain save verified");
                     }
                     else
                     {
-                        LogError("⚠ Keychain verification failed - data mismatch");
-                        LogDebug($"Original length: {json.Length}, Retrieved length: {verifyJson?.Length ?? 0}");
+                        LogError("⚠ Keychain verification failed");
                     }
                 }
                 else
                 {
                     string cookiesPath = GetCookiesFilePath();
-                    LogDebug($"Saving to file: {cookiesPath}");
                     await File.WriteAllTextAsync(cookiesPath, json);
-                    LogSuccess($"Cookies saved to file: {cookiesPath}");
+                    LogSuccess($"✓ Cookies saved to file: {cookiesPath}");
                 }
             }
             catch (Exception ex)
             {
                 LogError($"Failed to save cookies: {ex.Message}");
-                LogDebug($"Exception details: {ex.GetType().Name} - {ex.StackTrace}");
                 throw;
             }
         }
@@ -2897,20 +2876,24 @@ namespace AkademiTrack.ViewModels
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    await KeychainService.DeleteFromKeychain();
-                    LogDebug("Cookies deleted from macOS Keychain");
+                    await Services.KeychainService.DeleteFromKeychain("cookies");
+                    LogDebug("✓ Cookies deleted from Keychain");
                 }
                 else
                 {
                     var path = GetCookiesFilePath();
-                    if (File.Exists(path)) File.Delete(path);
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                        LogDebug("✓ Cookie file deleted");
+                    }
                 }
             }
             catch (Exception ex)
             {
                 LogDebug($"Failed to delete cookies: {ex.Message}");
             }
-        }
+}
         private string GetUserParametersFilePath()
         {
             string appDataDir = Path.Combine(
@@ -3249,190 +3232,6 @@ namespace AkademiTrack.ViewModels
         public string? Name { get; set; }
         public string? Value { get; set; }
     }
-
-    public static class KeychainService
-    {
-        private const string SERVICE_NAME = "AkademiTrack";
-        private const string COOKIES_ACCOUNT = "cookies";
-
-        public static async Task SaveToKeychain(string data)
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                throw new PlatformNotSupportedException("Keychain is only available on macOS");
-            }
-
-            try
-            {
-                // Delete existing entry first
-                await DeleteFromKeychain();
-
-                // Escape the data properly for shell command
-                var escapedData = data.Replace("\"", "\\\"").Replace("$", "\\$").Replace("`", "\\`");
-                
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "/usr/bin/security",
-                        Arguments = $"add-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\" -w \"{escapedData}\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode != 0)
-                {
-                    throw new Exception($"Keychain save failed (exit code {process.ExitCode}): {error}");
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to save to macOS Keychain: {ex.Message}", ex);
-            }
-        }
-
-        public static async Task<string?> LoadFromKeychain()
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                throw new PlatformNotSupportedException("Keychain is only available on macOS");
-            }
-
-            try
-            {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "/usr/bin/security",
-                        Arguments = $"find-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\" -w",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0)
-                {
-                    var hexString = output.Trim().TrimEnd('\n', '\r', ' ');
-                    
-                    if (string.IsNullOrEmpty(hexString))
-                    {
-                        return null;
-                    }
-
-                    // Check if the output is hex-encoded (macOS keychain returns hex for -w flag)
-                    if (IsHexString(hexString))
-                    {
-                        // Decode hex string to UTF-8 text
-                        try
-                        {
-                            var bytes = new byte[hexString.Length / 2];
-                            for (int i = 0; i < bytes.Length; i++)
-                            {
-                                bytes[i] = Convert.ToByte(hexString.Substring(i * 2, 2), 16);
-                            }
-                            var decodedString = Encoding.UTF8.GetString(bytes);
-                            return decodedString;
-                        }
-                        catch (Exception hexEx)
-                        {
-                            throw new Exception($"Failed to decode hex string from keychain: {hexEx.Message}");
-                        }
-                    }
-                    
-                    // If not hex, return as-is
-                    return hexString;
-                }
-                
-                // Exit code 44 means item not found - this is expected
-                if (process.ExitCode == 44)
-                {
-                    return null;
-                }
-
-                // Other error codes
-                throw new Exception($"Keychain read failed (exit code {process.ExitCode}): {error}");
-            }
-            catch (Exception ex)
-            {
-                // Only log if it's not a "not found" error
-                if (!ex.Message.Contains("exit code 44"))
-                {
-                    System.Diagnostics.Debug.WriteLine($"Keychain load error: {ex.Message}");
-                }
-                return null;
-            }
-        }
-
-        private static bool IsHexString(string str)
-        {
-            // Check if string is valid hex (even length, only 0-9 a-f A-F characters)
-            if (string.IsNullOrEmpty(str) || str.Length % 2 != 0)
-            {
-                return false;
-            }
-
-            foreach (char c in str)
-            {
-                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static async Task DeleteFromKeychain()
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return;
-            }
-
-            try
-            {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "/usr/bin/security",
-                        Arguments = $"delete-generic-password -a \"{COOKIES_ACCOUNT}\" -s \"{SERVICE_NAME}\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-
-                process.Start();
-                await process.WaitForExitAsync();
-                
-                // Ignore exit code - item might not exist
-            }
-            catch
-            {
-                // Ignore all errors when deleting
-            }
-        }
-    }
-
-
 
     public class ScheduleResponse
     {
