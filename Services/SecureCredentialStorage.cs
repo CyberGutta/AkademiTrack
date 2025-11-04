@@ -430,10 +430,30 @@ namespace AkademiTrack.Services
             try
             {
                 if (!File.Exists(FallbackPath)) return null;
-                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath));
+
+                string jsonContent = File.ReadAllText(FallbackPath);
+
+                if (string.IsNullOrWhiteSpace(jsonContent))
+                    return null;
+
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                 if (dict == null || !dict.ContainsKey(key)) return null;
 
                 return Decrypt(Convert.FromBase64String(dict[key]));
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                Console.WriteLine($"❌ Corrupted credentials file. Backing up and creating fresh file.");
+                Console.WriteLine($"   Error: {ex.Message}");
+
+                if (File.Exists(FallbackPath))
+                {
+                    string backupPath = FallbackPath + ".corrupted." + DateTime.Now.Ticks;
+                    File.Move(FallbackPath, backupPath);
+                    Console.WriteLine($"   Old file backed up to: {backupPath}");
+                }
+
+                return null;
             }
             catch (Exception ex)
             {
