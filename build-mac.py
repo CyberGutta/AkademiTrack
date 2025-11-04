@@ -373,31 +373,62 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
 
     subprocess.run(["xattr", "-cr", str(bundle_dir)], check=False)
 
-    # Bundle helper app if it exists
+    # Bundle and sign helper app FIRST (before signing main app)
     helper_dest = macos_dir / "AkademiTrack.app"
     if HELPER_APP_SOURCE.exists():
+        print("\n📦 Bundling helper app (AkademiTrack.app)...")
         try:
+            # Copy helper app
+            if helper_dest.exists():
+                shutil.rmtree(helper_dest)
             shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
-            print("✅ AkademiTrack.app bundled")
+            print("✅ Helper app copied to bundle")
             
-            # Sign helper app if signing is enabled
+            # Set executable permissions on helper app
+            helper_executable = helper_dest / "Contents" / "MacOS" / "AkademiTrack"
+            if helper_executable.exists():
+                os.chmod(helper_executable, 0o755)
+                print("✅ Helper app executable permissions set")
+            
+            # Clear extended attributes from helper app
+            subprocess.run(["xattr", "-cr", str(helper_dest)], check=False)
+            
+            # Sign helper app FIRST (critical: sign nested apps before parent app)
             if sign:
-                sign_app(helper_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH)
+                print("\n🔐 Signing helper app (MUST be done before main app)...")
+                if not sign_app(helper_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=True):
+                    print("❌ Helper app signing failed - this will cause Gatekeeper issues!")
+                    print("⚠️  Continuing anyway, but app may not work on other Macs...")
+                else:
+                    print("✅ Helper app signed successfully")
         except Exception as e:
-            print(f"❌ Failed to bundle helper: {e}")
+            print(f"❌ Failed to bundle/sign helper app: {e}")
+            print("⚠️  Continuing without helper app...")
+    else:
+        print(f"⚠️  Helper app not found at: {HELPER_APP_SOURCE}")
+        print("    If you need authentication features, add the helper app to Assets/Helpers/")
 
-    # Sign the main app
+    # Sign the main app (AFTER helper app is signed)
+    # IMPORTANT: Do NOT use --deep here, as it will re-sign the helper app incorrectly
     if sign:
-        if not sign_app(bundle_dir, DEVELOPER_ID_APP, ENTITLEMENTS_PATH):
-            print("❌ Signing failed")
+        print("\n🔐 Signing main app bundle...")
+        # Sign without --deep since we already signed nested components
+        if not sign_app(bundle_dir, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=False):
+            print("❌ Main app signing failed")
             return False
+        print("✅ Main app signed successfully")
     
-    # Notarize the app
+    # Notarize the app (this covers both main and helper apps)
     if notarize and sign:
+        print("\n📝 Notarizing complete app bundle...")
         if not notarize_app(bundle_dir, BUNDLE_IDENTIFIER):
             print("⚠️  Notarization failed, but app is signed")
+            print("    The app will work but may show Gatekeeper warnings on first launch")
             # Continue anyway, app will work but show warning
 
+    print("\n✅ App bundle creation completed!")
+    print(f"📦 Bundle location: {bundle_dir}")
+    
     return bundle_dir
 
 def create_portable_zip(bundle_dir, version, notarize=True):
