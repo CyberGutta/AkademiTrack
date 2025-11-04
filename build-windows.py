@@ -143,7 +143,8 @@ def build_windows_release(version):
     ]
     
     print(f"Running: {' '.join(publish_cmd)}")
-    result = subprocess.run(publish_cmd, capture_output=True, text=True)
+    result = subprocess.run(publish_cmd, capture_output=True, text=True, 
+                           encoding='utf-8', errors='replace')
     if result.returncode != 0:
         print(f"❌ Publish failed: {result.stderr}")
         return False
@@ -164,7 +165,8 @@ def build_windows_release(version):
     ]
     
     print(f"Running: {' '.join(publish_single_cmd)}")
-    result = subprocess.run(publish_single_cmd, capture_output=True, text=True)
+    result = subprocess.run(publish_single_cmd, capture_output=True, text=True,
+                           encoding='utf-8', errors='replace')
     if result.returncode != 0:
         print(f"❌ Single-file publish failed: {result.stderr}")
         return False
@@ -208,7 +210,8 @@ def build_windows_release(version):
     
     # Check if vpk is installed
     try:
-        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True)
+        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True,
+                               encoding='utf-8', errors='replace')
         print(f"✅ Velopack found: {result.stdout.strip()}")
     except FileNotFoundError:
         print("❌ Velopack (vpk) not found!")
@@ -243,7 +246,8 @@ def build_windows_release(version):
         print(f"⚠️  Building without splash image")
     
     print(f"Running: {' '.join(vpk_cmd)}")
-    result = subprocess.run(vpk_cmd, capture_output=True, text=True)
+    result = subprocess.run(vpk_cmd, capture_output=True, text=True,
+                           encoding='utf-8', errors='replace')
     
     if result.returncode != 0:
         print(f"❌ VPK pack failed:")
@@ -449,4 +453,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         import traceback
-        traceback
+        traceback.print_exc()
