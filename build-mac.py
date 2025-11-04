@@ -6,13 +6,47 @@ import zipfile
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+import time
+
+# ============================================================================
+# CONFIGURATION - Update these values
+# ============================================================================
+
+# Code Signing Identities
+DEVELOPER_ID_APP = "Developer ID Application: Your Name (TEAM_ID)"
+DEVELOPER_ID_INSTALLER = "Developer ID Installer: Your Name (TEAM_ID)"
+
+# Apple Developer Credentials for Notarization
+APPLE_ID = "your-apple-id@example.com"
+TEAM_ID = "YOUR_TEAM_ID"  # Find at https://developer.apple.com/account
+APP_SPECIFIC_PASSWORD = "xxxx-xxxx-xxxx-xxxx"  # Generate at appleid.apple.com
+
+# App Details
+APP_NAME = "AkademiTrack"
+BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
+ICON_PATH = "./Assets/AT-1024.icns"
+ENTITLEMENTS_PATH = Path("./entitlements.plist")
+HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def run_command(cmd, description="", check=True):
+    """Run a command and handle errors"""
+    if description:
+        print(f"  {description}...")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if check and result.returncode != 0:
+        print(f"❌ Failed: {result.stderr}")
+        return False
+    return result
 
 def get_version_input():
     """Get version number from user or use current version from .csproj"""
     print("\n📦 Version Configuration")
     print("=" * 50)
 
-    # Try to read current version from .csproj
     current_version = get_current_version()
     if current_version:
         print(f"Current version in .csproj: {current_version}")
@@ -22,7 +56,6 @@ def get_version_input():
     if not version:
         version = current_version or "1.0.0"
 
-    # Validate version format
     if not re.match(r'^\d+\.\d+\.\d+$', version):
         print(f"⚠️  Invalid version format. Using default: 1.0.0")
         version = "1.0.0"
@@ -35,12 +68,10 @@ def get_current_version():
         tree = ET.parse("./AkademiTrack.csproj")
         root = tree.getroot()
 
-        # Look for Version element
         for prop_group in root.findall('.//PropertyGroup'):
             version_elem = prop_group.find('Version')
             if version_elem is not None and version_elem.text:
                 return version_elem.text.strip()
-
         return None
     except Exception as e:
         print(f"⚠️  Could not read version from .csproj: {e}")
@@ -51,10 +82,8 @@ def update_csproj_version(version):
     try:
         tree = ET.parse("./AkademiTrack.csproj")
         root = tree.getroot()
-
         version_updated = False
 
-        # Look for existing Version element
         for prop_group in root.findall('.//PropertyGroup'):
             version_elem = prop_group.find('Version')
             if version_elem is not None:
@@ -62,7 +91,6 @@ def update_csproj_version(version):
                 version_updated = True
                 break
 
-        # If no Version element exists, add it to first PropertyGroup
         if not version_updated:
             prop_groups = root.findall('.//PropertyGroup')
             if prop_groups:
@@ -77,100 +105,161 @@ def update_csproj_version(version):
         else:
             print(f"⚠️  Could not update version in .csproj")
             return False
-
     except Exception as e:
         print(f"❌ Failed to update .csproj: {e}")
         return False
 
-def create_vpk_package(version, build_dir):
-    """Create VPK package using Velopack"""
-    print("\n📦 Creating VPK Package")
-    print("=" * 50)
+# ============================================================================
+# CODE SIGNING FUNCTIONS
+# ============================================================================
 
-    publish_dir = Path("./publish-mac-arm")
-
-
-    # Check if vpk is installed (without --version flag)
-    try:
-        result = subprocess.run(["vpk"], capture_output=True, text=True)
-        print(f"✅ Velopack (vpk) found")
-    except FileNotFoundError:
-        print("❌ Velopack (vpk) not found!")
-        print("Install it with: dotnet tool install -g vpk")
+def sign_app(app_path, identity, entitlements_path=None, deep=True):
+    """Sign an application bundle"""
+    print(f"\n🔏 Signing {app_path.name}...")
+    
+    cmd = ["codesign", "--force", "--sign", identity, "--timestamp"]
+    
+    if deep:
+        cmd.append("--deep")
+    
+    cmd.extend([
+        "--options", "runtime",  # Hardened runtime required for notarization
+        "--verbose"
+    ])
+    
+    if entitlements_path and entitlements_path.exists():
+        cmd.extend(["--entitlements", str(entitlements_path)])
+    
+    cmd.append(str(app_path))
+    
+    result = run_command(cmd, f"Signing {app_path.name}", check=False)
+    
+    if result and result.returncode == 0:
+        print(f"✅ Signed: {app_path.name}")
+        # Verify signature
+        verify_result = run_command(
+            ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app_path)],
+            "Verifying signature",
+            check=False
+        )
+        if verify_result and verify_result.returncode == 0:
+            print(f"✅ Signature verified")
+            return True
+        else:
+            print(f"⚠️  Signature verification failed")
+            return False
+    else:
+        print(f"❌ Failed to sign {app_path.name}")
         return False
-    # Clean and create publish directory
-    if publish_dir.exists():
 
-        shutil.rmtree(publish_dir)
-    publish_dir.mkdir(parents=True)
-
-    print(f"📂 Publishing to {publish_dir}...")
-
-    # Publish the application
-
-    publish_cmd = [
-        "dotnet", "publish",
-        "-c", "Release",
-        "--self-contained",
-        "-r", "osx-arm64",
-        "-o", str(publish_dir)
+def sign_pkg(pkg_path, identity):
+    """Sign a .pkg installer"""
+    print(f"\n🔏 Signing installer package...")
+    
+    cmd = [
+        "productsign",
+        "--sign", identity,
+        "--timestamp",
+        str(pkg_path),
+        str(pkg_path.with_suffix('.signed.pkg'))
     ]
-    result = subprocess.run(publish_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"❌ Publish failed: {result.stderr}")
+    
+    result = run_command(cmd, f"Signing {pkg_path.name}", check=False)
+    
+    if result and result.returncode == 0:
+        # Replace unsigned with signed
+        shutil.move(str(pkg_path.with_suffix('.signed.pkg')), str(pkg_path))
+        print(f"✅ Signed: {pkg_path.name}")
+        
+        # Verify
+        verify_result = run_command(
+            ["pkgutil", "--check-signature", str(pkg_path)],
+            "Verifying package signature",
+            check=False
+        )
+        if verify_result:
+            print(verify_result.stdout)
+        return True
+    else:
+        print(f"❌ Failed to sign package")
         return False
-    print("✅ Published successfully")
 
-    # Create VPK package
-    print(f"📦 Creating VPK package (version {version})...")
+# ============================================================================
+# NOTARIZATION FUNCTIONS
+# ============================================================================
 
-    # Check if icon exists for VPK
-    icon_path = Path("./Assets/AT-1024.icns")
-
-    vpk_cmd = [
-        "vpk", "pack",
-        "--packId", "AkademiTrack",
-        "--packVersion", version,
-        "--packDir", str(publish_dir),
-        "--mainExe", "AkademiTrack",
-        "--icon", str(icon_path.absolute())
+def notarize_app(file_path, bundle_id):
+    """Submit app for notarization and wait for result"""
+    print(f"\n📝 Notarizing {file_path.name}...")
+    print("⏳ This may take 5-15 minutes...")
+    
+    # Create a temporary zip for notarization
+    zip_path = file_path.with_suffix('.zip')
+    
+    if file_path.suffix == '.app':
+        print("  Creating zip for notarization...")
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file in file_path.rglob('*'):
+                if file.is_file():
+                    arcname = file.relative_to(file_path.parent)
+                    zipf.write(file, arcname)
+        notarize_target = zip_path
+    else:
+        notarize_target = file_path
+    
+    # Submit for notarization
+    cmd = [
+        "xcrun", "notarytool", "submit",
+        str(notarize_target),
+        "--apple-id", APPLE_ID,
+        "--team-id", TEAM_ID,
+        "--password", APP_SPECIFIC_PASSWORD,
+        "--wait"
     ]
-
-    print(f"Running: {' '.join(vpk_cmd)}")
-    result = subprocess.run(vpk_cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        print(f"❌ VPK pack failed: {result.stderr}")
+    
+    print("  Submitting to Apple...")
+    result = run_command(cmd, check=False)
+    
+    # Clean up temporary zip
+    if file_path.suffix == '.app' and zip_path.exists():
+        zip_path.unlink()
+    
+    if result and result.returncode == 0:
+        print("✅ Notarization successful!")
+        
+        # Staple the notarization ticket
+        if file_path.suffix in ['.app', '.pkg']:
+            print("  Stapling notarization ticket...")
+            staple_cmd = ["xcrun", "stapler", "staple", str(file_path)]
+            staple_result = run_command(staple_cmd, check=False)
+            if staple_result and staple_result.returncode == 0:
+                print("✅ Notarization ticket stapled")
+            else:
+                print("⚠️  Failed to staple ticket (not critical)")
+        
+        return True
+    else:
+        print("❌ Notarization failed")
+        if result:
+            print(result.stdout)
+            print(result.stderr)
         return False
 
-    print("✅ VPK package created successfully")
-    if result.stdout:
-        print(result.stdout)
+# ============================================================================
+# BUILD FUNCTIONS
+# ============================================================================
 
-    return True
-
-import os, shutil, subprocess, zipfile
-from pathlib import Path
-
-def create_avalonia_macos_bundle(version):
+def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     """Create .app bundle for macOS"""
     PROJECT_PATH = "./AkademiTrack.csproj"
     BUILD_DIR = "./build"
-    APP_NAME = "AkademiTrack"
-    BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
-    ICON_PATH = "./Assets/AT-1024.icns"
-    HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
-    ENTITLEMENTS_PATH = Path("./entitlements.plist")
-    SIGNING_IDENTITY = "Apple Development: Andreas Nilsen (673WFZN2KZ)"
-
+    
     print("\n🏗️  Building AkademiTrack app for macOS Apple Silicon...")
     print("=" * 50)
 
     if not os.path.exists(ICON_PATH):
         print(f"❌ Icon file not found: {ICON_PATH}")
         return False
-    else:
-        print(f"✅ Icon file found: {ICON_PATH} ({Path(ICON_PATH).stat().st_size} bytes)")
 
     if os.path.exists(BUILD_DIR):
         print(f"🧹 Cleaning existing build directory: {BUILD_DIR}")
@@ -200,8 +289,6 @@ def create_avalonia_macos_bundle(version):
         executables = [f for f in build_path.iterdir() if f.is_file() and os.access(f, os.X_OK)]
         if executables:
             executable_path = executables[0]
-            APP_NAME = executable_path.name
-            print(f"✅ Found executable: {APP_NAME}")
         else:
             print("❌ No executables found!")
             return False
@@ -228,12 +315,7 @@ def create_avalonia_macos_bundle(version):
 
     icon_filename = "AppIcon.icns"
     icon_dest = resources_dir / icon_filename
-    try:
-        shutil.copy2(ICON_PATH, icon_dest)
-        print(f"✅ Added app icon: {icon_filename} ({icon_dest.stat().st_size} bytes)")
-    except Exception as e:
-        print(f"❌ Failed to copy icon: {e}")
-        return False
+    shutil.copy2(ICON_PATH, icon_dest)
 
     info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -288,70 +370,182 @@ def create_avalonia_macos_bundle(version):
 
     for lib in macos_dir.rglob("*.[ds]o"):
         os.chmod(lib, 0o755)
-    print("✅ Set permissions for native libraries")
 
-    try:
-        subprocess.run(["xattr", "-cr", str(bundle_dir)], check=True)
-        print("✅ Removed quarantine attributes")
-    except:
-        pass
+    subprocess.run(["xattr", "-cr", str(bundle_dir)], check=False)
 
-    try:
-        subprocess.run(["touch", str(bundle_dir)])
-        subprocess.run(["killall", "Finder"], stderr=subprocess.DEVNULL)
-        subprocess.run(["killall", "Dock"], stderr=subprocess.DEVNULL)
-        print("✅ Refreshed icon cache")
-    except:
-        pass
-
-    # ✅ Bundle AkademiTrackHelper.app
+    # Bundle helper app if it exists
     helper_dest = macos_dir / "AkademiTrack.app"
     if HELPER_APP_SOURCE.exists():
         try:
             shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
             print("✅ AkademiTrack.app bundled")
+            
+            # Sign helper app if signing is enabled
+            if sign:
+                sign_app(helper_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH)
         except Exception as e:
             print(f"❌ Failed to bundle helper: {e}")
+
+    # Sign the main app
+    if sign:
+        if not sign_app(bundle_dir, DEVELOPER_ID_APP, ENTITLEMENTS_PATH):
+            print("❌ Signing failed")
             return False
-    else:
-        print("⚠️ AkademiTrack not found")
+    
+    # Notarize the app
+    if notarize and sign:
+        if not notarize_app(bundle_dir, BUNDLE_IDENTIFIER):
+            print("⚠️  Notarization failed, but app is signed")
+            # Continue anyway, app will work but show warning
 
-    # ✅ Sign both apps
-    def sign_app(app_path, identity, entitlements_path=None):
-        cmd = ["codesign", "--force", "--deep", "--sign", identity]
-        if entitlements_path and entitlements_path.exists():
-            cmd += ["--entitlements", str(entitlements_path)]
-        cmd.append(str(app_path))
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"✅ Signed: {app_path.name}")
-        else:
-            print(f"❌ Failed to sign {app_path.name}: {result.stderr}")
+    return bundle_dir
 
-    sign_app(bundle_dir, SIGNING_IDENTITY, ENTITLEMENTS_PATH)
-    sign_app(helper_dest, SIGNING_IDENTITY, ENTITLEMENTS_PATH)
-
-    zip_path = Path(f"AkademiTrack-macOS-v{version}.zip").absolute()
+def create_portable_zip(bundle_dir, version, notarize=True):
+    """Create portable zip distribution"""
+    print("\n📦 Creating portable zip...")
+    print("=" * 50)
+    
+    zip_path = Path(f"AkademiTrack-osx-Portable.zip").absolute()
     if zip_path.exists():
         zip_path.unlink()
 
-    print("📦 Creating zip archive...")
     try:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in bundle_dir.rglob('*'):
                 if file_path.is_file():
-                    arc_name = file_path.relative_to(build_path)
+                    arc_name = file_path.relative_to(bundle_dir.parent)
                     zipf.write(file_path, arc_name)
-        print(f"✅ Zip archive created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        
+        print(f"✅ Portable zip created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        
+        # Notarize the zip
+        if notarize:
+            notarize_app(zip_path, BUNDLE_IDENTIFIER)
+        
+        return zip_path
     except Exception as e:
         print(f"❌ Failed to create zip: {e}")
+        return None
+
+def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
+    """Create .pkg installer"""
+    print("\n📦 Creating installer package...")
+    print("=" * 50)
+    
+    pkg_path = Path(f"AkademiTrack-osx-Setup.pkg").absolute()
+    
+    # Create pkg using pkgbuild
+    cmd = [
+        "pkgbuild",
+        "--root", str(bundle_dir.parent),
+        "--identifier", BUNDLE_IDENTIFIER,
+        "--version", version,
+        "--install-location", "/Applications",
+        str(pkg_path)
+    ]
+    
+    result = run_command(cmd, "Building package", check=False)
+    
+    if not result or result.returncode != 0:
+        print("❌ Failed to create package")
+        return None
+    
+    print(f"✅ Package created: {pkg_path.name} ({pkg_path.stat().st_size / 1024 / 1024:.1f} MB)")
+    
+    # Sign the package
+    if sign:
+        if not sign_pkg(pkg_path, DEVELOPER_ID_INSTALLER):
+            print("⚠️  Package signing failed")
+            return pkg_path
+    
+    # Notarize the package
+    if notarize and sign:
+        notarize_app(pkg_path, BUNDLE_IDENTIFIER)
+    
+    return pkg_path
+
+def create_velopack_package(version):
+    """Create VPK package using Velopack"""
+    print("\n📦 Creating VPK Package (NuGet)")
+    print("=" * 50)
+
+    publish_dir = Path("./publish-mac-arm")
+
+    try:
+        subprocess.run(["vpk"], capture_output=True, text=True)
+        print(f"✅ Velopack (vpk) found")
+    except FileNotFoundError:
+        print("❌ Velopack (vpk) not found!")
+        print("Install it with: dotnet tool install -g vpk")
         return False
 
+    if publish_dir.exists():
+        shutil.rmtree(publish_dir)
+    publish_dir.mkdir(parents=True)
+
+    print(f"📂 Publishing to {publish_dir}...")
+
+    publish_cmd = [
+        "dotnet", "publish",
+        "-c", "Release",
+        "--self-contained",
+        "-r", "osx-arm64",
+        "-o", str(publish_dir)
+    ]
+    result = subprocess.run(publish_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"❌ Publish failed: {result.stderr}")
+        return False
+    print("✅ Published successfully")
+
+    print(f"📦 Creating VPK package (version {version})...")
+
+    icon_path = Path(ICON_PATH)
+
+    vpk_cmd = [
+        "vpk", "pack",
+        "--packId", "AkademiTrack",
+        "--packVersion", version,
+        "--packDir", str(publish_dir),
+        "--mainExe", APP_NAME,
+        "--icon", str(icon_path.absolute())
+    ]
+
+    result = subprocess.run(vpk_cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print(f"❌ VPK pack failed: {result.stderr}")
+        return False
+
+    print("✅ VPK package created successfully")
+    
+    # Rename to match your naming convention
+    nupkg_file = list(Path(".").glob("AkademiTrack.*.nupkg"))
+    if nupkg_file:
+        new_name = f"AkademiTrack-{version}-osx-full.nupkg"
+        shutil.move(str(nupkg_file[0]), new_name)
+        print(f"✅ Renamed to: {new_name}")
+    
     return True
 
+# ============================================================================
+# MAIN FUNCTION
+# ============================================================================
+
 def main():
-    print("🚀 AkademiTrack Build & Package Tool")
+    print("🚀 AkademiTrack Build, Sign & Notarize Tool")
     print("=" * 50)
+
+    # Verify configuration
+    print("\n🔍 Checking configuration...")
+    if "Your Name" in DEVELOPER_ID_APP or "your-apple-id" in APPLE_ID:
+        print("❌ Please update the configuration at the top of this script!")
+        print("   - DEVELOPER_ID_APP")
+        print("   - DEVELOPER_ID_INSTALLER")
+        print("   - APPLE_ID")
+        print("   - TEAM_ID")
+        print("   - APP_SPECIFIC_PASSWORD")
+        return
 
     # Get version number
     version = get_version_input()
@@ -362,52 +556,72 @@ def main():
     if update_proj != 'n':
         update_csproj_version(version)
 
-    # Ask what to build
-    print("\n🔧 Build Options:")
-    print("1. Create .app bundle only")
-    print("2. Create VPK package only")
-    print("3. Create both")
+    # Ask about signing and notarization
+    print("\n🔐 Signing & Notarization Options:")
+    sign_choice = input("Sign applications? (y/n) [y]: ").strip().lower()
+    do_sign = sign_choice != 'n'
     
-    choice = input("\nSelect option (1/2/3) [3]: ").strip()
-    if not choice:
-        choice = "3"
+    do_notarize = False
+    if do_sign:
+        notarize_choice = input("Notarize applications? (y/n) [y]: ").strip().lower()
+        do_notarize = notarize_choice != 'n'
+
+    # Build the app
+    print("\n" + "=" * 50)
+    bundle_dir = create_avalonia_macos_bundle(version, sign=do_sign, notarize=do_notarize)
+    if not bundle_dir:
+        print("❌ App bundle creation failed")
+        return
+
+    # Ask what distributions to create
+    print("\n📦 Distribution Options:")
+    print("1. Portable ZIP")
+    print("2. Installer PKG")
+    print("3. VPK Package (NuGet)")
+    print("4. All of the above")
+    
+    dist_choice = input("\nSelect option (1/2/3/4) [4]: ").strip()
+    if not dist_choice:
+        dist_choice = "4"
     
     success = True
     
-    if choice in ["1", "3"]:
-        print("\n" + "=" * 50)
-        success = create_avalonia_macos_bundle(version)
-        if not success:
-            print("❌ .app bundle creation failed")
-            return
-
-    if choice in ["2", "3"]:
-        print("\n" + "=" * 50)
-        vpk_success = create_vpk_package(version, "./build")
-        if not vpk_success:
-            print("❌ VPK package creation failed")
-            success = False
+    if dist_choice in ["1", "4"]:
+        create_portable_zip(bundle_dir, version, notarize=do_notarize)
     
-    if success:
-        print("\n" + "=" * 50)
-        print("🎉 Build completed successfully!")
-        print(f"📦 Version: {version}")
-
-        if choice in ["1", "3"]:
-            print(f"✅ .app bundle: ./build/AkademiTrack.app")
-            print(f"✅ Zip file: AkademiTrack-macOS-v{version}.zip")
-
-        if choice in ["2", "3"]:
-            print(f"✅ VPK package: ./publish-mac-arm/")
-        print("\n📋 Next steps:")
-        print("  • Test the .app by opening it from ./build/")
-        print("  • Distribute the zip file to users")
-        print("  • Use VPK for auto-updates")
-        print("  • Right-click → Open if blocked by Gatekeeper")
-        print("\n💡 Icon troubleshooting:")
-        print("  • If icon doesn't show, restart Finder: killall Finder")
-        print("  • Clear icon cache: rm ~/Library/Caches/com.apple.iconservices.store")
-        print("  • Verify icon file: ls -lh ./build/AkademiTrack.app/Contents/Resources/")
+    if dist_choice in ["2", "4"]:
+        create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
+    
+    if dist_choice in ["3", "4"]:
+        create_velopack_package(version)
+    
+    # Final summary
+    print("\n" + "=" * 50)
+    print("🎉 Build completed successfully!")
+    print(f"📦 Version: {version}")
+    print("\n📋 Files created:")
+    print(f"  ✅ .app bundle: ./build/{APP_NAME}.app")
+    
+    if dist_choice in ["1", "4"]:
+        print(f"  ✅ Portable ZIP: AkademiTrack-osx-Portable.zip")
+    if dist_choice in ["2", "4"]:
+        print(f"  ✅ Installer PKG: AkademiTrack-osx-Setup.pkg")
+    if dist_choice in ["3", "4"]:
+        print(f"  ✅ VPK Package: AkademiTrack-{version}-osx-full.nupkg")
+    
+    if do_sign:
+        print("\n✅ All files signed with Developer ID")
+    if do_notarize:
+        print("✅ All files notarized by Apple")
+    
+    print("\n📋 Next steps:")
+    print("  • Test the .app by opening it")
+    print("  • Test the .pkg installer")
+    print("  • Distribute the files to users")
+    if do_notarize:
+        print("  • No Gatekeeper warnings will appear!")
+    else:
+        print("  • Users may need to right-click → Open (Gatekeeper)")
 
 if __name__ == "__main__":
     try:
@@ -417,3 +631,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         import traceback
+        traceback.print_exc()
