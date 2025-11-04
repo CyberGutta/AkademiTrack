@@ -21,12 +21,12 @@
 	<ItemGroup>
 	  <Content Include="Assets\AT-Transparrent72.ico" />
 	</ItemGroup>
-	<ItemGroup>
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
   <Content Include="Assets/Helpers/AkademiAuth">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
 	</ItemGroup>
-	<ItemGroup>
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
 		<Content Include="Assets/Helpers/WinHelloAuth.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
