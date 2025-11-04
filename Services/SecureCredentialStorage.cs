@@ -8,10 +8,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-#if WINDOWS
-using Microsoft.Win32;
-using System.Security.Cryptography;
-#endif
 
 namespace AkademiTrack.Services
 {
@@ -379,7 +375,6 @@ namespace AkademiTrack.Services
             byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
             byte[] encrypted = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
 
-            // Combine IV + encrypted data
             byte[] result = new byte[aes.IV.Length + encrypted.Length];
             Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
             Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);

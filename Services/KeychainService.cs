@@ -1,4 +1,3 @@
-// Services/KeychainService.cs
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -16,7 +15,7 @@ namespace AkademiTrack.Services
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 throw new PlatformNotSupportedException("Keychain is only available on macOS");
 
-            await DeleteFromKeychain(key); // Unngå duplikat
+            await DeleteFromKeychain(key);
 
             var process = new Process
             {
@@ -66,7 +65,6 @@ namespace AkademiTrack.Services
             {
                 var trimmed = output.Trim();
                 
-                // ONLY FIX: Check if it's hex (for cookies JSON) and decode it
                 if (key == "cookies" && IsHexString(trimmed))
                 {
                     try
@@ -75,12 +73,10 @@ namespace AkademiTrack.Services
                     }
                     catch
                     {
-                        // If hex decode fails, return as-is
                         return trimmed;
                     }
                 }
                 
-                // For credentials (email, password, school), return as-is
                 return trimmed;
             }
 
@@ -110,7 +106,6 @@ namespace AkademiTrack.Services
 
             process.Start();
             await process.WaitForExitAsync();
-            // Ignorer feil hvis ikke finnes
         }
 
         private static string Escape(string input)
@@ -127,7 +122,6 @@ namespace AkademiTrack.Services
             if (string.IsNullOrEmpty(input) || input.Length < 10)
                 return false;
 
-            // Check if all characters are hex digits
             foreach (char c in input)
             {
                 if (!Uri.IsHexDigit(c))

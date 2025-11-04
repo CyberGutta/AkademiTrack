@@ -664,38 +664,6 @@ namespace AkademiTrack.ViewModels
             return Path.Combine(appDataDir, "processed_notifications.json");
         }
 
-        private async Task LoadProcessedNotificationIdsAsync()
-        {
-            try
-            {
-                var filePath = GetProcessedNotificationsFilePath();
-                if (File.Exists(filePath))
-                {
-                    var json = await File.ReadAllTextAsync(filePath);
-                    var ids = JsonSerializer.Deserialize<string[]>(json);
-                    if (ids != null)
-                    {
-                        _processedNotificationIds = new HashSet<string>(ids);
-                    }
-                }
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        private async Task SaveProcessedNotificationIdsAsync()
-        {
-            try
-            {
-                var filePath = GetProcessedNotificationsFilePath();
-                var json = JsonSerializer.Serialize(_processedNotificationIds.ToArray());
-                await File.WriteAllTextAsync(filePath, json);
-            }
-            catch (Exception)
-            {
-            }
-        }
 
         public class EnhancedAdminNotification
         {
@@ -819,294 +787,7 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
 
-
-        private void ShowNotification(string title, string message, string level = "INFO")
-        {
-            var allowedNotifications = new[]
-            {
-        "Automatisering startet",
-        "Automatisering stoppet",
-        "Registrering vellykket",
-        "Alle Studietimer Registrert",
-        "Ingen STUDIE-økter funnet for i dag",
-        "Ingen Flere Økter",
-        "Ingen gyldige STU-økter",
-        "FEIL: Ikke Tilkoblet Skolens Nettverk",
-        "Koble til Skolens Nettverk",
-        "Manuell pålogging kreves"
-    };
-
-            bool isAdminNotification = title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN[");
-
-            if (allowedNotifications.Contains(title) || isAdminNotification)
-            {
-                LogDebug($"Showing native notification: {title}");
-
-                // Clean admin prefix from title for native notifications
-                string cleanTitle = title;
-                if (title.StartsWith("[ADMIN]"))
-                {
-                    cleanTitle = "🔔 ADMIN: " + title.Substring(7);
-                }
-                else if (title.StartsWith("[ADMIN["))
-                {
-                    var endIndex = title.IndexOf(']', 7);
-                    if (endIndex > 0)
-                    {
-                        cleanTitle = "🔔 ADMIN: " + title.Substring(7, endIndex - 7);
-                    }
-                }
-
-                // Show native notification
-                NativeNotificationService.Show(cleanTitle, message, level);
-            }
-            else
-            {
-                LogDebug($"Notification filtered out: {title}");
-            }
-        }
-
-        private bool DetermineNotificationPriority(string title, string level)
-        {
-            if (level == "ERROR" || title.Contains("FEIL:"))
-                return true;
-
-            if (title == "Registrering vellykket")
-                return true;
-
-            if (title.StartsWith("[ADMIN]") || title.StartsWith("[ADMIN["))
-                return true;
-
-            if (title.Contains("Nettverk") || title.Contains("WiFi"))
-                return true;
-
-            if (title == "Ingen Flere Økter" || title.Contains("Alle Studietimer"))
-                return true;
-
-            return false;
-        }
-
-        private Task QueueNotificationAsync(string title, string message, string level,
-    string? imageUrl = null, string? customColor = null, bool isHighPriority = false)
-        {
-            var queueItem = new NotificationQueueItem
-            {
-                Title = title,
-                Message = message,
-                Level = level,
-                ImageUrl = imageUrl ?? "",
-                CustomColor = customColor ?? "",
-                IsHighPriority = isHighPriority
-            };
-
-            lock (_queueLock)
-            {
-                if (isHighPriority)
-                {
-                    var tempList = _notificationQueue.ToList();
-                    _notificationQueue.Clear();
-                    _notificationQueue.Enqueue(queueItem);
-
-                    foreach (var item in tempList)
-                    {
-                        _notificationQueue.Enqueue(item);
-                    }
-
-                    LogDebug($"HIGH PRIORITY notification queued: {title} (Queue size: {_notificationQueue.Count})");
-                }
-                else
-                {
-                    _notificationQueue.Enqueue(queueItem);
-                    LogDebug($"Notification queued: {title} (Queue size: {_notificationQueue.Count})");
-                }
-            }
-
-            if (!_isProcessingQueue)
-            {
-                _ = Task.Run(ProcessNotificationQueueAsync);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        private async Task ProcessNotificationQueueAsync()
-        {
-            if (!await _notificationSemaphore.WaitAsync(100))
-            {
-                LogDebug("Notification processor already running - skipping");
-                return;
-            }
-
-            try
-            {
-                _isProcessingQueue = true;
-                LogDebug("Started notification queue processing");
-
-                while (true)
-                {
-                    NotificationQueueItem nextNotification = null!;
-
-                    lock (_queueLock)
-                    {
-                        if (_notificationQueue.Count == 0)
-                        {
-                            LogDebug("Queue empty - stopping processor");
-                            break;
-                        }
-
-                        nextNotification = _notificationQueue.Dequeue();
-                    }
-
-                    LogDebug($"Processing notification: {nextNotification.Title} (Remaining: {_notificationQueue.Count})");
-
-                    try
-                    {
-                        await ShowNotificationWithTimeoutAsync(nextNotification);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to show notification '{nextNotification.Title}': {ex.Message}");
-                    }
-
-                    await Task.Delay(300);
-                }
-            }
-            finally
-            {
-                _isProcessingQueue = false;
-                _notificationSemaphore.Release();
-                LogDebug("Notification queue processing completed");
-            }
-        }
-
-        private async Task ShowNotificationWithTimeoutAsync(NotificationQueueItem item)
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-
-            try
-            {
-                if (Dispatcher.UIThread.CheckAccess())
-                {
-                    await CreateAndShowNotificationAsync(item, cts.Token);
-                }
-                else
-                {
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await CreateAndShowNotificationAsync(item, cts.Token);
-                    });
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                LogDebug($"Notification '{item.Title}' timed out - continuing with next");
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to show notification '{item.Title}': {ex.Message}");
-
-                LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-            }
-        }
-
-        private Task CreateAndShowNotificationAsync(NotificationQueueItem item, CancellationToken cancellationToken)
-        {
-            try
-            {
-                CleanupOldWindows();
-                LogDebug($"Creating notification window: {item.Title}");
-
-                NotificationOverlayWindow overlayWindow;
-                try
-                {
-                    overlayWindow = new NotificationOverlayWindow(
-                        item.Title!,
-                        item.Message!,
-                        item.Level!,
-                        item.ImageUrl!,
-                        item.CustomColor!
-                    );
-                }
-                catch (Exception createEx)
-                {
-                    LogError($"Failed to create notification window: {createEx.Message}");
-                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                    return Task.CompletedTask;
-                }
-
-                var windowClosed = false;
-                overlayWindow.Closed += (s, e) =>
-                {
-                    if (!windowClosed)
-                    {
-                        windowClosed = true;
-                        RemoveFromActiveWindows(overlayWindow);
-                        LogDebug($"Notification closed: {item.Title}");
-                    }
-                };
-
-                AddToActiveWindows(overlayWindow);
-
-                try
-                {
-                    overlayWindow.Show();
-                    LogDebug($"✓ Notification shown successfully: {item.Title}");
-                }
-                catch (Exception showEx)
-                {
-                    LogError($"Failed to show notification window: {showEx.Message}");
-                    RemoveFromActiveWindows(overlayWindow);
-                    LogInfo($"NOTIFICATION (fallback): {item.Title} - {item.Message}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Complete failure in notification display: {ex.Message}");
-                LogInfo($"NOTIFICATION (emergency fallback): {item.Title} - {item.Message}");
-            }
-
-            return Task.CompletedTask;
-        }
-
-        private void AddToActiveWindows(NotificationOverlayWindow window)
-        {
-            lock (_activeOverlayWindowsLock)
-            {
-                _activeOverlayWindows.Add(window);
-                LogDebug($"Added window to tracking. Total active: {_activeOverlayWindows.Count}");
-            }
-        }
-
-        private void RemoveFromActiveWindows(NotificationOverlayWindow window)
-        {
-            lock (_activeOverlayWindowsLock)
-            {
-                _activeOverlayWindows.Remove(window);
-                LogDebug($"Removed window from tracking. Total active: {_activeOverlayWindows.Count}");
-            }
-        }
-
-        private void CleanupOldWindows()
-        {
-            lock (_activeOverlayWindowsLock)
-            {
-                for (int i = _activeOverlayWindows.Count - 1; i >= 0; i--)
-                {
-                    var w = _activeOverlayWindows[i];
-                    if (!w.IsVisible)
-                    {
-                        try { w.Close(); } catch { }
-                        _activeOverlayWindows.RemoveAt(i);
-                    }
-                }
-            }
-        }
-
-
-        private void ShowSystemOverlayNotification(string title, string message, string level, string? imageUrl = null, string? customColor = null)
-        {
-            NativeNotificationService.Show(title, message, level);
-        }
+        
         private Task DismissCurrentNotificationAsync()
         {
             CurrentNotification = null!;
@@ -1604,8 +1285,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
-
         private async Task<bool> TestCookiesAsync(Dictionary<string, string> cookies)
         {
             try
@@ -2066,7 +1745,6 @@ namespace AkademiTrack.ViewModels
                         }
                         finally
                         {
-                            // Clear the temporary plaintext password immediately
                             passwordPlain = null;
                         }
 
@@ -2458,7 +2136,6 @@ namespace AkademiTrack.ViewModels
                     await Services.KeychainService.SaveToKeychain("cookies", json);
                     LogSuccess("✓ Cookies saved to Keychain");
 
-                    // Verify save
                     var verify = await Services.KeychainService.LoadFromKeychain("cookies");
                     if (verify == json)
                     {
@@ -2889,7 +2566,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // MainWindowViewModel.cs - REPLACE DeleteCookiesAsync
         private async Task DeleteCookiesAsync()
         {
             try

@@ -379,7 +379,7 @@ Terminal=false
             }
             catch
             {
-                return defaultSettings;   // corrupt file → use defaults, will be overwritten later
+                return defaultSettings;  
             }
         }
 
@@ -961,8 +961,6 @@ Terminal=false
         {
             await ShowConfirmationDialog(title, message, true);
         }
-
-
 
 
         public async Task CheckForUpdatesAsync()

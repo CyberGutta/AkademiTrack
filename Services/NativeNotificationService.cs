@@ -76,7 +76,6 @@ namespace AkademiTrack.Services
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
-                    //Console.WriteLine("✅ Launched AkademiTrackHelper for native macOS notification");
                 }
             }
             catch (Exception ex)
@@ -153,7 +152,6 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
         {
             try
             {
-                // Use notify-send (standard on most Linux distros)
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "/usr/bin/notify-send",
@@ -175,7 +173,6 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
             {
                 Console.WriteLine($"Linux notification failed: {ex.Message}");
 
-                // Fallback: Try OsNotifications
                 try
                 {
                     OsNotifications.Notifications.ShowNotification(title, message);

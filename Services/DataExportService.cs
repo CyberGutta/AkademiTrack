@@ -14,7 +14,6 @@ namespace AkademiTrack.Services
     {
         public static async Task<ExportData> CollectAllDataAsync(string userEmail, string appVersion)
         {
-            //Debug.WriteLine("=== COLLECTING LOCAL USER DATA ===");
 
             var exportData = new ExportData
             {
@@ -28,8 +27,6 @@ namespace AkademiTrack.Services
                 Local = await CollectLocalDataAsync(),
             };
 
-            //Debug.WriteLine($"✓ Local data collection complete. Files: {exportData.Local.Files.Count}");
-
             return exportData;
         }
 
@@ -40,7 +37,6 @@ namespace AkademiTrack.Services
                 "AkademiTrack"
             );
 
-            //Debug.WriteLine($"Scanning local directory: {appDataDir}");
 
             var localData = new LocalData
             {
@@ -73,7 +69,6 @@ namespace AkademiTrack.Services
                             };
                         }
                     }
-                    //Debug.WriteLine($"✓ Settings collected: {localData.Settings.Count} items");
                 }
                 catch (Exception ex)
                 {
@@ -89,7 +84,6 @@ namespace AkademiTrack.Services
             if (localData.Settings.ContainsKey("EncryptedSchoolName"))
                 localData.Credentials["HasSchoolName"] = (!string.IsNullOrEmpty(localData.Settings["EncryptedSchoolName"]?.ToString())).ToString();
 
-            //Debug.WriteLine("✓ Credential metadata collected");
 
             if (Directory.Exists(appDataDir))
             {
@@ -120,7 +114,6 @@ namespace AkademiTrack.Services
                                 content = SanitizeSensitiveData(content, fileInfo.Name);
 
                                 localData.FileContents[relativePath] = content;
-                                //Debug.WriteLine($"✓ Read and sanitized content from: {fileInfo.Name}");
                             }
                         }
                         catch (Exception contentEx)
@@ -134,8 +127,6 @@ namespace AkademiTrack.Services
                         Debug.WriteLine($"⚠️ Could not process file {file}: {ex.Message}");
                     }
                 }
-                //Debug.WriteLine($"✓ File information collected: {localData.Files.Count} files");
-                //Debug.WriteLine($"✓ File contents collected: {localData.FileContents.Count} files");
             }
 
             return localData;
@@ -242,7 +233,6 @@ namespace AkademiTrack.Services
             });
 
             await File.WriteAllTextAsync(filepath, json);
-            //Debug.WriteLine($"✓ JSON export saved to: {filepath}");
 
             return filepath;
         }
@@ -294,7 +284,6 @@ namespace AkademiTrack.Services
             csv.AppendLine();
 
             await File.WriteAllTextAsync(filepath, csv.ToString());
-            //Debug.WriteLine($"✓ CSV export saved to: {filepath}");
 
             return filepath;
         }
