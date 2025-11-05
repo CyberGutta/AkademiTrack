@@ -13,13 +13,13 @@ import time
 # ============================================================================
 
 # Code Signing Identities
-DEVELOPER_ID_APP = "Developer ID Application: Your Name (TEAM_ID)"
-DEVELOPER_ID_INSTALLER = "Developer ID Installer: Your Name (TEAM_ID)"
+DEVELOPER_ID_APP = "sdf"
+DEVELOPER_ID_INSTALLER = "sdf"
 
 # Apple Developer Credentials for Notarization
-APPLE_ID = "your-email@gmail.com"
-TEAM_ID = "YOUR_TEAM_ID"  # Find at https://developer.apple.com/account
-APP_SPECIFIC_PASSWORD = "xxxx-xxxx-xxxx-xxxx"  # Generate at appleid.apple.com
+APPLE_ID = "sdfsdf@gmail.com"
+TEAM_ID = "sdfsdf"  # Find at https://developer.apple.com/account
+APP_SPECIFIC_PASSWORD = "sdf-sdf-sdf-sdf"  # Generate at appleid.apple.com
 
 # App Details
 APP_NAME = "AkademiTrack"
@@ -412,9 +412,11 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
         "--runtime", "osx-arm64",
         "--self-contained", "true",
         "--output", BUILD_DIR,
-        "-p:IncludeNativeLibrariesForSelfExtract=true",
         "-p:PublishTrimmed=false",
-        "-p:PublishSingleFile=false"
+        "-p:PublishSingleFile=false",
+        "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:CopyOutputSymbolsToPublishDirectory=true",
+        "-p:IncludeAllContentForSelfExtract=true"
     ]
 
     print(f"🔨 Building...")
@@ -458,6 +460,13 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     icon_filename = "AppIcon.icns"
     icon_dest = resources_dir / icon_filename
     shutil.copy2(ICON_PATH, icon_dest)
+
+    if ENTITLEMENTS_PATH.exists():
+        entitlements_dest = resources_dir / "entitlements.plist"
+        shutil.copy2(ENTITLEMENTS_PATH, entitlements_dest)
+        print(f"✅ Copied entitlements.plist to bundle")
+    else:
+        print(f"⚠️  Entitlements file not found at {ENTITLEMENTS_PATH}")
 
     # Create Info.plist
     info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
