@@ -13,13 +13,13 @@ import time
 # ============================================================================
 
 # Code Signing Identities
-DEVELOPER_ID_APP = "Developer ID Application: yapp)"
-DEVELOPER_ID_INSTALLER = "Developer ID Installer:asdasda)"
+DEVELOPER_ID_APP = "Developer ID Application: Your Name (TEAM_ID)"
+DEVELOPER_ID_INSTALLER = "Developer ID Installer: Your Name (TEAM_ID)"
 
 # Apple Developer Credentials for Notarization
-APPLE_ID = "asdasdsa@gmail.com"
-TEAM_ID = "asdasd"  # Find at https://developer.apple.com/account
-APP_SPECIFIC_PASSWORD = "asd-as-asd-asd"  # Generate at appleid.apple.com
+APPLE_ID = "your-email@gmail.com"
+TEAM_ID = "YOUR_TEAM_ID"  # Find at https://developer.apple.com/account
+APP_SPECIFIC_PASSWORD = "xxxx-xxxx-xxxx-xxxx"  # Generate at appleid.apple.com
 
 # App Details
 APP_NAME = "AkademiTrack"
@@ -32,14 +32,18 @@ HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
 # HELPER FUNCTIONS
 # ============================================================================
 
-def run_command(cmd, description="", check=True):
+def run_command(cmd, description="", check=True, show_output=False):
     """Run a command and handle errors"""
     if description:
         print(f"  {description}...")
     result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if show_output and result.stdout:
+        print(result.stdout)
+    
     if check and result.returncode != 0:
         print(f"❌ Failed: {result.stderr}")
-        return False
+        return None
     return result
 
 def get_version_input():
@@ -110,37 +114,95 @@ def update_csproj_version(version):
         return False
 
 # ============================================================================
-# CODE SIGNING FUNCTIONS
+# CODE SIGNING FUNCTIONS - IMPROVED
 # ============================================================================
 
-def sign_dylibs(app_path, identity):
-    """Sign all .dylib files inside an app bundle"""
-    macos_dir = Path(app_path) / "Contents" / "MacOS"
-    for dylib in macos_dir.glob("*.dylib"):
-        print(f"🔏 Signing {dylib.name}...")
-        cmd = [
-            "codesign", "--force", "--sign", identity,
-            "--timestamp", "--options", "runtime",
-            "--verbose", str(dylib)
-        ]
-        result = run_command(cmd, f"Signing {dylib.name}", check=False)
-        if result and result.returncode == 0:
-            print(f"✅ Signed: {dylib.name}")
-        else:
-            print(f"❌ Failed to sign {dylib.name}")
+def sign_file(file_path, identity, entitlements_path=None):
+    """Sign a single file (dylib, executable, etc.)"""
+    cmd = [
+        "codesign", "--force", "--sign", identity,
+        "--timestamp", "--options", "runtime",
+        "--verbose"
+    ]
+    
+    if entitlements_path and entitlements_path.exists():
+        cmd.extend(["--entitlements", str(entitlements_path)])
+    
+    cmd.append(str(file_path))
+    
+    result = run_command(cmd, check=False)
+    return result and result.returncode == 0
 
+def sign_all_binaries_in_app(app_path, identity, entitlements_path=None):
+    """Sign all binaries inside an app bundle in the correct order (inside-out)"""
+    print(f"\n🔏 Signing all binaries in {app_path.name}...")
+    
+    # Remove quarantine attributes first
+    subprocess.run(["xattr", "-cr", str(app_path)], check=False)
+    
+    macos_dir = Path(app_path) / "Contents" / "MacOS"
+    
+    # Collect all files that need signing
+    files_to_sign = []
+    
+    # 1. First, sign all .dylib files (deepest first)
+    dylibs = sorted(macos_dir.rglob("*.dylib"), key=lambda x: len(x.parts), reverse=True)
+    files_to_sign.extend(dylibs)
+    
+    # 2. Then sign any nested .app bundles
+    nested_apps = sorted(macos_dir.rglob("*.app"), key=lambda x: len(x.parts), reverse=True)
+    
+    # 3. Sign executables (but not the main one yet)
+    main_executable = macos_dir / APP_NAME
+    executables = []
+    for file in macos_dir.rglob("*"):
+        if file.is_file() and os.access(file, os.X_OK):
+            if file != main_executable and not file.name.endswith('.dylib'):
+                executables.append(file)
+    files_to_sign.extend(sorted(executables, key=lambda x: len(x.parts), reverse=True))
+    
+    # Sign all collected files
+    signed_count = 0
+    failed_count = 0
+    
+    for file_path in files_to_sign:
+        print(f"  🔏 Signing: {file_path.relative_to(app_path)}...")
+        if sign_file(file_path, identity, entitlements_path):
+            signed_count += 1
+        else:
+            print(f"    ⚠️  Failed to sign: {file_path.name}")
+            failed_count += 1
+    
+    # Sign nested apps with deep signing
+    for nested_app in nested_apps:
+        print(f"  🔏 Deep signing nested app: {nested_app.name}...")
+        if sign_app(nested_app, identity, entitlements_path, deep=True):
+            signed_count += 1
+        else:
+            failed_count += 1
+    
+    print(f"\n  ✅ Signed {signed_count} binaries/apps")
+    if failed_count > 0:
+        print(f"  ⚠️  Failed to sign {failed_count} items")
+    
+    return failed_count == 0
 
 def sign_app(app_path, identity, entitlements_path=None, deep=True):
     """Sign an application bundle"""
-    print(f"\n🔏 Signing {app_path.name}...")
+    print(f"\n🔏 Signing app bundle: {app_path.name}...")
     
+    # First sign all internal binaries
+    if not sign_all_binaries_in_app(app_path, identity, entitlements_path):
+        print(f"⚠️  Some internal files failed to sign, but continuing...")
+    
+    # Now sign the app bundle itself
     cmd = ["codesign", "--force", "--sign", identity, "--timestamp"]
     
     if deep:
         cmd.append("--deep")
     
     cmd.extend([
-        "--options", "runtime",  # Hardened runtime required for notarization
+        "--options", "runtime",
         "--verbose"
     ])
     
@@ -149,21 +211,30 @@ def sign_app(app_path, identity, entitlements_path=None, deep=True):
     
     cmd.append(str(app_path))
     
-    result = run_command(cmd, f"Signing {app_path.name}", check=False)
+    result = run_command(cmd, f"Final signing of {app_path.name}", check=False)
     
     if result and result.returncode == 0:
         print(f"✅ Signed: {app_path.name}")
+        
         # Verify signature
+        print("  Verifying signature...")
         verify_result = run_command(
             ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app_path)],
-            "Verifying signature",
-            check=False
+            check=False,
+            show_output=True
         )
+        
         if verify_result and verify_result.returncode == 0:
-            print(f"✅ Signature verified")
+            print(f"✅ Signature verified for {app_path.name}")
             return True
         else:
             print(f"⚠️  Signature verification failed")
+            # Show detailed info
+            run_command(
+                ["codesign", "-dv", "--verbose=4", str(app_path)],
+                check=False,
+                show_output=True
+            )
             return False
     else:
         print(f"❌ Failed to sign {app_path.name}")
@@ -173,60 +244,70 @@ def sign_pkg(pkg_path, identity):
     """Sign a .pkg installer"""
     print(f"\n🔏 Signing installer package...")
     
+    signed_pkg = pkg_path.with_name(pkg_path.stem + "-signed.pkg")
+    
     cmd = [
         "productsign",
         "--sign", identity,
         "--timestamp",
         str(pkg_path),
-        str(pkg_path.with_suffix('.signed.pkg'))
+        str(signed_pkg)
     ]
     
     result = run_command(cmd, f"Signing {pkg_path.name}", check=False)
     
     if result and result.returncode == 0:
         # Replace unsigned with signed
-        shutil.move(str(pkg_path.with_suffix('.signed.pkg')), str(pkg_path))
+        pkg_path.unlink()
+        signed_pkg.rename(pkg_path)
         print(f"✅ Signed: {pkg_path.name}")
         
         # Verify
+        print("  Verifying package signature...")
         verify_result = run_command(
             ["pkgutil", "--check-signature", str(pkg_path)],
-            "Verifying package signature",
-            check=False
+            check=False,
+            show_output=True
         )
-        if verify_result:
-            print(verify_result.stdout)
         return True
     else:
         print(f"❌ Failed to sign package")
+        if signed_pkg.exists():
+            signed_pkg.unlink()
         return False
 
 # ============================================================================
-# NOTARIZATION FUNCTIONS
+# NOTARIZATION FUNCTIONS - IMPROVED
 # ============================================================================
 
-def notarize_app(file_path, bundle_id):
-    """Submit app for notarization and wait for result with detailed debugging"""
+def notarize_file(file_path, bundle_id):
+    """Submit file for notarization and wait for result"""
     import json
 
     print(f"\n📝 Notarizing {file_path.name}...")
     print("⏳ This may take 5–15 minutes...")
 
-    # Create a temporary zip for notarization
-    zip_path = file_path.with_suffix('.zip')
-
+    # For .app bundles, we need to zip them first
     if file_path.suffix == '.app':
-        print("  Creating zip for notarization...")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file in file_path.rglob('*'):
-                if file.is_file():
-                    arcname = file.relative_to(file_path.parent)
-                    zipf.write(file, arcname)
+        print("  Creating temporary zip for notarization...")
+        zip_path = file_path.parent / f"{file_path.stem}-notarize.zip"
+        
+        # Use ditto to preserve code signatures
+        result = run_command(
+            ["ditto", "-c", "-k", "--keepParent", str(file_path), str(zip_path)],
+            "Creating zip with ditto",
+            check=False
+        )
+        
+        if not result or result.returncode != 0:
+            print("❌ Failed to create zip")
+            return False
+        
         notarize_target = zip_path
     else:
         notarize_target = file_path
 
-    # Submit for notarization with JSON output
+    # Submit for notarization
     cmd = [
         "xcrun", "notarytool", "submit",
         str(notarize_target),
@@ -237,46 +318,72 @@ def notarize_app(file_path, bundle_id):
         "--output-format", "json"
     ]
 
-    print(f"  Running notarization command:\n  {' '.join(cmd)}")
+    print(f"  Submitting to Apple notary service...")
     result = run_command(cmd, check=False)
 
     # Clean up temporary zip
-    if file_path.suffix == '.app' and zip_path.exists():
-        zip_path.unlink()
+    if file_path.suffix == '.app' and notarize_target.exists() and notarize_target != file_path:
+        notarize_target.unlink()
 
-    if result:
-        print("🔍 Notarization response:")
-        print(result.stdout)
-        print(result.stderr)
+    if not result:
+        print("❌ Notarization command failed")
+        return False
 
-        # Try to parse and show RequestUUID
-        try:
-            response_data = json.loads(result.stdout)
-            request_id = response_data.get("id")
-            status = response_data.get("status")
+    # Parse response
+    try:
+        response_data = json.loads(result.stdout)
+        request_id = response_data.get("id")
+        status = response_data.get("status")
+        
+        print(f"\n📋 Notarization Result:")
+        print(f"  Request ID: {request_id}")
+        print(f"  Status: {status}")
+        
+        if result.returncode == 0 and status == "Accepted":
+            print("✅ Notarization successful!")
+            
+            # Staple the notarization ticket
+            if file_path.suffix in ['.app', '.pkg']:
+                print("  Stapling notarization ticket...")
+                staple_cmd = ["xcrun", "stapler", "staple", str(file_path)]
+                staple_result = run_command(staple_cmd, check=False)
+                
+                if staple_result and staple_result.returncode == 0:
+                    print("✅ Notarization ticket stapled")
+                    
+                    # Verify stapling
+                    verify_result = run_command(
+                        ["xcrun", "stapler", "validate", str(file_path)],
+                        check=False,
+                        show_output=True
+                    )
+                else:
+                    print("⚠️ Failed to staple ticket")
+            
+            return True
+        else:
+            print("❌ Notarization failed")
+            
+            # Get detailed log
             if request_id:
-                print(f"🆔 RequestUUID: {request_id}")
-            if status:
-                print(f"📋 Status: {status}")
-        except Exception as e:
-            print(f"⚠️ Failed to parse notarization response: {e}")
-
-    if result and result.returncode == 0:
-        print("✅ Notarization successful!")
-
-        # Staple the notarization ticket
-        if file_path.suffix in ['.app', '.pkg']:
-            print("  Stapling notarization ticket...")
-            staple_cmd = ["xcrun", "stapler", "staple", str(file_path)]
-            staple_result = run_command(staple_cmd, check=False)
-            if staple_result and staple_result.returncode == 0:
-                print("✅ Notarization ticket stapled")
-            else:
-                print("⚠️ Failed to staple ticket (not critical)")
-
-        return True
-    else:
-        print("❌ Notarization failed")
+                print("\n  Fetching notarization log...")
+                log_cmd = [
+                    "xcrun", "notarytool", "log",
+                    request_id,
+                    "--apple-id", APPLE_ID,
+                    "--team-id", TEAM_ID,
+                    "--password", APP_SPECIFIC_PASSWORD
+                ]
+                log_result = run_command(log_cmd, check=False, show_output=True)
+            
+            return False
+            
+    except json.JSONDecodeError:
+        print("❌ Failed to parse notarization response")
+        print(f"Response: {result.stdout}")
+        return False
+    except Exception as e:
+        print(f"❌ Error processing notarization: {e}")
         return False
 
 # ============================================================================
@@ -335,18 +442,24 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     macos_dir.mkdir(parents=True, exist_ok=True)
     resources_dir.mkdir(parents=True, exist_ok=True)
 
-    files_to_bundle = []
+    # Copy all build output to MacOS directory
+    print("  Copying build files...")
     for item in build_path.iterdir():
-        # Skip Windows-only executables and AkademiAuth
         if item.name.endswith(".exe") or item.name == "AkademiAuth":
             continue
-        if not item.name.endswith(".app"):
-            files_to_bundle.append(item)
+        if item != bundle_dir:
+            dest = macos_dir / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, dest)
 
+    # Copy icon
     icon_filename = "AppIcon.icns"
     icon_dest = resources_dir / icon_filename
     shutil.copy2(ICON_PATH, icon_dest)
 
+    # Create Info.plist
     info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -385,76 +498,83 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <array><string>arm64</string></array>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
-    <key>LSUIElement</key>
-    <false/>
 </dict>
 </plist>"""
+    
     plist_path = contents_dir / "Info.plist"
     with open(plist_path, "w") as f:
         f.write(info_plist_content)
     print(f"✅ Created Info.plist with version {version}")
 
+    # Set executable permissions
     executable_in_bundle = macos_dir / APP_NAME
     if executable_in_bundle.exists():
         os.chmod(executable_in_bundle, 0o755)
 
-    for lib in macos_dir.rglob("*.[ds]o"):
-        os.chmod(lib, 0o755)
+    # Set permissions for all dylibs and executables
+    for lib in macos_dir.rglob("*"):
+        if lib.is_file() and (lib.suffix in ['.dylib', '.so'] or os.access(lib, os.X_OK)):
+            os.chmod(lib, 0o755)
 
+    # Remove quarantine attributes
     subprocess.run(["xattr", "-cr", str(bundle_dir)], check=False)
 
-    # Bundle helper app if it exists
-    helper_dest = macos_dir / "AkademiTrack.app"
+    # Handle helper app if it exists
     if HELPER_APP_SOURCE.exists():
+        print("\n  Bundling helper app...")
+        # Instead of nesting inside MacOS, put it in Resources or a proper location
+        helper_dest = resources_dir / "AkademiTrack.app"
         try:
             shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
-            print("✅ AkademiTrack.app bundled")
+            print("✅ Helper app bundled in Resources")
             
-            # Sign helper app if signing is enabled
             if sign:
-                sign_dylibs(helper_dest, DEVELOPER_ID_APP)
-                sign_app(helper_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH)
+                # Sign helper app first (it's nested)
+                sign_app(helper_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=True)
         except Exception as e:
-            print(f"❌ Failed to bundle helper: {e}")
+            print(f"⚠️ Failed to bundle helper: {e}")
 
     # Sign the main app
     if sign:
-        sign_dylibs(bundle_dir, DEVELOPER_ID_APP)
-        if not sign_app(bundle_dir, DEVELOPER_ID_APP, ENTITLEMENTS_PATH):
+        if not sign_app(bundle_dir, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=True):
             print("❌ Signing failed")
             return False
     
     # Notarize the app
     if notarize and sign:
-        if not notarize_app(bundle_dir, BUNDLE_IDENTIFIER):
+        if not notarize_file(bundle_dir, BUNDLE_IDENTIFIER):
             print("⚠️  Notarization failed, but app is signed")
-            # Continue anyway, app will work but show warning
 
     return bundle_dir
 
-def create_portable_zip(bundle_dir, version, notarize=True):
+def create_portable_zip(bundle_dir, version, sign=True, notarize=True):
     """Create portable zip distribution"""
     print("\n📦 Creating portable zip...")
     print("=" * 50)
     
-    zip_path = Path(f"AkademiTrack-osx-Portable.zip").absolute()
+    zip_path = Path(f"AkademiTrack-{version}-osx-Portable.zip").absolute()
     if zip_path.exists():
         zip_path.unlink()
 
     try:
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in bundle_dir.rglob('*'):
-                if file_path.is_file():
-                    arc_name = file_path.relative_to(bundle_dir.parent)
-                    zipf.write(file_path, arc_name)
+        # Use ditto to preserve code signatures
+        result = run_command(
+            ["ditto", "-c", "-k", "--keepParent", str(bundle_dir), str(zip_path)],
+            "Creating zip",
+            check=False
+        )
         
-        print(f"✅ Portable zip created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
-        
-        # Notarize the zip
-        if notarize:
-            notarize_app(zip_path, BUNDLE_IDENTIFIER)
-        
-        return zip_path
+        if result and result.returncode == 0:
+            print(f"✅ Portable zip created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
+            
+            # Note: We don't notarize the ZIP itself, the .app inside is already notarized
+            if notarize and sign:
+                print("  ℹ️  The .app inside is already notarized - no need to notarize the zip")
+            
+            return zip_path
+        else:
+            print("❌ Failed to create zip")
+            return None
     except Exception as e:
         print(f"❌ Failed to create zip: {e}")
         return None
@@ -464,9 +584,9 @@ def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
     print("\n📦 Creating installer package...")
     print("=" * 50)
     
-    pkg_path = Path(f"AkademiTrack-osx-Setup.pkg").absolute()
+    pkg_path = Path(f"AkademiTrack-{version}-osx-Setup.pkg").absolute()
     
-    # Create pkg using pkgbuild
+    # Create pkg
     cmd = [
         "pkgbuild",
         "--root", str(bundle_dir.parent),
@@ -492,7 +612,7 @@ def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
     
     # Notarize the package
     if notarize and sign:
-        notarize_app(pkg_path, BUNDLE_IDENTIFIER)
+        notarize_file(pkg_path, BUNDLE_IDENTIFIER)
     
     return pkg_path
 
@@ -551,7 +671,7 @@ def create_velopack_package(version):
 
     print("✅ VPK package created successfully")
     
-    # Rename to match your naming convention
+    # Rename to match convention
     nupkg_file = list(Path(".").glob("AkademiTrack.*.nupkg"))
     if nupkg_file:
         new_name = f"AkademiTrack-{version}-osx-full.nupkg"
@@ -559,6 +679,44 @@ def create_velopack_package(version):
         print(f"✅ Renamed to: {new_name}")
     
     return True
+
+# ============================================================================
+# VERIFICATION FUNCTIONS
+# ============================================================================
+
+def verify_all_signatures(bundle_dir):
+    """Verify signatures of all files"""
+    print("\n🔍 Verifying all signatures...")
+    print("=" * 50)
+    
+    # Verify main app
+    print(f"\n📱 Verifying main app bundle:")
+    run_command(
+        ["codesign", "-dv", "--verbose=4", str(bundle_dir)],
+        check=False,
+        show_output=True
+    )
+    run_command(
+        ["codesign", "--verify", "--deep", "--strict", str(bundle_dir)],
+        check=False,
+        show_output=True
+    )
+    
+    # Check notarization
+    print(f"\n📝 Checking notarization:")
+    run_command(
+        ["xcrun", "stapler", "validate", str(bundle_dir)],
+        check=False,
+        show_output=True
+    )
+    
+    # Check Gatekeeper
+    print(f"\n🚪 Checking Gatekeeper assessment:")
+    run_command(
+        ["spctl", "-a", "-vv", "-t", "exec", str(bundle_dir)],
+        check=False,
+        show_output=True
+    )
 
 # ============================================================================
 # MAIN FUNCTION
@@ -570,7 +728,7 @@ def main():
 
     # Verify configuration
     print("\n🔍 Checking configuration...")
-    if "Your Name" in DEVELOPER_ID_APP or "your-apple-id" in APPLE_ID:
+    if "Your Name" in DEVELOPER_ID_APP or "your-" in APPLE_ID.lower():
         print("❌ Please update the configuration at the top of this script!")
         print("   - DEVELOPER_ID_APP")
         print("   - DEVELOPER_ID_INSTALLER")
@@ -578,6 +736,14 @@ def main():
         print("   - TEAM_ID")
         print("   - APP_SPECIFIC_PASSWORD")
         return
+
+    # List available signing identities
+    print("\n🔑 Available signing identities:")
+    run_command(
+        ["security", "find-identity", "-v", "-p", "codesigning"],
+        check=False,
+        show_output=True
+    )
 
     # Get version number
     version = get_version_input()
@@ -605,6 +771,10 @@ def main():
         print("❌ App bundle creation failed")
         return
 
+    # Verify signatures if signed
+    if do_sign:
+        verify_all_signatures(bundle_dir)
+
     # Ask what distributions to create
     print("\n📦 Distribution Options:")
     print("1. Portable ZIP")
@@ -616,44 +786,63 @@ def main():
     if not dist_choice:
         dist_choice = "4"
     
-    success = True
+    created_files = []
     
     if dist_choice in ["1", "4"]:
-        create_portable_zip(bundle_dir, version, notarize=do_notarize)
+        zip_file = create_portable_zip(bundle_dir, version, sign=do_sign, notarize=do_notarize)
+        if zip_file:
+            created_files.append(("Portable ZIP", zip_file))
     
     if dist_choice in ["2", "4"]:
-        create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
+        pkg_file = create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
+        if pkg_file:
+            created_files.append(("Installer PKG", pkg_file))
     
     if dist_choice in ["3", "4"]:
-        create_velopack_package(version)
+        if create_velopack_package(version):
+            vpk_file = Path(f"AkademiTrack-{version}-osx-full.nupkg")
+            if vpk_file.exists():
+                created_files.append(("VPK Package", vpk_file))
     
     # Final summary
     print("\n" + "=" * 50)
     print("🎉 Build completed successfully!")
     print(f"📦 Version: {version}")
     print("\n📋 Files created:")
-    print(f"  ✅ .app bundle: ./build/{APP_NAME}.app")
+    print(f"  ✅ .app bundle: {bundle_dir}")
     
-    if dist_choice in ["1", "4"]:
-        print(f"  ✅ Portable ZIP: AkademiTrack-osx-Portable.zip")
-    if dist_choice in ["2", "4"]:
-        print(f"  ✅ Installer PKG: AkademiTrack-osx-Setup.pkg")
-    if dist_choice in ["3", "4"]:
-        print(f"  ✅ VPK Package: AkademiTrack-{version}-osx-full.nupkg")
+    for file_type, file_path in created_files:
+        size_mb = file_path.stat().st_size / 1024 / 1024
+        print(f"  ✅ {file_type}: {file_path.name} ({size_mb:.1f} MB)")
     
     if do_sign:
         print("\n✅ All files signed with Developer ID")
     if do_notarize:
         print("✅ All files notarized by Apple")
     
+    # Verification commands
+    print("\n🔍 Verification commands:")
+    print(f"  codesign -dv --verbose=4 '{bundle_dir}'")
+    print(f"  codesign --verify --deep --strict '{bundle_dir}'")
+    print(f"  xcrun stapler validate '{bundle_dir}'")
+    print(f"  spctl -a -vv -t exec '{bundle_dir}'")
+    
+    for file_type, file_path in created_files:
+        if file_path.suffix == '.pkg':
+            print(f"  pkgutil --check-signature '{file_path}'")
+            print(f"  xcrun stapler validate '{file_path}'")
+    
     print("\n📋 Next steps:")
-    print("  • Test the .app by opening it")
+    print("  • Test the .app by double-clicking it")
     print("  • Test the .pkg installer")
-    print("  • Distribute the files to users")
+    print("  • Upload files to GitHub Releases")
     if do_notarize:
-        print("  • No Gatekeeper warnings will appear!")
+        print("  • ✅ No Gatekeeper warnings will appear!")
     else:
-        print("  • Users may need to right-click → Open (Gatekeeper)")
+        print("  • ⚠️  Users will need to right-click → Open (unsigned)")
+    
+    print("\n💡 Tip: Run this to check notarization history:")
+    print(f"  xcrun notarytool history --apple-id {APPLE_ID} --team-id {TEAM_ID} --password {APP_SPECIFIC_PASSWORD}")
 
 if __name__ == "__main__":
     try:
