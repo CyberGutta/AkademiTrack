@@ -2891,7 +2891,7 @@ namespace AkademiTrack.ViewModels
 
         private void ShowUpdateNotification(UpdateInfo updateInfo)
         {
-            var title = "[ADMIN]Ny Oppdatering Tilgjengelig!";
+            var title = "Ny Oppdatering Tilgjengelig!";
             var message = $"Versjon {updateInfo.latest_version} er tilgjengelig!\n\n";
 
             LogInfo($"Viser oppdateringsvarsel: {updateInfo.latest_version}");

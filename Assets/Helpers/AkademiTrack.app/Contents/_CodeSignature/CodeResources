@@ -15,10 +15,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			hZ3qOnxcxymoUZ/cObSVCN29lSI=
+			e1Am/ZDbBqngEaJDueg6iMO1kGc=
 			</data>
 			<key>requirement</key>
-			<string>identifier MacNotify and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Andreas Nilsen (673WFZN2KZ)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
+			<string>identifier MacNotify and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "6SF4T9DUN4"</string>
 		</dict>
 		<key>Resources/Icon.icns</key>
 		<dict>
