@@ -21,7 +21,7 @@
 	<ItemGroup>
 	  <Content Include="Assets\AT-Transparrent72.ico" />
 	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
   <Content Include="Assets/Helpers/AkademiAuth">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
