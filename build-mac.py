@@ -823,6 +823,7 @@ def main():
 
     # Ask what distributions to create
     print("\n📦 Distribution Options:")
+    print("Når du skal pushe en update må du huske å ta zippen som ligger i akademitrack, extract den, gå inn i den, resources, så kopierer du entitlements.plist og helper appen inn i releases mappen sin akademitrack.app sin resources mappe. Deretter går du til downloads kopierer appen fra releases og limer inn i downloads. Deretter kjører du ./sign_and_notarize.sh når den er signert kjører du ./create-pkg-from-signed-app.sh så limer du alt untatt bundle og den gamle appen fra releases folderen inn til github versjonen for den du lager nå, og deretter limer du app.zip og bundle som du lagde/signerte inn i github. ")
     print("1. Portable ZIP + VPK Package")
     print("2. Installer PKG")
     print("3. VPK Package only")
