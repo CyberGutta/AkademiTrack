@@ -37,22 +37,22 @@ namespace AkademiTrack.ViewModels
             Schools = new ObservableCollection<string>
             {
                 "Akademiet Drammen AS",
-                "Akademiet Fredrikstad AS",
-                "Akademiet Kristiansand AS",
-                "Akademiet Norsk Restaurantskole",
-                "Akademiet Privatist og Nettstudier AS",
-                "Akademiet Realfagsgymnas Sandvika AS",
-                "Akademiet Realfagsskole Drammen",
-                "Akademiet Realfagsskole Oslo",
-                "Akademiet ungdomsskole Lier",
-                "Akademiet VGS Bergen",
-                "Akademiet VGS Bislett",
-                "Akademiet VGS Heltberg Drammen",
-                "Akademiet VGS Kongsberg",
-                "Akademiet VGS Oslo",
-                "Akademiet VGS Sandnes",
-                "Akademiet VGS Ypsilon",
-                "Akademiet vgs Ålesund"
+                //"Akademiet Fredrikstad AS",
+                //"Akademiet Kristiansand AS",
+                //"Akademiet Norsk Restaurantskole",
+                //"Akademiet Privatist og Nettstudier AS",
+                //"Akademiet Realfagsgymnas Sandvika AS",
+                //"Akademiet Realfagsskole Drammen",
+                //"Akademiet Realfagsskole Oslo",
+                //"Akademiet ungdomsskole Lier",
+                //"Akademiet VGS Bergen",
+                //"Akademiet VGS Bislett",
+                //"Akademiet VGS Heltberg Drammen",
+                //"Akademiet VGS Kongsberg",
+                //"Akademiet VGS Oslo",
+                //"Akademiet VGS Sandnes",
+                //"Akademiet VGS Ypsilon",
+                //"Akademiet vgs Ålesund"
             };
         }
         
