@@ -453,6 +453,7 @@ namespace AkademiTrack.ViewModels
         private bool _showDetailedLogs = true;
         private NotificationEntry? _currentNotification;
         private Timer _updateCheckTimer;
+        private Timer _schoolHoursCheckTimer;
         private DateTime _lastUpdateCheck = DateTime.MinValue;
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
         private readonly ApplicationInfo _applicationInfo;
@@ -546,6 +547,13 @@ namespace AkademiTrack.ViewModels
                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
                 (int)TimeSpan.FromMinutes(30).TotalMilliseconds
             );
+
+            _schoolHoursCheckTimer = new Timer(
+                async (state) => await CheckSchoolHoursAutoRestart(state),
+                null,
+                (int)TimeSpan.FromMinutes(5).TotalMilliseconds,
+                (int)TimeSpan.FromMinutes(5).TotalMilliseconds
+            );
         }
 
         private async Task CheckAutoStartAutomationAsync()
@@ -564,14 +572,29 @@ namespace AkademiTrack.ViewModels
                 }
 
                 // Wait for app to fully initialize
-                await Task.Delay(3000); // Increased from 2000 to ensure full initialization
+                await Task.Delay(3000);
 
                 var settingsViewModel = new SettingsViewModel();
-                await Task.Delay(500); // Increased delay to ensure settings are loaded
+                await Task.Delay(500);
 
                 if (settingsViewModel.AutoStartAutomation)
                 {
-                    LogInfo("Auto-start automatisering er aktivert - starter automatisk...");
+                    LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
+
+                    // Check if we should auto-start based on school hours
+                    var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+
+
+                    if (!shouldStart)
+                    {
+                        LogInfo($"Auto-start ikke nødvendig: {reason}");
+                        NativeNotificationService.Show("Auto-start Info",
+                            $"Automatisering starter ikke: {reason}",
+                            "INFO");
+                        return;
+                    }
+
+                    LogInfo($"Auto-start betingelser oppfylt: {reason}");
 
                     await LoadCredentialsAsync();
                     bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
@@ -581,6 +604,9 @@ namespace AkademiTrack.ViewModels
                     if (hasCredentials)
                     {
                         LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
+                        NativeNotificationService.Show("Auto-start aktivert",
+                            $"Starter automatisk registrering - {reason}",
+                            "SUCCESS");
 
                         await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
@@ -596,8 +622,8 @@ namespace AkademiTrack.ViewModels
                     }
                     else
                     {
-                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger - venter på manuell start");
-                        NativeNotificationService.Show("Auto-start Aktivert",
+                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
+                        NativeNotificationService.Show("Mangler innloggingsopplysninger",
                             "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet. Lagre innloggingsopplysninger i innstillinger.",
                             "WARNING");
                     }
@@ -617,6 +643,56 @@ namespace AkademiTrack.ViewModels
                 }
             }
         }
+        
+        private async Task CheckSchoolHoursAutoRestart(object? state)
+        {
+            try
+            {
+                // Don't check if automation is already running
+                if (IsAutomationRunning)
+                    return;
+
+                var settingsViewModel = new SettingsViewModel();
+                await Task.Delay(100);
+
+                if (!settingsViewModel.AutoStartAutomation)
+                    return;
+
+                // Check if we should auto-start
+                var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+
+                
+                if (shouldStart)
+                {
+                    LogInfo($"[AUTO-RESTART] Betingelser oppfylt: {reason}");
+                    LogInfo("[AUTO-RESTART] Starter automatisering automatisk etter gjenåpning av app");
+                    
+                    await LoadCredentialsAsync();
+                    bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
+                                        _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
+                                        !string.IsNullOrEmpty(_schoolName);
+
+                    if (hasCredentials)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            if (!IsAutomationRunning)
+                            {
+                                NativeNotificationService.Show("Auto-restart aktivert",
+                                    "Automatisering starter på nytt - du er innenfor skoletid",
+                                    "INFO");
+                                await StartAutomationAsync();
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"[AUTO-RESTART] Error: {ex.Message}");
+            }
+        }
+
 
         private async Task LoadCredentialsAsync()
         {
@@ -1002,6 +1078,19 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
+            // Check if we should auto-start based on school hours (handles reopening during school day)
+            var (shouldAutoStart, autoStartReason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+            
+            if (!shouldAutoStart && _cancellationTokenSource == null)
+            {
+                // First time starting and outside school hours - just log and continue for manual start
+                LogInfo($"Manuell start utenfor skoletid: {autoStartReason}");
+            }
+            else if (shouldAutoStart)
+            {
+                LogInfo($"Auto-start check passed: {autoStartReason}");
+            }
+
             IsAutomationRunning = true;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -1129,7 +1218,12 @@ namespace AkademiTrack.ViewModels
             {
                 IsAutomationRunning = false;
                 _cancellationTokenSource?.Dispose();
-                LogInfo("Automatisering stoppet");
+                
+                // Only log if automation actually ran
+                if (_cancellationTokenSource != null)
+                {
+                    LogInfo("Automatisering fullført");
+                }
             }
         }
 
@@ -2346,6 +2440,10 @@ namespace AkademiTrack.ViewModels
                         LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
                         LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt gyldige: {validStuSessions.Count}");
 
+                        // Mark today as completed to prevent auto-start until tomorrow
+                        await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        LogInfo("✓ Dagens registreringer merket som fullført - auto-start vil ikke kjøre igjen før i morgen");
+
                         if (registeredSessions.Count > 0)
                         {
                             NativeNotificationService.Show("Alle Studietimer Registrert",
@@ -2906,6 +3004,7 @@ namespace AkademiTrack.ViewModels
             _loginPasswordSecure = null;
 
             _updateCheckTimer?.Dispose();
+            _schoolHoursCheckTimer?.Dispose();
 
             _isProcessingQueue = false;
 
