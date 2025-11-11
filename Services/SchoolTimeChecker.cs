@@ -7,25 +7,18 @@ using System.Diagnostics;
 
 namespace AkademiTrack.Services
 {
-    /// <summary>
-    /// Manages intelligent auto-start based on school hours and STU session times.
-    /// Checks time online first, falls back to local time if offline.
-    /// Prevents time manipulation by students.
-    /// </summary>
+
     public static class SchoolTimeChecker
     {
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         private static DateTime? _lastOnlineTimeCheck = null;
         private static TimeSpan _onlineTimeOffset = TimeSpan.Zero;
 
-        /// <summary>
-        /// Gets the current time, preferring online time to prevent manipulation
-        /// </summary>
+
         public static async Task<DateTime> GetTrustedCurrentTimeAsync()
         {
             try
             {
-                // Try to get time from world time API
                 var response = await _httpClient.GetAsync("http://worldtimeapi.org/api/timezone/Europe/Oslo");
                 
                 if (response.IsSuccessStatusCode)
@@ -37,7 +30,6 @@ namespace AkademiTrack.Services
                     {
                         var onlineTime = DateTime.Parse(datetimeElement.GetString()!);
                         
-                        // Calculate offset between online and local time
                         _onlineTimeOffset = onlineTime - DateTime.Now;
                         _lastOnlineTimeCheck = DateTime.Now;
                         
@@ -54,12 +46,10 @@ namespace AkademiTrack.Services
                 Debug.WriteLine($"[TIME CHECK] Online time check failed: {ex.Message}");
             }
 
-            // Fallback: Use local time with last known offset
             var localTime = DateTime.Now;
             
             if (_lastOnlineTimeCheck.HasValue)
             {
-                // If we checked online recently (within last 30 minutes), apply the offset
                 if ((DateTime.Now - _lastOnlineTimeCheck.Value).TotalMinutes < 30)
                 {
                     var adjustedTime = localTime + _onlineTimeOffset;
@@ -72,14 +62,11 @@ namespace AkademiTrack.Services
             return localTime;
         }
 
-        /// <summary>
-        /// Checks if current time is within school hours (considering STU sessions)
-        /// </summary>
+
         public static async Task<bool> IsWithinSchoolHoursAsync()
         {
             var now = await GetTrustedCurrentTimeAsync();
-            
-            // Only check Monday-Friday
+
             if (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday)
             {
                 Debug.WriteLine($"[SCHOOL HOURS] Weekend - outside school hours");
@@ -87,26 +74,22 @@ namespace AkademiTrack.Services
             }
 
             var currentTime = now.TimeOfDay;
-            
-            // Monday: 9:00 - 15:30
+
             if (now.DayOfWeek == DayOfWeek.Monday)
             {
-                bool isWithinHours = currentTime >= TimeSpan.FromHours(9) && 
-                                    currentTime <= TimeSpan.FromHours(15, 15, 0);
-                Debug.WriteLine($"[SCHOOL HOURS] Monday {now:HH:mm} - {(isWithinHours ? "INSIDE" : "OUTSIDE")} school hours (9:00-15:30)");
+                bool isWithinHours = currentTime >= TimeSpan.FromHours(9) &&
+                                    currentTime <= TimeSpan.FromHours(15.25);
+                Debug.WriteLine($"[SCHOOL HOURS] Monday {now:HH:mm} - {(isWithinHours ? "INSIDE" : "OUTSIDE")} school hours (9:00-15:15)");
                 return isWithinHours;
             }
-            
-            // Tuesday-Friday: 8:15 - 15:30
-            bool isSchoolDay = currentTime >= new TimeSpan(8, 15, 0) && 
-                              currentTime <= TimeSpan.FromHours(15,15,0);
-            Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} {now:HH:mm} - {(isSchoolDay ? "INSIDE" : "OUTSIDE")} school hours (8:15-15:30)");
+
+            bool isSchoolDay = currentTime >= new TimeSpan(8, 15, 0) &&
+                              currentTime <= TimeSpan.FromHours(15.25);
+            Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} {now:HH:mm} - {(isSchoolDay ? "INSIDE" : "OUTSIDE")} school hours (8:15-15:15)");
             return isSchoolDay;
         }
 
-        /// <summary>
-        /// Checks if automation should auto-start based on schedule and last run date
-        /// </summary>
+
         public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime)> ShouldAutoStartAutomationAsync()
         {
             try
@@ -114,7 +97,6 @@ namespace AkademiTrack.Services
                 var now = await GetTrustedCurrentTimeAsync();
                 Debug.WriteLine($"=== AUTO-START CHECK at {now:yyyy-MM-dd HH:mm:ss} ===");
 
-                // Check last run date first
                 var lastRunDate = await GetLastSuccessfulRunDateAsync();
                 var today = now.Date;
 
@@ -126,7 +108,6 @@ namespace AkademiTrack.Services
                     return (false, $"Allerede fullført i dag kl. {lastRunDate:HH:mm}", nextStart);
                 }
 
-                // Check if we're within school hours
                 if (!await IsWithinSchoolHoursAsync())
                 {
                     var nextStart = GetNextSchoolStartTime(now);
@@ -151,14 +132,11 @@ namespace AkademiTrack.Services
             }
         }
 
-        /// <summary>
-        /// Gets the next school start time
-        /// </summary>
+
         private static DateTime? GetNextSchoolStartTime(DateTime from)
         {
             var current = from.Date;
             
-            // Check today first if we haven't passed school hours
             if (from.TimeOfDay < TimeSpan.FromHours(15, 15, 0))
             {
                 var todayStart = GetSchoolStartTime(current);
@@ -166,7 +144,6 @@ namespace AkademiTrack.Services
                     return todayStart;
             }
 
-            // Check next 7 days
             for (int i = 1; i <= 7; i++)
             {
                 var checkDate = current.AddDays(i);
@@ -179,20 +156,14 @@ namespace AkademiTrack.Services
             return null;
         }
 
-        /// <summary>
-        /// Gets the school start time for a specific date
-        /// </summary>
         private static DateTime GetSchoolStartTime(DateTime date)
         {
             if (date.DayOfWeek == DayOfWeek.Monday)
-                return date.Date.AddHours(9); // Monday starts at 9:00
+                return date.Date.AddHours(9);
             else
-                return date.Date.Add(new TimeSpan(8, 15, 0)); // Other days at 8:15
+                return date.Date.Add(new TimeSpan(8, 15, 0)); 
         }
 
-        /// <summary>
-        /// Gets the next school day from a given date
-        /// </summary>
         private static DateTime GetNextSchoolDay(DateTime from)
         {
             var nextDay = from.Date.AddDays(1);
@@ -203,9 +174,7 @@ namespace AkademiTrack.Services
             return nextDay;
         }
 
-        /// <summary>
-        /// Gets Norwegian day name
-        /// </summary>
+
         private static string GetNorwegianDayName(DayOfWeek day)
         {
             return day switch
@@ -221,9 +190,6 @@ namespace AkademiTrack.Services
             };
         }
 
-        /// <summary>
-        /// Marks today as successfully completed
-        /// </summary>
         public static async Task MarkTodayAsCompletedAsync()
         {
             try
@@ -242,9 +208,6 @@ namespace AkademiTrack.Services
             }
         }
 
-        /// <summary>
-        /// Gets the last successful run date
-        /// </summary>
         private static async Task<DateTime?> GetLastSuccessfulRunDateAsync()
         {
             try
@@ -268,9 +231,6 @@ namespace AkademiTrack.Services
             return null;
         }
 
-        /// <summary>
-        /// Resets the daily completion flag (for testing or manual reset)
-        /// </summary>
         public static void ResetDailyCompletion()
         {
             try

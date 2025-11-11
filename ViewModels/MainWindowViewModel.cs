@@ -538,6 +538,15 @@ namespace AkademiTrack.ViewModels
 
             LogInfo("Applikasjon er klar");
 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    await CheckAndRequestNotificationPermissionAsync();
+                });
+            }
+
 
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
@@ -549,18 +558,69 @@ namespace AkademiTrack.ViewModels
             );
 
             _schoolHoursCheckTimer = new Timer(
-                async (state) => await CheckSchoolHoursAutoRestart(state),
-                null,
-                (int)TimeSpan.FromMinutes(5).TotalMilliseconds,
-                (int)TimeSpan.FromMinutes(5).TotalMilliseconds
-            );
+                 async (state) => await CheckSchoolHoursAutoRestart(state),
+                 null,
+                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
+                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds
+             );
+        }
+
+        private async Task CheckAndRequestNotificationPermissionAsync()
+        {
+            try
+            {
+                var status = await Services.NotificationPermissionChecker.CheckMacNotificationPermissionAsync();
+
+                LogDebug($"Notification permission status: {status}");
+
+                if (status == Services.NotificationPermissionChecker.PermissionStatus.NotDetermined ||
+                    status == Services.NotificationPermissionChecker.PermissionStatus.Denied)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        try
+                        {
+                            var dialog = new NotificationPermissionDialog();
+
+                            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                            {
+                                var mainWindow = desktop.MainWindow;
+                                if (mainWindow != null)
+                                {
+                                    await dialog.ShowDialog(mainWindow);
+
+                                    if (dialog.UserGrantedPermission)
+                                    {
+                                        LogInfo("Bruker aktiverte varseltillatelser");
+                                    }
+                                    else
+                                    {
+                                        LogInfo("Bruker utsatte varseltillatelser");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogDebug($"Failed to show notification permission dialog: {ex.Message}");
+                        }
+                    });
+                }
+                else if (status == Services.NotificationPermissionChecker.PermissionStatus.Authorized)
+                {
+                    LogDebug("Notification permissions already granted");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Error checking notification permissions: {ex.Message}");
+            }
         }
 
         private async Task CheckAutoStartAutomationAsync()
         {
             try
             {
-                // Use a GLOBAL static lock to prevent ANY instance from running this twice
                 lock (_globalAutoStartLock)
                 {
                     if (_globalAutoStartTriggered)
@@ -571,7 +631,6 @@ namespace AkademiTrack.ViewModels
                     _globalAutoStartTriggered = true;
                 }
 
-                // Wait for app to fully initialize
                 await Task.Delay(3000);
 
                 var settingsViewModel = new SettingsViewModel();
@@ -581,7 +640,6 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
 
-                    // Check if we should auto-start based on school hours
                     var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
 
 
@@ -648,7 +706,6 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Don't check if automation is already running
                 if (IsAutomationRunning)
                     return;
 
@@ -658,7 +715,6 @@ namespace AkademiTrack.ViewModels
                 if (!settingsViewModel.AutoStartAutomation)
                     return;
 
-                // Check if we should auto-start
                 var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
 
                 
