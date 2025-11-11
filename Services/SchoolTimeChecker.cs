@@ -92,14 +92,14 @@ namespace AkademiTrack.Services
             if (now.DayOfWeek == DayOfWeek.Monday)
             {
                 bool isWithinHours = currentTime >= TimeSpan.FromHours(9) && 
-                                    currentTime <= TimeSpan.FromHours(15.5);
+                                    currentTime <= TimeSpan.FromHours(15, 15, 0);
                 Debug.WriteLine($"[SCHOOL HOURS] Monday {now:HH:mm} - {(isWithinHours ? "INSIDE" : "OUTSIDE")} school hours (9:00-15:30)");
                 return isWithinHours;
             }
             
             // Tuesday-Friday: 8:15 - 15:30
             bool isSchoolDay = currentTime >= new TimeSpan(8, 15, 0) && 
-                              currentTime <= TimeSpan.FromHours(15.5);
+                              currentTime <= TimeSpan.FromHours(15,15,0);
             Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} {now:HH:mm} - {(isSchoolDay ? "INSIDE" : "OUTSIDE")} school hours (8:15-15:30)");
             return isSchoolDay;
         }
@@ -159,7 +159,7 @@ namespace AkademiTrack.Services
             var current = from.Date;
             
             // Check today first if we haven't passed school hours
-            if (from.TimeOfDay < TimeSpan.FromHours(15.5))
+            if (from.TimeOfDay < TimeSpan.FromHours(15, 15, 0))
             {
                 var todayStart = GetSchoolStartTime(current);
                 if (todayStart > from)
