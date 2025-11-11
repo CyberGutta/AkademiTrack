@@ -4,7 +4,7 @@
 <dict>
 	<key>files</key>
 	<dict>
-		<key>Resources/Icon.icns</key>
+		<key>Resources/AppIcon.icns</key>
 		<data>
 		dl3ybyewpbSkbeQXqOg526wPG2c=
 		</data>
@@ -15,12 +15,12 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			e1Am/ZDbBqngEaJDueg6iMO1kGc=
+			iU4+63lNrXjgMeGkIRhSglC3mSE=
 			</data>
 			<key>requirement</key>
-			<string>identifier MacNotify and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "6SF4T9DUN4"</string>
+			<string>cdhash H"894e3eeb794dad78e031e1a42118528250b79921"</string>
 		</dict>
-		<key>Resources/Icon.icns</key>
+		<key>Resources/AppIcon.icns</key>
 		<dict>
 			<key>hash2</key>
 			<data>
