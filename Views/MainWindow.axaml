@@ -10,10 +10,10 @@
         Icon="/Assets/AT-Transparrent.png"
         Title="AkademiTrack - Akademiet"
         Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
-		Height="725"
+		Height="705"
 		Width="1100"
         MinWidth="900"
-        MinHeight="725">
+        MinHeight="705">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel/>
@@ -173,27 +173,26 @@
 		</Style>
 
 		<Style Selector="TextBlock.section-title">
-			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="FontSize" Value="20"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 			<Setter Property="Margin" Value="0,0,0,12"/>
 		</Style>
 
-		<!-- Status Indicator -->
-		<Style Selector="Border.status-indicator">
-			<Setter Property="Width" Value="12"/>
-			<Setter Property="Height" Value="12"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="VerticalAlignment" Value="Center"/>
-			<Setter Property="Margin" Value="0,0,8,0"/>
+		<!-- Status Box Styles -->
+		<Style Selector="TextBlock.status-label">
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
 
-		<Style Selector="Border.status-indicator.stopped">
-			<Setter Property="Background" Value="#DC3545"/>
-		</Style>
-
-		<Style Selector="Border.status-indicator.running">
-			<Setter Property="Background" Value="#4CAF50"/>
+		<Style Selector="TextBlock.status">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,0,0,0"/>
 		</Style>
 
 	</Window.Styles>
@@ -216,14 +215,6 @@
 			<StackPanel Grid.Column="0" VerticalAlignment="Center">
 				<TextBlock Text="AkademiTrack" Classes="main-title"/>
 				<TextBlock Text="Automatisk oppmøte-system - Akademiet" Classes="subtitle" Margin="0,4,0,0"/>
-
-				<!-- Status -->
-				<StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-					<Border Classes="status-indicator stopped"/>
-					<TextBlock Text="Automatisering stoppet"
-							   FontSize="13"
-							   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-				</StackPanel>
 			</StackPanel>
 
 			<!-- Theme Toggle -->
@@ -261,12 +252,6 @@
 				<StackPanel Spacing="16">
 					<TextBlock Text="Automatisering" Classes="section-title"/>
 
-					<TextBlock Text="Start automatisk oppmøte-overvåking. Systemet logger inn og registrerer automatisk."
-							   TextWrapping="Wrap"
-							   FontSize="13"
-							   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-							   Margin="0,0,0,8"/>
-
 					<Button Content="▶ Start automatisering"
 							Classes="start-button"
 							Command="{Binding StartAutomationCommand}"
@@ -278,6 +263,23 @@
 							Command="{Binding StopAutomationCommand}"
 							IsEnabled="{Binding IsAutomationRunning}"
 							HorizontalAlignment="Stretch"/>
+
+					<!-- Status Box -->
+					<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+							CornerRadius="6"
+							Padding="16,12"
+							BorderThickness="1"
+							BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+							Margin="0,8,0,0">
+						<StackPanel Spacing="6">
+							<TextBlock Text="Gjeldende status:"
+									   Classes="status-label"/>
+							<TextBlock Text="{Binding StatusMessage}"
+									   Classes="status"
+									   HorizontalAlignment="Center"
+									   TextWrapping="Wrap"/>
+						</StackPanel>
+					</Border>
 				</StackPanel>
 			</Border>
 
