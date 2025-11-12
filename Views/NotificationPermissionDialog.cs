@@ -12,6 +12,12 @@ namespace AkademiTrack.ViewModels
     public class NotificationPermissionDialog : Window
     {
         public bool UserGrantedPermission { get; private set; }
+        
+        // Static state to persist across window instances
+        private static bool _notificationsEnabled = false;
+        private Border? _enableButton;
+        private Border? _settingsButton;
+        private TextBlock? _enableButtonText;
 
         public NotificationPermissionDialog()
         {
@@ -22,7 +28,10 @@ namespace AkademiTrack.ViewModels
             CanResize = false;
             ShowInTaskbar = false;
             SystemDecorations = SystemDecorations.BorderOnly;
-
+            
+            // Keep window within app, not system-modal
+            Topmost = false;
+            
             BuildContent();
         }
 
@@ -54,50 +63,55 @@ namespace AkademiTrack.ViewModels
                 CornerRadius = new CornerRadius(text == "✕" ? 0 : 8),
                 Child = textBlock,
                 Cursor = isEnabled ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Arrow),
-                IsEnabled = isEnabled,
+                Tag = new ButtonState { IsEnabled = isEnabled, OriginalBg = bgColor, OriginalFg = fgColor },
                 Opacity = isEnabled ? 1.0 : 0.5
             };
 
-            if (isEnabled)
+            border.PointerEntered += (s, e) =>
             {
-                var originalBg = bgColor;
-                var originalFg = fgColor;
-
-                border.PointerEntered += (s, e) =>
+                var state = border.Tag as ButtonState;
+                if (state?.IsEnabled == true)
                 {
-                    if (border.IsEnabled)
+                    border.Background = new SolidColorBrush(Color.Parse(hoverColor));
+                    if (text == "✕")
                     {
-                        border.Background = new SolidColorBrush(Color.Parse(hoverColor));
-                        if (text == "✕")
-                        {
-                            textBlock.Foreground = new SolidColorBrush(Color.Parse("#FF3B30"));
-                        }
-                        System.Diagnostics.Debug.WriteLine($"Hover entered: {text}");
+                        textBlock.Foreground = new SolidColorBrush(Color.Parse("#FF3B30"));
                     }
-                };
+                }
+            };
 
-                border.PointerExited += (s, e) =>
+            border.PointerExited += (s, e) =>
+            {
+                var state = border.Tag as ButtonState;
+                if (state?.IsEnabled == true)
                 {
-                    if (border.IsEnabled)
-                    {
-                        border.Background = new SolidColorBrush(Color.Parse(originalBg));
-                        textBlock.Foreground = new SolidColorBrush(Color.Parse(originalFg));
-                        System.Diagnostics.Debug.WriteLine($"Hover exited: {text}");
-                    }
-                };
+                    border.Background = new SolidColorBrush(Color.Parse(state.OriginalBg));
+                    textBlock.Foreground = new SolidColorBrush(Color.Parse(state.OriginalFg));
+                }
+            };
 
-                border.PointerPressed += (s, e) =>
+            border.PointerPressed += (s, e) =>
+            {
+                var state = border.Tag as ButtonState;
+                if (state?.IsEnabled == true && e.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
                 {
-                    if (border.IsEnabled && e.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Button clicked: {text}");
-                        clickAction?.Invoke();
-                        e.Handled = true;
-                    }
-                };
-            }
+                    System.Diagnostics.Debug.WriteLine($"Button clicked: {text}");
+                    clickAction?.Invoke();
+                    e.Handled = true;
+                }
+            };
 
             return border;
+        }
+
+        private void SetButtonEnabled(Border button, bool enabled)
+        {
+            if (button.Tag is ButtonState state)
+            {
+                state.IsEnabled = enabled;
+                button.Opacity = enabled ? 1.0 : 0.5;
+                button.Cursor = enabled ? new Cursor(StandardCursorType.Hand) : new Cursor(StandardCursorType.Arrow);
+            }
         }
 
         private void BuildContent()
@@ -187,70 +201,37 @@ namespace AkademiTrack.ViewModels
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
-            // Settings button reference
-            Border settingsButtonBorder = null!;
-            Border enableButton = null!;
-
             // Primary action button - Activate notifications
-            enableButton = CreateStyledButton(
+            _enableButton = CreateStyledButton(
                 "Aktiver Varsler",
                 280,
                 44,
                 "#007AFF",
                 "#FFFFFF",
                 "#0051D5",
-                async () =>
-                {
-                    UserGrantedPermission = true;
-                    enableButton.IsEnabled = false;
-                    enableButton.Opacity = 0.6;
-                    enableButton.Cursor = new Cursor(StandardCursorType.Wait);
-                    
-                    var textBlock = (TextBlock)enableButton.Child!;
-                    textBlock.Text = "Sender testvarsel...";
-                    
-                    await AkademiTrack.Services.NotificationPermissionChecker.RequestPermissionAsync();
-                    
-                    // Enable the settings button
-                    if (settingsButtonBorder != null)
-                    {
-                        settingsButtonBorder.IsEnabled = true;
-                        settingsButtonBorder.Opacity = 1.0;
-                        settingsButtonBorder.Cursor = new Cursor(StandardCursorType.Hand);
-                        var settingsText = (TextBlock)settingsButtonBorder.Child!;
-                        settingsText.Foreground = new SolidColorBrush(Color.Parse("#333333"));
-                    }
-                    
-                    textBlock.Text = "Varsler Aktivert! ✓";
-                    enableButton.Background = new SolidColorBrush(Color.Parse("#34C759"));
-                    
-                    await Task.Delay(2000);
-                    
-                    await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                    Close();
-                }
+                async () => await EnableNotificationsAsync()
             );
+            _enableButtonText = (TextBlock)_enableButton.Child!;
 
             // Secondary button - Open settings (initially disabled)
-            settingsButtonBorder = CreateStyledButton(
+            _settingsButton = CreateStyledButton(
                 "Åpne Systeminnstillinger",
                 280,
                 44,
                 "#F0F0F0",
                 "#999999",
                 "#E0E0E0",
-                async () =>
+                () =>
                 {
+                    System.Diagnostics.Debug.WriteLine("Opening macOS notification settings...");
                     AkademiTrack.Services.NotificationPermissionChecker.OpenMacNotificationSettings();
-                    await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                    UserGrantedPermission = false;
-                    Close();
+                    // Don't close or reset - just open settings
                 },
                 false // Initially disabled
             );
 
-            buttonPanel.Children.Add(enableButton);
-            buttonPanel.Children.Add(settingsButtonBorder);
+            buttonPanel.Children.Add(_enableButton);
+            buttonPanel.Children.Add(_settingsButton);
             stackPanel.Children.Add(buttonPanel);
 
             // Help text
@@ -271,6 +252,58 @@ namespace AkademiTrack.ViewModels
 
             mainBorder.Child = mainGrid;
             Content = mainBorder;
+
+            // Restore state if already enabled (in case window was deactivated)
+            if (_notificationsEnabled)
+            {
+                RestoreEnabledState();
+            }
+        }
+
+        private async Task EnableNotificationsAsync()
+        {
+            if (_notificationsEnabled) return; // Prevent double-click
+            
+            _notificationsEnabled = true;
+            UserGrantedPermission = true;
+            
+            SetButtonEnabled(_enableButton!, false);
+            _enableButton!.Cursor = new Cursor(StandardCursorType.Wait);
+            _enableButtonText!.Text = "Sender testvarsel...";
+            
+            await AkademiTrack.Services.NotificationPermissionChecker.RequestPermissionAsync();
+            
+            // Enable the settings button
+            SetButtonEnabled(_settingsButton!, true);
+            var settingsText = (TextBlock)_settingsButton!.Child!;
+            settingsText.Foreground = new SolidColorBrush(Color.Parse("#333333"));
+            
+            _enableButtonText.Text = "Varsler Aktivert! ✓";
+            _enableButton.Background = new SolidColorBrush(Color.Parse("#34C759"));
+            
+            // Mark as dismissed so it doesn't show again on next launch
+            await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+        }
+
+        private void RestoreEnabledState()
+        {
+            if (_enableButton != null && _enableButtonText != null && _settingsButton != null)
+            {
+                SetButtonEnabled(_enableButton, false);
+                _enableButtonText.Text = "Varsler Aktivert! ✓";
+                _enableButton.Background = new SolidColorBrush(Color.Parse("#34C759"));
+                
+                SetButtonEnabled(_settingsButton, true);
+                var settingsText = (TextBlock)_settingsButton.Child!;
+                settingsText.Foreground = new SolidColorBrush(Color.Parse("#333333"));
+            }
+        }
+
+        private class ButtonState
+        {
+            public bool IsEnabled { get; set; }
+            public string OriginalBg { get; set; } = "";
+            public string OriginalFg { get; set; } = "";
         }
     }
 }
