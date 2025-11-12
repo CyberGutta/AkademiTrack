@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using System;
@@ -15,7 +16,7 @@ namespace AkademiTrack.ViewModels
         {
             Title = "Varsel Tillatelser";
             Width = 500;
-            Height = 320;
+            Height = 440;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             CanResize = false;
             ShowInTaskbar = false;
@@ -30,6 +31,43 @@ namespace AkademiTrack.ViewModels
             {
                 Background = Brushes.White,
                 Padding = new Thickness(30)
+            };
+
+            var mainGrid = new Grid();
+            
+            // Close button in top-right corner
+            var closeButton = new Button
+            {
+                Content = "✕",
+                Width = 32,
+                Height = 32,
+                Background = Brushes.Transparent,
+                Foreground = new SolidColorBrush(Color.Parse("#999999")),
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, -10, -10, 0),
+                BorderThickness = new Thickness(0),
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            
+            // Hover effect for close button
+            closeButton.PointerEntered += (s, e) =>
+            {
+                closeButton.Foreground = new SolidColorBrush(Color.Parse("#FF3B30"));
+                closeButton.Background = new SolidColorBrush(Color.Parse("#FFEBEE"));
+            };
+            closeButton.PointerExited += (s, e) =>
+            {
+                closeButton.Foreground = new SolidColorBrush(Color.Parse("#999999"));
+                closeButton.Background = Brushes.Transparent;
+            };
+            
+            closeButton.Click += async (s, e) =>
+            {
+                UserGrantedPermission = false;
+                await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                Close();
             };
 
             var stackPanel = new StackPanel
@@ -84,61 +122,115 @@ namespace AkademiTrack.ViewModels
 
             var buttonPanel = new StackPanel
             {
-                Orientation = Orientation.Horizontal,
+                Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Spacing = 12,
+                Spacing = 10,
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
-            var laterButton = new Button
+            // Primary action button - Activate notifications
+            var enableButton = new Button
             {
-                Content = "Senere",
-                Width = 120,
+                Content = "Aktiver Varsler",
+                Width = 280,
+                Height = 44,
+                Background = new SolidColorBrush(Color.Parse("#007AFF")),
+                Foreground = Brushes.White,
+                Padding = new Thickness(20, 12),
+                CornerRadius = new CornerRadius(8),
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 15,
+                BorderThickness = new Thickness(0),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            
+            // Hover effect for enable button
+            enableButton.PointerEntered += (s, e) =>
+            {
+                if (enableButton.IsEnabled)
+                    enableButton.Background = new SolidColorBrush(Color.Parse("#0051D5"));
+            };
+            enableButton.PointerExited += (s, e) =>
+            {
+                if (enableButton.IsEnabled)
+                    enableButton.Background = new SolidColorBrush(Color.Parse("#007AFF"));
+            };
+            
+            enableButton.Click += async (s, e) =>
+            {
+                UserGrantedPermission = true;
+                enableButton.IsEnabled = false;
+                enableButton.Content = "Sender testvarsel...";
+                enableButton.Background = new SolidColorBrush(Color.Parse("#007AFF")) { Opacity = 0.6 };
+                enableButton.Cursor = new Cursor(StandardCursorType.Wait);
+                
+                await AkademiTrack.Services.NotificationPermissionChecker.RequestPermissionAsync();
+                await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                
+                // Small delay to show feedback
+                await Task.Delay(1000);
+                
+                Close();
+            };
+
+            // Secondary button - Open settings
+            var settingsButton = new Button
+            {
+                Content = "Åpne Systeminnstillinger",
+                Width = 280,
+                Height = 44,
                 Background = new SolidColorBrush(Color.Parse("#F0F0F0")),
                 Foreground = new SolidColorBrush(Color.Parse("#333333")),
-                Padding = new Thickness(20, 10),
-                CornerRadius = new CornerRadius(8)
+                Padding = new Thickness(20, 12),
+                CornerRadius = new CornerRadius(8),
+                FontSize = 14,
+                BorderThickness = new Thickness(0),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
             };
-            laterButton.Click += (s, e) =>
+            
+            // Hover effect for settings button
+            settingsButton.PointerEntered += (s, e) =>
             {
+                settingsButton.Background = new SolidColorBrush(Color.Parse("#E0E0E0"));
+            };
+            settingsButton.PointerExited += (s, e) =>
+            {
+                settingsButton.Background = new SolidColorBrush(Color.Parse("#F0F0F0"));
+            };
+            
+            settingsButton.Click += async (s, e) =>
+            {
+                AkademiTrack.Services.NotificationPermissionChecker.OpenMacNotificationSettings();
+                await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
                 UserGrantedPermission = false;
                 Close();
             };
 
-            var enableButton = new Button
-            {
-                Content = "Aktiver Varsler",
-                Width = 160,
-                Background = new SolidColorBrush(Color.Parse("#007AFF")),
-                Foreground = Brushes.White,
-                Padding = new Thickness(20, 10),
-                CornerRadius = new CornerRadius(8),
-                FontWeight = FontWeight.SemiBold
-            };
-            enableButton.Click += async (s, e) =>
-            {
-                UserGrantedPermission = true;
-                await Services.NotificationPermissionChecker.RequestPermissionAsync();
-                Services.NotificationPermissionChecker.OpenMacNotificationSettings();
-                Close();
-            };
-
-            buttonPanel.Children.Add(laterButton);
             buttonPanel.Children.Add(enableButton);
+            buttonPanel.Children.Add(settingsButton);
             stackPanel.Children.Add(buttonPanel);
 
             // Help text
             var helpText = new TextBlock
             {
-                Text = "Du kan endre dette senere i Systeminnstillinger",
+                Text = "Klikk 'Aktiver Varsler' for å sende et testvarsel.\nDu vil bli bedt om å tillate varsler i macOS.",
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Color.Parse("#999999")),
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 5, 0, 0)
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 5, 0, 0),
+                LineHeight = 16
             };
             stackPanel.Children.Add(helpText);
 
-            mainBorder.Child = stackPanel;
+            mainGrid.Children.Add(stackPanel);
+            mainGrid.Children.Add(closeButton);
+
+            mainBorder.Child = mainGrid;
             Content = mainBorder;
         }
     }
