@@ -15,6 +15,11 @@ namespace AkademiTrack.ViewModels
         
         // Static state to persist across window instances
         private static bool _notificationsEnabled = false;
+        
+        // Static lock to prevent multiple dialogs
+        private static bool _isDialogOpen = false;
+        private static readonly object _dialogLock = new object();
+        
         private Border? _enableButton;
         private Border? _settingsButton;
         private TextBlock? _enableButtonText;
@@ -33,83 +38,30 @@ namespace AkademiTrack.ViewModels
             Topmost = false;
             ExtendClientAreaToDecorationsHint = false;
             
+            // Prevent multiple dialogs from being created
+            lock (_dialogLock)
+            {
+                if (_isDialogOpen)
+                {
+                    System.Diagnostics.Debug.WriteLine("[NotificationDialog] Dialog already open - preventing duplicate");
+                    // Mark for immediate close
+                    this.Opened += (s, e) => Close();
+                    return;
+                }
+                _isDialogOpen = true;
+            }
+            
+            // Handle cleanup when window closes
+            this.Closed += (s, e) =>
+            {
+                lock (_dialogLock)
+                {
+                    _isDialogOpen = false;
+                    System.Diagnostics.Debug.WriteLine("[NotificationDialog] Dialog closed - lock released");
+                }
+            };
+            
             BuildContent();
-        }
-
-        protected override void OnOpened(EventArgs e)
-        {
-            base.OnOpened(e);
-            System.Diagnostics.Debug.WriteLine("[NotificationDialog] Dialog opened, starting permission check loop");
-            _ = PermissionCheckLoopAsync();
-        }
-
-        private async Task PermissionCheckLoopAsync()
-        {
-            // Wait a bit before first check
-            await Task.Delay(500);
-            
-            while (IsVisible)
-            {
-                try
-                {
-                    bool isEnabled = await CheckIfNotificationsReallyEnabledAsync();
-                    System.Diagnostics.Debug.WriteLine($"[NotificationDialog] Permission check result: {isEnabled}");
-                    
-                    if (isEnabled)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[NotificationDialog] Notifications ARE enabled, closing now!");
-                        await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                        Close();
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[NotificationDialog] Check error: {ex.Message}");
-                }
-                
-                await Task.Delay(1500); // Check every 1.5 seconds
-            }
-        }
-
-        private async Task<bool> CheckIfNotificationsReallyEnabledAsync()
-        {
-            try
-            {
-                // ONLY check for flags = 16 which means notifications are ACTUALLY enabled
-                // Just being in the notification center doesn't mean they're enabled!
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "/bin/bash",
-                    Arguments = "-c \"defaults read ~/Library/Preferences/com.apple.ncprefs.plist 2>/dev/null | grep -B 2 'AkademiTrack' | grep -A 2 'AkademiTrack' | grep 'flags' | grep '16'\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(startInfo);
-                if (process != null)
-                {
-                    await process.WaitForExitAsync();
-                    var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
-                    
-                    System.Diagnostics.Debug.WriteLine($"[NotificationDialog] Permission check output: '{output}'");
-                    
-                    // Only return true if we find "flags = 16" or "flags = (16)"
-                    bool isEnabled = !string.IsNullOrEmpty(output) && 
-                                   (output.Contains("flags = 16") || output.Contains("flags = (") && output.Contains("16"));
-                    
-                    System.Diagnostics.Debug.WriteLine($"[NotificationDialog] Is enabled: {isEnabled}");
-                    return isEnabled;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[NotificationDialog] Error checking: {ex.Message}");
-            }
-            
-            return false;
         }
 
         private Border CreateStyledButton(
