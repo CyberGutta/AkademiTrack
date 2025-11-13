@@ -430,7 +430,29 @@ Terminal=false
                     _startMinimized = value;
                     OnPropertyChanged();
                     _ = SaveSettingsAsync();
+
+                    _ = RefreshMainWindowSettings();
                 }
+            }
+        }
+
+        private async Task RefreshMainWindowSettings()
+        {
+            try
+            {
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var mainWindow = desktop.MainWindow as MainWindow;
+                    if (mainWindow != null)
+                    {
+                        await mainWindow.RefreshSettingsAsync();
+                        Debug.WriteLine("✓ MainWindow settings cache refreshed");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error refreshing MainWindow settings: {ex.Message}");
             }
         }
 

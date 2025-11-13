@@ -11,47 +11,66 @@ namespace AkademiTrack.Views
 {
     public partial class MainWindow : Window
     {
+        private bool _hasShownMinimizeNotification = false;
+        private bool _isReallyClosing = false;
+        private AkademiTrack.ViewModels.AppSettings? _cachedSettings;
+
         public MainWindow()
         {
             InitializeComponent();
-            //DataContext = new MainWindowViewModel();
 
             this.Closing += MainWindow_Closing;
             this.WindowState = WindowState.Normal;
-
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+            _ = LoadSettingsAsync();
+        }
+
+        private async Task LoadSettingsAsync()
+        {
+            try
+            {
+                _cachedSettings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading settings: {ex.Message}");
+            }
+        }
+
+        public async Task RefreshSettingsAsync()
+        {
+            await LoadSettingsAsync();
         }
 
         private async void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
         {
             try
             {
-                var settings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                if (_isReallyClosing)
+                {
+                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    return;
+                }
 
-                if (settings.StartMinimized && settings.StartWithSystem)
+                if (_cachedSettings == null)
+                {
+                    _cachedSettings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                }
+
+                if (_cachedSettings.StartMinimized)
                 {
                     e.Cancel = true;
+                    AkademiTrack.Services.TrayIconManager.MinimizeToTray();
 
-                    var result = await AkademiTrack.Views.ConfirmationDialog.ShowAsync(
-                        this,
-                        "Minimer til systemstatusfeltet?",
-                        "Vil du minimere til systemstatusfeltet eller avslutte helt?\n\n" +
-                        "Tips: Du kan alltid avslutte ved å høyreklikke på ikonet i systemstatusfeltet.",
-                        false
-                    );
-
-                    if (result)
+                    if (!_hasShownMinimizeNotification)
                     {
-                        AkademiTrack.Services.TrayIconManager.MinimizeToTray();
-                    }
-                    else
-                    {
-                        AkademiTrack.Services.TrayIconManager.Dispose();
-
-                        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                        {
-                            desktop.Shutdown(0);
-                        }
+                        AkademiTrack.Services.NativeNotificationService.Show(
+                            "AkademiTrack kjører fortsatt",
+                            "Programmet kjører i bakgrunnen. Høyreklikk på tray-ikonet og velg 'Avslutt' for å lukke helt.",
+                            "INFO"
+                        );
+                        _hasShownMinimizeNotification = true;
                     }
                 }
                 else
@@ -62,7 +81,6 @@ namespace AkademiTrack.Views
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error in MainWindow_Closing: {ex.Message}");
-
                 AkademiTrack.Services.TrayIconManager.Dispose();
             }
         }
@@ -75,30 +93,20 @@ namespace AkademiTrack.Views
             {
                 var newState = (WindowState)(change.NewValue ?? WindowState.Normal);
 
-                if (newState == WindowState.Minimized)
+                if (newState == WindowState.Minimized && _cachedSettings?.StartMinimized == true)
                 {
-
-                    Task.Run(async () =>
+                    Dispatcher.UIThread.Post(() =>
                     {
-                        try
-                        {
-                            var settings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
-
-                            if (settings.StartMinimized && settings.StartWithSystem)
-                            {
-                                await Dispatcher.UIThread.InvokeAsync(() =>
-                                {
-                                    AkademiTrack.Services.TrayIconManager.MinimizeToTray();
-                                });
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"Error handling minimize: {ex.Message}");
-                        }
+                        AkademiTrack.Services.TrayIconManager.MinimizeToTray();
                     });
                 }
             }
+        }
+
+        public void ReallyClose()
+        {
+            _isReallyClosing = true;
+            Close();
         }
 
         private void OnWindowLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -121,7 +129,7 @@ namespace AkademiTrack.Views
                 var windowHeight = this.Height;
 
                 var centerX = screenX + (screenWidth - windowWidth) / 2;
-                var centerY = screenY + (screenHeight - windowHeight) / 2;
+                var centerY = screenY + (screenY + screenHeight - windowHeight) / 2;
 
                 Position = new PixelPoint((int)centerX, (int)centerY);
             }
