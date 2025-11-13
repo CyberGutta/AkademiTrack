@@ -13,45 +13,55 @@ namespace AkademiTrack.ViewModels
     {
         public bool UserGrantedPermission { get; private set; }
         
-        // Static state to persist across window instances
         private static bool _notificationsEnabled = false;
         
-        // Static lock to prevent multiple dialogs
         private static bool _isDialogOpen = false;
         private static readonly object _dialogLock = new object();
         
+        public static bool IsDialogCurrentlyOpen 
+        { 
+            get 
+            { 
+                lock (_dialogLock) 
+                { 
+                    return _isDialogOpen; 
+                } 
+            } 
+        }
+        
         private Border? _enableButton;
         private Border? _settingsButton;
+        private Border? _skipButton;
+        private Border? _doneButton;
         private TextBlock? _enableButtonText;
+        private TextBlock? _instructionText;
+        private Border? _stepIndicator;
 
         public NotificationPermissionDialog()
         {
-            Title = "Varsel Tillatelser";
-            Width = 500;
-            Height = 440;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            CanResize = false;
-            ShowInTaskbar = false;
-            SystemDecorations = SystemDecorations.BorderOnly;
-            
-            // Keep window within app, not system-modal
-            Topmost = false;
-            ExtendClientAreaToDecorationsHint = false;
-            
-            // Prevent multiple dialogs from being created
             lock (_dialogLock)
             {
                 if (_isDialogOpen)
                 {
                     System.Diagnostics.Debug.WriteLine("[NotificationDialog] Dialog already open - preventing duplicate");
-                    // Mark for immediate close
+                    this.IsVisible = false;
                     this.Opened += (s, e) => Close();
                     return;
                 }
                 _isDialogOpen = true;
             }
             
-            // Handle cleanup when window closes
+            Title = "Varsel Tillatelser";
+            Width = 480;
+            Height = 520;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            CanResize = false;
+            ShowInTaskbar = false;
+            SystemDecorations = SystemDecorations.BorderOnly;
+            
+            Topmost = false;
+            ExtendClientAreaToDecorationsHint = false;
+            
             this.Closed += (s, e) =>
             {
                 lock (_dialogLock)
@@ -77,8 +87,8 @@ namespace AkademiTrack.ViewModels
             var textBlock = new TextBlock
             {
                 Text = text,
-                FontSize = text == "✕" ? 18 : (text == "Aktiver Varsler" ? 15 : 14),
-                FontWeight = text == "Aktiver Varsler" ? FontWeight.SemiBold : FontWeight.Normal,
+                FontSize = text == "✕" ? 18 : (text == "Aktiver Varsler" || text == "Ferdig" ? 15 : 13),
+                FontWeight = text == "Aktiver Varsler" || text == "Ferdig" ? FontWeight.SemiBold : FontWeight.Normal,
                 Foreground = new SolidColorBrush(Color.Parse(fgColor)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
@@ -148,12 +158,11 @@ namespace AkademiTrack.ViewModels
             var mainBorder = new Border
             {
                 Background = Brushes.White,
-                Padding = new Thickness(30)
+                Padding = new Thickness(25)
             };
 
             var mainGrid = new Grid();
             
-            // Close button in top-right corner
             var closeButton = CreateStyledButton(
                 "✕",
                 32,
@@ -174,7 +183,7 @@ namespace AkademiTrack.ViewModels
 
             var stackPanel = new StackPanel
             {
-                Spacing = 20
+                Spacing = 18
             };
 
             var iconBorder = new Border
@@ -199,7 +208,7 @@ namespace AkademiTrack.ViewModels
             var title = new TextBlock
             {
                 Text = "Aktiver Varsler",
-                FontSize = 22,
+                FontSize = 20,
                 FontWeight = FontWeight.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Foreground = new SolidColorBrush(Color.Parse("#1A1A1A"))
@@ -208,32 +217,67 @@ namespace AkademiTrack.ViewModels
 
             var description = new TextBlock
             {
-                Text = "AkademiTrack trenger tillatelse til å sende varsler for å holde deg informert om:\n\n" +
+                Text = "AkademiTrack vil holde deg informert om:\n\n" +
                        "• Automatisk registrering av STU-timer\n" +
                        "• Viktige oppdateringer og meldinger\n" +
                        "• Status for automatisering",
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 14,
+                FontSize = 13,
                 Foreground = new SolidColorBrush(Color.Parse("#666666")),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                MaxWidth = 400,
-                LineHeight = 22
+                MaxWidth = 380,
+                LineHeight = 20
             };
             stackPanel.Children.Add(description);
+
+            _stepIndicator = new Border
+            {
+                Background = new SolidColorBrush(Color.Parse("#E8F5E9")),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 12, 16, 12),
+                IsVisible = false,
+                MaxWidth = 380
+            };
+
+            var stepStack = new StackPanel { Spacing = 8 };
+            
+            var stepTitle = new TextBlock
+            {
+                Text = "✓ Testvarsel Sendt!",
+                FontSize = 14,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.Parse("#2E7D32"))
+            };
+            stepStack.Children.Add(stepTitle);
+
+            _instructionText = new TextBlock
+            {
+                Text = "1. Åpne Systeminnstillinger\n" +
+                       "2. Gå til 'Varslinger'\n" +
+                       "3. Finn 'AkademiTrack'\n" +
+                       "4. Slå på 'Tillat varsler'",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Color.Parse("#555555")),
+                LineHeight = 18
+            };
+            stepStack.Children.Add(_instructionText);
+
+            _stepIndicator.Child = stepStack;
+            stackPanel.Children.Add(_stepIndicator);
 
             var buttonPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Spacing = 10,
-                Margin = new Thickness(0, 10, 0, 0)
+                Margin = new Thickness(0, 8, 0, 0)
             };
 
-            // Primary action button - Activate notifications
             _enableButton = CreateStyledButton(
                 "Aktiver Varsler",
-                280,
+                300,
                 44,
                 "#007AFF",
                 "#FFFFFF",
@@ -242,37 +286,67 @@ namespace AkademiTrack.ViewModels
             );
             _enableButtonText = (TextBlock)_enableButton.Child!;
 
-            // Secondary button - Open settings (initially disabled)
             _settingsButton = CreateStyledButton(
-                "Åpne Systeminnstillinger",
-                280,
+                "→ Åpne Systeminnstillinger",
+                300,
                 44,
-                "#F0F0F0",
-                "#999999",
-                "#E0E0E0",
+                "#007AFF",
+                "#FFFFFF",
+                "#0051D5",
                 () =>
                 {
                     System.Diagnostics.Debug.WriteLine("Opening macOS notification settings...");
                     AkademiTrack.Services.NotificationPermissionChecker.OpenMacNotificationSettings();
-                    // Don't close or reset - just open settings
                 },
-                false // Initially disabled
+                true
+            );
+            _settingsButton.IsVisible = false;
+
+            _doneButton = CreateStyledButton(
+                "Jeg har aktivert varsler",
+                300,
+                40,
+                "#F5F5F5",
+                "#666666",
+                "#E0E0E0",
+                async () =>
+                {
+                    await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                    Close();
+                }
+            );
+            _doneButton.IsVisible = false;
+
+            // Skip button
+            _skipButton = CreateStyledButton(
+                "Hopp over",
+                300,
+                38,
+                "#FFFFFF",
+                "#999999",
+                "#F5F5F5",
+                async () =>
+                {
+                    UserGrantedPermission = false;
+                    await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                    Close();
+                }
             );
 
             buttonPanel.Children.Add(_enableButton);
             buttonPanel.Children.Add(_settingsButton);
+            buttonPanel.Children.Add(_doneButton);
+            buttonPanel.Children.Add(_skipButton);
             stackPanel.Children.Add(buttonPanel);
 
-            // Help text
             var helpText = new TextBlock
             {
-                Text = "Klikk 'Aktiver Varsler' for å sende et testvarsel.\nDu vil bli bedt om å tillate varsler i macOS.",
+                Text = "Du kan endre dette senere i Systeminnstillinger",
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Color.Parse("#999999")),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 5, 0, 0),
-                LineHeight = 16
+                Margin = new Thickness(0, 2, 0, 0)
             };
             stackPanel.Children.Add(helpText);
 
@@ -282,7 +356,6 @@ namespace AkademiTrack.ViewModels
             mainBorder.Child = mainGrid;
             Content = mainBorder;
 
-            // Restore state if already enabled (in case window was deactivated)
             if (_notificationsEnabled)
             {
                 RestoreEnabledState();
@@ -291,7 +364,7 @@ namespace AkademiTrack.ViewModels
 
         private async Task EnableNotificationsAsync()
         {
-            if (_notificationsEnabled) return; // Prevent double-click
+            if (_notificationsEnabled) return;
             
             _notificationsEnabled = true;
             UserGrantedPermission = true;
@@ -300,31 +373,55 @@ namespace AkademiTrack.ViewModels
             _enableButton!.Cursor = new Cursor(StandardCursorType.Wait);
             _enableButtonText!.Text = "Sender testvarsel...";
             
+            this.Height = 580;
+            
+            if (_stepIndicator != null)
+            {
+                _stepIndicator.IsVisible = true;
+            }
+            
             await AkademiTrack.Services.NotificationPermissionChecker.RequestPermissionAsync();
             
-            // Enable the settings button
-            SetButtonEnabled(_settingsButton!, true);
-            var settingsText = (TextBlock)_settingsButton!.Child!;
-            settingsText.Foreground = new SolidColorBrush(Color.Parse("#333333"));
+            await Task.Delay(1500);
             
-            _enableButtonText.Text = "Varsler Aktivert! ✓";
-            _enableButton.Background = new SolidColorBrush(Color.Parse("#34C759"));
+            _enableButton.IsVisible = false;
             
-            // Mark as dismissed so it doesn't show again on next launch
+            if (_doneButton != null)
+            {
+                _doneButton.IsVisible = true;
+            }
+            
+            if (_settingsButton != null)
+            {
+                _settingsButton.IsVisible = true;
+            }
+            
+            if (_skipButton != null)
+            {
+                _skipButton.IsVisible = false;
+            }
+            
             await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
         }
 
         private void RestoreEnabledState()
         {
-            if (_enableButton != null && _enableButtonText != null && _settingsButton != null)
+            if (_enableButton != null && _doneButton != null && _settingsButton != null && _stepIndicator != null)
             {
-                SetButtonEnabled(_enableButton, false);
-                _enableButtonText.Text = "Varsler Aktivert! ✓";
-                _enableButton.Background = new SolidColorBrush(Color.Parse("#34C759"));
+                // Expand window
+                this.Height = 580;
                 
-                SetButtonEnabled(_settingsButton, true);
-                var settingsText = (TextBlock)_settingsButton.Child!;
-                settingsText.Foreground = new SolidColorBrush(Color.Parse("#333333"));
+                _enableButton.IsVisible = false;
+                
+                _stepIndicator.IsVisible = true;
+                
+                _doneButton.IsVisible = true;
+                _settingsButton.IsVisible = true;
+                
+                if (_skipButton != null)
+                {
+                    _skipButton.IsVisible = false;
+                }
             }
         }
 
