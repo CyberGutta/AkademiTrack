@@ -345,8 +345,8 @@
 								<TextBlock Text="DENNE MÅNEDEN" Classes="card-label"/>
 								<TextBlock Text="📝" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
-							<TextBlock Text="45/52" Classes="card-value orange"/>
-							<TextBlock Text="86.5% fremmøte" Classes="card-subtext"/>
+							<TextBlock Text="{Binding Dashboard.MonthlyDisplay}" Classes="card-value orange"/>
+							<TextBlock Text="{Binding Dashboard.MonthlyStatus}" Classes="card-subtext"/>
 						</StackPanel>
 					</Border>
 

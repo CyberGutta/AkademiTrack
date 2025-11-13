@@ -21,6 +21,76 @@ namespace AkademiTrack.ViewModels
         private string _nextClassName = "Ingen time";
         private string _nextClassTime = "--:-- - --:--";
         private string _nextClassRoom = "";
+
+        // Monthly attendance
+        private string _monthlyDisplay = "0/0";
+        private string _monthlyStatus = "0% fremmøte";
+
+        public string MonthlyDisplay
+        {
+            get => _monthlyDisplay;
+            set
+            {
+                _monthlyDisplay = value;
+                OnPropertyChanged(nameof(MonthlyDisplay));
+            }
+        }
+
+        public string MonthlyStatus
+        {
+            get => _monthlyStatus;
+            set
+            {
+                _monthlyStatus = value;
+                OnPropertyChanged(nameof(MonthlyStatus));
+            }
+        }
+
+        // Weekly attendance
+        private string _weeklyPercentage = "0%";
+        private string _weeklyDisplay = "0 av 0 økter registrert";
+        private string _weeklyRemaining = "0 økter gjenstår";
+        private List<DailyAttendance> _weeklyDays = new List<DailyAttendance>();
+
+        public string WeeklyPercentage
+        {
+            get => _weeklyPercentage;
+            set
+            {
+                _weeklyPercentage = value;
+                OnPropertyChanged(nameof(WeeklyPercentage));
+            }
+        }
+
+        public string WeeklyDisplay
+        {
+            get => _weeklyDisplay;
+            set
+            {
+                _weeklyDisplay = value;
+                OnPropertyChanged(nameof(WeeklyDisplay));
+            }
+        }
+
+        public string WeeklyRemaining
+        {
+            get => _weeklyRemaining;
+            set
+            {
+                _weeklyRemaining = value;
+                OnPropertyChanged(nameof(WeeklyRemaining));
+            }
+        }
+
+        public List<DailyAttendance> WeeklyDays
+        {
+            get => _weeklyDays;
+            set
+            {
+                _weeklyDays = value;
+                OnPropertyChanged(nameof(WeeklyDays));
+            }
+        }
         
         // Over/Undertid
         private string _overtimeValue = "0.0";
@@ -162,12 +232,34 @@ namespace AkademiTrack.ViewModels
                         UpdateNextClassDisplay(todayData);
                     });
                 }
+
+                // Fetch monthly attendance
+                var monthlyData = await _attendanceService.GetMonthlyAttendanceAsync();
+                if (monthlyData != null)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        UpdateMonthlyDisplay(monthlyData);
+                    });
+                }
+
+                // Fetch weekly attendance
+                var weeklyData = await _attendanceService.GetWeeklyAttendanceAsync();
+                if (weeklyData != null)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        UpdateWeeklyDisplay(weeklyData);
+                    });
+                }
             }
             catch (Exception)
             {
                 // Log error if needed
             }
         }
+
+        
 
 
         private void UpdateTodayDisplay(TodayScheduleData data)
@@ -197,12 +289,12 @@ namespace AkademiTrack.ViewModels
         {
             // Prioritize NextClass, but fall back to CurrentClass if no next class
             var displayClass = data.NextClass ?? data.CurrentClass;
-            
+
             if (displayClass != null)
             {
                 // Get full subject name from Fag field if available
                 NextClassName = GetSubjectDisplayName(displayClass);
-                
+
                 // Format time (from "1015" to "10:15")
                 if (!string.IsNullOrEmpty(displayClass.StartKl) && !string.IsNullOrEmpty(displayClass.SluttKl))
                 {
@@ -214,7 +306,7 @@ namespace AkademiTrack.ViewModels
                 {
                     NextClassTime = "--:-- - --:--";
                 }
-                
+
                 // Room information isn't in the API response, so we'll leave it empty or use a placeholder
                 NextClassRoom = ""; // Can be updated if room data becomes available
             }
@@ -224,6 +316,23 @@ namespace AkademiTrack.ViewModels
                 NextClassTime = "--:-- - --:--";
                 NextClassRoom = "";
             }
+        }
+
+        private void UpdateMonthlyDisplay(MonthlyAttendanceData data)
+        {
+            MonthlyDisplay = $"{data.RegisteredSessions}/{data.TotalSessions}";
+            MonthlyStatus = $"{data.AttendancePercentage:F1}% fremmøte";
+        }
+        
+        private void UpdateWeeklyDisplay(WeeklyAttendanceData data)
+        {
+            WeeklyPercentage = $"{data.WeeklyPercentage:F0}%";
+            WeeklyDisplay = $"{data.TotalRegistered} av {data.TotalSessions} økter registrert";
+            
+            int remaining = data.TotalSessions - data.TotalRegistered;
+            WeeklyRemaining = remaining > 0 ? $"{remaining} økter gjenstår" : "Alle økter fullført!";
+            
+            WeeklyDays = data.DailyAttendance ?? new List<DailyAttendance>();
         }
 
         private string GetSubjectDisplayName(Services.ScheduleItem item)

@@ -109,6 +109,218 @@ namespace AkademiTrack.Services
             }
         }
 
+        public async Task<MonthlyAttendanceData?> GetMonthlyAttendanceAsync()
+        {
+            try
+            {
+                if (_userParameters == null || _cookies == null)
+                {
+                    Console.WriteLine("[MONTHLY DEBUG] No parameters or cookies available");
+                    return null;
+                }
+
+                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+
+                // Calculate first and last day of current month
+                var now = DateTime.Now;
+                var firstDayOfMonth = new DateTime(now.Year, now.Month, 1);
+                var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+
+                var startDate = firstDayOfMonth.ToString("yyyyMMdd");
+                var endDate = lastDayOfMonth.ToString("yyyyMMdd");
+
+                Console.WriteLine($"[MONTHLY DEBUG] Date range: {startDate} to {endDate}");
+
+                // Use the VoTimeplan_elev endpoint with date range
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={startDate},endDate={endDate}&onlyData=true&limit=1000&totalResults=true";
+
+                Console.WriteLine($"[MONTHLY DEBUG] Request URL: {url}");
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Accept-Language", "no-NB");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+
+                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                request.Headers.Add("Cookie", cookieString);
+
+                var response = await _httpClient.SendAsync(request);
+
+                Console.WriteLine($"[MONTHLY DEBUG] Response status: {response.StatusCode}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[MONTHLY DEBUG] Request failed with status {response.StatusCode}");
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                Console.WriteLine($"[MONTHLY DEBUG] JSON length: {json.Length}");
+
+                // Need to deserialize with fields: Fag, Fagnavn, Fravaer (from your JSON example)
+                var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (scheduleResponse?.Items == null)
+                {
+                    Console.WriteLine($"[MONTHLY DEBUG] scheduleResponse is null or has no items");
+                    return null;
+                }
+
+                Console.WriteLine($"[MONTHLY DEBUG] Total items received: {scheduleResponse.Items.Count}");
+
+                // Print first few items to see what we're getting
+                if (scheduleResponse.Items.Count > 0)
+                {
+                    var firstItem = scheduleResponse.Items[0];
+                    Console.WriteLine($"[MONTHLY DEBUG] Sample item #1 - Fag: '{firstItem.Fag}', Fagnavn: '{firstItem.Fagnavn}', Fravaer: '{firstItem.Fravaer}'");
+
+                    if (scheduleResponse.Items.Count > 1)
+                    {
+                        var secondItem = scheduleResponse.Items[1];
+                        Console.WriteLine($"[MONTHLY DEBUG] Sample item #2 - Fag: '{secondItem.Fag}', Fagnavn: '{secondItem.Fagnavn}', Fravaer: '{secondItem.Fravaer}'");
+                    }
+                }
+
+                // Count STU sessions - look for "STU" in Fag field or "Studietid" in Fagnavn
+                var stuSessions = scheduleResponse.Items.Where(i =>
+                    (i.Fag != null && i.Fag.Contains("STU")) ||
+                    (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
+                ).ToList();
+
+                Console.WriteLine($"[MONTHLY DEBUG] STU sessions found: {stuSessions.Count}");
+
+                if (stuSessions.Count > 0)
+                {
+                    Console.WriteLine($"[MONTHLY DEBUG] First STU session - Fag: '{stuSessions[0].Fag}', Fagnavn: '{stuSessions[0].Fagnavn}', Fravaer: '{stuSessions[0].Fravaer}'");
+                }
+
+                // Count registered (Fravaer = "M" means "Møtt" = attended)
+                var registeredCount = stuSessions.Count(s => s.Fravaer == "M");
+                var totalCount = stuSessions.Count;
+
+                Console.WriteLine($"[MONTHLY DEBUG] Registered: {registeredCount}, Total: {totalCount}");
+
+                double percentage = totalCount > 0 ? (double)registeredCount / totalCount * 100 : 0;
+
+                Console.WriteLine($"[MONTHLY DEBUG] Percentage: {percentage:F1}%");
+
+                return new MonthlyAttendanceData
+                {
+                    RegisteredSessions = registeredCount,
+                    TotalSessions = totalCount,
+                    AttendancePercentage = percentage
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MONTHLY DEBUG] Exception: {ex.Message}");
+                Console.WriteLine($"[MONTHLY DEBUG] Stack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+        
+        // Fetch THIS WEEK's attendance data
+        public async Task<WeeklyAttendanceData?> GetWeeklyAttendanceAsync()
+        {
+            try
+            {
+                if (_userParameters == null || _cookies == null)
+                    return null;
+
+                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                
+                // Calculate Monday-Friday of current week
+                var today = DateTime.Now;
+                var dayOfWeek = (int)today.DayOfWeek;
+                
+                // Adjust for Monday as start of week (Monday = 1, Sunday = 0)
+                var daysUntilMonday = dayOfWeek == 0 ? -6 : -(dayOfWeek - 1);
+                var monday = today.AddDays(daysUntilMonday);
+                var friday = monday.AddDays(4);
+                
+                var startDate = monday.ToString("yyyyMMdd");
+                var endDate = friday.ToString("yyyyMMdd");
+                
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={startDate},endDate={endDate}&onlyData=true&limit=1000&totalResults=true";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Accept-Language", "no-NB");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+
+                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                request.Headers.Add("Cookie", cookieString);
+
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var json = await response.Content.ReadAsStringAsync();
+                var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (scheduleResponse?.Items == null)
+                    return null;
+
+                // Group by day (Monday through Friday)
+                var dailyStats = new List<DailyAttendance>();
+                
+                for (int i = 0; i < 5; i++)
+                {
+                    var currentDay = monday.AddDays(i);
+                    var dayString = currentDay.ToString("yyyyMMdd");
+                    
+                    // Get all STU sessions for this day
+                    var dayStuSessions = scheduleResponse.Items.Where(item =>
+                        item.Dato == dayString &&
+                        ((item.Fag != null && item.Fag.Contains("STU")) || 
+                        (item.Fagnavn != null && item.Fagnavn.Contains("Studietid")))
+                    ).ToList();
+                    
+                    var registeredCount = dayStuSessions.Count(s => s.Fravaer == "M");
+                    var totalCount = dayStuSessions.Count;
+                    
+                    dailyStats.Add(new DailyAttendance
+                    {
+                        DayOfWeek = currentDay.DayOfWeek,
+                        Date = currentDay,
+                        RegisteredSessions = registeredCount,
+                        TotalSessions = totalCount,
+                        FillPercentage = totalCount > 0 ? (double)registeredCount / totalCount * 100 : 0
+                    });
+                }
+                
+                // Calculate weekly totals
+                var weeklyRegistered = dailyStats.Sum(d => d.RegisteredSessions);
+                var weeklyTotal = dailyStats.Sum(d => d.TotalSessions);
+                var weeklyPercentage = weeklyTotal > 0 ? (double)weeklyRegistered / weeklyTotal * 100 : 0;
+                
+                return new WeeklyAttendanceData
+                {
+                    DailyAttendance = dailyStats,
+                    TotalRegistered = weeklyRegistered,
+                    TotalSessions = weeklyTotal,
+                    WeeklyPercentage = weeklyPercentage
+                };
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         private TimeSpan? ParseTimeString(string? timeStr)
         {
             if (string.IsNullOrEmpty(timeStr) || timeStr.Length != 4)
@@ -154,7 +366,7 @@ namespace AkademiTrack.Services
                     StartTime = ParseTimeString(i.StartKl),
                     EndTime = ParseTimeString(i.SluttKl)
                 })
-                .Where(x => x.StartTime.HasValue && x.EndTime.HasValue && 
+                .Where(x => x.StartTime.HasValue && x.EndTime.HasValue &&
                            x.StartTime.Value <= now && x.EndTime.Value >= now)
                 .OrderBy(x => x.StartTime)
                 .ToList();
@@ -253,4 +465,56 @@ namespace AkademiTrack.Services
         public ScheduleItem? CurrentClass { get; set; }
         public List<ScheduleItem>? AllTodayItems { get; set; }
     }
-}
+    public class MonthlyAttendanceData
+    {
+        public int RegisteredSessions { get; set; }
+        public int TotalSessions { get; set; }
+        public double AttendancePercentage { get; set; }
+    }
+
+    public class MonthlyScheduleItem
+    {
+        public string? Id { get; set; } 
+        public string? Dato { get; set; }
+        public int Timenr { get; set; }
+        public string? Fradato { get; set; }
+        public string? Tildato { get; set; }
+        public string? Fag { get; set; }
+        public string? Fagnavn { get; set; }
+        public string? Skoletype { get; set; }
+        public string? Romnr { get; set; }
+        public string? Kode { get; set; }
+        public string? Faglaerer { get; set; }
+        public string? ProviderId { get; set; }
+        public string? Fravaer { get; set; }  // "M" means registered (Møtt)
+        public string? Fravaerstekst { get; set; }
+        public string? Merknad { get; set; }
+        public string? Egenmelding { get; set; }
+        public string? Dokumentert { get; set; }
+        public string? Tidssone { get; set; }
+        public string? Timetype { get; set; }
+    }
+
+    public class MonthlyScheduleResponse
+    {
+        public List<MonthlyScheduleItem>? Items { get; set; }
+        public int TotalResults { get; set; }
+    }
+
+    public class WeeklyAttendanceData
+    {
+        public List<DailyAttendance>? DailyAttendance { get; set; }
+        public int TotalRegistered { get; set; }
+        public int TotalSessions { get; set; }
+        public double WeeklyPercentage { get; set; }
+    }
+
+    public class DailyAttendance
+    {
+        public DayOfWeek DayOfWeek { get; set; }
+        public DateTime Date { get; set; }
+        public int RegisteredSessions { get; set; }
+        public int TotalSessions { get; set; }
+        public double FillPercentage { get; set; } // 0-100 for the visual fill
+    }
+}   
