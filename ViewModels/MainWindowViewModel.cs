@@ -534,19 +534,18 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new SimpleCommand(ToggleThemeAsync);
 
-
-
             LogInfo("Applikasjon er klar");
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                _ = Task.Run(async () =>
+                // FIXED: Use Dispatcher.UIThread.Post instead of Task.Run
+                // This ensures the dialog runs on the UI thread with proper timing
+                Dispatcher.UIThread.Post(async () =>
                 {
                     await Task.Delay(2000);
                     await CheckAndRequestNotificationPermissionAsync();
                 });
             }
-
 
             _ = Task.Run(CheckAutoStartAutomationAsync);
 
@@ -558,11 +557,11 @@ namespace AkademiTrack.ViewModels
             );
 
             _schoolHoursCheckTimer = new Timer(
-                 async (state) => await CheckSchoolHoursAutoRestart(state),
-                 null,
-                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
-                 (int)TimeSpan.FromMinutes(1).TotalMilliseconds
-             );
+                async (state) => await CheckSchoolHoursAutoRestart(state),
+                null,
+                (int)TimeSpan.FromMinutes(1).TotalMilliseconds,
+                (int)TimeSpan.FromMinutes(1).TotalMilliseconds
+            );
         }
 
         private async Task CheckAndRequestNotificationPermissionAsync()

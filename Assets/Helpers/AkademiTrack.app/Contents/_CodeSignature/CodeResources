@@ -15,10 +15,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			iU4+63lNrXjgMeGkIRhSglC3mSE=
+			e1Am/ZDbBqngEaJDueg6iMO1kGc=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"894e3eeb794dad78e031e1a42118528250b79921"</string>
+			<string>identifier MacNotify and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "6SF4T9DUN4"</string>
 		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>
