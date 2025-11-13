@@ -26,13 +26,13 @@
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
 	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' or '$(RuntimeIdentifier)' == 'win-x86'">
 		<Content Include="Assets/Helpers/WinHelloAuth.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
-	<ItemGroup>
-	<None Include="Assets/Helpers/AkademiTrack.app\**\*">
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
+		<None Include="Assets/Helpers/AkademiTrack.app\**\*">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
 	</ItemGroup>
