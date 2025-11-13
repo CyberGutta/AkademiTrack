@@ -97,15 +97,15 @@ namespace AkademiTrack.Services
                 var now = await GetTrustedCurrentTimeAsync();
                 Debug.WriteLine($"=== AUTO-START CHECK at {now:yyyy-MM-dd HH:mm:ss} ===");
 
-                var lastRunDate = await GetLastSuccessfulRunDateAsync();
+                var completionStatus = await GetCompletionStatusAsync();
                 var today = now.Date;
 
-                if (lastRunDate.HasValue && lastRunDate.Value.Date == today)
+                if (completionStatus.HasValue && completionStatus.Value.Date == today)
                 {
-                    Debug.WriteLine($"[AUTO-START] Already ran today ({lastRunDate:yyyy-MM-dd HH:mm})");
+                    Debug.WriteLine($"[AUTO-START] Already COMPLETED today ({completionStatus:yyyy-MM-dd HH:mm})");
                     var nextDay = GetNextSchoolDay(now);
                     var nextStart = GetSchoolStartTime(nextDay);
-                    return (false, $"Allerede fullført i dag kl. {lastRunDate:HH:mm}", nextStart);
+                    return (false, $"Allerede fullført i dag kl. {completionStatus:HH:mm}", nextStart);
                 }
 
                 if (!await IsWithinSchoolHoursAsync())
@@ -122,7 +122,7 @@ namespace AkademiTrack.Services
                     return (false, "Utenfor skoletid", null);
                 }
 
-                Debug.WriteLine($"[AUTO-START] ✓ Should start - within school hours and not run today");
+                Debug.WriteLine($"[AUTO-START] ✓ Should start - within school hours and not completed today");
                 return (true, $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}", null);
             }
             catch (Exception ex)
@@ -137,7 +137,7 @@ namespace AkademiTrack.Services
         {
             var current = from.Date;
             
-            if (from.TimeOfDay < TimeSpan.FromHours(15, 15, 0))
+            if (from.TimeOfDay < TimeSpan.FromHours(15.25))
             {
                 var todayStart = GetSchoolStartTime(current);
                 if (todayStart > from)
@@ -190,17 +190,35 @@ namespace AkademiTrack.Services
             };
         }
 
+        public static async Task MarkTodayAsStartedAsync()
+        {
+            try
+            {
+                var now = await GetTrustedCurrentTimeAsync();
+                var filePath = GetLastRunFilePath();
+                var data = new { lastRun = now, started = true, completed = false };
+                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                await System.IO.File.WriteAllTextAsync(filePath, json);
+                
+                Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as STARTED at {now:HH:mm}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AUTO-START] Error saving started status: {ex.Message}");
+            }
+        }
+
         public static async Task MarkTodayAsCompletedAsync()
         {
             try
             {
                 var now = await GetTrustedCurrentTimeAsync();
                 var filePath = GetLastRunFilePath();
-                var data = new { lastRun = now, completed = true };
+                var data = new { lastRun = now, started = true, completed = true };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 await System.IO.File.WriteAllTextAsync(filePath, json);
                 
-                Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as completed at {now:HH:mm}");
+                Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as COMPLETED at {now:HH:mm}");
             }
             catch (Exception ex)
             {
@@ -208,7 +226,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        private static async Task<DateTime?> GetLastSuccessfulRunDateAsync()
+        private static async Task<DateTime?> GetCompletionStatusAsync()
         {
             try
             {
@@ -219,14 +237,25 @@ namespace AkademiTrack.Services
                 var json = await System.IO.File.ReadAllTextAsync(filePath);
                 var data = JsonSerializer.Deserialize<JsonElement>(json);
                 
-                if (data.TryGetProperty("lastRun", out var lastRunElement))
+                // Only return date if it was COMPLETED, not just started
+                if (data.TryGetProperty("completed", out var completedElement) && 
+                    completedElement.GetBoolean() == true)
                 {
-                    return DateTime.Parse(lastRunElement.GetString()!);
+                    if (data.TryGetProperty("lastRun", out var lastRunElement))
+                    {
+                        var completedDate = DateTime.Parse(lastRunElement.GetString()!);
+                        Debug.WriteLine($"[AUTO-START] Found completion record: {completedDate:yyyy-MM-dd HH:mm}");
+                        return completedDate;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine("[AUTO-START] Found start record but not completed - app can restart");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[AUTO-START] Error reading last run: {ex.Message}");
+                Debug.WriteLine($"[AUTO-START] Error reading completion status: {ex.Message}");
             }
             return null;
         }
