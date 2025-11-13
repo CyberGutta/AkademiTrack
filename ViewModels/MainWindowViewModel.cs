@@ -19,7 +19,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json; 
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -483,6 +483,7 @@ namespace AkademiTrack.ViewModels
         public new event PropertyChangedEventHandler? PropertyChanged;
 
         public SettingsViewModel SettingsViewModel { get; set; }
+        public DashboardViewModel Dashboard { get; private set; }
 
 
         private string _loginEmail = "";
@@ -521,6 +522,7 @@ namespace AkademiTrack.ViewModels
         {   
             _processedNotificationsFile = GetProcessedNotificationsFilePath();
             SettingsViewModel = new SettingsViewModel();
+            Dashboard = new DashboardViewModel();
             _httpClient = new HttpClient();
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
             _logEntries = new ObservableCollection<LogEntry>();
@@ -1254,6 +1256,18 @@ namespace AkademiTrack.ViewModels
                 LogSuccess("Autentisering og parametere fullført - starter overvåkingssløyfe...");
                 LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
 
+                // Convert ViewModels.UserParameters to Services.UserParameters
+                var servicesUserParams = new Services.UserParameters
+                {
+                    FylkeId = _userParameters.FylkeId,
+                    PlanPeri = _userParameters.PlanPeri,
+                    SkoleId = _userParameters.SkoleId
+                };
+
+                Dashboard.SetCredentials(servicesUserParams, cookies);
+                await Dashboard.RefreshDataAsync();
+                LogInfo("Dashboard data refreshed");
+
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
             }
             catch (OperationCanceledException)
@@ -1272,6 +1286,7 @@ namespace AkademiTrack.ViewModels
             finally
             {
                 IsAutomationRunning = false;
+                Dashboard.StopRefreshing();
                 _cancellationTokenSource?.Dispose();
                 
                 // Only log if automation actually ran
@@ -1287,6 +1302,7 @@ namespace AkademiTrack.ViewModels
             if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 _cancellationTokenSource.Cancel();
+                Dashboard.StopRefreshing();
                 LogInfo("Stopp forespurt - stopper automatisering...");
                 NativeNotificationService.Show("Automatisering stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
             }
@@ -2463,6 +2479,8 @@ namespace AkademiTrack.ViewModels
                                             $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}", "SUCCESS");
 
                                         registeredSessions.Add(sessionKey);
+                                        await Dashboard.RefreshDataAsync();
+
                                     }
                                     else
                                     {
@@ -3077,6 +3095,9 @@ namespace AkademiTrack.ViewModels
             _webDriver?.Quit();
             _webDriver?.Dispose();
             _httpClient?.Dispose();
+            
+            Dashboard?.StopRefreshing();
+            Dashboard?.Dispose();
         }
         
         private static SecureString StringToSecureString(string str)

@@ -21,6 +21,7 @@
 
 	<Window.Resources>
 		<vm:StringEqualityConverter x:Key="StringEqualityConverter"/>
+		<vm:ColorNameToBrushConverter x:Key="ColorNameToBrushConverter"/>
 	</Window.Resources>
 
 	<Window.Styles>
@@ -293,37 +294,38 @@
 						<ColumnDefinition Width="*"/>
 					</Grid.ColumnDefinitions>
 
-					<!-- Today Card -->
+					<!-- Today Card - DYNAMIC -->
 					<Border Grid.Column="0" Classes="dashboard-card">
 						<StackPanel>
 							<Grid>
 								<TextBlock Text="I DAG" Classes="card-label"/>
 								<TextBlock Text="📅" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
-							<TextBlock Text="3/3" Classes="card-value green"/>
-							<TextBlock Text="✓ Alle registrert" Classes="card-subtext"/>
+							<TextBlock Text="{Binding Dashboard.TodayDisplay}" Classes="card-value green"/>
+							<TextBlock Text="{Binding Dashboard.TodayStatus}" Classes="card-subtext"/>
 						</StackPanel>
 					</Border>
 
-					<!-- Next Class Card -->
+					<!-- Next Class Card - DYNAMIC -->
 					<Border Grid.Column="2" Classes="dashboard-card">
 						<StackPanel>
 							<Grid>
 								<TextBlock Text="NESTE TIME" Classes="card-label"/>
 								<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
-							<TextBlock Text="Matematikk"
+							<TextBlock Text="{Binding Dashboard.NextClassName}"
 									   FontSize="24"
 									   FontWeight="Bold"
 									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-							<TextBlock Text="10:15 - 12:00"
+							<TextBlock Text="{Binding Dashboard.NextClassTime}"
 									   FontSize="16"
 									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 									   Margin="0,4,0,0"/>
-							<TextBlock Text="Rom 204"
+							<TextBlock Text="{Binding Dashboard.NextClassRoom}"
 									   FontSize="13"
 									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									   Margin="0,2,0,0"/>
+									   Margin="0,2,0,0"
+									   IsVisible="{Binding Dashboard.NextClassRoom, Converter={x:Static ObjectConverters.IsNotNull}}"/>
 						</StackPanel>
 					</Border>
 				</Grid>
@@ -336,7 +338,7 @@
 						<ColumnDefinition Width="*"/>
 					</Grid.ColumnDefinitions>
 
-					<!-- This Month Card -->
+					<!-- This Month Card - STATIC FOR NOW -->
 					<Border Grid.Column="0" Classes="dashboard-card">
 						<StackPanel>
 							<Grid>
@@ -348,15 +350,17 @@
 						</StackPanel>
 					</Border>
 
-					<!-- Absence Remaining Card -->
+					<!-- Over/Undertid Card - DYNAMIC -->
 					<Border Grid.Column="2" Classes="dashboard-card">
 						<StackPanel>
 							<Grid>
 								<TextBlock Text="OVER-/UNDERTID" Classes="card-label"/>
 								<TextBlock Text="⚠️" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
-							<TextBlock Text="-3" Classes="card-value orange"/>
-							<TextBlock Text="Du er under grensen!" Classes="card-subtext"/>
+							<TextBlock Text="{Binding Dashboard.OvertimeValue}" 
+									   Classes="card-value"
+									   Foreground="{Binding Dashboard.OvertimeColor, Converter={StaticResource ColorNameToBrushConverter}}"/>
+							<TextBlock Text="{Binding Dashboard.OvertimeStatus}" Classes="card-subtext"/>
 						</StackPanel>
 					</Border>
 				</Grid>
