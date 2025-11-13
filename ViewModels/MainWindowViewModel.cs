@@ -461,6 +461,9 @@ namespace AkademiTrack.ViewModels
         private bool _autoStartTriggered = false;
         private readonly object _autoStartLock = new object();
 
+        private DateTime _lastAutoStartCheck = DateTime.MinValue;
+        private readonly object _autoStartCheckLock = new object();
+        private bool _hasPerformedInitialAutoStartCheck = false;
 
 
         private List<ScheduleItem>? _cachedScheduleData;
@@ -488,6 +491,7 @@ namespace AkademiTrack.ViewModels
         private string _loginEmail = "";
         private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
+
 
 
         public class NotificationQueueItem
@@ -539,16 +543,13 @@ namespace AkademiTrack.ViewModels
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                // FIXED: Use Dispatcher.UIThread.Post instead of Task.Run
-                // This ensures the dialog runs on the UI thread with proper timing
+                
                 Dispatcher.UIThread.Post(async () =>
                 {
                     await Task.Delay(2000);
                     await CheckAndRequestNotificationPermissionAsync();
                 });
             }
-
-            _ = Task.Run(CheckAutoStartAutomationAsync);
 
             _updateCheckTimer = new Timer(
                 async (state) => await CheckForUpdatesAutomatically(state),
@@ -560,8 +561,8 @@ namespace AkademiTrack.ViewModels
             _schoolHoursCheckTimer = new Timer(
                 async (state) => await CheckSchoolHoursAutoRestart(state),
                 null,
-                (int)TimeSpan.FromMinutes(2).TotalMilliseconds,
-                (int)TimeSpan.FromMinutes(1).TotalMilliseconds
+                (int)TimeSpan.FromSeconds(5).TotalMilliseconds,
+                (int)TimeSpan.FromMinutes(1).TotalMilliseconds   
             );
         }
 
@@ -617,109 +618,79 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task CheckAutoStartAutomationAsync()
-        {
-            try
-            {
-                await Task.Delay(3000);
 
-                var settingsViewModel = new SettingsViewModel();
-                await Task.Delay(500);
-
-                if (settingsViewModel.AutoStartAutomation)
-                {
-                    LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
-
-                    var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
-
-                    if (!shouldStart)
-                    {
-                        LogInfo($"Auto-start ikke nødvendig: {reason}");
-                        NativeNotificationService.Show("Auto-start Info",
-                            $"Automatisering starter ikke: {reason}",
-                            "INFO");
-                        return;
-                    }
-
-                    LogInfo($"Auto-start betingelser oppfylt: {reason}");
-
-                    await LoadCredentialsAsync();
-                    bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                        _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                        !string.IsNullOrEmpty(_schoolName);
-
-                    if (hasCredentials)
-                    {
-                        LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
-                        NativeNotificationService.Show("Auto-start aktivert",
-                            $"Starter automatisk registrering - {reason}",
-                            "SUCCESS");
-
-                        await Dispatcher.UIThread.InvokeAsync(async () =>
-                        {
-                            if (!IsAutomationRunning)
-                            {
-                                await StartAutomationAsync();
-                            }
-                            else
-                            {
-                                LogInfo("Automatisering kjører allerede - ignorerer auto-start");
-                            }
-                        });
-                    }
-                    else
-                    {
-                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
-                        NativeNotificationService.Show("Mangler innloggingsopplysninger",
-                            "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet. Lagre innloggingsopplysninger i innstillinger.",
-                            "WARNING");
-                    }
-                }
-                else
-                {
-                    LogInfo("Auto-start er deaktivert i innstillinger");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Feil ved auto-start sjekk: {ex.Message}");
-            }
-        }
         private async Task CheckSchoolHoursAutoRestart(object? state)
         {
-            try
+            bool isInitialCheck = false;
+
+            lock (_autoStartCheckLock)
             {
-                if (IsAutomationRunning)
+                if (!_hasPerformedInitialAutoStartCheck)
                 {
-                    // Only log every 5 minutes to avoid spam
+                    _hasPerformedInitialAutoStartCheck = true;
+                    isInitialCheck = true;
+                    LogDebug("[AUTO-START] Performing initial auto-start check");
+                }
+                else if (IsAutomationRunning)
+                {
                     if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
                     {
                         LogDebug("[AUTO-RESTART] Automation already running - skipping check");
                     }
                     return;
                 }
+            }
 
+            try
+            {
                 var settingsViewModel = new SettingsViewModel();
                 await Task.Delay(100);
 
                 if (!settingsViewModel.AutoStartAutomation)
+                {
+                    if (isInitialCheck)
+                    {
+                        LogInfo("Auto-start er deaktivert i innstillinger");
+                    }
                     return;
+                }
+
+                if (isInitialCheck)
+                {
+                    LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
+                }
 
                 var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
 
                 if (!shouldStart)
                 {
-                    // Only log every 5 minutes to reduce spam
-                    if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
+                    if (isInitialCheck)
                     {
-                        LogDebug($"[AUTO-RESTART] Not starting: {reason}");
+                        LogInfo($"Auto-start ikke nødvendig: {reason}");
+                        NativeNotificationService.Show("Auto-start Info",
+                            $"Automatisering starter ikke: {reason}",
+                            "INFO");
+                    }
+                    else
+                    {
+                        if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
+                        {
+                            LogDebug($"[AUTO-RESTART] Not starting: {reason}");
+                        }
                     }
                     return;
                 }
-                
-                LogInfo($"[AUTO-RESTART] Conditions met: {reason}");
-                LogInfo("[AUTO-RESTART] Starting automation automatically");
-                
+
+                if (isInitialCheck)
+                {
+                    LogInfo($"Auto-start betingelser oppfylt: {reason}");
+                }
+                else
+                {
+                    LogInfo($"[AUTO-RESTART] Conditions met: {reason}");
+                    LogInfo("[AUTO-RESTART] Starting automation automatically");
+                }
+
                 await LoadCredentialsAsync();
                 bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
                                     _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
@@ -731,17 +702,41 @@ namespace AkademiTrack.ViewModels
                     {
                         if (!IsAutomationRunning)
                         {
-                            NativeNotificationService.Show("Auto-restart aktivert",
-                                "Automatisering starter på nytt - du er innenfor skoletid",
-                                "INFO");
+                            if (isInitialCheck)
+                            {
+                                LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
+                                NativeNotificationService.Show("Auto-start aktivert",
+                                    $"Starter automatisk registrering - {reason}",
+                                    "SUCCESS");
+                            }
+                            else
+                            {
+                                NativeNotificationService.Show("Auto-restart aktivert",
+                                    "Automatisering starter på nytt - du er innenfor skoletid",
+                                    "INFO");
+                            }
                             await StartAutomationAsync();
                         }
+                        else
+                        {
+                            LogInfo("Automatisering kjører allerede - ignorerer auto-start");
+                        }
                     });
+                }
+                else
+                {
+                    if (isInitialCheck)
+                    {
+                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
+                        NativeNotificationService.Show("Mangler innloggingsopplysninger",
+                            "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet. Lagre innloggingsopplysninger i innstillinger.",
+                            "WARNING");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                LogDebug($"[AUTO-RESTART] Error: {ex.Message}");
+                LogError($"Feil ved auto-start sjekk: {ex.Message}");
             }
         }
 
@@ -1256,7 +1251,6 @@ namespace AkademiTrack.ViewModels
                 LogSuccess("Autentisering og parametere fullført - starter overvåkingssløyfe...");
                 LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
 
-                // Convert ViewModels.UserParameters to Services.UserParameters
                 var servicesUserParams = new Services.UserParameters
                 {
                     FylkeId = _userParameters.FylkeId,
@@ -1289,7 +1283,6 @@ namespace AkademiTrack.ViewModels
                 Dashboard.StopRefreshing();
                 _cancellationTokenSource?.Dispose();
                 
-                // Only log if automation actually ran
                 if (_cancellationTokenSource != null)
                 {
                     LogInfo("Automatisering fullført");

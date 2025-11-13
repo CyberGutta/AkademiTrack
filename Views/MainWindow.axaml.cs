@@ -14,7 +14,7 @@ namespace AkademiTrack.Views
         public MainWindow()
         {
             InitializeComponent();
-            DataContext = new MainWindowViewModel();
+            //DataContext = new MainWindowViewModel();
 
             this.Closing += MainWindow_Closing;
             this.WindowState = WindowState.Normal;
