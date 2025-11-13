@@ -1379,62 +1379,30 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                var json = await SecureCredentialStorage.GetCredentialAsync("cookies");
+
+                if (string.IsNullOrEmpty(json))
                 {
-                    LogDebug("Loading cookies from macOS Keychain...");
-                    var json = await Services.KeychainService.LoadFromKeychain("cookies");
-
-                    if (string.IsNullOrEmpty(json))
-                    {
-                        LogDebug("No cookies found in Keychain");
-                        return null!;
-                    }
-
-                    LogDebug($"Retrieved cookies JSON ({json.Length} characters)");
-
-                    try
-                    {
-                        var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-
-                        if (cookieArray == null || cookieArray.Length == 0)
-                        {
-                            LogDebug("Cookie deserialization returned null or empty array");
-                            return null!;
-                        }
-
-                        LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from Keychain");
-                        return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
-                    }
-                    catch (JsonException jsonEx)
-                    {
-                        LogError($"JSON deserialization failed: {jsonEx.Message}");
-                        await Services.KeychainService.DeleteFromKeychain("cookies");
-                        return null!;
-                    }
+                    LogDebug("No cookies found in secure storage");
+                    return null!;
                 }
-                else
+
+                var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
+
+                if (cookieArray == null || cookieArray.Length == 0)
                 {
-                    // File-based storage for non-macOS
-                    string path = GetCookiesFilePath();
-
-                    if (!File.Exists(path))
-                    {
-                        LogDebug($"Cookie file not found at: {path}");
-                        return null!;
-                    }
-
-                    LogDebug($"Loading cookies from file: {path}");
-                    var json = await File.ReadAllTextAsync(path);
-                    var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-
-                    if (cookieArray == null || cookieArray.Length == 0)
-                    {
-                        return null!;
-                    }
-
-                    LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from file");
-                    return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
+                    LogDebug("Cookie deserialization returned null or empty array");
+                    return null!;
                 }
+
+                LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from secure storage");
+                return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
+            }
+            catch (JsonException jsonEx)
+            {
+                LogError($"JSON deserialization failed: {jsonEx.Message}");
+                await SecureCredentialStorage.DeleteCredentialAsync("cookies");
+                return null!;
             }
             catch (Exception ex)
             {
@@ -1442,6 +1410,8 @@ namespace AkademiTrack.ViewModels
                 return null!;
             }
         }
+
+
 
         private async Task<bool> TestCookiesAsync(Dictionary<string, string> cookies)
         {
@@ -2278,43 +2248,13 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if (cookies == null || cookies.Length == 0)
-                {
-                    LogError("Cannot save null or empty cookie array");
-                    return;
-                }
-
-                var json = JsonSerializer.Serialize(cookies, new JsonSerializerOptions { WriteIndented = true });
-
-                LogDebug($"Serialized {cookies.Length} cookies to JSON ({json.Length} characters)");
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    LogDebug("Saving cookies to macOS Keychain...");
-                    await Services.KeychainService.SaveToKeychain("cookies", json);
-                    LogSuccess("✓ Cookies saved to Keychain");
-
-                    var verify = await Services.KeychainService.LoadFromKeychain("cookies");
-                    if (verify == json)
-                    {
-                        LogSuccess("✓ Keychain save verified");
-                    }
-                    else
-                    {
-                        LogError("⚠ Keychain verification failed");
-                    }
-                }
-                else
-                {
-                    string cookiesPath = GetCookiesFilePath();
-                    await File.WriteAllTextAsync(cookiesPath, json);
-                    LogSuccess($"✓ Cookies saved to file: {cookiesPath}");
-                }
+                string json = JsonSerializer.Serialize(cookies);
+                await SecureCredentialStorage.SaveCredentialAsync("cookies", json);
+                LogSuccess($"✓ Saved {cookies.Length} cookies securely");
             }
             catch (Exception ex)
             {
                 LogError($"Failed to save cookies: {ex.Message}");
-                throw;
             }
         }
 
@@ -2734,26 +2674,15 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    await Services.KeychainService.DeleteFromKeychain("cookies");
-                    LogDebug("✓ Cookies deleted from Keychain");
-                }
-                else
-                {
-                    var path = GetCookiesFilePath();
-                    if (File.Exists(path))
-                    {
-                        File.Delete(path);
-                        LogDebug("✓ Cookie file deleted");
-                    }
-                }
+                await SecureCredentialStorage.DeleteCredentialAsync("cookies");
+                LogSuccess("✓ Cookies deleted from secure storage");
             }
             catch (Exception ex)
             {
-                LogDebug($"Failed to delete cookies: {ex.Message}");
+                LogError($"Failed to delete cookies: {ex.Message}");
             }
         }
+
         private string GetUserParametersFilePath()
         {
             string appDataDir = Path.Combine(

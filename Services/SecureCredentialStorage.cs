@@ -3,9 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 
@@ -226,6 +229,28 @@ namespace AkademiTrack.Services
                 Debug.WriteLine($"❌ Windows credential delete error: {ex.Message}");
                 return false;
             }
+        }
+
+        public static async Task SaveCookiesAsync(Cookie[] cookies)
+        {
+            string json = JsonSerializer.Serialize(cookies);
+            await SaveCredentialAsync("cookies", json);
+        }
+
+        public static async Task<Dictionary<string, string>> LoadCookiesAsync()
+        {
+            var json = await GetCredentialAsync("cookies");
+
+            if (string.IsNullOrEmpty(json))
+                return null!;
+
+            var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
+            return cookieArray?.ToDictionary(c => c.Name ?? "", c => c.Value ?? "") ?? null!;
+        }
+
+        public static async Task DeleteCookiesAsync()
+        {
+            await DeleteCredentialAsync("cookies");
         }
 
         #endregion
