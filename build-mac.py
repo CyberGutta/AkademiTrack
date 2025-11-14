@@ -29,6 +29,48 @@ ENTITLEMENTS_PATH = Path("./entitlements.plist")
 HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
 
 # ============================================================================
+# NEW: LaunchAgent Creation Function
+# ============================================================================
+
+def create_launchagent_plist(version):
+    """Create LaunchAgent plist for auto-startup"""
+    print("\n📝 Creating LaunchAgent plist...")
+    
+    plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- This is what macOS shows in Background Items -->
+  <key>Label</key>
+  <string>AkademiTrack</string>
+  
+  <!-- Path to app bundle -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/open</string>
+    <string>-a</string>
+    <string>/Applications/AkademiTrack.app</string>
+  </array>
+  
+  <!-- Run when the user logs in -->
+  <key>RunAtLoad</key>
+  <true/>
+  
+  <!-- Don't keep alive if it crashes -->
+  <key>KeepAlive</key>
+  <false/>
+</dict>
+</plist>"""
+    
+    plist_path = Path("com.CyberBrothers.akademitrack.plist")
+    with open(plist_path, "w") as f:
+        f.write(plist_content)
+    
+    print(f"✅ Created LaunchAgent plist: {plist_path}")
+    return plist_path
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -114,7 +156,7 @@ def update_csproj_version(version):
         return False
 
 # ============================================================================
-# CODE SIGNING FUNCTIONS - IMPROVED
+# CODE SIGNING FUNCTIONS
 # ============================================================================
 
 def sign_file(file_path, identity, entitlements_path=None):
@@ -229,7 +271,6 @@ def sign_app(app_path, identity, entitlements_path=None, deep=True):
             return True
         else:
             print(f"⚠️  Signature verification failed")
-            # Show detailed info
             run_command(
                 ["codesign", "-dv", "--verbose=4", str(app_path)],
                 check=False,
@@ -277,7 +318,7 @@ def sign_pkg(pkg_path, identity):
         return False
 
 # ============================================================================
-# NOTARIZATION FUNCTIONS - IMPROVED
+# NOTARIZATION FUNCTIONS
 # ============================================================================
 
 def notarize_file(file_path, bundle_id):
@@ -531,7 +572,6 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     # Handle helper app if it exists
     if HELPER_APP_SOURCE.exists():
         print("\n  Bundling helper app...")
-        # Instead of nesting inside MacOS, put it in Resources or a proper location
         helper_dest = resources_dir / "AkademiTrack.app"
         try:
             shutil.copytree(HELPER_APP_SOURCE, helper_dest, dirs_exist_ok=True)
@@ -576,7 +616,6 @@ def create_portable_zip(bundle_dir, version, sign=True, notarize=True):
         if result and result.returncode == 0:
             print(f"✅ Portable zip created: {zip_path.name} ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
             
-            # Note: We don't notarize the ZIP itself, the .app inside is already notarized
             if notarize and sign:
                 print("  ℹ️  The .app inside is already notarized - no need to notarize the zip")
             
@@ -589,23 +628,50 @@ def create_portable_zip(bundle_dir, version, sign=True, notarize=True):
         return None
 
 def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
-    """Create .pkg installer"""
-    print("\n📦 Creating installer package...")
+    """Create .pkg installer with LaunchAgent"""
+    print("\n📦 Creating installer package with LaunchAgent...")
     print("=" * 50)
+    
+    # Create LaunchAgent plist
+    launchagent_plist = create_launchagent_plist(version)
+    
+    # Create temporary root directory structure
+    temp_root = Path("./pkg_root")
+    if temp_root.exists():
+        shutil.rmtree(temp_root)
+    
+    temp_root.mkdir(parents=True)
+    
+    # Create directory structure
+    apps_dir = temp_root / "Applications"
+    launch_agents_dir = temp_root / "Library" / "LaunchAgents"
+    
+    apps_dir.mkdir(parents=True)
+    launch_agents_dir.mkdir(parents=True)
+    
+    print("  Copying app bundle...")
+    shutil.copytree(bundle_dir, apps_dir / f"{APP_NAME}.app", dirs_exist_ok=True)
+    
+    print("  Copying LaunchAgent plist...")
+    shutil.copy2(launchagent_plist, launch_agents_dir / launchagent_plist.name)
     
     pkg_path = Path(f"AkademiTrack-{version}-osx-Setup.pkg").absolute()
     
     # Create pkg
     cmd = [
         "pkgbuild",
-        "--root", str(bundle_dir.parent),
+        "--root", str(temp_root),
         "--identifier", BUNDLE_IDENTIFIER,
         "--version", version,
-        "--install-location", "/Applications",
+        "--install-location", "/",
         str(pkg_path)
     ]
     
     result = run_command(cmd, "Building package", check=False)
+    
+    # Clean up
+    if temp_root.exists():
+        shutil.rmtree(temp_root)
     
     if not result or result.returncode != 0:
         print("❌ Failed to create package")
@@ -638,7 +704,7 @@ def create_velopack_package(bundle_dir, version):
         print("Install it with: dotnet tool install -g vpk")
         return None
 
-    # Create a temporary directory for Velopack that matches the structure
+    # Create a temporary directory for Velopack
     publish_dir = Path("./publish-mac-arm")
     
     if publish_dir.exists():
@@ -647,7 +713,6 @@ def create_velopack_package(bundle_dir, version):
 
     print(f"📂 Copying complete .app bundle for Velopack...")
     
-    # Copy the entire Contents/MacOS directory which has everything
     macos_source = bundle_dir / "Contents" / "MacOS"
     
     if not macos_source.exists():
@@ -692,8 +757,8 @@ def create_velopack_package(bundle_dir, version):
         shutil.move(str(nupkg_file[0]), new_name)
         print(f"✅ Renamed to: {new_name}")
         
-        # Now fix the Releases folder .app to include Resources
-        print("\n🔧 Fixing Releases folder .app to match portable version...")
+        # Fix Releases folder .app
+        print("\n🔧 Fixing Releases folder .app...")
         releases_app = Path("./Releases/AkademiTrack.app")
         
         if releases_app.exists():
@@ -701,7 +766,6 @@ def create_velopack_package(bundle_dir, version):
             original_resources = bundle_dir / "Contents" / "Resources"
             
             if original_resources.exists():
-                # Copy entitlements.plist if it exists
                 entitlements_src = original_resources / "entitlements.plist"
                 if entitlements_src.exists():
                     shutil.copy2(entitlements_src, releases_resources / "entitlements.plist")
@@ -774,7 +838,7 @@ def main():
 
     # Verify configuration
     print("\n🔍 Checking configuration...")
-    if "Your Name" in DEVELOPER_ID_APP or "your-" in APPLE_ID.lower():
+    if "sdf" in DEVELOPER_ID_APP or "sdfsdf" in APPLE_ID:
         print("❌ Please update the configuration at the top of this script!")
         print("   - DEVELOPER_ID_APP")
         print("   - DEVELOPER_ID_INSTALLER")
@@ -796,18 +860,18 @@ def main():
     print(f"\n📌 Using version: {version}")
 
     # Ask if user wants to update .csproj
-    update_proj = input("\nUpdate version in .csproj file? (y/n) [n]: ").strip().lower()
+    update_proj = input("\nUpdate version in .csproj file? (y/n) [y]: ").strip().lower()
     if update_proj != 'n':
         update_csproj_version(version)
 
     # Ask about signing and notarization
     print("\n🔐 Signing & Notarization Options:")
-    sign_choice = input("Sign applications? (y/n) [n]: ").strip().lower()
+    sign_choice = input("Sign applications? (y/n) [y]: ").strip().lower()
     do_sign = sign_choice != 'n'
     
     do_notarize = False
     if do_sign:
-        notarize_choice = input("Notarize applications? (y/n) [n]: ").strip().lower()
+        notarize_choice = input("Notarize applications? (y/n) [y]: ").strip().lower()
         do_notarize = notarize_choice != 'n'
 
     # Build the app
@@ -823,9 +887,8 @@ def main():
 
     # Ask what distributions to create
     print("\n📦 Distribution Options:")
-    print("Når du skal pushe en update må du huske å ta zippen som ligger i akademitrack, extract den, gå inn i den, resources, så kopierer du entitlements.plist og helper appen inn i releases mappen sin akademitrack.app sin resources mappe. Deretter går du til downloads kopierer appen fra releases og limer inn i downloads. Deretter kjører du ./sign_and_notarize.sh når den er signert kjører du ./create-pkg-from-signed-app.sh så limer du alt untatt bundle og den gamle appen fra releases folderen inn til github versjonen for den du lager nå, og deretter limer du app.zip og bundle som du lagde/signerte inn i github. ")
     print("1. Portable ZIP + VPK Package")
-    print("2. Installer PKG")
+    print("2. Installer PKG (includes LaunchAgent)")
     print("3. VPK Package only")
     print("4. All of the above")
     
@@ -835,7 +898,7 @@ def main():
     
     created_files = []
     
-    # Option 1 now includes both ZIP and VPK
+    # Option 1: ZIP + VPK
     if dist_choice in ["1", "4"]:
         zip_file = create_portable_zip(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if zip_file:
@@ -845,11 +908,13 @@ def main():
         if vpk_file:
             created_files.append(("VPK Package", vpk_file))
     
+    # Option 2: PKG with LaunchAgent
     if dist_choice in ["2", "4"]:
         pkg_file = create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if pkg_file:
             created_files.append(("Installer PKG", pkg_file))
     
+    # Option 3: VPK only
     if dist_choice == "3":
         vpk_file = create_velopack_package(bundle_dir, version)
         if vpk_file:
@@ -871,6 +936,16 @@ def main():
     if do_notarize:
         print("✅ All files notarized by Apple")
     
+    # LaunchAgent info
+    if dist_choice in ["2", "4"]:
+        print("\n🚀 LaunchAgent Information:")
+        print("  ✅ PKG installer includes LaunchAgent")
+        print("  📝 Location: ~/Library/LaunchAgents/com.CyberBrothers.akademitrack.plist")
+        print("  👤 Display name: AkademiTrack (shown in Background Items)")
+        print("\n  After installation, users will see:")
+        print("  • System Settings → General → Login Items → Allow in Background")
+        print("  • Shows 'AkademiTrack' instead of your developer name!")
+    
     # Verification commands
     print("\n🔍 Verification commands:")
     print(f"  codesign -dv --verbose=4 '{bundle_dir}'")
@@ -886,13 +961,21 @@ def main():
     print("\n📋 Next steps:")
     print("  • Test the .app by double-clicking it")
     print("  • Test the .pkg installer")
+    if dist_choice in ["2", "4"]:
+        print("  • After PKG install, check: System Settings → Login Items")
+        print("  • Verify 'AkademiTrack' appears (not your name)")
     print("  • Upload files to GitHub Releases")
     if do_notarize:
         print("  • ✅ No Gatekeeper warnings will appear!")
     else:
         print("  • ⚠️  Users will need to right-click → Open (unsigned)")
     
-    print("\n💡 Tip: Run this to check notarization history:")
+    print("\n💡 Tips:")
+    print("  • LaunchAgent will auto-start the app on login")
+    print("  • Users can disable it in System Settings → Login Items")
+    print("  • The app's auto-start toggle in Settings will manage this")
+    
+    print("\n🔍 Check notarization history:")
     print(f"  xcrun notarytool history --apple-id {APPLE_ID} --team-id {TEAM_ID} --password {APP_SPECIFIC_PASSWORD}")
 
 if __name__ == "__main__":

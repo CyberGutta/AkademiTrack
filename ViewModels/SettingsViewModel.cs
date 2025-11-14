@@ -141,38 +141,138 @@ using Microsoft.Win32;
                 if (!Directory.Exists(launchAgentsDir))
                     Directory.CreateDirectory(launchAgentsDir!);
 
+                // Get the path to the .app bundle, not the executable inside
                 var exePath = Assembly.GetExecutingAssembly().Location;
-                if (exePath.EndsWith(".dll"))
+                string appBundlePath;
+
+                // If we're inside a .app bundle, get the bundle path
+                if (exePath.Contains(".app/Contents/MacOS"))
                 {
-                    var appDir = Path.GetDirectoryName(exePath);
-                    var appName = Path.GetFileNameWithoutExtension(exePath);
-                    exePath = Path.Combine(appDir!, appName);
+                    // Extract the .app bundle path
+                    var appIndex = exePath.IndexOf(".app/Contents/MacOS");
+                    appBundlePath = exePath.Substring(0, appIndex + 4); // Include ".app"
+                }
+                else
+                {
+                    // Fallback to the executable itself
+                    if (exePath.EndsWith(".dll"))
+                    {
+                        var appDir = Path.GetDirectoryName(exePath);
+                        var appName = Path.GetFileNameWithoutExtension(exePath);
+                        appBundlePath = Path.Combine(appDir!, appName);
+                    }
+                    else
+                    {
+                        appBundlePath = exePath;
+                    }
                 }
 
+                Debug.WriteLine($"[AutoStart] App bundle path: {appBundlePath}");
+
+                // Create the LaunchAgent plist with the display name as Label
                 var plistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
 <plist version=""1.0"">
 <dict>
     <key>Label</key>
-    <string>com.akademitrack.app</string>
+    <string>AkademiTrack</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{exePath}</string>
+        <string>/usr/bin/open</string>
+        <string>-a</string>
+        <string>{appBundlePath}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
+    <key>KeepAlive</key>
+    <false/>
 </dict>
 </plist>";
 
+                Debug.WriteLine($"[AutoStart] Writing plist to: {plistPath}");
                 File.WriteAllText(plistPath, plistContent);
-                Process.Start(new ProcessStartInfo { FileName = "launchctl", Arguments = $"load \"{plistPath}\"", UseShellExecute = false, CreateNoWindow = true });
+
+                // Load the LaunchAgent
+                try
+                {
+                    // Unload first if it exists
+                    var unloadProcess = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "launchctl",
+                        Arguments = $"unload \"{plistPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    });
+                    unloadProcess?.WaitForExit();
+
+                    // Load the new one
+                    var loadProcess = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "launchctl",
+                        Arguments = $"load \"{plistPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    });
+
+                    if (loadProcess != null)
+                    {
+                        loadProcess.WaitForExit();
+                        var output = loadProcess.StandardOutput.ReadToEnd();
+                        var error = loadProcess.StandardError.ReadToEnd();
+
+                        Debug.WriteLine($"[AutoStart] launchctl load exit code: {loadProcess.ExitCode}");
+                        if (!string.IsNullOrEmpty(output))
+                            Debug.WriteLine($"[AutoStart] Output: {output}");
+                        if (!string.IsNullOrEmpty(error))
+                            Debug.WriteLine($"[AutoStart] Error: {error}");
+
+                        if (loadProcess.ExitCode == 0)
+                        {
+                            Debug.WriteLine("[AutoStart] ✓ LaunchAgent loaded successfully");
+                            return true;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[AutoStart] Error loading LaunchAgent: {ex.Message}");
+                }
             }
             else
             {
                 if (File.Exists(plistPath))
                 {
-                    Process.Start(new ProcessStartInfo { FileName = "launchctl", Arguments = $"unload \"{plistPath}\"", UseShellExecute = false, CreateNoWindow = true });
-                    File.Delete(plistPath);
+                    try
+                    {
+                        // Unload the LaunchAgent
+                        var unloadProcess = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "launchctl",
+                            Arguments = $"unload \"{plistPath}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true
+                        });
+
+                        if (unloadProcess != null)
+                        {
+                            unloadProcess.WaitForExit();
+                            Debug.WriteLine($"[AutoStart] Unload exit code: {unloadProcess.ExitCode}");
+                        }
+
+                        // Delete the plist file
+                        File.Delete(plistPath);
+                        Debug.WriteLine("[AutoStart] ✓ LaunchAgent removed successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[AutoStart] Error removing LaunchAgent: {ex.Message}");
+                    }
                 }
             }
             return true;
@@ -181,7 +281,8 @@ using Microsoft.Win32;
         private static string GetMacOSPlistPath()
         {
             var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            return Path.Combine(homeDir, "Library", "LaunchAgents", "com.akademitrack.app.plist");
+            // Use the bundle identifier as filename, but Label inside will be "AkademiTrack"
+            return Path.Combine(homeDir, "Library", "LaunchAgents", "com.CyberBrothers.akademitrack.plist");
         }
 
         private static bool IsAutoStartEnabledLinux()
