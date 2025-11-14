@@ -41,15 +41,14 @@
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.8" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.8" />
 		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.8" />
-		<PackageReference Include="MessageBox.Avalonia" Version="3.2.0" />
+		<PackageReference Include="MessageBox.Avalonia" Version="3.3.0" />
 		<PackageReference Include="OsNotifications" Version="1.1.3" />
 		<PackageReference Include="Selenium.WebDriver" Version="4.38.0" />
-		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="142.0.7444.5900" />
-		<PackageReference Include="Supabase" Version="1.1.1" />
-		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.10" />
+		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="142.0.7444.16200" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
 		<PackageReference Include="Velopack" Version="0.0.1298" />
 		<PackageReference Include="WebDriverManager" Version="2.17.6" />
-		<PackageReference Include="System.Text.Json" Version="9.0.10" />
+		<PackageReference Include="System.Text.Json" Version="10.0.0" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.8">
 			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
