@@ -13,7 +13,6 @@ namespace AkademiTrack.Services
         private static DateTime? _lastOnlineTimeCheck = null;
         private static TimeSpan _onlineTimeOffset = TimeSpan.Zero;
 
-        // Track notifications - only notify when meaningful to the student
         private static DateTime _lastNotificationTime = DateTime.MinValue;
         private static string _lastNotificationMessage = "";
         private static bool _hasNotifiedTodayOutsideHours = false;

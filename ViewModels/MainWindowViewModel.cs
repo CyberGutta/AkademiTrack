@@ -1157,6 +1157,21 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
+        private async Task<bool> CheckInternetConnectionAsync()
+        {
+            try
+            {
+                LogDebug("Checking internet connectivity...");
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await _httpClient.GetAsync("https://www.google.com", cts.Token);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private async Task StartAutomationAsync()
         {
             lock (_autoStartLock)
@@ -1166,8 +1181,21 @@ namespace AkademiTrack.ViewModels
                     LogInfo("Automatisering kjører allerede - ignorerer ny startforespørsel");
                     return;
                 }
-                
+
                 IsAutomationRunning = true;
+            }
+
+            bool hasInternet = await CheckInternetConnectionAsync();
+            if (!hasInternet)
+            {
+                LogError("Ingen internettforbindelse - kan ikke starte automatisering");
+                NativeNotificationService.Show(
+                    "Ingen Internett",
+                    "Automatisering kan ikke starte uten internettforbindelse. Vennligst koble til internett og prøv igjen.",
+                    "ERROR"
+                );
+                IsAutomationRunning = false;
+                return;
             }
 
             await Services.SchoolTimeChecker.MarkTodayAsStartedAsync();
