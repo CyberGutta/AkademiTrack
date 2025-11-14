@@ -5,6 +5,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace AkademiTrack.Views
@@ -56,6 +57,17 @@ namespace AkademiTrack.Views
                 if (_cachedSettings == null)
                 {
                     _cachedSettings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _isReallyClosing = true;
+                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+                    {
+                        lifetime.Shutdown();
+                    }
+                    return;
                 }
 
                 if (_cachedSettings.StartMinimized)

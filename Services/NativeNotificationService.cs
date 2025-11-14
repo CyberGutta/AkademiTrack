@@ -67,10 +67,12 @@ namespace AkademiTrack.Services
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = helperPath,
-                    Arguments = $"\"{title}\" \"{message}\"",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
+
+                startInfo.ArgumentList.Add(title);
+                startInfo.ArgumentList.Add(message);
 
                 using var process = Process.Start(startInfo);
                 if (process != null)
@@ -83,6 +85,7 @@ namespace AkademiTrack.Services
                 Console.WriteLine($"❌ Failed to launch AkademiTrackHelper: {ex.Message}");
             }
         }
+
 
         private static async Task ShowWindowsNotificationAsync(string title, string message)
         {
