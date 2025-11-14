@@ -145,8 +145,8 @@ namespace AkademiTrack.Services
                     {
                         var timeUntil = nextStart.Value - now;
                         string waitMessage = timeUntil.TotalHours < 24
-                            ? $"Starter automatisk {nextStart:HH:mm} ({GetNorwegianDayName(nextStart.Value.DayOfWeek)})"
-                            : $"Starter automatisk {nextStart:dddd HH:mm}";
+                            ? $"Starter automatisk {nextStart.Value:HH:mm} ({GetNorwegianDayName(nextStart.Value.DayOfWeek)})"
+                            : $"Starter automatisk {GetNorwegianDayName(nextStart.Value.DayOfWeek)} {nextStart.Value:HH:mm}";
 
                         bool shouldNotify = ShouldShowNotification(waitMessage);
                         return (false, waitMessage, nextStart, shouldNotify);
