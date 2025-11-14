@@ -1365,16 +1365,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private string GetCookiesFilePath()
-        {
-            string appSupportPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string appDataDir = Path.Combine(appSupportPath, "AkademiTrack");
-
-            Directory.CreateDirectory(appDataDir);
-
-            return Path.Combine(appDataDir, "cookies.json");
-        }
-
         private async Task<Dictionary<string, string>> LoadCookiesAsync()
         {
             try
@@ -1445,7 +1435,7 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                
+
                 bool shouldTryAutomatic = !string.IsNullOrEmpty(_loginEmail) &&
                                         _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
                                         !string.IsNullOrEmpty(_schoolName);
@@ -1473,7 +1463,17 @@ namespace AkademiTrack.ViewModels
                     options.AddArgument("--disable-gpu");
                 }
 
-                localWebDriver = new ChromeDriver(options);
+                // Hide CMD window on Windows
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    var chromeDriverService = ChromeDriverService.CreateDefaultService();
+                    chromeDriverService.HideCommandPromptWindow = true;
+                    localWebDriver = new ChromeDriver(chromeDriverService, options);
+                }
+                else
+                {
+                    localWebDriver = new ChromeDriver(options);
+                }
                 _webDriver = localWebDriver;
 
                 LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
@@ -1507,7 +1507,16 @@ namespace AkademiTrack.ViewModels
                         visibleOptions.AddArgument("--disable-dev-shm-usage");
                         visibleOptions.AddArgument("--start-maximized");
 
-                        localWebDriver = new ChromeDriver(visibleOptions);
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            var chromeDriverService = ChromeDriverService.CreateDefaultService();
+                            chromeDriverService.HideCommandPromptWindow = true;
+                            localWebDriver = new ChromeDriver(chromeDriverService, visibleOptions);
+                        }
+                        else
+                        {
+                            localWebDriver = new ChromeDriver(visibleOptions);
+                        }
                         _webDriver = localWebDriver;
 
                         _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
