@@ -666,6 +666,7 @@
 										Command="{Binding OpenProgramFolderCommand}"/>
 							</StackPanel>
 						</Border>
+						<Rectangle Height="100" Fill="Transparent"/>
 					</StackPanel>
 
 					<!-- Advanced Category -->
