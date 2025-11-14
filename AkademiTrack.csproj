@@ -21,10 +21,13 @@
 	<ItemGroup>
 	  <Content Include="Assets\AT-Transparrent72.ico" />
 	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
-  <Content Include="Assets/Helpers/AkademiAuth">
-    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </Content>
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64' Or ($([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX))) And '$(RuntimeIdentifier)' == '')">
+		<Content Include="Assets/Helpers/AkademiAuth">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Include="Assets/Helpers/AkademiTrack.app\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 	<ItemGroup Condition="'$(OS)' == 'Windows_NT'">
 		<Content Include="Assets/Helpers/WinHelloAuth.exe">
@@ -32,11 +35,7 @@
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
 	</ItemGroup>
-	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
-		<None Include="Assets/Helpers/AkademiTrack.app\**\*">
-		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
-	</ItemGroup>
+	
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.8" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.8" />
