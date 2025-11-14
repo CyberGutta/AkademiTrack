@@ -796,18 +796,18 @@ def main():
     print(f"\n📌 Using version: {version}")
 
     # Ask if user wants to update .csproj
-    update_proj = input("\nUpdate version in .csproj file? (y/n) [y]: ").strip().lower()
+    update_proj = input("\nUpdate version in .csproj file? (y/n) [n]: ").strip().lower()
     if update_proj != 'n':
         update_csproj_version(version)
 
     # Ask about signing and notarization
     print("\n🔐 Signing & Notarization Options:")
-    sign_choice = input("Sign applications? (y/n) [y]: ").strip().lower()
+    sign_choice = input("Sign applications? (y/n) [n]: ").strip().lower()
     do_sign = sign_choice != 'n'
     
     do_notarize = False
     if do_sign:
-        notarize_choice = input("Notarize applications? (y/n) [y]: ").strip().lower()
+        notarize_choice = input("Notarize applications? (y/n) [n]: ").strip().lower()
         do_notarize = notarize_choice != 'n'
 
     # Build the app
