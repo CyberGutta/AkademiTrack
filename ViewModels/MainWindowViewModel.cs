@@ -622,6 +622,7 @@ namespace AkademiTrack.ViewModels
         private async Task CheckSchoolHoursAutoRestart(object? state)
         {
             bool isInitialCheck = false;
+            bool isWakeFromSleep = Services.SchoolTimeChecker.DetectWakeFromSleep();
 
             lock (_autoStartCheckLock)
             {
@@ -633,7 +634,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else if (IsAutomationRunning)
                 {
-                    if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
+                    if (DateTime.Now.Minute % 10 == 0 && DateTime.Now.Second < 5)
                     {
                         LogDebug("[AUTO-RESTART] Automation already running - skipping check");
                     }
@@ -659,19 +660,25 @@ namespace AkademiTrack.ViewModels
                 {
                     LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
                 }
+                else if (isWakeFromSleep)
+                {
+                    LogInfo("[WAKE DETECTION] Laptop ble åpnet etter søvn - sjekker om automatisering skal starte");
+                }
 
-                var (shouldStart, reason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+                var (shouldStart, reason, nextStartTime, shouldNotify) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
 
                 if (!shouldStart)
                 {
-                    if (isInitialCheck)
+
+                    if ((isInitialCheck || isWakeFromSleep) && shouldNotify)
                     {
                         LogInfo($"Auto-start ikke nødvendig: {reason}");
+
                         NativeNotificationService.Show("Auto-start Info",
                             $"Automatisering starter ikke: {reason}",
                             "INFO");
                     }
-                    else
+                    else if (!isInitialCheck && !isWakeFromSleep)
                     {
                         if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
                         {
@@ -684,6 +691,10 @@ namespace AkademiTrack.ViewModels
                 if (isInitialCheck)
                 {
                     LogInfo($"Auto-start betingelser oppfylt: {reason}");
+                }
+                else if (isWakeFromSleep)
+                {
+                    LogInfo($"[WAKE DETECTION] Auto-restart betingelser oppfylt etter søvn: {reason}");
                 }
                 else
                 {
@@ -702,30 +713,40 @@ namespace AkademiTrack.ViewModels
                     {
                         if (!IsAutomationRunning)
                         {
+                            string notificationTitle;
+                            string notificationMessage;
+
                             if (isInitialCheck)
                             {
+                                notificationTitle = "Auto-start aktivert";
+                                notificationMessage = $"Starter automatisk registrering - {reason}";
                                 LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
-                                NativeNotificationService.Show("Auto-start aktivert",
-                                    $"Starter automatisk registrering - {reason}",
-                                    "SUCCESS");
+                            }
+                            else if (isWakeFromSleep)
+                            {
+                                notificationTitle = "Auto-restart etter søvn";
+                                notificationMessage = "Automatisering starter på nytt - du er innenfor skoletid";
+                                LogInfo("Starter automatisering på nytt etter laptop ble åpnet");
                             }
                             else
                             {
-                                NativeNotificationService.Show("Auto-restart aktivert",
-                                    "Automatisering starter på nytt - du er innenfor skoletid",
-                                    "INFO");
+                                notificationTitle = "Auto-restart aktivert";
+                                notificationMessage = "Automatisering starter på nytt - du er innenfor skoletid";
                             }
+
+                            NativeNotificationService.Show(notificationTitle, notificationMessage, "SUCCESS");
+
                             await StartAutomationAsync();
                         }
                         else
                         {
-                            LogInfo("Automatisering kjører allerede - ignorerer auto-start");
+                            LogDebug("Automatisering kjører allerede - ignorerer auto-start forespørsel");
                         }
                     });
                 }
                 else
                 {
-                    if (isInitialCheck)
+                    if ((isInitialCheck || isWakeFromSleep) && shouldNotify)
                     {
                         LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
                         NativeNotificationService.Show("Mangler innloggingsopplysninger",
@@ -737,6 +758,25 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Feil ved auto-start sjekk: {ex.Message}");
+            }
+        }
+
+        public async Task RefreshAutoStartStatusAsync()
+        {
+            try
+            {
+                LogDebug("[AUTO-START] Manual refresh triggered - checking status immediately");
+
+                lock (_autoStartCheckLock)
+                {
+                    _hasPerformedInitialAutoStartCheck = false;
+                }
+
+                await CheckSchoolHoursAutoRestart(null);
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error refreshing auto-start status: {ex.Message}");
             }
         }
 
@@ -1135,8 +1175,8 @@ namespace AkademiTrack.ViewModels
 
             _cancellationTokenSource = new CancellationTokenSource();
 
-            var (shouldAutoStart, autoStartReason, nextStartTime) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
-            
+            var (shouldAutoStart, autoStartReason, nextStartTime, shouldNotify) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+
             if (!shouldAutoStart && _cancellationTokenSource == null)
             {
                 LogInfo($"Manuell start utenfor skoletid: {autoStartReason}");

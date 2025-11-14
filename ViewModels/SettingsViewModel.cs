@@ -538,7 +538,39 @@ Terminal=false
         public bool AutoStartAutomation
         {
             get => _autoStartAutomation;
-            set { if (_autoStartAutomation != value) { _autoStartAutomation = value; OnPropertyChanged(); _ = SaveSettingsAsync(); } }
+            set
+            {
+                if (_autoStartAutomation != value)
+                {
+                    _autoStartAutomation = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+
+                    _ = NotifyMainWindowAutoStartChanged();
+                }
+            }
+        }
+
+        private async Task NotifyMainWindowAutoStartChanged()
+        {
+            try
+            {
+                await Task.Delay(100); 
+
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var mainWindow = desktop.MainWindow as MainWindow;
+                    if (mainWindow?.DataContext is MainWindowViewModel viewModel)
+                    {
+                        Debug.WriteLine("[SETTINGS] Auto-start setting changed - triggering immediate refresh");
+                        await viewModel.RefreshAutoStartStatusAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error notifying MainWindow of auto-start change: {ex.Message}");
+            }
         }
 
         public string LoginEmail

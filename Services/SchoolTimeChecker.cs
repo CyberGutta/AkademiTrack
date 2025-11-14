@@ -7,36 +7,39 @@ using System.Diagnostics;
 
 namespace AkademiTrack.Services
 {
-
     public static class SchoolTimeChecker
     {
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         private static DateTime? _lastOnlineTimeCheck = null;
         private static TimeSpan _onlineTimeOffset = TimeSpan.Zero;
 
+        // Track notifications - only notify when meaningful to the student
+        private static DateTime _lastNotificationTime = DateTime.MinValue;
+        private static string _lastNotificationMessage = "";
+        private static bool _hasNotifiedTodayOutsideHours = false;
 
         public static async Task<DateTime> GetTrustedCurrentTimeAsync()
         {
             try
             {
                 var response = await _httpClient.GetAsync("http://worldtimeapi.org/api/timezone/Europe/Oslo");
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     var timeData = JsonSerializer.Deserialize<JsonElement>(json);
-                    
+
                     if (timeData.TryGetProperty("datetime", out var datetimeElement))
                     {
                         var onlineTime = DateTime.Parse(datetimeElement.GetString()!);
-                        
+
                         _onlineTimeOffset = onlineTime - DateTime.Now;
                         _lastOnlineTimeCheck = DateTime.Now;
-                        
+
                         Debug.WriteLine($"[TIME CHECK] Online time: {onlineTime:yyyy-MM-dd HH:mm:ss}");
                         Debug.WriteLine($"[TIME CHECK] Local time:  {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         Debug.WriteLine($"[TIME CHECK] Offset: {_onlineTimeOffset.TotalSeconds:F0} seconds");
-                        
+
                         return onlineTime;
                     }
                 }
@@ -47,7 +50,7 @@ namespace AkademiTrack.Services
             }
 
             var localTime = DateTime.Now;
-            
+
             if (_lastOnlineTimeCheck.HasValue)
             {
                 if ((DateTime.Now - _lastOnlineTimeCheck.Value).TotalMinutes < 30)
@@ -61,7 +64,6 @@ namespace AkademiTrack.Services
             Debug.WriteLine($"[TIME CHECK] Using raw local time: {localTime:yyyy-MM-dd HH:mm:ss}");
             return localTime;
         }
-
 
         public static async Task<bool> IsWithinSchoolHoursAsync()
         {
@@ -89,8 +91,32 @@ namespace AkademiTrack.Services
             return isSchoolDay;
         }
 
+        private static DateTime _lastCheckTime = DateTime.MinValue;
+        private const int WAKE_DETECTION_THRESHOLD_MINUTES = 5;
 
-        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime)> ShouldAutoStartAutomationAsync()
+        public static double NOTIFICATION_COOLDOWN_MINUTES { get; private set; }
+
+        public static bool DetectWakeFromSleep()
+        {
+            if (_lastCheckTime == DateTime.MinValue)
+            {
+                _lastCheckTime = DateTime.Now;
+                return false;
+            }
+
+            var timeSinceLastCheck = DateTime.Now - _lastCheckTime;
+            _lastCheckTime = DateTime.Now;
+
+            if (timeSinceLastCheck.TotalMinutes > WAKE_DETECTION_THRESHOLD_MINUTES)
+            {
+                Debug.WriteLine($"[WAKE DETECTION] Detected wake from sleep ({timeSinceLastCheck.TotalMinutes:F0} minutes passed)");
+                return true;
+            }
+
+            return false;
+        }
+
+        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify)> ShouldAutoStartAutomationAsync()
         {
             try
             {
@@ -100,12 +126,17 @@ namespace AkademiTrack.Services
                 var completionStatus = await GetCompletionStatusAsync();
                 var today = now.Date;
 
+                // Check if completed today
                 if (completionStatus.HasValue && completionStatus.Value.Date == today)
                 {
                     Debug.WriteLine($"[AUTO-START] Already COMPLETED today ({completionStatus:yyyy-MM-dd HH:mm})");
                     var nextDay = GetNextSchoolDay(now);
                     var nextStart = GetSchoolStartTime(nextDay);
-                    return (false, $"Allerede fullført i dag kl. {completionStatus:HH:mm}", nextStart);
+
+                    string reason = $"Allerede fullført i dag kl. {completionStatus:HH:mm}";
+                    bool shouldNotify = ShouldShowNotification(reason);
+
+                    return (false, reason, nextStart, shouldNotify);
                 }
 
                 if (!await IsWithinSchoolHoursAsync())
@@ -114,29 +145,62 @@ namespace AkademiTrack.Services
                     if (nextStart.HasValue)
                     {
                         var timeUntil = nextStart.Value - now;
-                        string waitMessage = timeUntil.TotalHours < 24 
+                        string waitMessage = timeUntil.TotalHours < 24
                             ? $"Starter automatisk {nextStart:HH:mm} ({GetNorwegianDayName(nextStart.Value.DayOfWeek)})"
                             : $"Starter automatisk {nextStart:dddd HH:mm}";
-                        return (false, waitMessage, nextStart);
+
+                        bool shouldNotify = ShouldShowNotification(waitMessage);
+                        return (false, waitMessage, nextStart, shouldNotify);
                     }
-                    return (false, "Utenfor skoletid", null);
+
+                    string outsideReason = "Utenfor skoletid";
+                    bool shouldNotifyOutside = ShouldShowNotification(outsideReason);
+                    return (false, outsideReason, null, shouldNotifyOutside);
                 }
 
                 Debug.WriteLine($"[AUTO-START] ✓ Should start - within school hours and not completed today");
-                return (true, $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}", null);
+                string startReason = $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}";
+
+                UpdateLastNotification(startReason);
+
+                return (true, startReason, null, true);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[AUTO-START] Error: {ex.Message}");
-                return (false, $"Feil ved sjekk: {ex.Message}", null);
+                return (false, $"Feil ved sjekk: {ex.Message}", null, false);
             }
         }
 
+        private static bool ShouldShowNotification(string message)
+        {
+            if (message != _lastNotificationMessage)
+            {
+                UpdateLastNotification(message);
+                return true;
+            }
+
+            var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
+            if (timeSinceLastNotification.TotalMinutes >= NOTIFICATION_COOLDOWN_MINUTES)
+            {
+                UpdateLastNotification(message);
+                return true;
+            }
+
+            Debug.WriteLine($"[NOTIFICATION] Suppressing duplicate notification (last shown {timeSinceLastNotification.TotalMinutes:F0} min ago)");
+            return false;
+        }
+
+        private static void UpdateLastNotification(string message)
+        {
+            _lastNotificationTime = DateTime.Now;
+            _lastNotificationMessage = message;
+        }
 
         private static DateTime? GetNextSchoolStartTime(DateTime from)
         {
             var current = from.Date;
-            
+
             if (from.TimeOfDay < TimeSpan.FromHours(15.25))
             {
                 var todayStart = GetSchoolStartTime(current);
@@ -161,7 +225,7 @@ namespace AkademiTrack.Services
             if (date.DayOfWeek == DayOfWeek.Monday)
                 return date.Date.AddHours(9);
             else
-                return date.Date.Add(new TimeSpan(8, 15, 0)); 
+                return date.Date.Add(new TimeSpan(8, 15, 0));
         }
 
         private static DateTime GetNextSchoolDay(DateTime from)
@@ -173,7 +237,6 @@ namespace AkademiTrack.Services
             }
             return nextDay;
         }
-
 
         private static string GetNorwegianDayName(DayOfWeek day)
         {
@@ -199,7 +262,7 @@ namespace AkademiTrack.Services
                 var data = new { lastRun = now, started = true, completed = false };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 await System.IO.File.WriteAllTextAsync(filePath, json);
-                
+
                 Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as STARTED at {now:HH:mm}");
             }
             catch (Exception ex)
@@ -217,7 +280,7 @@ namespace AkademiTrack.Services
                 var data = new { lastRun = now, started = true, completed = true };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
                 await System.IO.File.WriteAllTextAsync(filePath, json);
-                
+
                 Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as COMPLETED at {now:HH:mm}");
             }
             catch (Exception ex)
@@ -236,9 +299,8 @@ namespace AkademiTrack.Services
 
                 var json = await System.IO.File.ReadAllTextAsync(filePath);
                 var data = JsonSerializer.Deserialize<JsonElement>(json);
-                
-                // Only return date if it was COMPLETED, not just started
-                if (data.TryGetProperty("completed", out var completedElement) && 
+
+                if (data.TryGetProperty("completed", out var completedElement) &&
                     completedElement.GetBoolean() == true)
                 {
                     if (data.TryGetProperty("lastRun", out var lastRunElement))
