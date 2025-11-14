@@ -13,12 +13,12 @@ import time
 # ============================================================================
 
 # Code Signing Identities
-DEVELOPER_ID_APP = "sdf"
-DEVELOPER_ID_INSTALLER = "sdf"
+DEVELOPER_ID_APP = "ssdfsdff"
+DEVELOPER_ID_INSTALLER = "sddsfsdfsdff"
 
 # Apple Developer Credentials for Notarization
 APPLE_ID = "sdfsdf@gmail.com"
-TEAM_ID = "sdfsdf"  # Find at https://developer.apple.com/account
+TEAM_ID = "sdfsdfsdfssdf"  # Find at https://developer.apple.com/account
 APP_SPECIFIC_PASSWORD = "sdf-sdf-sdf-sdf"  # Generate at appleid.apple.com
 
 # App Details
@@ -838,7 +838,7 @@ def main():
 
     # Verify configuration
     print("\n🔍 Checking configuration...")
-    if "sdf" in DEVELOPER_ID_APP or "sdfsdf" in APPLE_ID:
+    if "sdfsdfsdfsdfds" in DEVELOPER_ID_APP or "sdfsdfdsfs" in APPLE_ID:
         print("❌ Please update the configuration at the top of this script!")
         print("   - DEVELOPER_ID_APP")
         print("   - DEVELOPER_ID_INSTALLER")
