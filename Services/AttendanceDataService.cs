@@ -160,6 +160,7 @@ namespace AkademiTrack.Services
                 var json = await response.Content.ReadAsStringAsync();
 
                 Console.WriteLine($"[MONTHLY DEBUG] JSON length: {json.Length}");
+                Console.WriteLine($"[MONTHLY DEBUG] First 500 chars of JSON: {json.Substring(0, Math.Min(500, json.Length))}");
 
                 // Need to deserialize with fields: Fag, Fagnavn, Fravaer (from your JSON example)
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
@@ -175,30 +176,34 @@ namespace AkademiTrack.Services
 
                 Console.WriteLine($"[MONTHLY DEBUG] Total items received: {scheduleResponse.Items.Count}");
 
-                // Print first few items to see what we're getting
-                if (scheduleResponse.Items.Count > 0)
+                // Print first 5 items to see what we're getting
+                for (int i = 0; i < Math.Min(5, scheduleResponse.Items.Count); i++)
                 {
-                    var firstItem = scheduleResponse.Items[0];
-                    Console.WriteLine($"[MONTHLY DEBUG] Sample item #1 - Fag: '{firstItem.Fag}', Fagnavn: '{firstItem.Fagnavn}', Fravaer: '{firstItem.Fravaer}'");
-
-                    if (scheduleResponse.Items.Count > 1)
-                    {
-                        var secondItem = scheduleResponse.Items[1];
-                        Console.WriteLine($"[MONTHLY DEBUG] Sample item #2 - Fag: '{secondItem.Fag}', Fagnavn: '{secondItem.Fagnavn}', Fravaer: '{secondItem.Fravaer}'");
-                    }
+                    var item = scheduleResponse.Items[i];
+                    Console.WriteLine($"[MONTHLY DEBUG] Item #{i+1}:");
+                    Console.WriteLine($"  - Dato: '{item.Dato}'");
+                    Console.WriteLine($"  - Fag: '{item.Fag}'");
+                    Console.WriteLine($"  - Fagnavn: '{item.Fagnavn}'");
+                    Console.WriteLine($"  - Fravaer: '{item.Fravaer}'");
+                    Console.WriteLine($"  - Timetype: '{item.Timetype}'");
                 }
 
                 // Count STU sessions - look for "STU" in Fag field or "Studietid" in Fagnavn
                 var stuSessions = scheduleResponse.Items.Where(i =>
-                    (i.Fag != null && i.Fag.Contains("STU")) ||
-                    (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
+                    (i.Fag != null && i.Fag.Contains("STU", StringComparison.OrdinalIgnoreCase)) ||
+                    (i.Fagnavn != null && i.Fagnavn.Contains("Studietid", StringComparison.OrdinalIgnoreCase))
                 ).ToList();
 
                 Console.WriteLine($"[MONTHLY DEBUG] STU sessions found: {stuSessions.Count}");
 
                 if (stuSessions.Count > 0)
                 {
-                    Console.WriteLine($"[MONTHLY DEBUG] First STU session - Fag: '{stuSessions[0].Fag}', Fagnavn: '{stuSessions[0].Fagnavn}', Fravaer: '{stuSessions[0].Fravaer}'");
+                    Console.WriteLine($"[MONTHLY DEBUG] First 3 STU sessions:");
+                    for (int i = 0; i < Math.Min(3, stuSessions.Count); i++)
+                    {
+                        var stu = stuSessions[i];
+                        Console.WriteLine($"  STU #{i+1} - Fag: '{stu.Fag}', Fagnavn: '{stu.Fagnavn}', Fravaer: '{stu.Fravaer}'");
+                    }
                 }
 
                 // Count registered (Fravaer = "M" means "Møtt" = attended)
