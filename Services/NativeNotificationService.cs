@@ -68,7 +68,9 @@ namespace AkademiTrack.Services
                 {
                     FileName = helperPath,
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
                 };
 
                 startInfo.ArgumentList.Add(title);
@@ -77,7 +79,11 @@ namespace AkademiTrack.Services
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    await process.WaitForExitAsync();
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        await process.WaitForExitAsync();
+                    });
                 }
             }
             catch (Exception ex)

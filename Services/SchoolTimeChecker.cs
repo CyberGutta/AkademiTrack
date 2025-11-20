@@ -17,6 +17,9 @@ namespace AkademiTrack.Services
         private static string _lastNotificationMessage = "";
         private static bool _hasNotifiedTodayOutsideHours = false;
 
+        // Add flag to track if we've done initial check
+        private static bool _hasPerformedInitialCheck = false;
+
         public static async Task<DateTime> GetTrustedCurrentTimeAsync()
         {
             try
@@ -133,7 +136,9 @@ namespace AkademiTrack.Services
                     var nextStart = GetSchoolStartTime(nextDay);
 
                     string reason = $"Allerede fullført i dag kl. {completionStatus:HH:mm}";
-                    bool shouldNotify = ShouldShowNotification(reason);
+                    
+                    // Only notify on initial check, not on periodic checks
+                    bool shouldNotify = !_hasPerformedInitialCheck;
 
                     return (false, reason, nextStart, shouldNotify);
                 }
@@ -148,12 +153,17 @@ namespace AkademiTrack.Services
                             ? $"Starter automatisk {nextStart.Value:HH:mm} ({GetNorwegianDayName(nextStart.Value.DayOfWeek)})"
                             : $"Starter automatisk {GetNorwegianDayName(nextStart.Value.DayOfWeek)} {nextStart.Value:HH:mm}";
 
-                        bool shouldNotify = ShouldShowNotification(waitMessage);
+                        // Only notify on initial check or if message changed significantly
+                        bool shouldNotify = !_hasPerformedInitialCheck || ShouldShowNotification(waitMessage);
+                        
                         return (false, waitMessage, nextStart, shouldNotify);
                     }
 
                     string outsideReason = "Utenfor skoletid";
-                    bool shouldNotifyOutside = ShouldShowNotification(outsideReason);
+                    
+                    // Only notify on initial check
+                    bool shouldNotifyOutside = !_hasPerformedInitialCheck;
+                    
                     return (false, outsideReason, null, shouldNotifyOutside);
                 }
 
@@ -161,6 +171,7 @@ namespace AkademiTrack.Services
                 string startReason = $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}";
 
                 UpdateLastNotification(startReason);
+                _hasPerformedInitialCheck = true;
 
                 return (true, startReason, null, true);
             }
@@ -173,20 +184,19 @@ namespace AkademiTrack.Services
 
         private static bool ShouldShowNotification(string message)
         {
+            // If this is a different message, only show if enough time has passed (30 minutes)
             if (message != _lastNotificationMessage)
             {
-                UpdateLastNotification(message);
-                return true;
+                var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
+                if (timeSinceLastNotification.TotalMinutes >= 30)
+                {
+                    UpdateLastNotification(message);
+                    return true;
+                }
+                return false;
             }
 
-            var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
-            if (timeSinceLastNotification.TotalMinutes >= NOTIFICATION_COOLDOWN_MINUTES)
-            {
-                UpdateLastNotification(message);
-                return true;
-            }
-
-            Debug.WriteLine($"[NOTIFICATION] Suppressing duplicate notification (last shown {timeSinceLastNotification.TotalMinutes:F0} min ago)");
+            // Same message - don't show again
             return false;
         }
 
@@ -194,6 +204,7 @@ namespace AkademiTrack.Services
         {
             _lastNotificationTime = DateTime.Now;
             _lastNotificationMessage = message;
+            _hasPerformedInitialCheck = true;
         }
 
         private static DateTime? GetNextSchoolStartTime(DateTime from)
@@ -331,6 +342,9 @@ namespace AkademiTrack.Services
                     System.IO.File.Delete(filePath);
                     Debug.WriteLine("[AUTO-START] Daily completion flag reset");
                 }
+                
+                // Reset the initial check flag too
+                _hasPerformedInitialCheck = false;
             }
             catch (Exception ex)
             {

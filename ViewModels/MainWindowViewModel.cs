@@ -669,25 +669,15 @@ namespace AkademiTrack.ViewModels
 
                 if (!shouldStart)
                 {
-
-                    if ((isInitialCheck || isWakeFromSleep) && shouldNotify)
+                    // NO NOTIFICATIONS for periodic checks - only log silently
+                    if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
                     {
-                        LogInfo($"Auto-start ikke nødvendig: {reason}");
-
-                        NativeNotificationService.Show("Auto-start Info",
-                            $"Automatisering starter ikke: {reason}",
-                            "INFO");
-                    }
-                    else if (!isInitialCheck && !isWakeFromSleep)
-                    {
-                        if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
-                        {
-                            LogDebug($"[AUTO-RESTART] Not starting: {reason}");
-                        }
+                        LogDebug($"[AUTO-RESTART] Not starting: {reason}");
                     }
                     return;
                 }
 
+                // Only reach here if shouldStart is TRUE
                 if (isInitialCheck)
                 {
                     LogInfo($"Auto-start betingelser oppfylt: {reason}");
@@ -702,7 +692,12 @@ namespace AkademiTrack.ViewModels
                     LogInfo("[AUTO-RESTART] Starting automation automatically");
                 }
 
-                await LoadCredentialsAsync();
+                // Load credentials only once when needed
+                if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
+                {
+                    await LoadCredentialsAsync();
+                }
+
                 bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
                                     _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
                                     !string.IsNullOrEmpty(_schoolName);
@@ -746,7 +741,8 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    if ((isInitialCheck || isWakeFromSleep) && shouldNotify)
+                    // Only show this notification when actually needed
+                    if (isInitialCheck || isWakeFromSleep)
                     {
                         LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
                         NativeNotificationService.Show("Mangler innloggingsopplysninger",
