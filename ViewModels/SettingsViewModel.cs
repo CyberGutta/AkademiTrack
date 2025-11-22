@@ -541,15 +541,22 @@ Terminal=false
         {
             try
             {
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                // Use InvokeAsync with Background priority and don't await it
+                _ = Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    var mainWindow = desktop.MainWindow as MainWindow;
-                    if (mainWindow != null)
+                    if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
-                        await mainWindow.RefreshSettingsAsync();
-                        Debug.WriteLine("✓ MainWindow settings cache refreshed");
+                        var mainWindow = desktop.MainWindow as MainWindow;
+                        if (mainWindow != null)
+                        {
+                            // Don't activate the window - just update settings
+                            await mainWindow.RefreshSettingsAsync();
+                            Debug.WriteLine("✓ MainWindow settings cache refreshed");
+                        }
                     }
-                }
+                }, Avalonia.Threading.DispatcherPriority.Background);
+                
+                // Don't await - fire and forget to prevent blocking
             }
             catch (Exception ex)
             {
@@ -656,17 +663,23 @@ Terminal=false
         {
             try
             {
-                await Task.Delay(100); 
+                await Task.Delay(100);
 
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                // Use InvokeAsync with Background priority and don't await it
+                _ = Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    var mainWindow = desktop.MainWindow as MainWindow;
-                    if (mainWindow?.DataContext is MainWindowViewModel viewModel)
+                    if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
-                        Debug.WriteLine("[SETTINGS] Auto-start setting changed - triggering immediate refresh");
-                        await viewModel.RefreshAutoStartStatusAsync();
+                        var mainWindow = desktop.MainWindow as MainWindow;
+                        if (mainWindow?.DataContext is MainWindowViewModel viewModel)
+                        {
+                            Debug.WriteLine("[SETTINGS] Auto-start setting changed - triggering immediate refresh");
+                            await viewModel.RefreshAutoStartStatusAsync();
+                        }
                     }
-                }
+                }, Avalonia.Threading.DispatcherPriority.Background);
+                
+                // Don't await - fire and forget
             }
             catch (Exception ex)
             {

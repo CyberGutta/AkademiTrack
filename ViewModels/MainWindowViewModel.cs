@@ -559,10 +559,10 @@ namespace AkademiTrack.ViewModels
             );
 
             _schoolHoursCheckTimer = new Timer(
-                async (state) => await CheckSchoolHoursAutoRestart(state),
+                CheckSchoolHoursAutoRestartSilent,  
                 null,
-                (int)TimeSpan.FromSeconds(5).TotalMilliseconds,
-                (int)TimeSpan.FromMinutes(1).TotalMilliseconds   
+                (int)TimeSpan.FromSeconds(30).TotalMilliseconds,  
+                (int)TimeSpan.FromMinutes(1).TotalMilliseconds    
             );
         }
 
@@ -619,142 +619,70 @@ namespace AkademiTrack.ViewModels
         }
 
 
-        private async Task CheckSchoolHoursAutoRestart(object? state)
+        private void CheckSchoolHoursAutoRestartSilent(object? state)
         {
-            bool isInitialCheck = false;
-            bool isWakeFromSleep = Services.SchoolTimeChecker.DetectWakeFromSleep();
+            _ = CheckSchoolHoursAutoRestartSilentAsync();
+        }
 
-            lock (_autoStartCheckLock)
+        private Task CheckSchoolHoursAutoRestartSilentAsync()
+        {
+            return Task.Run(async () =>
             {
-                if (!_hasPerformedInitialAutoStartCheck)
+                try
                 {
-                    _hasPerformedInitialAutoStartCheck = true;
-                    isInitialCheck = true;
-                    LogDebug("[AUTO-START] Performing initial auto-start check");
-                }
-                else if (IsAutomationRunning)
-                {
-                    if (DateTime.Now.Minute % 10 == 0 && DateTime.Now.Second < 5)
-                    {
-                        LogDebug("[AUTO-RESTART] Automation already running - skipping check");
-                    }
-                    return;
-                }
-            }
+                    if (IsAutomationRunning)
+                        return;
 
-            try
-            {
-                var settingsViewModel = new SettingsViewModel();
-                await Task.Delay(100);
+                    var settingsFile = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "AkademiTrack",
+                        "settings.json"
+                    );
 
-                if (!settingsViewModel.AutoStartAutomation)
-                {
-                    if (isInitialCheck)
-                    {
-                        LogInfo("Auto-start er deaktivert i innstillinger");
-                    }
-                    return;
-                }
+                    if (!System.IO.File.Exists(settingsFile))
+                        return;
 
-                if (isInitialCheck)
-                {
-                    LogInfo("Auto-start automatisering er aktivert - sjekker skoletid...");
-                }
-                else if (isWakeFromSleep)
-                {
-                    LogInfo("[WAKE DETECTION] Laptop ble åpnet etter søvn - sjekker om automatisering skal starte");
-                }
+                    var json = await System.IO.File.ReadAllTextAsync(settingsFile);
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
 
-                var (shouldStart, reason, nextStartTime, shouldNotify) = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+                    if (settings?.AutoStartAutomation != true)
+                        return;
 
-                if (!shouldStart)
-                {
-                    // NO NOTIFICATIONS for periodic checks - only log silently
-                    if (DateTime.Now.Minute % 5 == 0 && DateTime.Now.Second < 5)
-                    {
-                        LogDebug($"[AUTO-RESTART] Not starting: {reason}");
-                    }
-                    return;
-                }
+                    var result = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+                    
+                    if (!result.shouldStart)
+                        return;
 
-                // Only reach here if shouldStart is TRUE
-                if (isInitialCheck)
-                {
-                    LogInfo($"Auto-start betingelser oppfylt: {reason}");
-                }
-                else if (isWakeFromSleep)
-                {
-                    LogInfo($"[WAKE DETECTION] Auto-restart betingelser oppfylt etter søvn: {reason}");
-                }
-                else
-                {
-                    LogInfo($"[AUTO-RESTART] Conditions met: {reason}");
-                    LogInfo("[AUTO-RESTART] Starting automation automatically");
-                }
-
-                // Load credentials only once when needed
-                if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
-                {
-                    await LoadCredentialsAsync();
-                }
-
-                bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                    _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                    !string.IsNullOrEmpty(_schoolName);
-
-                if (hasCredentials)
-                {
                     await Dispatcher.UIThread.InvokeAsync(async () =>
                     {
                         if (!IsAutomationRunning)
                         {
-                            string notificationTitle;
-                            string notificationMessage;
-
-                            if (isInitialCheck)
+                            if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
                             {
-                                notificationTitle = "Auto-start aktivert";
-                                notificationMessage = $"Starter automatisk registrering - {reason}";
-                                LogInfo("Starter automatisering automatisk med lagrede innloggingsopplysninger");
-                            }
-                            else if (isWakeFromSleep)
-                            {
-                                notificationTitle = "Auto-restart etter søvn";
-                                notificationMessage = "Automatisering starter på nytt - du er innenfor skoletid";
-                                LogInfo("Starter automatisering på nytt etter laptop ble åpnet");
-                            }
-                            else
-                            {
-                                notificationTitle = "Auto-restart aktivert";
-                                notificationMessage = "Automatisering starter på nytt - du er innenfor skoletid";
+                                await LoadCredentialsAsync();
                             }
 
-                            NativeNotificationService.Show(notificationTitle, notificationMessage, "SUCCESS");
+                            bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
+                                                _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
+                                                !string.IsNullOrEmpty(_schoolName);
 
-                            await StartAutomationAsync();
+                            if (hasCredentials)
+                            {
+                                NativeNotificationService.Show(
+                                    "Auto-restart", 
+                                    "Starter automatisering - innenfor skoletid",
+                                    "SUCCESS"
+                                );
+
+                                await StartAutomationAsync();
+                            }
                         }
-                        else
-                        {
-                            LogDebug("Automatisering kjører allerede - ignorerer auto-start forespørsel");
-                        }
-                    });
+                    }, Avalonia.Threading.DispatcherPriority.Background);
                 }
-                else
+                catch
                 {
-                    // Only show this notification when actually needed
-                    if (isInitialCheck || isWakeFromSleep)
-                    {
-                        LogInfo("Auto-start aktivert men ingen lagrede innloggingsopplysninger");
-                        NativeNotificationService.Show("Mangler innloggingsopplysninger",
-                            "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet. Lagre innloggingsopplysninger i innstillinger.",
-                            "WARNING");
-                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Feil ved auto-start sjekk: {ex.Message}");
-            }
+            });
         }
 
         public async Task RefreshAutoStartStatusAsync()
@@ -768,7 +696,7 @@ namespace AkademiTrack.ViewModels
                     _hasPerformedInitialAutoStartCheck = false;
                 }
 
-                await CheckSchoolHoursAutoRestart(null);
+                await CheckSchoolHoursAutoRestartSilentAsync();
             }
             catch (Exception ex)
             {
@@ -985,7 +913,7 @@ namespace AkademiTrack.ViewModels
                 Level = level
             };
 
-            if (Dispatcher.UIThread.CheckAccess())
+            Dispatcher.UIThread.Post(() =>
             {
                 LogEntries.Add(logEntry);
 
@@ -998,24 +926,7 @@ namespace AkademiTrack.ViewModels
                 {
                     LogEntries.RemoveAt(0);
                 }
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    LogEntries.Add(logEntry);
-
-                    if (ShouldShowInStatus(message, level))
-                    {
-                        StatusMessage = logEntry.FormattedMessage;
-                    }
-
-                    while (LogEntries.Count > 100)
-                    {
-                        LogEntries.RemoveAt(0);
-                    }
-                });
-            }
+            }, Avalonia.Threading.DispatcherPriority.Background);  
         }
 
         private bool ShouldShowInStatus(string message, string level)

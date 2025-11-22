@@ -15,6 +15,7 @@ namespace AkademiTrack.Views
         private bool _hasShownMinimizeNotification = false;
         private bool _isReallyClosing = false;
         private AkademiTrack.ViewModels.AppSettings? _cachedSettings;
+        private bool _preventActivation = false;
 
         public MainWindow()
         {
@@ -23,8 +24,40 @@ namespace AkademiTrack.Views
             this.Closing += MainWindow_Closing;
             this.WindowState = WindowState.Normal;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            
+            // CRITICAL: Prevent focus stealing when window properties change
+            this.Activated += MainWindow_Activated;
 
             _ = LoadSettingsAsync();
+        }
+
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            // If we're minimized or in tray, immediately deactivate
+            if (this.WindowState == WindowState.Minimized || 
+                (_cachedSettings?.StartMinimized == true && !this.IsVisible))
+            {
+                Debug.WriteLine("[FOCUS] Window activated while minimized - preventing focus steal");
+                _preventActivation = true;
+                
+                // Return focus to previously active application
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    try
+                    {
+                        var script = "tell application \"System Events\" to keystroke tab using {command down}";
+                        var startInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "/usr/bin/osascript",
+                            ArgumentList = { "-e", script },
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        System.Diagnostics.Process.Start(startInfo);
+                    }
+                    catch { /* Ignore errors */ }
+                }
+            }
         }
 
         private async Task LoadSettingsAsync()
@@ -41,7 +74,17 @@ namespace AkademiTrack.Views
 
         public async Task RefreshSettingsAsync()
         {
+            // Refresh settings WITHOUT activating the window
+            var previousState = this.WindowState;
+            var wasVisible = this.IsVisible;
+            
             await LoadSettingsAsync();
+            
+            // Ensure window state doesn't change
+            if (!wasVisible || previousState == WindowState.Minimized)
+            {
+                this.WindowState = previousState;
+            }
         }
 
         private async void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
@@ -78,8 +121,8 @@ namespace AkademiTrack.Views
                     if (!_hasShownMinimizeNotification)
                     {
                         AkademiTrack.Services.NativeNotificationService.Show(
-                            "AkademiTrack kjører fortsatt",
-                            "Programmet kjører i bakgrunnen. Høyreklikk på tray-ikonet og velg 'Avslutt' for å lukke helt.",
+                            "AkademiTrack kjÃ¸rer fortsatt",
+                            "Programmet kjÃ¸rer i bakgrunnen. HÃ¸yreklikk pÃ¥ tray-ikonet og velg 'Avslutt' for Ã¥ lukke helt.",
                             "INFO"
                         );
                         _hasShownMinimizeNotification = true;
@@ -110,7 +153,7 @@ namespace AkademiTrack.Views
                     Dispatcher.UIThread.Post(() =>
                     {
                         AkademiTrack.Services.TrayIconManager.MinimizeToTray();
-                    });
+                    }, Avalonia.Threading.DispatcherPriority.Background);
                 }
             }
         }
