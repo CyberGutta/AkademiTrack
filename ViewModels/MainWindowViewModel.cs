@@ -487,6 +487,10 @@ namespace AkademiTrack.ViewModels
         public SettingsViewModel SettingsViewModel { get; set; }
         public DashboardViewModel Dashboard { get; private set; }
 
+        private static DateTime _lastDailyLogTime = DateTime.MinValue;
+
+        private Process? _caffeinateProcess;
+        private readonly object _caffeinateLock = new object();
 
         private string _loginEmail = "";
         private SecureString? _loginPasswordSecure;
@@ -561,8 +565,8 @@ namespace AkademiTrack.ViewModels
             _schoolHoursCheckTimer = new Timer(
                 CheckSchoolHoursAutoRestartSilent,  
                 null,
-                (int)TimeSpan.FromSeconds(30).TotalMilliseconds,  
-                (int)TimeSpan.FromMinutes(1).TotalMilliseconds    
+                (int)TimeSpan.FromSeconds(5).TotalMilliseconds,  
+                (int)TimeSpan.FromSeconds(10).TotalMilliseconds    
             );
         }
 
@@ -624,6 +628,7 @@ namespace AkademiTrack.ViewModels
             _ = CheckSchoolHoursAutoRestartSilentAsync();
         }
 
+        
         private Task CheckSchoolHoursAutoRestartSilentAsync()
         {
             return Task.Run(async () =>
@@ -650,37 +655,79 @@ namespace AkademiTrack.ViewModels
 
                     var result = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
                     
-                    if (!result.shouldStart)
-                        return;
-
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    if (result.shouldStart)
                     {
-                        if (!IsAutomationRunning)
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
-                            if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
+                            if (!IsAutomationRunning)
                             {
-                                await LoadCredentialsAsync();
+                                LogInfo("[AUTO-RESTART] Conditions met - starting automation");
+                                
+                                if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
+                                {
+                                    await LoadCredentialsAsync();
+                                }
+
+                                bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
+                                                    _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
+                                                    !string.IsNullOrEmpty(_schoolName);
+
+                                if (hasCredentials)
+                                {
+                                    LogInfo($"Auto-restart: {result.reason}");
+                                    
+                                    NativeNotificationService.Show(
+                                        "Auto-restart aktivert", 
+                                        result.reason,
+                                        "SUCCESS"
+                                    );
+
+                                    await StartAutomationAsync();
+                                }
+                                else
+                                {
+                                    LogInfo("Auto-restart aktivert men ingen lagrede innloggingsopplysninger");
+                                    NativeNotificationService.Show(
+                                        "Mangler innloggingsopplysninger",
+                                        "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet.",
+                                        "WARNING"
+                                    );
+                                }
                             }
-
-                            bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                                _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                                !string.IsNullOrEmpty(_schoolName);
-
-                            if (hasCredentials)
+                        }, Avalonia.Threading.DispatcherPriority.Background);
+                    }
+                    else if (result.shouldNotify && result.nextStartTime.HasValue)
+                    {
+                        var now = DateTime.Now;
+                        var hoursSinceLastLog = (now - _lastDailyLogTime).TotalHours;
+                        
+                        if (hoursSinceLastLog >= 12) 
+                        {
+                            _lastDailyLogTime = now;
+                            
+                            await Dispatcher.UIThread.InvokeAsync(() =>
                             {
-                                NativeNotificationService.Show(
-                                    "Auto-restart", 
-                                    "Starter automatisering - innenfor skoletid",
-                                    "SUCCESS"
-                                );
-
-                                await StartAutomationAsync();
-                            }
+                                LogInfo($"Auto-start status: {result.reason}");
+                                
+                                var timeUntil = result.nextStartTime.Value - now;
+                                if (timeUntil.TotalHours < 24)
+                                {
+                                    NativeNotificationService.Show(
+                                        "Auto-start planlagt",
+                                        result.reason,
+                                        "INFO"
+                                    );
+                                }
+                            }, Avalonia.Threading.DispatcherPriority.Background);
                         }
-                    }, Avalonia.Threading.DispatcherPriority.Background);
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        LogError($"Auto-restart check error: {ex.Message}");
+                    }, Avalonia.Threading.DispatcherPriority.Background);
                 }
             });
         }
@@ -701,6 +748,76 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 LogError($"Error refreshing auto-start status: {ex.Message}");
+            }
+        }
+
+        private void StartCaffeinate()
+        {
+            lock (_caffeinateLock)
+            {
+                if (_caffeinateProcess != null)
+                {
+                    LogDebug("Caffeinate already running");
+                    return;
+                }
+
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    LogDebug("Caffeinate only works on macOS - skipping");
+                    return;
+                }
+
+                try
+                {
+                    // -d = prevent display sleep
+                    // -i = prevent system idle sleep
+                    // -s = prevent system sleep
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "/usr/bin/caffeinate",
+                        Arguments = "-dims", // All sleep prevention flags
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    _caffeinateProcess = Process.Start(startInfo);
+                    LogInfo("✓ Caffeinate started - Mac will not sleep during automation");
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to start caffeinate: {ex.Message}");
+                }
+            }
+        }
+
+        // Add this method to stop caffeinate
+        private void StopCaffeinate()
+        {
+            lock (_caffeinateLock)
+            {
+                if (_caffeinateProcess == null)
+                    return;
+
+                try
+                {
+                    if (!_caffeinateProcess.HasExited)
+                    {
+                        _caffeinateProcess.Kill();
+                        _caffeinateProcess.WaitForExit(1000);
+                        LogInfo("✓ Caffeinate stopped - Mac can sleep normally");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug($"Error stopping caffeinate: {ex.Message}");
+                }
+                finally
+                {
+                    _caffeinateProcess?.Dispose();
+                    _caffeinateProcess = null;
+                }
             }
         }
 
@@ -1092,6 +1209,8 @@ namespace AkademiTrack.ViewModels
                 IsAutomationRunning = true;
             }
 
+                StartCaffeinate();
+
             bool hasInternet = await CheckInternetConnectionAsync();
             if (!hasInternet)
             {
@@ -1102,6 +1221,7 @@ namespace AkademiTrack.ViewModels
                     "ERROR"
                 );
                 IsAutomationRunning = false;
+                StopCaffeinate();
                 return;
             }
 
@@ -1257,6 +1377,7 @@ namespace AkademiTrack.ViewModels
                 IsAutomationRunning = false;
                 Dashboard.StopRefreshing();
                 _cancellationTokenSource?.Dispose();
+                StopCaffeinate();
                 
                 if (_cancellationTokenSource != null)
                 {
@@ -1271,6 +1392,7 @@ namespace AkademiTrack.ViewModels
             {
                 _cancellationTokenSource.Cancel();
                 Dashboard.StopRefreshing();
+                StopCaffeinate();
                 LogInfo("Stopp forespurt - stopper automatisering...");
                 NativeNotificationService.Show("Automatisering stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
             }
@@ -2978,6 +3100,8 @@ namespace AkademiTrack.ViewModels
         public void Dispose()
         {
             LogInfo("Disposing resources...");
+
+            StopCaffeinate();
 
             _loginPasswordSecure?.Dispose();
             _loginPasswordSecure = null;
