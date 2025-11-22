@@ -12,6 +12,10 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
 using System.Diagnostics;
+using Avalonia.Controls;
+using MsBox.Avalonia;
+using MsBox.Avalonia.Enums;
+using AkademiTrack.Services;
 
 namespace AkademiTrack
 {
@@ -157,7 +161,6 @@ namespace AkademiTrack
 
             // ✅ Trigger update check after window is shown
             _ = settingsViewModel.CheckForUpdatesAsync();
-
         }
 
         private async Task<bool> ShouldStartMinimized()
@@ -204,6 +207,135 @@ namespace AkademiTrack
             {
                 Debug.WriteLine($"[App] Error checking Feide credentials: {ex.Message}");
                 return false;
+            }
+        }
+
+        // ========== NATIVE MENU HANDLERS ==========
+
+        private void ShowAbout(object? sender, EventArgs e)
+        {
+            var aboutText = @"AkademiTrack v1.1.0
+
+Automatisk oppmøteregistrering for STU-økter på Akademiet
+
+Utviklet av:
+- Andreas Nilsen (@CyberNilsen)
+- Mathias Hansen (@CyberHansen)
+
+Lisens: MIT
+© 2025 CyberGutta
+
+github.com/CyberGutta/AkademiTrack";
+
+            Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var messageBox = MsBox.Avalonia.MessageBoxManager
+                    .GetMessageBoxStandard("Om AkademiTrack", aboutText, ButtonEnum.Ok);
+                await messageBox.ShowAsync();
+            });
+        }
+
+        private void ShowSettings(object? sender, EventArgs e)
+        {
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    // Ensure main window is visible
+                    desktop.MainWindow?.Show();
+                    desktop.MainWindow?.Activate();
+                    
+                    // Trigger OpenSettingsCommand from MainWindowViewModel
+                    if (desktop.MainWindow?.DataContext is MainWindowViewModel mainViewModel)
+                    {
+                        mainViewModel.OpenSettingsCommand?.Execute(null);
+                    }
+                }
+            });
+        }
+
+        private void CheckForUpdates(object? sender, EventArgs e)
+        {
+            Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.MainWindow?.Show();
+                    desktop.MainWindow?.Activate();
+                    
+                    if (desktop.MainWindow?.DataContext is MainWindowViewModel viewModel)
+                    {
+                        if (viewModel.SettingsViewModel == null)
+                        {
+                            viewModel.SettingsViewModel = new SettingsViewModel();
+                        }
+                        
+                        await viewModel.SettingsViewModel.CheckForUpdatesAsync();
+                        
+                        var status = viewModel.SettingsViewModel.UpdateStatus;
+                        if (viewModel.SettingsViewModel.UpdateAvailable)
+                        {
+                            NativeNotificationService.Show(
+                                "Oppdatering tilgjengelig",
+                                $"Versjon {viewModel.SettingsViewModel.AvailableVersion} er klar for nedlasting!",
+                                "SUCCESS"
+                            );
+                        }
+                        else
+                        {
+                            NativeNotificationService.Show(
+                                "Ingen oppdateringer",
+                                "Du har allerede den nyeste versjonen.",
+                                "INFO"
+                            );
+                        }
+                    }
+                }
+            });
+        }
+
+        private void QuitApp(object? sender, EventArgs e)
+        {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                _isShuttingDown = true;
+                desktop.Shutdown();
+            }
+        }
+
+        private void OpenWiki(object? sender, EventArgs e)
+        {
+            OpenUrl("https://github.com/CyberGutta/AkademiTrack/wiki");
+        }
+
+        private void OpenUserGuide(object? sender, EventArgs e)
+        {
+            OpenUrl("https://github.com/CyberGutta/AkademiTrack/wiki/User-Guide");
+        }
+
+        private void ReportIssue(object? sender, EventArgs e)
+        {
+            OpenUrl("https://forms.gle/HsHgvxYrZMgd9fyR7");
+        }
+
+        private void OpenGitHub(object? sender, EventArgs e)
+        {
+            OpenUrl("https://github.com/CyberGutta/AkademiTrack");
+        }
+
+        private void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] Failed to open URL: {ex.Message}");
             }
         }
     }

@@ -2,7 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="AkademiTrack.App"
              xmlns:local="using:AkademiTrack"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Default"
+             Name="AkademiTrack">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
@@ -12,4 +13,38 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+
+    <!-- macOS Native Menu -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <!-- Application Menu -->
+            <NativeMenuItem Header="AkademiTrack">
+                <NativeMenu>
+                    <NativeMenuItem Header="Om AkademiTrack" Click="ShowAbout" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Innstillinger..." Gesture="CMD+," Click="ShowSettings" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Se etter oppdateringer" Click="CheckForUpdates" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Skjul AkademiTrack" Gesture="CMD+H" />
+                    <NativeMenuItem Header="Skjul andre" Gesture="ALT+CMD+H" />
+                    <NativeMenuItem Header="Vis alle" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Avslutt AkademiTrack" Gesture="CMD+Q" Click="QuitApp" />
+                </NativeMenu>
+            </NativeMenuItem>
+
+            <!-- Help Menu -->
+            <NativeMenuItem Header="Hjelp">
+                <NativeMenu>
+                    <NativeMenuItem Header="AkademiTrack Wiki" Click="OpenWiki" />
+                    <NativeMenuItem Header="Brukerveiledning" Click="OpenUserGuide" />
+                    <NativeMenuItem Header="Rapporter et problem" Click="ReportIssue" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="GitHub Repository" Click="OpenGitHub" />
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
 </Application>
