@@ -17,6 +17,15 @@
 		<Product>AkademiTrack</Product>
 		<Company>CyberBrothersHQ</Company>
 		<Description>Automatisk oppmøte-system - Akademiet</Description>
+
+		<CFBundleName>AkademiTrack</CFBundleName>
+		<CFBundleDisplayName>AkademiTrack</CFBundleDisplayName>
+		<CFBundleIdentifier>com.CyberBrothers.akademitrack</CFBundleIdentifier>
+		<CFBundleVersion>1.1.0</CFBundleVersion>
+		<CFBundleShortVersionString>1.1.0</CFBundleShortVersionString>
+		<CFBundleIconFile>AT-1024.icns</CFBundleIconFile>
+		<NSPrincipalClass>NSApplication</NSPrincipalClass>
+		<NSHighResolutionCapable>true</NSHighResolutionCapable>
 	</PropertyGroup>
 	<ItemGroup>
 		<Folder Include="Models\" />

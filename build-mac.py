@@ -41,11 +41,9 @@ def create_launchagent_plist(version):
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- This is what macOS shows in Background Items -->
   <key>Label</key>
-  <string>AkademiTrack</string>
+  <string>com.CyberBrothers.akademitrack</string>
   
-  <!-- Path to app bundle -->
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/open</string>
@@ -53,11 +51,9 @@ def create_launchagent_plist(version):
     <string>/Applications/AkademiTrack.app</string>
   </array>
   
-  <!-- Run when the user logs in -->
   <key>RunAtLoad</key>
   <true/>
   
-  <!-- Don't keep alive if it crashes -->
   <key>KeepAlive</key>
   <false/>
 </dict>
@@ -517,9 +513,9 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <key>CFBundleExecutable</key>
     <string>{APP_NAME}</string>
     <key>CFBundleIdentifier</key>
-    <string>{BUNDLE_IDENTIFIER}</string>
+    <string>com.CyberBrothers.akademitrack</string>
     <key>CFBundleName</key>
-    <string>{APP_NAME}</string>
+    <string>AkademiTrack</string>
     <key>CFBundleDisplayName</key>
     <string>AkademiTrack</string>
     <key>CFBundleVersion</key>
@@ -529,9 +525,7 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleIconName</key>
-    <string>AppIcon</string>
+    <string>AT-1024.icns</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>
@@ -541,11 +535,7 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.education</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2025 AkademiTrack. All rights reserved.</string>
-    <key>LSRequiresNativeExecution</key>
-    <true/>
-    <key>LSArchitecturePriority</key>
-    <array><string>arm64</string></array>
+    <string>© 2025 CyberBrothers. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

@@ -175,7 +175,7 @@ using Microsoft.Win32;
 <plist version=""1.0"">
 <dict>
     <key>Label</key>
-    <string>AkademiTrack</string>
+    <string>com.CyberBrothers.akademitrack</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/open</string>
