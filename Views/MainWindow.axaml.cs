@@ -15,7 +15,7 @@ namespace AkademiTrack.Views
         private bool _hasShownMinimizeNotification = false;
         private bool _isReallyClosing = false;
         private AkademiTrack.ViewModels.AppSettings? _cachedSettings;
-        private bool _preventActivation = false;
+        private bool _isBeingRestored = false;
 
         public MainWindow()
         {
@@ -25,37 +25,40 @@ namespace AkademiTrack.Views
             this.WindowState = WindowState.Normal;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             
-            // CRITICAL: Prevent focus stealing when window properties change
-            this.Activated += MainWindow_Activated;
+            // Track when window is being legitimately restored
+            this.PropertyChanged += MainWindow_PropertyChanged;
 
             _ = LoadSettingsAsync();
         }
 
-        private void MainWindow_Activated(object? sender, EventArgs e)
+        private void MainWindow_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
-            // If we're minimized or in tray, immediately deactivate
-            if (this.WindowState == WindowState.Minimized || 
-                (_cachedSettings?.StartMinimized == true && !this.IsVisible))
+            // Track window state changes to detect legitimate restore operations
+            if (e.Property == WindowStateProperty)
             {
-                Debug.WriteLine("[FOCUS] Window activated while minimized - preventing focus steal");
-                _preventActivation = true;
-                
-                // Return focus to previously active application
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                var oldState = (WindowState)(e.OldValue ?? WindowState.Normal);
+                var newState = (WindowState)(e.NewValue ?? WindowState.Normal);
+
+                // If transitioning FROM minimized TO normal, this is a legitimate restore
+                if (oldState == WindowState.Minimized && newState == WindowState.Normal)
                 {
-                    try
+                    Debug.WriteLine("[FOCUS] Window being restored from minimized - allowing activation");
+                    _isBeingRestored = true;
+                    
+                    // Clear the flag after a short delay
+                    Dispatcher.UIThread.Post(() => 
                     {
-                        var script = "tell application \"System Events\" to keystroke tab using {command down}";
-                        var startInfo = new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = "/usr/bin/osascript",
-                            ArgumentList = { "-e", script },
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-                        System.Diagnostics.Process.Start(startInfo);
-                    }
-                    catch { /* Ignore errors */ }
+                        _isBeingRestored = false;
+                    }, DispatcherPriority.Background);
+                }
+                
+                // Handle minimize to tray
+                if (newState == WindowState.Minimized && _cachedSettings?.StartMinimized == true)
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        AkademiTrack.Services.TrayIconManager.MinimizeToTray();
+                    }, DispatcherPriority.Background);
                 }
             }
         }
@@ -140,24 +143,6 @@ namespace AkademiTrack.Views
             }
         }
 
-        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-        {
-            base.OnPropertyChanged(change);
-
-            if (change.Property == WindowStateProperty)
-            {
-                var newState = (WindowState)(change.NewValue ?? WindowState.Normal);
-
-                if (newState == WindowState.Minimized && _cachedSettings?.StartMinimized == true)
-                {
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        AkademiTrack.Services.TrayIconManager.MinimizeToTray();
-                    }, Avalonia.Threading.DispatcherPriority.Background);
-                }
-            }
-        }
-
         public void ReallyClose()
         {
             _isReallyClosing = true;
@@ -184,7 +169,7 @@ namespace AkademiTrack.Views
                 var windowHeight = this.Height;
 
                 var centerX = screenX + (screenWidth - windowWidth) / 2;
-                var centerY = screenY + (screenY + screenHeight - windowHeight) / 2;
+                var centerY = screenY + (screenHeight - windowHeight) / 2;
 
                 Position = new PixelPoint((int)centerX, (int)centerY);
             }
