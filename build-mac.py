@@ -524,6 +524,8 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <string>{version}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
     <key>CFBundleIconFile</key>
     <string>AT-1024.icns</string>
     <key>LSMinimumSystemVersion</key>
@@ -539,7 +541,7 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>
-</plist>"""
+</plist>""" 
     
     plist_path = contents_dir / "Info.plist"
     with open(plist_path, "w") as f:
