@@ -1306,7 +1306,6 @@ namespace AkademiTrack.ViewModels
                 LogInfo("Starter automatisering...");
                 NativeNotificationService.Show("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
-                // GET COOKIES FROM SECURE STORAGE (already authenticated)
                 var cookies = await SecureCredentialStorage.LoadCookiesAsync();
 
                 if (cookies == null || cookies.Count == 0)
@@ -1314,16 +1313,61 @@ namespace AkademiTrack.ViewModels
                     LogError("Ingen gyldige cookies funnet - autentisering kreves");
                     LogInfo("Starter re-autentisering...");
                     
-                    IsLoading = true;
-                    await InitializeAsync();
-                    IsLoading = false;
+                    // Re-authenticate and get new cookies
+                    _authService = new AuthenticationService();
+                    var authResult = await _authService.AuthenticateAsync();
                     
-                    IsAutomationRunning = false;
-                    StopCaffeinate();
-                    return;
+                    if (authResult.Success && authResult.Cookies != null && authResult.Cookies.Count > 0)
+                    {
+                        LogSuccess("✓ Re-autentisering fullført!");
+                        LogInfo($"Fikk {authResult.Cookies.Count} cookies");
+                        
+                        // Use the new cookies
+                        cookies = authResult.Cookies;
+                        
+                        // Check if we got parameters
+                        if (authResult.Parameters != null && authResult.Parameters.IsComplete)
+                        {
+                            LogSuccess("✓ Parametere mottatt fra autentisering");
+                            _userParameters = authResult.Parameters;
+                        }
+                        else
+                        {
+                            LogInfo("Ingen parametere fra autentisering - bruker eksisterende parametere");
+                            // Keep existing _userParameters - they're still valid
+                        }
+                        
+                        // Update dashboard credentials
+                        var servicesUserParams = new Services.UserParameters
+                        {
+                            FylkeId = _userParameters.FylkeId,
+                            PlanPeri = _userParameters.PlanPeri,
+                            SkoleId = _userParameters.SkoleId
+                        };
+                        
+                        Dashboard.SetCredentials(servicesUserParams, cookies);
+                        await Dashboard.RefreshDataAsync();
+                        
+                        LogSuccess($"✓ Autentisering vellykket - fortsetter med automatisering");
+                    }
+                    else
+                    {
+                        LogError($"Re-autentisering mislyktes - Success: {authResult.Success}, Cookies: {authResult.Cookies?.Count ?? 0}");
+                        NativeNotificationService.Show(
+                            "Autentisering mislyktes",
+                            "Kunne ikke autentisere. Vennligst prøv igjen.",
+                            "ERROR"
+                        );
+                        IsAutomationRunning = false;
+                        StopCaffeinate();
+                        return;
+                    }
+                }
+                else
+                {
+                    LogSuccess($"✓ Cookies lastet - {cookies.Count} cookies funnet");
                 }
 
-                LogSuccess($"✓ Cookies lastet - {cookies.Count} cookies funnet");
                 LogSuccess("Autentisering og parametere fullført - starter overvåkingssløyfe...");
                 LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
 

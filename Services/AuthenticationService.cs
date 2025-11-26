@@ -151,7 +151,7 @@ namespace AkademiTrack.Services
 
                 if (hasCredentials)
                 {
-                    
+                    options.AddArgument("--headless=new");
                     options.AddArgument("--window-size=1920,1080");
                 }
                 else
