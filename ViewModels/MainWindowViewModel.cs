@@ -390,7 +390,7 @@ namespace AkademiTrack.ViewModels
     {
         public DateTime Timestamp { get; set; }
         public string? Message { get; set; }
-        public string? Level { get; set; } // INFO, SUCCESS, ERROR, DEBUG
+        public string? Level { get; set; }
         public string FormattedMessage => $"[{Timestamp:HH:mm:ss}] [{Level}] {Message}";
     }
 
@@ -399,7 +399,7 @@ namespace AkademiTrack.ViewModels
         public DateTime Timestamp { get; set; }
         public string? Title { get; set; }
         public string? Message { get; set; }
-        public string? Level { get; set; } // INFO, SUCCESS, ERROR, WARNING
+        public string? Level { get; set; }
         public bool IsVisible { get; set; } = true;
         public int Id { get; set; }
     }
@@ -447,7 +447,6 @@ namespace AkademiTrack.ViewModels
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _isAutomationRunning;
         private string _statusMessage = "Ready";
-        private IWebDriver? _webDriver;
         private ObservableCollection<LogEntry> _logEntries;
         private ObservableCollection<NotificationEntry> _notifications;
         private bool _showDetailedLogs = true;
@@ -464,7 +463,6 @@ namespace AkademiTrack.ViewModels
         private DateTime _lastAutoStartCheck = DateTime.MinValue;
         private readonly object _autoStartCheckLock = new object();
         private bool _hasPerformedInitialAutoStartCheck = false;
-
 
         private List<ScheduleItem>? _cachedScheduleData;
         private DateTime _scheduleDataFetchTime;
@@ -492,11 +490,13 @@ namespace AkademiTrack.ViewModels
         private Process? _caffeinateProcess;
         private readonly object _caffeinateLock = new object();
 
-        private string _loginEmail = "";
-        private SecureString? _loginPasswordSecure;
-        private string _schoolName = "";
+        // NEW: Authentication state
+        private bool _isLoading = true;
+        private bool _isAuthenticated = false;
+        private AuthenticationService? _authService;
 
-
+        // User parameters (now set during authentication)
+        private UserParameters? _userParameters;
 
         public class NotificationQueueItem
         {
@@ -518,7 +518,6 @@ namespace AkademiTrack.ViewModels
             public string? published_at { get; set; }
             public string? timestamp { get; set; }
         }
-
 
         protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null!)
         {
@@ -543,11 +542,11 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new SimpleCommand(ToggleThemeAsync);
 
-            LogInfo("Applikasjon er klar");
+            // Start authentication flow instead of logging "ready"
+            _ = InitializeAsync();
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                
                 Dispatcher.UIThread.Post(async () =>
                 {
                     await Task.Delay(2000);
@@ -568,6 +567,108 @@ namespace AkademiTrack.ViewModels
                 (int)TimeSpan.FromSeconds(5).TotalMilliseconds,  
                 (int)TimeSpan.FromSeconds(10).TotalMilliseconds    
             );
+        }
+
+        // NEW: Loading state property
+        public bool IsLoading
+        {
+            get => _isLoading;
+            private set
+            {
+                if (_isLoading != value)
+                {
+                    _isLoading = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        // NEW: Authentication state property
+        public bool IsAuthenticated
+        {
+            get => _isAuthenticated;
+            private set
+            {
+                if (_isAuthenticated != value)
+                {
+                    _isAuthenticated = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        // NEW: Initialize authentication on startup
+        private async Task InitializeAsync()
+        {
+            try
+            {
+                IsLoading = true;
+
+                LogInfo("🚀 Starter AkademiTrack...");
+
+                // Initialize authentication service
+                _authService = new AuthenticationService();
+                
+
+                // Perform authentication
+                var authResult = await _authService.AuthenticateAsync();
+
+                if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
+                {
+                    LogSuccess("✓ Autentisering fullført!");
+                    
+                    IsAuthenticated = true;
+                    
+                    // Store parameters for automation use
+                    _userParameters = authResult.Parameters;
+                    
+                    // Initialize dashboard with credentials
+                    var servicesUserParams = new Services.UserParameters
+                    {
+                        FylkeId = authResult.Parameters.FylkeId,
+                        PlanPeri = authResult.Parameters.PlanPeri,
+                        SkoleId = authResult.Parameters.SkoleId
+                    };
+                    
+                    Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
+                    
+                    LogInfo("📊 Laster dashboard data...");
+                    await Dashboard.RefreshDataAsync();
+                    
+                    LogSuccess("✓ Applikasjon er klar!");
+                    
+                    await Task.Delay(500); // Brief delay to show success message
+                    
+                    IsLoading = false;
+                }
+                else
+                {
+                    LogError("❌ Autentisering mislyktes - kan ikke starte applikasjon");
+                    NativeNotificationService.Show(
+                        "Autentisering mislyktes",
+                        "Kunne ikke autentisere med iskole.net. Vennligst prøv igjen.",
+                        "ERROR"
+                    );
+                    
+                    // Stay on loading screen with error
+                    await Task.Delay(3000);
+                    
+                    // Retry authentication
+                    await InitializeAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError($"Kritisk feil under oppstart: {ex.Message}");
+                NativeNotificationService.Show(
+                    "Oppstartsfeil",
+                    "En kritisk feil oppstod under oppstart. Prøver igjen...",
+                    "ERROR"
+                );
+                
+                await Task.Delay(3000);
+                await InitializeAsync();
+            }
         }
 
         private async Task CheckAndRequestNotificationPermissionAsync()
@@ -622,13 +723,11 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
         private void CheckSchoolHoursAutoRestartSilent(object? state)
         {
             _ = CheckSchoolHoursAutoRestartSilentAsync();
         }
 
-        
         private Task CheckSchoolHoursAutoRestartSilentAsync()
         {
             return Task.Run(async () =>
@@ -663,16 +762,7 @@ namespace AkademiTrack.ViewModels
                             {
                                 LogInfo("[AUTO-RESTART] Conditions met - starting automation");
                                 
-                                if (string.IsNullOrEmpty(_loginEmail) || _loginPasswordSecure == null || _loginPasswordSecure.Length == 0)
-                                {
-                                    await LoadCredentialsAsync();
-                                }
-
-                                bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                                    _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                                    !string.IsNullOrEmpty(_schoolName);
-
-                                if (hasCredentials)
+                                if (IsAuthenticated && _userParameters != null && _userParameters.IsComplete)
                                 {
                                     LogInfo($"Auto-restart: {result.reason}");
                                     
@@ -686,10 +776,10 @@ namespace AkademiTrack.ViewModels
                                 }
                                 else
                                 {
-                                    LogInfo("Auto-restart aktivert men ingen lagrede innloggingsopplysninger");
+                                    LogInfo("Auto-restart aktivert men autentisering kreves");
                                     NativeNotificationService.Show(
-                                        "Mangler innloggingsopplysninger",
-                                        "Auto-start er aktivert, men ingen lagrede innloggingsopplysninger funnet.",
+                                        "Autentisering kreves",
+                                        "Auto-start er aktivert, men du må autentisere først.",
                                         "WARNING"
                                     );
                                 }
@@ -769,13 +859,10 @@ namespace AkademiTrack.ViewModels
 
                 try
                 {
-                    // -d = prevent display sleep
-                    // -i = prevent system idle sleep
-                    // -s = prevent system sleep
                     var startInfo = new ProcessStartInfo
                     {
                         FileName = "/usr/bin/caffeinate",
-                        Arguments = "-dims", // All sleep prevention flags
+                        Arguments = "-dims",
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
@@ -792,7 +879,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Add this method to stop caffeinate
         private void StopCaffeinate()
         {
             lock (_caffeinateLock)
@@ -821,43 +907,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-
-        private async Task LoadCredentialsAsync()
-        {
-            try
-            {
-                LogDebug("Loading credentials from secure storage...");
-
-                _loginEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
-
-                var passwordPlain = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
-                _loginPasswordSecure?.Dispose();
-                _loginPasswordSecure = StringToSecureString(passwordPlain);
-
-                // Clear plaintext password from memory immediately
-                passwordPlain = null;
-
-                _schoolName = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
-
-                if (!string.IsNullOrEmpty(_loginEmail))
-                {
-                    LogSuccess($"✓ Credentials loaded for: {_loginEmail}");
-                }
-                else
-                {
-                    LogInfo("No saved credentials found in secure storage");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to load credentials: {ex.Message}");
-                _loginEmail = "";
-                _loginPasswordSecure?.Dispose();
-                _loginPasswordSecure = new SecureString();
-                _schoolName = "";
-            }
-        }
-
         private string GetProcessedNotificationsFilePath()
         {
             string appDataDir = Path.Combine(
@@ -867,7 +916,6 @@ namespace AkademiTrack.ViewModels
             Directory.CreateDirectory(appDataDir);
             return Path.Combine(appDataDir, "processed_notifications.json");
         }
-
 
         public class EnhancedAdminNotification
         {
@@ -991,7 +1039,6 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
 
-        
         private Task DismissCurrentNotificationAsync()
         {
             CurrentNotification = null!;
@@ -1166,7 +1213,6 @@ namespace AkademiTrack.ViewModels
             return true;
         }
 
-
         private Task ClearLogsAsync()
         {
             LogEntries.Clear();
@@ -1209,7 +1255,21 @@ namespace AkademiTrack.ViewModels
                 IsAutomationRunning = true;
             }
 
-                StartCaffeinate();
+            StartCaffeinate();
+
+            // CHECK: Ensure we're authenticated
+            if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
+            {
+                LogError("Ikke autentisert - kan ikke starte automatisering");
+                NativeNotificationService.Show(
+                    "Autentiseringsfeil",
+                    "Du må være innlogget for å starte automatisering",
+                    "ERROR"
+                );
+                IsAutomationRunning = false;
+                StopCaffeinate();
+                return;
+            }
 
             bool hasInternet = await CheckInternetConnectionAsync();
             if (!hasInternet)
@@ -1244,118 +1304,28 @@ namespace AkademiTrack.ViewModels
             try
             {
                 LogInfo("Starter automatisering...");
+                NativeNotificationService.Show("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
 
-                LogInfo("Laster innloggingsopplysninger...");
-                await LoadCredentialsAsync();
+                // GET COOKIES FROM SECURE STORAGE (already authenticated)
+                var cookies = await SecureCredentialStorage.LoadCookiesAsync();
 
-                bool hasCredentials = !string.IsNullOrEmpty(_loginEmail) &&
-                                    _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                    !string.IsNullOrEmpty(_schoolName);
-
-                if (hasCredentials)
+                if (cookies == null || cookies.Count == 0)
                 {
-                    LogInfo($"Innloggingsopplysninger lastet for: {_loginEmail}");
-                    NativeNotificationService.Show("Automatisering startet", "STU tidsregistrering automatisering kjører nå", "SUCCESS");
-                }
-                else
-                {
-                    LogInfo("Ingen lagrede innloggingsopplysninger funnet - fortsetter med manuell innlogging");
-                    NativeNotificationService.Show("Manuell pålogging kreves", "Ingen lagrede innloggingsopplysninger - åpner nettleser for manuell innlogging", "INFO");
-                }
-
-                Dictionary<string, string> cookies = null!;
-                bool needsFreshLogin = false;
-
-                LogDebug("Laster eksisterende cookies fra fil...");
-                cookies = await LoadCookiesAsync();
-
-                if (cookies != null)
-                {
-                    LogInfo($"Fant {cookies.Count} eksisterende cookies, tester gyldighet...");
-                    bool cookiesValid = await TestCookiesAsync(cookies);
-
-                    if (cookiesValid)
-                    {
-                        LogSuccess("Eksisterende cookies er gyldige!");
-
-                        try
-                        {
-                            LogInfo("Forsøker å laste parametere for gyldig cookie-økt...");
-                            _userParameters = await ExtractUserParametersAsync(cookies);
-
-                            if (_userParameters != null && _userParameters.IsComplete)
-                            {
-                                LogSuccess($"Parametere lastet: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
-                            }
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            LogInfo("Parametere krever ny innlogging - cookies slettet");
-                            needsFreshLogin = true;
-                            cookies = null!;
-                        }
-                    }
-                    else
-                    {
-                        LogInfo("Eksisterende cookies er ugyldige eller utløpt");
-                        needsFreshLogin = true;
-                    }
-                }
-                else
-                {
-                    LogInfo("Ingen eksisterende cookies funnet");
-                    needsFreshLogin = true;
-                }
-
-                if (needsFreshLogin || cookies == null)
-                {
-                    if (hasCredentials)
-                    {
-                        LogInfo("Åpner nettleser for automatisk innlogging...");
-                    }
-                    else
-                    {
-                        LogInfo("Åpner nettleser for manuell innlogging...");
-                    }
-
-                    cookies = await GetCookiesViaBrowserAsync();
-
-                    if (cookies == null)
-                    {
-                        LogError("Kunne ikke få cookies fra nettleser innlogging");
-                        return;
-                    }
-
-                    if (hasCredentials)
-                    {
-                        LogSuccess($"Fikk {cookies.Count} nye cookies via automatisk innlogging");
-                    }
-                    else
-                    {
-                        LogSuccess($"Fikk {cookies.Count} nye cookies via manuell innlogging");
-                    }
-                }
-
-                if (_userParameters == null || !_userParameters.IsComplete)
-                {
-                    LogError("KRITISK: Mangler gyldige parametere etter innlogging");
-                    LogError("Dette bør ikke skje - sjekk parameter-capture logikk");
+                    LogError("Ingen gyldige cookies funnet - autentisering kreves");
+                    LogInfo("Starter re-autentisering...");
+                    
+                    IsLoading = true;
+                    await InitializeAsync();
+                    IsLoading = false;
+                    
+                    IsAutomationRunning = false;
+                    StopCaffeinate();
                     return;
                 }
 
+                LogSuccess($"✓ Cookies lastet - {cookies.Count} cookies funnet");
                 LogSuccess("Autentisering og parametere fullført - starter overvåkingssløyfe...");
                 LogInfo($"Bruker parametere: fylkeid={_userParameters.FylkeId}, planperi={_userParameters.PlanPeri}, skoleid={_userParameters.SkoleId}");
-
-                var servicesUserParams = new Services.UserParameters
-                {
-                    FylkeId = _userParameters.FylkeId,
-                    PlanPeri = _userParameters.PlanPeri,
-                    SkoleId = _userParameters.SkoleId
-                };
-
-                Dashboard.SetCredentials(servicesUserParams, cookies);
-                await Dashboard.RefreshDataAsync();
-                LogInfo("Dashboard data refreshed");
 
                 await RunMonitoringLoopAsync(_cancellationTokenSource.Token, cookies);
             }
@@ -1375,23 +1345,21 @@ namespace AkademiTrack.ViewModels
             finally
             {
                 IsAutomationRunning = false;
-                Dashboard.StopRefreshing();
                 _cancellationTokenSource?.Dispose();
                 StopCaffeinate();
-                
+
                 if (_cancellationTokenSource != null)
                 {
                     LogInfo("Automatisering fullført");
                 }
             }
-}
+        }
 
         private Task StopAutomationAsync()
         {
             if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 _cancellationTokenSource.Cancel();
-                Dashboard.StopRefreshing();
                 StopCaffeinate();
                 LogInfo("Stopp forespurt - stopper automatisering...");
                 NativeNotificationService.Show("Automatisering stoppet", "Automatisering har blitt stoppet av bruker", "INFO");
@@ -1462,909 +1430,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task<Dictionary<string, string>> LoadCookiesAsync()
-        {
-            try
-            {
-                var json = await SecureCredentialStorage.GetCredentialAsync("cookies");
-
-                if (string.IsNullOrEmpty(json))
-                {
-                    LogDebug("No cookies found in secure storage");
-                    return null!;
-                }
-
-                var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-
-                if (cookieArray == null || cookieArray.Length == 0)
-                {
-                    LogDebug("Cookie deserialization returned null or empty array");
-                    return null!;
-                }
-
-                LogSuccess($"✓ Successfully loaded {cookieArray.Length} cookies from secure storage");
-                return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
-            }
-            catch (JsonException jsonEx)
-            {
-                LogError($"JSON deserialization failed: {jsonEx.Message}");
-                await SecureCredentialStorage.DeleteCredentialAsync("cookies");
-                return null!;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to load cookies: {ex.Message}");
-                return null!;
-            }
-        }
-
-
-
-        private async Task<bool> TestCookiesAsync(Dictionary<string, string> cookies)
-        {
-            try
-            {
-                LogDebug("Testing cookies by fetching schedule data...");
-                var scheduleData = await GetScheduleDataAsync(cookies);
-                bool isValid = scheduleData?.Items != null;
-
-                if (isValid)
-                {
-                    LogDebug($"Cookie test successful - found {scheduleData?.Items?.Count} schedule items");
-                }
-                else
-                {
-                    LogDebug("Cookie test failed - no schedule data returned");
-                }
-
-                return isValid;
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Cookie test failed with exception: {ex.Message}");
-                return false;
-            }
-        }
-
-        private async Task<Dictionary<string, string>> GetCookiesViaBrowserAsync()
-        {
-            IWebDriver localWebDriver = null!;
-
-            try
-            {
-
-                bool shouldTryAutomatic = !string.IsNullOrEmpty(_loginEmail) &&
-                                        _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
-                                        !string.IsNullOrEmpty(_schoolName);
-
-                var options = new ChromeOptions();
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-dev-shm-usage");
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--disable-web-security");
-                options.AddArgument("--disable-features=VizDisplayCompositor");
-
-                if (shouldTryAutomatic)
-                {
-                    options.AddArgument("--headless");
-                    LogInfo("Forsøker automatisk innlogging i bakgrunnen...");
-                }
-                else
-                {
-                    options.AddArgument("--start-maximized");
-                    LogInfo("Åpner synlig nettleser for manuell innlogging...");
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    options.AddArgument("--disable-gpu");
-                }
-
-                // Hide CMD window on Windows
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    var chromeDriverService = ChromeDriverService.CreateDefaultService();
-                    chromeDriverService.HideCommandPromptWindow = true;
-                    localWebDriver = new ChromeDriver(chromeDriverService, options);
-                }
-                else
-                {
-                    localWebDriver = new ChromeDriver(options);
-                }
-                _webDriver = localWebDriver;
-
-                LogInfo("Navigerer til innloggingsside: https://iskole.net/elev/?ojr=login");
-                _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
-
-                await Task.Delay(1000);
-
-                bool loginSuccess = false;
-
-                if (shouldTryAutomatic)
-                {
-                    LogInfo("Utfører rask automatisk innlogging...");
-                    loginSuccess = await PerformFastAutomaticLoginAsync();
-
-                    if (loginSuccess)
-                    {
-                        LogSuccess("Automatisk innlogging fullført!");
-                    }
-                    else
-                    {
-                        LogInfo("Automatisk innlogging mislyktes - skifter til synlig modus for manuell innlogging");
-
-                        NativeNotificationService.Show("Manuell pålogging kreves",
-                        "Automatisk innlogging mislyktes. Nettleseren åpnes for manuell innlogging.",
-                        "WARNING");
-
-                        await CleanupWebDriverAsync(localWebDriver);
-
-                        var visibleOptions = new ChromeOptions();
-                        visibleOptions.AddArgument("--no-sandbox");
-                        visibleOptions.AddArgument("--disable-dev-shm-usage");
-                        visibleOptions.AddArgument("--start-maximized");
-
-                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            var chromeDriverService = ChromeDriverService.CreateDefaultService();
-                            chromeDriverService.HideCommandPromptWindow = true;
-                            localWebDriver = new ChromeDriver(chromeDriverService, visibleOptions);
-                        }
-                        else
-                        {
-                            localWebDriver = new ChromeDriver(visibleOptions);
-                        }
-                        _webDriver = localWebDriver;
-
-                        _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
-                        await Task.Delay(1000);
-
-                        LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
-                        var targetReached = await WaitForTargetUrlAsync();
-                        if (!targetReached)
-                        {
-                            LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
-                            return null!;
-                        }
-                    }
-                }
-                else
-                {
-                    LogInfo("Vennligst fullfør innloggingsprosessen i nettleseren");
-                    var targetReached = await WaitForTargetUrlAsync();
-                    if (!targetReached)
-                    {
-                        LogError("Tidsavbrudd - innlogging ble ikke fullført innen 10 minutter");
-                        return null!;
-                    }
-                }
-
-                LogSuccess("Innlogging fullført!");
-
-                await QuickParameterCapture();
-
-                LogInfo("Ekstraherer cookies fra nettleser økten...");
-
-                if (!IsWebDriverValid(_webDriver))
-                {
-                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet etter innlogging");
-                    NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                    return null!;
-                }
-
-                var seleniumCookies = _webDriver.Manage().Cookies.AllCookies;
-                var cookieDict = seleniumCookies.ToDictionary(c => c.Name, c => c.Value);
-
-                LogDebug($"Ekstraherte cookies: {string.Join(", ", cookieDict.Keys)}");
-
-                await SaveCookiesAsync(seleniumCookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray());
-
-                LogSuccess($"Ekstraherte og lagret {cookieDict.Count} cookies");
-                return cookieDict;
-            }
-            catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
-                                                webEx.Message.Contains("target window already closed") ||
-                                                webEx.Message.Contains("Session info: chrome") ||
-                                                webEx.Message.Contains("disconnected"))
-            {
-                LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
-                NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                await ForceStopAutomationAsync();
-                return null!;
-            }
-            catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
-                                                        invEx.Message.Contains("no such session"))
-            {
-                LogError("Automatisering stoppet - bruker lukket innloggingsvinduet under prosessen");
-                NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                await ForceStopAutomationAsync();
-                return null!;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Nettleser innlogging feilet: {ex.Message}");
-                LogDebug($"Exception type: {ex.GetType().Name}");
-                NativeNotificationService.Show("Automatisering stoppet", "Innlogging feilet - automatisering stoppet", "ERROR");
-                await ForceStopAutomationAsync();
-                return null!;
-            }
-            finally
-            {
-                await CleanupWebDriverAsync(localWebDriver);
-            }
-        }
-
-        private async Task<bool> PerformFastAutomaticLoginAsync()
-        {
-            try
-            {
-                if (_webDriver == null || !IsWebDriverValid(_webDriver))
-                {
-                    LogDebug("WebDriver not valid for automatic login");
-                    return false;
-                }
-
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(6));
-
-                LogDebug("Starting fast automatic login process...");
-
-                try
-                {
-                    LogDebug("Looking for FEIDE button...");
-                    var feideButton = wait.Until(driver =>
-                    {
-                        try
-                        {
-                            var selectors = new[]
-                            {
-                        "//span[contains(@class, 'feide_icon')]/ancestor::button",
-                        "//button[contains(., 'FEIDE')]",
-                        "//button[contains(@class, 'button')]"
-                    };
-
-                            foreach (var selector in selectors)
-                            {
-                                var elements = driver.FindElements(By.XPath(selector));
-                                foreach (var btn in elements)
-                                {
-                                    if (btn.Displayed && btn.Enabled &&
-                                        (btn.Text.Contains("FEIDE") || btn.GetAttribute("innerHTML").Contains("FEIDE")))
-                                    {
-                                        return btn;
-                                    }
-                                }
-                            }
-                            return null;
-                        }
-                        catch (NoSuchElementException)
-                        {
-                            return null;
-                        }
-                    });
-
-                    if (feideButton != null)
-                    {
-                        LogDebug("Found FEIDE button - clicking...");
-                        feideButton.Click();
-                        await Task.Delay(800);
-                    }
-                }
-                catch (WebDriverTimeoutException)
-                {
-                    LogDebug("FEIDE button not found within timeout, continuing...");
-                }
-
-                if (await HandleFastOrganizationSelectionAsync())
-                {
-                    LogDebug("Organization selection completed");
-                }
-
-                return await HandleFastFeideLoginFormAsync();
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error during fast automatic login: {ex.Message}");
-                return false;
-            }
-        }
-
-        private async Task<bool> HandleFastOrganizationSelectionAsync()
-        {
-            try
-            {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(5));
-
-                LogDebug("Fast organization selection check...");
-
-                IWebElement? orgSearchField = null;
-                try
-                {
-                    orgSearchField = wait.Until(driver =>
-                    {
-                        try
-                        {
-                            var element = driver.FindElement(By.Id("org_selector_filter"));
-                            return element.Displayed ? element : null;
-                        }
-                        catch (NoSuchElementException)
-                        {
-                            return null;
-                        }
-                    });
-                }
-                catch (WebDriverTimeoutException)
-                {
-                    LogDebug("Organization selection not needed");
-                    return true;
-                }
-                if (orgSearchField == null)
-                {
-                    LogDebug("Organization search field not found");
-                    return true;
-                }
-
-                if (orgSearchField != null)
-                {
-                    LogDebug($"Fast search for '{_schoolName}'...");
-
-                    orgSearchField.Clear();
-                    orgSearchField.SendKeys(_schoolName);
-                    await Task.Delay(500);
-
-                    try
-                    {
-                        var schoolOption = wait.Until(driver =>
-                        {
-                            var selectors = new[]
-                            {
-                        $"//li[contains(text(), '{_schoolName}')]",
-                        $"//div[contains(text(), '{_schoolName}')]",
-                        $"//*[contains(text(), 'Akademiet Drammen')]"
-                    };
-
-                            foreach (var selector in selectors)
-                            {
-                                try
-                                {
-                                    var elements = driver.FindElements(By.XPath(selector));
-                                    foreach (var elem in elements)
-                                    {
-                                        if (elem.Displayed && elem.Enabled)
-                                        {
-                                            return elem;
-                                        }
-                                    }
-                                }
-                                catch { continue; }
-                            }
-                            return null;
-                        });
-
-                        if (schoolOption != null)
-                        {
-                            LogDebug("Found school - clicking...");
-                            schoolOption.Click();
-                            await Task.Delay(300);
-
-                            try
-                            {
-                                var continueButton = _webDriver?.FindElement(By.Id("selectorg_button"));
-                                if (continueButton?.Enabled == true)
-                                {
-                                    continueButton.Click();
-                                    await Task.Delay(800);
-                                    return true;
-                                }
-                            }
-                            catch (NoSuchElementException)
-                            {
-                                LogDebug("Continue button not found");
-                            }
-                        }
-                    }
-                    catch (WebDriverTimeoutException)
-                    {
-                        LogError($"Timeout while searching for '{_schoolName}'");
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error during fast organization selection: {ex.Message}");
-                return false;
-            }
-        }
-
-        private async Task<bool> HandleFastFeideLoginFormAsync()
-        {
-            try
-            {
-                var wait = new WebDriverWait(_webDriver, TimeSpan.FromSeconds(8));
-
-                LogDebug("Fast Feide form detection...");
-
-                IWebElement? usernameField = null;
-                IWebElement? passwordField = null;
-                IWebElement? loginButton = null;
-
-                try
-                {
-                    usernameField = wait.Until(driver =>
-                    {
-                        try
-                        {
-                            var field = driver.FindElement(By.Id("username"));
-                            if (field.Displayed) return field;
-                        }
-                        catch { }
-
-                        try
-                        {
-                            var altField = driver.FindElement(By.Name("feidename"));
-                            if (altField.Displayed) return altField;
-                        }
-                        catch { }
-
-                        return null;
-                    });
-
-                    try
-                    {
-                        if (_webDriver == null)
-                        {
-                            LogError("WebDriver is null, cannot find password field");
-                            return false;
-                        }
-
-                        passwordField = _webDriver.FindElement(By.Id("password"));
-                        if (!passwordField.Displayed)
-                        {
-                            passwordField = _webDriver.FindElement(By.Name("password"));
-                        }
-                    }
-                    catch (NoSuchElementException)
-                    {
-                        LogDebug("Password field not found");
-                    }
-
-                    var buttonSelectors = new[]
-                    {
-                "//button[@type='submit']",
-                "//button[contains(text(), 'Logg inn')]",
-                "//input[@value='Logg inn']"
-            };
-
-                    foreach (var selector in buttonSelectors)
-                    {
-
-                        try
-                        {
-                            var button = _webDriver?.FindElement(By.XPath(selector));
-                            if (button != null && button.Displayed && button.Enabled)
-                            {
-                                loginButton = button;
-                                break;
-                            }
-                        }
-                        catch (NoSuchElementException)
-                        {
-                            loginButton = null;
-                        }
-                    }
-                }
-                catch (WebDriverTimeoutException)
-                {
-                    LogDebug("Login form not found within timeout");
-                    return false;
-                }
-
-                if (usernameField != null && passwordField != null)
-                {
-                    LogDebug("Fast form filling...");
-
-                    try
-                    {
-                        usernameField.Clear();
-                        usernameField.SendKeys(_loginEmail);
-
-                        passwordField.Clear();
-
-                        var passwordPlain = SecureStringToString(_loginPasswordSecure);
-                        try
-                        {
-                            passwordField.SendKeys(passwordPlain);
-                        }
-                        finally
-                        {
-                            passwordPlain = null;
-                        }
-
-                        await Task.Delay(200);
-
-                        if (loginButton != null)
-                        {
-                            LogDebug("Clicking login button...");
-                            loginButton.Click();
-                        }
-                        else
-                        {
-                            LogDebug("Using Enter key...");
-                            passwordField.SendKeys(Keys.Enter);
-                        }
-
-                        LogDebug("Form submitted - checking for success...");
-
-                        for (int i = 0; i < 10; i++)
-                        {
-                            await Task.Delay(200);
-
-
-
-                            var currentUrl = _webDriver?.Url;
-                            if (string.IsNullOrEmpty(currentUrl))
-                            {
-                                LogDebug("Current URL is null or empty, cannot verify login success");
-                                return false;
-                            }
-
-                            if (currentUrl.Contains("isFeideinnlogget=true") ||
-                                currentUrl.Contains("ojr=timeplan") ||
-                                (!currentUrl.Contains("login") && !currentUrl.Contains("feide") && !currentUrl.Contains("org_selector")))
-                            {
-                                LogSuccess("Fast Feide login successful!");
-                                return true;
-                            }
-                        }
-
-                        var finalUrl = _webDriver?.Url;
-                        if (string.IsNullOrEmpty(finalUrl))
-                        {
-                            LogDebug("Final URL is null or empty, cannot verify login success");
-                            return false;
-                        }
-
-                        if (finalUrl.Contains("isFeideinnlogget=true") ||
-                            finalUrl.Contains("ojr=timeplan") ||
-                            (!finalUrl.Contains("login") && !finalUrl.Contains("feide") && !finalUrl.Contains("org_selector")))
-                        {
-                            LogSuccess("Fast Feide login successful!");
-                            return true;
-                        }
-                        else
-                        {
-                            LogDebug("Fast login appears to have failed");
-                            return false;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Error during fast form submission: {ex.Message}");
-                        return false;
-                    }
-                }
-                else
-                {
-                    LogDebug("Complete login form not found");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error in fast Feide form handling: {ex.Message}");
-                return false;
-            }
-        }
-        private async Task<UserParameters?> QuickParameterCapture()
-        {
-            try
-            {
-                if (_webDriver == null || !IsWebDriverValid(_webDriver))
-                    return null;
-                LogDebug("Fanger parametere fra nettverkstrafikk...");
-
-                var jsExecutor = (IJavaScriptExecutor)_webDriver;
-
-                var result = jsExecutor.ExecuteScript(@"
-            try {
-                var entries = performance.getEntries();
-                
-                for (var i = 0; i < entries.length; i++) {
-                    var entry = entries[i];
-                    if (entry.name && 
-                        (entry.name.includes('VoTimeplan_elev') || entry.name.includes('RESTFilter')) &&
-                        entry.name.includes('fylkeid=')) {
-                        
-                        console.log('Found network request:', entry.name);
-                        
-                        // Extract parameters from the URL
-                        var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                        if (match && match.length >= 4) {
-                            return {
-                                fylkeid: match[1],
-                                planperi: match[2], 
-                                skoleid: match[3],
-                                source: 'network'
-                            };
-                        }
-                    }
-                }
-                
-                return { waiting: true };
-                
-            } catch (e) {
-                console.error('Error capturing parameters:', e);
-                return null;
-            }
-        ");
-
-                for (int attempt = 0; attempt < 5 && result is Dictionary<string, object> waiting && waiting.ContainsKey("waiting"); attempt++)
-                {
-                    LogDebug($"Venter på nettverkstrafikk... forsøk {attempt + 1}/5");
-                    await Task.Delay(1000);
-
-                    result = jsExecutor.ExecuteScript(@"
-                try {
-                    var entries = performance.getEntries();
-                    for (var i = 0; i < entries.length; i++) {
-                        var entry = entries[i];
-                        if (entry.name && 
-                            (entry.name.includes('VoTimeplan_elev') || entry.name.includes('RESTFilter')) &&
-                            entry.name.includes('fylkeid=')) {
-                            
-                            var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                            if (match && match.length >= 4) {
-                                return {
-                                    fylkeid: match[1],
-                                    planperi: match[2], 
-                                    skoleid: match[3],
-                                    source: 'network'
-                                };
-                            }
-                        }
-                    }
-                    return null;
-                } catch (e) {
-                    return null;
-                }
-            ");
-                }
-
-                if (result is Dictionary<string, object> resultDict &&
-                    resultDict.ContainsKey("fylkeid") &&
-                    resultDict.ContainsKey("planperi") &&
-                    resultDict.ContainsKey("skoleid"))
-                {
-                    var parameters = new UserParameters
-                    {
-                        FylkeId = resultDict["fylkeid"]?.ToString(),
-                        PlanPeri = resultDict["planperi"]?.ToString(),
-                        SkoleId = resultDict["skoleid"]?.ToString()
-                    };
-
-                    LogSuccess($"Fanget parametere fra nettverkstrafikk: fylkeid={parameters.FylkeId}, planperi={parameters.PlanPeri}, skoleid={parameters.SkoleId}");
-
-                    await SaveParametersAsync(parameters);
-
-                    _userParameters = parameters;
-
-                    return parameters;
-                }
-                else
-                {
-                    LogDebug("Ingen nettverkstrafikk funnet med parametere");
-                    return null!;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Parameter capture feilet: {ex.Message}");
-                return null!;
-            }
-        }
-
-        private string GetCurrentSchoolYear()
-        {
-            var now = DateTime.Now;
-            var currentYear = now.Year;
-
-
-            var schoolYearStart = now.Month >= 8 ? currentYear : currentYear - 1;
-            var schoolYearEnd = schoolYearStart + 1;
-
-            return $"{schoolYearStart}-{schoolYearEnd.ToString().Substring(2)}";
-        }
-
-        private async Task<bool> WaitForTargetUrlAsync()
-        {
-            var timeout = DateTime.Now.AddMinutes(10);
-            // var targetUrl = "https://iskole.net/elev/?isFeideinnlogget=true&ojr=timeplan";
-            int checkCount = 0;
-
-            while (DateTime.Now < timeout && !_cancellationTokenSource?.Token.IsCancellationRequested == true)
-            {
-                try
-                {
-                    if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
-                    {
-                        LogInfo("Automatisering ble stoppet under venting på innlogging");
-                        return false;
-                    }
-
-                    if (_webDriver == null || !IsWebDriverValid(_webDriver))
-                    {
-                        LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                        NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                        return false;
-                    }
-
-                    checkCount++;
-                    var currentUrl = _webDriver.Url;
-
-                    if (checkCount % 15 == 0)
-                    {
-                        var elapsed = checkCount * 2;
-                        LogInfo($"Venter på innlogging... ({elapsed} sekunder)");
-                    }
-
-                    if (currentUrl.Contains("isFeideinnlogget=true") && currentUrl.Contains("ojr=timeplan"))
-                    {
-                        LogDebug($"Target URL reached after {checkCount * 2} seconds");
-                        return true;
-                    }
-                }
-                catch (WebDriverException webEx) when (webEx.Message.Contains("no such window") ||
-                                                    webEx.Message.Contains("target window already closed") ||
-                                                    webEx.Message.Contains("disconnected"))
-                {
-                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                    NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                    return false;
-                }
-                catch (InvalidOperationException invEx) when (invEx.Message.Contains("disconnected") ||
-                                                            invEx.Message.Contains("no such session"))
-                {
-                    LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                    NativeNotificationService.Show("Automatisering stoppet", "Innlogging avbrutt av bruker - automatisering stoppet", "WARNING");
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    LogDebug($"Error checking URL: {ex.Message}");
-
-                    if (_webDriver == null || !IsWebDriverValid(_webDriver))
-                    {
-                        LogError("Automatisering stoppet - bruker lukket innloggingsvinduet");
-                        NativeNotificationService.Show(
-                            "Automatisering stoppet",
-                            "Innlogging avbrutt av bruker - automatisering stoppet",
-                            "WARNING"
-                        );
-                        return false;
-                    }
-                }
-
-                await Task.Delay(2000);
-            }
-
-            LogError("Automatisering stoppet - innlogging tidsavbrudd");
-            NativeNotificationService.Show("Automatisering stoppet", "Innlogging tidsavbrudd - automatisering stoppet", "ERROR");
-            return false;
-        }
-
-        private bool IsWebDriverValid(IWebDriver driver)
-        {
-            if (driver == null) return false;
-
-            try
-            {
-                var _ = driver.CurrentWindowHandle;
-                return true;
-            }
-            catch (WebDriverException)
-            {
-                return false;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private async Task CleanupWebDriverAsync(IWebDriver driverToCleanup)
-        {
-            try
-            {
-                LogInfo("Rydder opp nettleser ressurser...");
-
-                if (driverToCleanup != null)
-                {
-                    try
-                    {
-                        if (IsWebDriverValid(driverToCleanup))
-                        {
-                            LogDebug("Lukker nettleser...");
-                            driverToCleanup.Quit();
-                        }
-                        else
-                        {
-                            LogDebug("Nettleser allerede lukket av bruker");
-                        }
-                    }
-                    catch (Exception quitEx)
-                    {
-                        LogDebug($"Feil ved lukking av nettleser: {quitEx.Message}");
-                    }
-                    finally
-                    {
-                        try
-                        {
-                            driverToCleanup.Dispose();
-                        }
-                        catch (Exception disposeEx)
-                        {
-                            LogDebug($"Feil ved dispose av nettleser: {disposeEx.Message}");
-                        }
-                    }
-                }
-
-                _webDriver = null;
-                LogDebug("Nettleser opprydding fullført");
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil under opprydding av nettleser: {ex.Message}");
-
-                _webDriver = null;
-            }
-
-            await Task.Delay(500);
-        }
-
-        private Task ForceStopAutomationAsync()
-        {
-            try
-            {
-                LogInfo("Stopper automatisering på grunn av nettleser problem...");
-
-                if (_cancellationTokenSource != null && !_cancellationTokenSource.Token.IsCancellationRequested)
-                {
-                    _cancellationTokenSource.Cancel();
-                }
-
-                IsAutomationRunning = false;
-                StatusMessage = "Automatisering stoppet - nettleser ble lukket";
-
-                LogInfo("Automatisering stoppet - klar for ny start");
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil ved tvungen stopp av automatisering: {ex.Message}");
-            }
-            return Task.CompletedTask;
-        }
-
-        private async Task SaveCookiesAsync(Cookie[] cookies)
-        {
-            try
-            {
-                string json = JsonSerializer.Serialize(cookies);
-                await SecureCredentialStorage.SaveCredentialAsync("cookies", json);
-                LogSuccess($"✓ Saved {cookies.Length} cookies securely");
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to save cookies: {ex.Message}");
-            }
-        }
-
-
         private bool HasConflictingClass(ScheduleItem stuSession, List<ScheduleItem> allScheduleItems)
         {
             try
@@ -2390,7 +1455,6 @@ namespace AkademiTrack.ViewModels
                         LogDebug($"Could not parse class times for {otherClass.KNavn}: {otherClass.StartKl}-{otherClass.SluttKl}");
                         continue;
                     }
-
 
                     bool hasOverlap = stuStartTime < otherEndTime && otherStartTime < stuEndTime;
 
@@ -2552,7 +1616,6 @@ namespace AkademiTrack.ViewModels
                         LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
                         LogInfo($"Registrerte økter: {registeredSessions.Count}, Totalt gyldige: {validStuSessions.Count}");
 
-                        // Mark today as completed to prevent auto-start until tomorrow
                         await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
                         LogInfo("✓ Dagens registreringer merket som fullført - auto-start vil ikke kjøre igjen før i morgen");
 
@@ -2651,19 +1714,8 @@ namespace AkademiTrack.ViewModels
             {
                 if (_userParameters == null || !_userParameters.IsComplete)
                 {
-                    LogInfo("Henter brukerparametere...");
-                    _userParameters = await ExtractUserParametersAsync(cookies);
-
-                    if (_userParameters == null || !_userParameters.IsComplete)
-                    {
-                        LogError("Kunne ikke få brukerparametere - bruker fallback verdier");
-                        _userParameters = new UserParameters
-                        {
-                            FylkeId = "00",
-                            PlanPeri = "2025-26",
-                            SkoleId = "312"
-                        };
-                    }
+                    LogError("Missing user parameters - cannot fetch schedule");
+                    return null!;
                 }
 
                 var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
@@ -2714,190 +1766,6 @@ namespace AkademiTrack.ViewModels
                 return null!;
             }
         }
-
-
-
-        public class UserParameters
-        {
-            public string? FylkeId { get; set; }
-            public string? PlanPeri { get; set; }
-            public string? SkoleId { get; set; }
-
-            public bool IsComplete => !string.IsNullOrEmpty(FylkeId) &&
-                                      !string.IsNullOrEmpty(PlanPeri) &&
-                                      !string.IsNullOrEmpty(SkoleId);
-        }
-
-        private UserParameters? _userParameters;
-
-        private async Task<UserParameters> ExtractUserParametersAsync(Dictionary<string, string> cookies)
-        {
-            try
-            {
-                LogDebug("Sjekker cached parametere...");
-
-                var cachedParams = await LoadValidParametersAsync();
-                if (cachedParams != null && cachedParams.IsComplete)
-                {
-                    LogInfo($"Bruker gyldige cached parametere for skoleår {cachedParams.PlanPeri}");
-                    return cachedParams;
-                }
-
-                if (_webDriver != null && IsWebDriverValid(_webDriver))
-                {
-                    LogInfo("Ingen gyldige cached parametere - utvinner fra nettleser...");
-                    var extractedParams = await QuickParameterCapture();
-
-                    if (extractedParams != null && extractedParams.IsComplete)
-                    {
-                        LogSuccess($"Fant nye parametere fra nettleser for skoleår {extractedParams.PlanPeri} - lagrer");
-                        await SaveParametersAsync(extractedParams);
-                        return extractedParams;
-                    }
-                }
-
-                LogError("Kunne ikke finne gyldige parametere - fallback ikke tillatt");
-                LogError("Sletter cookies for å tvinge ny innlogging med parameterinnhenting");
-
-                await DeleteCookiesAsync();
-
-                throw new InvalidOperationException("Parameters required - forcing fresh login");
-            }
-            catch (InvalidOperationException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                LogError($"Kritisk feil ved parameterhåndtering: {ex.Message}");
-                LogError("Tvinger ny innlogging for å sikre korrekte parametere");
-                await DeleteCookiesAsync();
-                throw new InvalidOperationException("Parameters required - forcing fresh login");
-            }
-        }
-
-        private async Task DeleteCookiesAsync()
-        {
-            try
-            {
-                await SecureCredentialStorage.DeleteCredentialAsync("cookies");
-                LogSuccess("✓ Cookies deleted from secure storage");
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to delete cookies: {ex.Message}");
-            }
-        }
-
-        private string GetUserParametersFilePath()
-        {
-            string appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "AkademiTrack"
-            );
-            Directory.CreateDirectory(appDataDir);
-            return Path.Combine(appDataDir, "user_parameters.json");
-        }
-
-        private async Task<UserParameters?> LoadValidParametersAsync()
-        {
-            try
-            {
-                var filePath = GetUserParametersFilePath();
-                if (!File.Exists(filePath))
-                {
-                    LogDebug("Ingen lagrede parametere funnet");
-                    return null;
-                }
-
-                var json = await File.ReadAllTextAsync(filePath);
-                var savedData = JsonSerializer.Deserialize<SavedParameterData>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (savedData?.Parameters == null)
-                {
-                    LogDebug("Ugyldig parameterdata");
-                    return null;
-                }
-
-                var age = DateTime.Now - savedData.SavedAt;
-
-                if (savedData.Parameters.PlanPeri != null &&
-    !IsCurrentSchoolYear(savedData.Parameters.PlanPeri))
-                {
-                    LogInfo($"Lagrede parametere er for gammelt skoleår ({savedData.Parameters.PlanPeri}) - trenger oppdatering");
-                    File.Delete(filePath);
-                    return null;
-                }
-
-                LogSuccess($"Lastet gyldige parametere fra cache (alder: {age.TotalDays:F0} dager, skoleår: {savedData.Parameters.PlanPeri})");
-                LogDebug($"Parametere: fylkeid={savedData.Parameters.FylkeId}, planperi={savedData.Parameters.PlanPeri}, skoleid={savedData.Parameters.SkoleId}");
-                return savedData.Parameters;
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Feil ved lasting av parametere: {ex.Message}");
-                return null!;
-            }
-        }
-
-        private bool IsCurrentSchoolYear(string planPeri)
-        {
-            try
-            {
-                var currentSchoolYear = GetCurrentSchoolYear();
-                return planPeri == currentSchoolYear;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private async Task SaveParametersAsync(UserParameters parameters)
-        {
-            try
-            {
-                if (parameters == null || !parameters.IsComplete)
-                {
-                    LogDebug("Kan ikke lagre ufullstendige parametere");
-                    return;
-                }
-
-                var currentSchoolYear = GetCurrentSchoolYear();
-                if (parameters.PlanPeri != currentSchoolYear)
-                {
-                    LogInfo($"ADVARSEL: Lagrer parametere for skoleår {parameters.PlanPeri}, men nåværende skoleår er {currentSchoolYear}");
-                    LogInfo("Dette kan være normalt hvis du tester på slutten/begynnelsen av skoleåret");
-                }
-
-                var saveData = new SavedParameterData
-                {
-                    Parameters = parameters,
-                    SavedAt = DateTime.Now,
-                    SchoolYear = parameters.PlanPeri
-                };
-
-                var json = JsonSerializer.Serialize(saveData, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(GetUserParametersFilePath(), json);
-
-                LogSuccess($"Lagret parametere for skoleår {parameters.PlanPeri} med timestamp: {saveData.SavedAt}");
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Kunne ikke lagre parametere: {ex.Message}");
-            }
-        }
-
-        public class SavedParameterData
-        {
-            public UserParameters? Parameters { get; set; }
-            public DateTime SavedAt { get; set; }
-            public string? SchoolYear { get; set; }
-        }
-
 
         private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, Dictionary<string, string> cookies)
         {
@@ -3103,9 +1971,6 @@ namespace AkademiTrack.ViewModels
 
             StopCaffeinate();
 
-            _loginPasswordSecure?.Dispose();
-            _loginPasswordSecure = null;
-
             _updateCheckTimer?.Dispose();
             _schoolHoursCheckTimer?.Dispose();
 
@@ -3122,53 +1987,13 @@ namespace AkademiTrack.ViewModels
 
             _notificationSemaphore?.Dispose();
             _cancellationTokenSource?.Cancel();
-            _webDriver?.Quit();
-            _webDriver?.Dispose();
+            
+            _authService?.Dispose();
+            
             _httpClient?.Dispose();
             
-            Dashboard?.StopRefreshing();
             Dashboard?.Dispose();
         }
-        
-        private static SecureString StringToSecureString(string str)
-        {
-            if (string.IsNullOrEmpty(str))
-                return new SecureString();
-
-            var secure = new SecureString();
-            foreach (char c in str)
-            {
-                secure.AppendChar(c);
-            }
-            secure.MakeReadOnly();
-            return secure;
-        }
-
-        private static string SecureStringToString(SecureString? secure)
-        {
-            if (secure == null || secure.Length == 0)
-                return string.Empty;
-
-            IntPtr ptr = IntPtr.Zero;
-            try
-            {
-                ptr = Marshal.SecureStringToBSTR(secure);
-                return Marshal.PtrToStringBSTR(ptr) ?? string.Empty;
-            }
-            finally
-            {
-                if (ptr != IntPtr.Zero)
-                {
-                    Marshal.ZeroFreeBSTR(ptr);
-                }
-            }
-        }
-    }
-
-    public class Cookie
-    {
-        public string? Name { get; set; }
-        public string? Value { get; set; }
     }
 
     public class ScheduleResponse

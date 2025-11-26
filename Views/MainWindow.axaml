@@ -277,11 +277,11 @@
 							Margin="0,8,0,0">
 						<StackPanel Spacing="6">
 							<TextBlock Text="Gjeldende status:"
-									   Classes="status-label"/>
+									Classes="status-label"/>
 							<TextBlock Text="{Binding StatusMessage}"
-									   Classes="status"
-									   HorizontalAlignment="Center"
-									   TextWrapping="Wrap"/>
+									Classes="status"
+									HorizontalAlignment="Center"
+									TextWrapping="Wrap"/>
 						</StackPanel>
 					</Border>
 				</StackPanel>
@@ -317,18 +317,18 @@
 								<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
 							<TextBlock Text="{Binding Dashboard.NextClassName}"
-									   FontSize="24"
-									   FontWeight="Bold"
-									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									FontSize="24"
+									FontWeight="Bold"
+									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 							<TextBlock Text="{Binding Dashboard.NextClassTime}"
-									   FontSize="16"
-									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									   Margin="0,4,0,0"/>
+									FontSize="16"
+									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									Margin="0,4,0,0"/>
 							<TextBlock Text="{Binding Dashboard.NextClassRoom}"
-									   FontSize="13"
-									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									   Margin="0,2,0,0"
-									   IsVisible="{Binding Dashboard.NextClassRoom, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+									FontSize="13"
+									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									Margin="0,2,0,0"
+									IsVisible="{Binding Dashboard.NextClassRoom, Converter={x:Static ObjectConverters.IsNotNull}}"/>
 						</StackPanel>
 					</Border>
 				</Grid>
@@ -361,8 +361,8 @@
 								<TextBlock Text="⚠️" FontSize="20" HorizontalAlignment="Right"/>
 							</Grid>
 							<TextBlock Text="{Binding Dashboard.OvertimeValue}" 
-									   Classes="card-value"
-									   Foreground="{Binding Dashboard.OvertimeColor, Converter={StaticResource ColorNameToBrushConverter}}"/>
+									Classes="card-value"
+									Foreground="{Binding Dashboard.OvertimeColor, Converter={StaticResource ColorNameToBrushConverter}}"/>
 							<TextBlock Text="{Binding Dashboard.OvertimeStatus}" Classes="card-subtext"/>
 						</StackPanel>
 					</Border>
@@ -376,16 +376,16 @@
 				<Grid>
 					<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
 					<TextBlock Text="{Binding Dashboard.WeeklyPercentage}"
-							   FontSize="24"
-							   FontWeight="Bold"
-							   Foreground="#4CAF50"
-							   HorizontalAlignment="Right"
-							   VerticalAlignment="Center"/>
+							FontSize="24"
+							FontWeight="Bold"
+							Foreground="#4CAF50"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Center"/>
 				</Grid>
 
 				<TextBlock Text="{Binding Dashboard.WeeklyDisplay}"
-						   FontSize="12"
-						   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+						FontSize="12"
+						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
 
 				<!-- Progress Bar -->
 				<Border Height="8" 
@@ -429,19 +429,19 @@
 									
 									<!-- Day label overlay -->
 									<TextBlock Text="{Binding DayOfWeek, Converter={StaticResource DayOfWeekConverter}}"
-											   FontSize="10"
-											   FontWeight="SemiBold"
-											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-											   HorizontalAlignment="Center"
-											   VerticalAlignment="Top"
-											   Margin="0,4,0,0"/>
+											FontSize="10"
+											FontWeight="SemiBold"
+											Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+											HorizontalAlignment="Center"
+											VerticalAlignment="Top"
+											Margin="0,4,0,0"/>
 									
 									<!-- Session count overlay -->
 									<TextBlock HorizontalAlignment="Center"
-											   VerticalAlignment="Bottom"
-											   Margin="0,0,0,4"
-											   FontSize="9"
-											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}">
+											VerticalAlignment="Bottom"
+											Margin="0,0,0,4"
+											FontSize="9"
+											Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
 										<TextBlock.Text>
 											<MultiBinding StringFormat="{}{0}/{1}">
 												<Binding Path="RegisteredSessions"/>
@@ -456,10 +456,10 @@
 				</ItemsControl>
 
 				<TextBlock Text="{Binding Dashboard.WeeklyRemaining}"
-						   FontSize="11"
-						   Margin="0,4,0,0"
-						   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-						   HorizontalAlignment="Right"/>
+						FontSize="11"
+						Margin="0,4,0,0"
+						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+						HorizontalAlignment="Right"/>
 			</StackPanel>
 		</Border>
 	</Grid>

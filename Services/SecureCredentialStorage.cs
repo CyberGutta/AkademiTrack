@@ -11,7 +11,6 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-
 namespace AkademiTrack.Services
 {
     public static class SecureCredentialStorage
@@ -231,35 +230,13 @@ namespace AkademiTrack.Services
             }
         }
 
-        public static async Task SaveCookiesAsync(Cookie[] cookies)
-        {
-            string json = JsonSerializer.Serialize(cookies);
-            await SaveCredentialAsync("cookies", json);
-        }
-
-        public static async Task<Dictionary<string, string>> LoadCookiesAsync()
-        {
-            var json = await GetCredentialAsync("cookies");
-
-            if (string.IsNullOrEmpty(json))
-                return null!;
-
-            var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
-            return cookieArray?.ToDictionary(c => c.Name ?? "", c => c.Value ?? "") ?? null!;
-        }
-
-        public static async Task DeleteCookiesAsync()
-        {
-            await DeleteCredentialAsync("cookies");
-        }
-
         #endregion
 
         #region Linux Secret Service + Fallback
 
         private static readonly string FallbackPath = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-    ".akademitrack", "creds.json");
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".akademitrack", "creds.json");
 
         private static async Task<bool> SaveToLinuxSecretServiceAsync(string key, string value)
         {
@@ -436,11 +413,11 @@ namespace AkademiTrack.Services
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FallbackPath)!);
                 var dict = File.Exists(FallbackPath)
-                    ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath)) ?? new()
+                    ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath)) ?? new()
                     : new Dictionary<string, string>();
 
                 dict[key] = Convert.ToBase64String(Encrypt(value));
-                File.WriteAllText(FallbackPath, System.Text.Json.JsonSerializer.Serialize(dict));
+                File.WriteAllText(FallbackPath, JsonSerializer.Serialize(dict));
                 return true;
             }
             catch (Exception ex)
@@ -461,12 +438,12 @@ namespace AkademiTrack.Services
                 if (string.IsNullOrWhiteSpace(jsonContent))
                     return null;
 
-                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                 if (dict == null || !dict.ContainsKey(key)) return null;
 
                 return Decrypt(Convert.FromBase64String(dict[key]));
             }
-            catch (System.Text.Json.JsonException ex)
+            catch (JsonException ex)
             {
                 Console.WriteLine($"❌ Corrupted credentials file. Backing up and creating fresh file.");
                 Console.WriteLine($"   Error: {ex.Message}");
@@ -493,11 +470,11 @@ namespace AkademiTrack.Services
             {
                 if (!File.Exists(FallbackPath)) return false;
 
-                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath));
+                var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FallbackPath));
                 if (dict == null || !dict.ContainsKey(key)) return false;
 
                 dict.Remove(key);
-                File.WriteAllText(FallbackPath, System.Text.Json.JsonSerializer.Serialize(dict));
+                File.WriteAllText(FallbackPath, JsonSerializer.Serialize(dict));
                 return true;
             }
             catch (Exception ex)
@@ -508,5 +485,76 @@ namespace AkademiTrack.Services
         }
 
         #endregion
+
+        // Cookie helper methods
+        public static async Task SaveCookiesAsync(Cookie[] cookies)
+        {
+            try
+            {
+                string json = JsonSerializer.Serialize(cookies);
+                await SaveCredentialAsync("cookies", json);
+                Debug.WriteLine($"✓ Saved {cookies.Length} cookies securely");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to save cookies: {ex.Message}");
+            }
+        }
+
+        public static async Task<Dictionary<string, string>?> LoadCookiesAsync()
+        {
+            try
+            {
+                var json = await GetCredentialAsync("cookies");
+
+                if (string.IsNullOrEmpty(json))
+                {
+                    Debug.WriteLine("No cookies found in secure storage");
+                    return null;
+                }
+
+                var cookieArray = JsonSerializer.Deserialize<Cookie[]>(json);
+
+                if (cookieArray == null || cookieArray.Length == 0)
+                {
+                    Debug.WriteLine("Cookie deserialization returned null or empty array");
+                    return null;
+                }
+
+                Debug.WriteLine($"✓ Successfully loaded {cookieArray.Length} cookies from secure storage");
+                return cookieArray.ToDictionary(c => c.Name ?? "", c => c.Value ?? "");
+            }
+            catch (JsonException jsonEx)
+            {
+                Debug.WriteLine($"JSON deserialization failed: {jsonEx.Message}");
+                await DeleteCredentialAsync("cookies");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to load cookies: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static async Task DeleteCookiesAsync()
+        {
+            try
+            {
+                await DeleteCredentialAsync("cookies");
+                Debug.WriteLine("✓ Cookies deleted from secure storage");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to delete cookies: {ex.Message}");
+            }
+        }
+    }
+
+    // Cookie class definition
+    public class Cookie
+    {
+        public string? Name { get; set; }
+        public string? Value { get; set; }
     }
 }

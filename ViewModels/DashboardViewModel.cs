@@ -11,7 +11,6 @@ namespace AkademiTrack.ViewModels
     public class DashboardViewModel : INotifyPropertyChanged
     {
         private readonly AttendanceDataService _attendanceService;
-        private readonly Timer _refreshTimer;
 
         // Today's STU sessions
         private string _todayDisplay = "0/0";
@@ -50,7 +49,7 @@ namespace AkademiTrack.ViewModels
         private string _weeklyPercentage = "0%";
         private string _weeklyDisplay = "0 av 0 økter registrert";
         private string _weeklyRemaining = "0 økter gjenstår";
-        private List<DailyAttendance> _weeklyDays = new List<DailyAttendance>();
+        private List<DailyAttendance> _weeklyDays = InitializeEmptyWeek();
 
         public string WeeklyPercentage
         {
@@ -103,10 +102,7 @@ namespace AkademiTrack.ViewModels
         {
             _attendanceService = new AttendanceDataService();
             
-            // Refresh data every 30 seconds
-            _refreshTimer = new Timer(30000);
-            _refreshTimer.Elapsed += async (s, e) => await RefreshDataAsync();
-            _refreshTimer.AutoReset = true;
+            _weeklyDays = InitializeEmptyWeek();
         }
 
         // Today's STU Sessions
@@ -195,17 +191,6 @@ namespace AkademiTrack.ViewModels
         public void SetCredentials(Services.UserParameters parameters, Dictionary<string, string> cookies)
         {
             _attendanceService.SetCredentials(parameters, cookies);
-        }
-
-        public async Task StartRefreshingAsync()
-        {
-            await RefreshDataAsync();
-            _refreshTimer.Start();
-        }
-
-        public void StopRefreshing()
-        {
-            _refreshTimer.Stop();
         }
 
         public async Task RefreshDataAsync()
@@ -407,9 +392,29 @@ namespace AkademiTrack.ViewModels
 
         public void Dispose()
         {
-            _refreshTimer?.Stop();
-            _refreshTimer?.Dispose();
             _attendanceService?.Dispose();
+        }
+
+        private static List<DailyAttendance> InitializeEmptyWeek()
+        {
+            var today = DateTime.Now;
+            var dayOfWeek = (int)today.DayOfWeek;
+            var daysUntilMonday = dayOfWeek == 0 ? -6 : -(dayOfWeek - 1);
+            var monday = today.AddDays(daysUntilMonday);
+            
+            var emptyWeek = new List<DailyAttendance>();
+            for (int i = 0; i < 5; i++)
+            {
+                emptyWeek.Add(new DailyAttendance
+                {
+                    DayOfWeek = monday.AddDays(i).DayOfWeek,
+                    Date = monday.AddDays(i),
+                    RegisteredSessions = 0,
+                    TotalSessions = 0,
+                    FillPercentage = 0
+                });
+            }
+            return emptyWeek;
         }
     }
 }

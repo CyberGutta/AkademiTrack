@@ -403,18 +403,6 @@ namespace AkademiTrack.Services
         }
     }
 
-    // Data Models
-    public class UserParameters
-    {
-        public string? FylkeId { get; set; }
-        public string? PlanPeri { get; set; }
-        public string? SkoleId { get; set; }
-
-        public bool IsComplete => !string.IsNullOrEmpty(FylkeId) &&
-                                  !string.IsNullOrEmpty(PlanPeri) &&
-                                  !string.IsNullOrEmpty(SkoleId);
-    }
-
     public class AttendanceSummary
     {
         public int Elevnr { get; set; }
