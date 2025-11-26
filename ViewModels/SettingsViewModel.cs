@@ -521,6 +521,170 @@ Terminal=false
         private bool _isDeleting = false;
         private bool _startMinimized = false;
 
+        private SchoolHoursSettings _schoolHours = new SchoolHoursSettings();
+
+        // Monday
+        private bool _mondayEnabled = true;
+        private TimeSpan _mondayStart = new TimeSpan(9, 0, 0);
+        private TimeSpan _mondayEnd = new TimeSpan(15, 15, 0);
+
+        public bool MondayEnabled
+        {
+            get => _mondayEnabled;
+            set { if (_mondayEnabled != value) { _mondayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan MondayStart
+        {
+            get => _mondayStart;
+            set { if (_mondayStart != value) { _mondayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan MondayEnd
+        {
+            get => _mondayEnd;
+            set { if (_mondayEnd != value) { _mondayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Tuesday
+        private bool _tuesdayEnabled = true;
+        private TimeSpan _tuesdayStart = new TimeSpan(8, 15, 0);
+        private TimeSpan _tuesdayEnd = new TimeSpan(15, 15, 0);
+
+        public bool TuesdayEnabled
+        {
+            get => _tuesdayEnabled;
+            set { if (_tuesdayEnabled != value) { _tuesdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan TuesdayStart
+        {
+            get => _tuesdayStart;
+            set { if (_tuesdayStart != value) { _tuesdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan TuesdayEnd
+        {
+            get => _tuesdayEnd;
+            set { if (_tuesdayEnd != value) { _tuesdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Wednesday
+        private bool _wednesdayEnabled = true;
+        private TimeSpan _wednesdayStart = new TimeSpan(8, 15, 0);
+        private TimeSpan _wednesdayEnd = new TimeSpan(15, 15, 0);
+
+        public bool WednesdayEnabled
+        {
+            get => _wednesdayEnabled;
+            set { if (_wednesdayEnabled != value) { _wednesdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan WednesdayStart
+        {
+            get => _wednesdayStart;
+            set { if (_wednesdayStart != value) { _wednesdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan WednesdayEnd
+        {
+            get => _wednesdayEnd;
+            set { if (_wednesdayEnd != value) { _wednesdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Thursday
+        private bool _thursdayEnabled = true;
+        private TimeSpan _thursdayStart = new TimeSpan(8, 15, 0);
+        private TimeSpan _thursdayEnd = new TimeSpan(15, 15, 0);
+
+        public bool ThursdayEnabled
+        {
+            get => _thursdayEnabled;
+            set { if (_thursdayEnabled != value) { _thursdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan ThursdayStart
+        {
+            get => _thursdayStart;
+            set { if (_thursdayStart != value) { _thursdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan ThursdayEnd
+        {
+            get => _thursdayEnd;
+            set { if (_thursdayEnd != value) { _thursdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Friday
+        private bool _fridayEnabled = true;
+        private TimeSpan _fridayStart = new TimeSpan(8, 15, 0);
+        private TimeSpan _fridayEnd = new TimeSpan(15, 15, 0);
+
+        public bool FridayEnabled
+        {
+            get => _fridayEnabled;
+            set { if (_fridayEnabled != value) { _fridayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan FridayStart
+        {
+            get => _fridayStart;
+            set { if (_fridayStart != value) { _fridayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan FridayEnd
+        {
+            get => _fridayEnd;
+            set { if (_fridayEnd != value) { _fridayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Saturday
+        private bool _saturdayEnabled = false;
+        private TimeSpan _saturdayStart = new TimeSpan(8, 0, 0);
+        private TimeSpan _saturdayEnd = new TimeSpan(15, 0, 0);
+
+        public bool SaturdayEnabled
+        {
+            get => _saturdayEnabled;
+            set { if (_saturdayEnabled != value) { _saturdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan SaturdayStart
+        {
+            get => _saturdayStart;
+            set { if (_saturdayStart != value) { _saturdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan SaturdayEnd
+        {
+            get => _saturdayEnd;
+            set { if (_saturdayEnd != value) { _saturdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        // Sunday
+        private bool _sundayEnabled = false;
+        private TimeSpan _sundayStart = new TimeSpan(8, 0, 0);
+        private TimeSpan _sundayEnd = new TimeSpan(15, 0, 0);
+
+        public bool SundayEnabled
+        {
+            get => _sundayEnabled;
+            set { if (_sundayEnabled != value) { _sundayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan SundayStart
+        {
+            get => _sundayStart;
+            set { if (_sundayStart != value) { _sundayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+        public TimeSpan SundayEnd
+        {
+            get => _sundayEnd;
+            set { if (_sundayEnd != value) { _sundayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
+        }
+
+
         public bool StartMinimized
         {
             get => _startMinimized;
@@ -541,7 +705,6 @@ Terminal=false
         {
             try
             {
-                // Use InvokeAsync with Background priority and don't await it
                 _ = Dispatcher.UIThread.InvokeAsync(async () =>
                 {
                     if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -549,14 +712,12 @@ Terminal=false
                         var mainWindow = desktop.MainWindow as MainWindow;
                         if (mainWindow != null)
                         {
-                            // Don't activate the window - just update settings
                             await mainWindow.RefreshSettingsAsync();
                             Debug.WriteLine("✓ MainWindow settings cache refreshed");
                         }
                     }
                 }, Avalonia.Threading.DispatcherPriority.Background);
                 
-                // Don't await - fire and forget to prevent blocking
             }
             catch (Exception ex)
             {
@@ -608,6 +769,8 @@ Terminal=false
         public ICommand ExportDataAsJsonCommand { get; }
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
+        public ICommand ResetSchoolHoursCommand { get; }
+
 
 
         public string UpdateStatus
@@ -659,13 +822,151 @@ Terminal=false
             }
         }
 
+        private void ResetSchoolHoursToDefaults()
+        {
+            var defaults = SchoolHoursSettings.GetDefault();
+
+            MondayEnabled = defaults.WeekSchedule[DayOfWeek.Monday].IsEnabled;
+            MondayStart = defaults.WeekSchedule[DayOfWeek.Monday].StartTime;
+            MondayEnd = defaults.WeekSchedule[DayOfWeek.Monday].EndTime;
+
+            TuesdayEnabled = defaults.WeekSchedule[DayOfWeek.Tuesday].IsEnabled;
+            TuesdayStart = defaults.WeekSchedule[DayOfWeek.Tuesday].StartTime;
+            TuesdayEnd = defaults.WeekSchedule[DayOfWeek.Tuesday].EndTime;
+
+            WednesdayEnabled = defaults.WeekSchedule[DayOfWeek.Wednesday].IsEnabled;
+            WednesdayStart = defaults.WeekSchedule[DayOfWeek.Wednesday].StartTime;
+            WednesdayEnd = defaults.WeekSchedule[DayOfWeek.Wednesday].EndTime;
+
+            ThursdayEnabled = defaults.WeekSchedule[DayOfWeek.Thursday].IsEnabled;
+            ThursdayStart = defaults.WeekSchedule[DayOfWeek.Thursday].StartTime;
+            ThursdayEnd = defaults.WeekSchedule[DayOfWeek.Thursday].EndTime;
+
+            FridayEnabled = defaults.WeekSchedule[DayOfWeek.Friday].IsEnabled;
+            FridayStart = defaults.WeekSchedule[DayOfWeek.Friday].StartTime;
+            FridayEnd = defaults.WeekSchedule[DayOfWeek.Friday].EndTime;
+
+            SaturdayEnabled = defaults.WeekSchedule[DayOfWeek.Saturday].IsEnabled;
+            SaturdayStart = defaults.WeekSchedule[DayOfWeek.Saturday].StartTime;
+            SaturdayEnd = defaults.WeekSchedule[DayOfWeek.Saturday].EndTime;
+
+            SundayEnabled = defaults.WeekSchedule[DayOfWeek.Sunday].IsEnabled;
+            SundayStart = defaults.WeekSchedule[DayOfWeek.Sunday].StartTime;
+            SundayEnd = defaults.WeekSchedule[DayOfWeek.Sunday].EndTime;
+        }
+
+        private async Task LoadSchoolHoursAsync()
+        {
+            try
+            {
+                var filePath = GetSchoolHoursFilePath();
+
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+                    _schoolHours = JsonSerializer.Deserialize<SchoolHoursSettings>(json) ?? new SchoolHoursSettings();
+                }
+                else
+                {
+                    _schoolHours = SchoolHoursSettings.GetDefault();
+                }
+
+                LoadDayScheduleToUI(DayOfWeek.Monday, ref _mondayEnabled, ref _mondayStart, ref _mondayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Tuesday, ref _tuesdayEnabled, ref _tuesdayStart, ref _tuesdayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Wednesday, ref _wednesdayEnabled, ref _wednesdayStart, ref _wednesdayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Thursday, ref _thursdayEnabled, ref _thursdayStart, ref _thursdayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Friday, ref _fridayEnabled, ref _fridayStart, ref _fridayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Saturday, ref _saturdayEnabled, ref _saturdayStart, ref _saturdayEnd);
+                LoadDayScheduleToUI(DayOfWeek.Sunday, ref _sundayEnabled, ref _sundayStart, ref _sundayEnd);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    OnPropertyChanged(nameof(MondayEnabled));
+                    OnPropertyChanged(nameof(MondayStart));
+                    OnPropertyChanged(nameof(MondayEnd));
+                    OnPropertyChanged(nameof(TuesdayEnabled));
+                    OnPropertyChanged(nameof(TuesdayStart));
+                    OnPropertyChanged(nameof(TuesdayEnd));
+                    OnPropertyChanged(nameof(WednesdayEnabled));
+                    OnPropertyChanged(nameof(WednesdayStart));
+                    OnPropertyChanged(nameof(WednesdayEnd));
+                    OnPropertyChanged(nameof(ThursdayEnabled));
+                    OnPropertyChanged(nameof(ThursdayStart));
+                    OnPropertyChanged(nameof(ThursdayEnd));
+                    OnPropertyChanged(nameof(FridayEnabled));
+                    OnPropertyChanged(nameof(FridayStart));
+                    OnPropertyChanged(nameof(FridayEnd));
+                    OnPropertyChanged(nameof(SaturdayEnabled));
+                    OnPropertyChanged(nameof(SaturdayStart));
+                    OnPropertyChanged(nameof(SaturdayEnd));
+                    OnPropertyChanged(nameof(SundayEnabled));
+                    OnPropertyChanged(nameof(SundayStart));
+                    OnPropertyChanged(nameof(SundayEnd));
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading school hours: {ex.Message}");
+                _schoolHours = SchoolHoursSettings.GetDefault();
+            }
+        }
+
+        private void LoadDayScheduleToUI(DayOfWeek day, ref bool enabled, ref TimeSpan start, ref TimeSpan end)
+        {
+            if (_schoolHours.WeekSchedule.ContainsKey(day))
+            {
+                var schedule = _schoolHours.WeekSchedule[day];
+                enabled = schedule.IsEnabled;
+                start = schedule.StartTime;
+                end = schedule.EndTime;
+            }
+        }
+
+        private void SaveSchoolHours()
+        {
+            _ = SaveSchoolHoursAsync();
+        }
+
+        private async Task SaveSchoolHoursAsync()
+        {
+            try
+            {
+                _schoolHours.WeekSchedule[DayOfWeek.Monday] = new DaySchedule(_mondayEnabled, _mondayStart, _mondayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Tuesday] = new DaySchedule(_tuesdayEnabled, _tuesdayStart, _tuesdayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Wednesday] = new DaySchedule(_wednesdayEnabled, _wednesdayStart, _wednesdayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Thursday] = new DaySchedule(_thursdayEnabled, _thursdayStart, _thursdayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Friday] = new DaySchedule(_fridayEnabled, _fridayStart, _fridayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Saturday] = new DaySchedule(_saturdayEnabled, _saturdayStart, _saturdayEnd);
+                _schoolHours.WeekSchedule[DayOfWeek.Sunday] = new DaySchedule(_sundayEnabled, _sundayStart, _sundayEnd);
+
+                var filePath = GetSchoolHoursFilePath();
+                var json = JsonSerializer.Serialize(_schoolHours, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(filePath, json);
+
+                Debug.WriteLine("School hours saved successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error saving school hours: {ex.Message}");
+            }
+        }
+
+        private string GetSchoolHoursFilePath()
+        {
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "school_hours.json");
+        }
+
         private async Task NotifyMainWindowAutoStartChanged()
         {
             try
             {
                 await Task.Delay(100);
 
-                // Use InvokeAsync with Background priority and don't await it
                 _ = Dispatcher.UIThread.InvokeAsync(async () =>
                 {
                     if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -679,7 +980,6 @@ Terminal=false
                     }
                 }, Avalonia.Threading.DispatcherPriority.Background);
                 
-                // Don't await - fire and forget
             }
             catch (Exception ex)
             {
@@ -752,7 +1052,9 @@ Terminal=false
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
-
+            ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
+            
+            _ = LoadSchoolHoursAsync();
 
             _ = LoadSettingsAsync();
         }

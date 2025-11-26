@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -12,21 +13,22 @@ namespace AkademiTrack.Services
         private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         private static DateTime? _lastOnlineTimeCheck = null;
         private static TimeSpan _onlineTimeOffset = TimeSpan.Zero;
-
         private static DateTime _lastNotificationTime = DateTime.MinValue;
         private static string _lastNotificationMessage = "";
         private static bool _hasNotifiedTodayOutsideHours = false;
-
         private static bool _hasPerformedInitialCheck = false;
+
+        private static SchoolHoursSettings? _cachedSchoolHours = null;
+        private static DateTime _lastSchoolHoursLoad = DateTime.MinValue;
 
         public static async Task<DateTime> GetTrustedCurrentTimeAsync(bool silent = false)
         {
             try
             {
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
-                
+
                 var response = await _httpClient.GetAsync(
-                    "http://worldtimeapi.org/api/timezone/Europe/Oslo", 
+                    "http://worldtimeapi.org/api/timezone/Europe/Oslo",
                     cts.Token
                 ).ConfigureAwait(false);
 
@@ -38,7 +40,6 @@ namespace AkademiTrack.Services
                     if (timeData.TryGetProperty("datetime", out var datetimeElement))
                     {
                         var onlineTime = DateTime.Parse(datetimeElement.GetString()!);
-
                         _onlineTimeOffset = onlineTime - DateTime.Now;
                         _lastOnlineTimeCheck = DateTime.Now;
 
@@ -66,15 +67,12 @@ namespace AkademiTrack.Services
 
             var localTime = DateTime.Now;
 
-            if (_lastOnlineTimeCheck.HasValue)
+            if (_lastOnlineTimeCheck.HasValue && (DateTime.Now - _lastOnlineTimeCheck.Value).TotalMinutes < 30)
             {
-                if ((DateTime.Now - _lastOnlineTimeCheck.Value).TotalMinutes < 30)
-                {
-                    var adjustedTime = localTime + _onlineTimeOffset;
-                    if (!silent)
-                        Debug.WriteLine($"[TIME CHECK] Using local time with offset: {adjustedTime:yyyy-MM-dd HH:mm:ss}");
-                    return adjustedTime;
-                }
+                var adjustedTime = localTime + _onlineTimeOffset;
+                if (!silent)
+                    Debug.WriteLine($"[TIME CHECK] Using local time with offset: {adjustedTime:yyyy-MM-dd HH:mm:ss}");
+                return adjustedTime;
             }
 
             if (!silent)
@@ -82,30 +80,59 @@ namespace AkademiTrack.Services
             return localTime;
         }
 
+        private static async Task<SchoolHoursSettings> LoadSchoolHoursAsync()
+        {
+            if (_cachedSchoolHours != null && (DateTime.Now - _lastSchoolHoursLoad).TotalMinutes < 5)
+            {
+                return _cachedSchoolHours;
+            }
+
+            try
+            {
+                var filePath = GetSchoolHoursFilePath();
+
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+                    _cachedSchoolHours = JsonSerializer.Deserialize<SchoolHoursSettings>(json) ?? SchoolHoursSettings.GetDefault();
+                    _lastSchoolHoursLoad = DateTime.Now;
+                    Debug.WriteLine("[SCHOOL HOURS] Loaded custom school hours from file");
+                }
+                else
+                {
+                    _cachedSchoolHours = SchoolHoursSettings.GetDefault();
+                    _lastSchoolHoursLoad = DateTime.Now;
+                    Debug.WriteLine("[SCHOOL HOURS] Using default school hours");
+                }
+
+                return _cachedSchoolHours;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SCHOOL HOURS] Error loading: {ex.Message}");
+                return SchoolHoursSettings.GetDefault();
+            }
+        }
+
         public static async Task<bool> IsWithinSchoolHoursAsync()
         {
             var now = await GetTrustedCurrentTimeAsync().ConfigureAwait(false);
+            var schoolHours = await LoadSchoolHoursAsync().ConfigureAwait(false);
 
-            if (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday)
+            if (!schoolHours.IsDayEnabled(now.DayOfWeek))
             {
-                Debug.WriteLine($"[SCHOOL HOURS] Weekend - outside school hours");
+                Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} is disabled - outside school hours");
                 return false;
             }
 
+            var (startTime, endTime) = schoolHours.GetDayTimes(now.DayOfWeek);
             var currentTime = now.TimeOfDay;
 
-            if (now.DayOfWeek == DayOfWeek.Monday)
-            {
-                bool isWithinHours = currentTime >= TimeSpan.FromHours(9) &&
-                                    currentTime <= TimeSpan.FromHours(15.25);
-                Debug.WriteLine($"[SCHOOL HOURS] Monday {now:HH:mm} - {(isWithinHours ? "INSIDE" : "OUTSIDE")} school hours (9:00-15:15)");
-                return isWithinHours;
-            }
+            bool isWithinHours = currentTime >= startTime && currentTime <= endTime;
 
-            bool isSchoolDay = currentTime >= new TimeSpan(8, 15, 0) &&
-                              currentTime <= TimeSpan.FromHours(15.25);
-            Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} {now:HH:mm} - {(isSchoolDay ? "INSIDE" : "OUTSIDE")} school hours (8:15-15:15)");
-            return isSchoolDay;
+            Debug.WriteLine($"[SCHOOL HOURS] {now.DayOfWeek} {now:HH:mm} - {(isWithinHours ? "INSIDE" : "OUTSIDE")} school hours ({startTime:hh\\:mm}-{endTime:hh\\:mm})");
+
+            return isWithinHours;
         }
 
         private static DateTime _lastCheckTime = DateTime.MinValue;
@@ -135,10 +162,10 @@ namespace AkademiTrack.Services
 
         public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify)> ShouldAutoStartAutomationAsync(bool silent = false)
         {
-            try 
+            try
             {
                 var now = await GetTrustedCurrentTimeAsync(silent).ConfigureAwait(false);
-                
+
                 if (!silent)
                     Debug.WriteLine($"=== AUTO-START CHECK at {now:yyyy-MM-dd HH:mm:ss} ===");
 
@@ -149,9 +176,9 @@ namespace AkademiTrack.Services
                 {
                     if (!silent)
                         Debug.WriteLine($"[AUTO-START] Already COMPLETED today ({completionStatus:yyyy-MM-dd HH:mm})");
-                    
-                    var nextDay = GetNextSchoolDay(now);
-                    var nextStart = GetSchoolStartTime(nextDay);
+
+                    var nextDay = await GetNextSchoolDayAsync(now);
+                    var nextStart = await GetSchoolStartTimeAsync(nextDay);
 
                     string reason = $"Allerede fullført i dag kl. {completionStatus:HH:mm}";
                     bool shouldNotify = !_hasPerformedInitialCheck;
@@ -161,7 +188,7 @@ namespace AkademiTrack.Services
 
                 if (!await IsWithinSchoolHoursAsync().ConfigureAwait(false))
                 {
-                    var nextStart = GetNextSchoolStartTime(now);
+                    var nextStart = await GetNextSchoolStartTimeAsync(now);
                     if (nextStart.HasValue)
                     {
                         var timeUntil = nextStart.Value - now;
@@ -170,19 +197,19 @@ namespace AkademiTrack.Services
                             : $"Starter automatisk {GetNorwegianDayName(nextStart.Value.DayOfWeek)} {nextStart.Value:HH:mm}";
 
                         bool shouldNotify = !_hasPerformedInitialCheck || ShouldShowNotification(waitMessage);
-                        
+
                         return (false, waitMessage, nextStart, shouldNotify);
                     }
 
                     string outsideReason = "Utenfor skoletid";
                     bool shouldNotifyOutside = !_hasPerformedInitialCheck;
-                    
+
                     return (false, outsideReason, null, shouldNotifyOutside);
                 }
 
                 if (!silent)
                     Debug.WriteLine($"[AUTO-START] ✓ Should start - within school hours and not completed today");
-                
+
                 string startReason = $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}";
 
                 UpdateLastNotification(startReason);
@@ -221,44 +248,58 @@ namespace AkademiTrack.Services
             _hasPerformedInitialCheck = true;
         }
 
-        private static DateTime? GetNextSchoolStartTime(DateTime from)
+        private static async Task<DateTime?> GetNextSchoolStartTimeAsync(DateTime from)
         {
+            var schoolHours = await LoadSchoolHoursAsync();
             var current = from.Date;
 
-            if (from.TimeOfDay < TimeSpan.FromHours(15.25))
+            if (from.TimeOfDay < (await GetSchoolEndTimeAsync(from.DayOfWeek)))
             {
-                var todayStart = GetSchoolStartTime(current);
-                if (todayStart > from)
+                var todayStart = await GetSchoolStartTimeAsync(current);
+                if (todayStart > from && schoolHours.IsDayEnabled(from.DayOfWeek))
                     return todayStart;
             }
 
             for (int i = 1; i <= 7; i++)
             {
                 var checkDate = current.AddDays(i);
-                if (checkDate.DayOfWeek != DayOfWeek.Saturday && checkDate.DayOfWeek != DayOfWeek.Sunday)
+                if (schoolHours.IsDayEnabled(checkDate.DayOfWeek))
                 {
-                    return GetSchoolStartTime(checkDate);
+                    return await GetSchoolStartTimeAsync(checkDate);
                 }
             }
 
             return null;
         }
 
-        private static DateTime GetSchoolStartTime(DateTime date)
+        private static async Task<DateTime> GetSchoolStartTimeAsync(DateTime date)
         {
-            if (date.DayOfWeek == DayOfWeek.Monday)
-                return date.Date.AddHours(9);
-            else
-                return date.Date.Add(new TimeSpan(8, 15, 0));
+            var schoolHours = await LoadSchoolHoursAsync();
+            var (startTime, _) = schoolHours.GetDayTimes(date.DayOfWeek);
+            return date.Date.Add(startTime);
         }
 
-        private static DateTime GetNextSchoolDay(DateTime from)
+        private static async Task<TimeSpan> GetSchoolEndTimeAsync(DayOfWeek day)
         {
+            var schoolHours = await LoadSchoolHoursAsync();
+            var (_, endTime) = schoolHours.GetDayTimes(day);
+            return endTime;
+        }
+
+        private static async Task<DateTime> GetNextSchoolDayAsync(DateTime from)
+        {
+            var schoolHours = await LoadSchoolHoursAsync();
             var nextDay = from.Date.AddDays(1);
-            while (nextDay.DayOfWeek == DayOfWeek.Saturday || nextDay.DayOfWeek == DayOfWeek.Sunday)
+
+            for (int i = 0; i < 7; i++)
             {
+                if (schoolHours.IsDayEnabled(nextDay.DayOfWeek))
+                {
+                    return nextDay;
+                }
                 nextDay = nextDay.AddDays(1);
             }
+
             return nextDay;
         }
 
@@ -285,7 +326,7 @@ namespace AkademiTrack.Services
                 var filePath = GetLastRunFilePath();
                 var data = new { lastRun = now, started = true, completed = false };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
+                await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
 
                 Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as STARTED at {now:HH:mm}");
             }
@@ -303,7 +344,7 @@ namespace AkademiTrack.Services
                 var filePath = GetLastRunFilePath();
                 var data = new { lastRun = now, started = true, completed = true };
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-                await System.IO.File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
+                await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
 
                 Debug.WriteLine($"[AUTO-START] Marked {now:yyyy-MM-dd} as COMPLETED at {now:HH:mm}");
             }
@@ -318,10 +359,10 @@ namespace AkademiTrack.Services
             try
             {
                 var filePath = GetLastRunFilePath();
-                if (!System.IO.File.Exists(filePath))
+                if (!File.Exists(filePath))
                     return null;
 
-                var json = await System.IO.File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+                var json = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
                 var data = JsonSerializer.Deserialize<JsonElement>(json);
 
                 if (data.TryGetProperty("completed", out var completedElement) &&
@@ -351,12 +392,12 @@ namespace AkademiTrack.Services
             try
             {
                 var filePath = GetLastRunFilePath();
-                if (System.IO.File.Exists(filePath))
+                if (File.Exists(filePath))
                 {
-                    System.IO.File.Delete(filePath);
+                    File.Delete(filePath);
                     Debug.WriteLine("[AUTO-START] Daily completion flag reset");
                 }
-                
+
                 _hasPerformedInitialCheck = false;
             }
             catch (Exception ex)
@@ -367,12 +408,29 @@ namespace AkademiTrack.Services
 
         private static string GetLastRunFilePath()
         {
-            var appDataDir = System.IO.Path.Combine(
+            var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "AkademiTrack"
             );
-            System.IO.Directory.CreateDirectory(appDataDir);
-            return System.IO.Path.Combine(appDataDir, "last_auto_run.json");
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "last_auto_run.json");
+        }
+
+        private static string GetSchoolHoursFilePath()
+        {
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "school_hours.json");
+        }
+
+        public static void InvalidateSchoolHoursCache()
+        {
+            _cachedSchoolHours = null;
+            _lastSchoolHoursLoad = DateTime.MinValue;
+            Debug.WriteLine("[SCHOOL HOURS] Cache invalidated - will reload on next check");
         }
     }
 }
