@@ -990,10 +990,10 @@
     <Button Content="Tilbakestill til standard"
             Classes="settings-action"
             Command="{Binding ResetSchoolHoursCommand}"
-            Margin="0,12,0,0"
+            Margin="5,12,0,0"
             Background="#6C757D"/>
 
-    <Rectangle Height="100" Fill="Transparent"/>
+    <Rectangle Height="130" Fill="Transparent"/>
 </StackPanel>
 
 					<!-- System Category -->
