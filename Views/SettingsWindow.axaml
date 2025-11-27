@@ -411,6 +411,28 @@
 			<Setter Property="VerticalAlignment" Value="Center"/>
 		</Style>
 
+		<!-- TimePicker Disabled State Fix - NUCLEAR OPTION -->
+		<Style Selector="TimePicker:disabled">
+			<Setter Property="Opacity" Value="0.5"/>
+		</Style>
+		
+		<!-- Force the flyout button to be visible -->
+		<Style Selector="TimePicker:disabled /template/ Button#PART_FlyoutButton">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#F5F5F5"/>
+		</Style>
+		
+		<!-- Force ALL TextBlocks inside disabled TimePickers to be dark -->
+		<Style Selector="TimePicker:disabled TextBlock">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<!-- CheckBox Styles for better visibility -->
+		<Style Selector="CheckBox">
+			<Setter Property="MinWidth" Value="20"/>
+			<Setter Property="MinHeight" Value="20"/>
+		</Style>
+
 	</Window.Styles>
 
 	<Grid>
