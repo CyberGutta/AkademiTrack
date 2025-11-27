@@ -411,61 +411,88 @@
 			<Setter Property="VerticalAlignment" Value="Center"/>
 		</Style>
 
-		<!-- TimePicker Disabled State Fix - NUCLEAR OPTION -->
-		<Style Selector="TimePicker:disabled">
-			<Setter Property="Opacity" Value="0.5"/>
-		</Style>
-		
-		<!-- Force the flyout button to be visible -->
-		<Style Selector="TimePicker:disabled /template/ Button#PART_FlyoutButton">
-			<Setter Property="Foreground" Value="#333333"/>
-			<Setter Property="Background" Value="#F5F5F5"/>
-		</Style>
-		
-		<!-- Force ALL TextBlocks inside disabled TimePickers to be dark -->
-		<Style Selector="TimePicker:disabled TextBlock">
-			<Setter Property="Foreground" Value="#333333"/>
-		</Style>
-
-		<!-- CheckBox Styles for better visibility -->
-				<!-- CheckBox Styles - Consistent size, good contrast -->
-		<!-- CheckBox Styles - Make it VISIBLE -->
 		<Style Selector="CheckBox">
-			<Setter Property="MinWidth" Value="20"/>
-			<Setter Property="MinHeight" Value="20"/>
-			<Setter Property="BorderBrush" Value="#CCCCCC"/>
-			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="CornerRadius" Value="4"/>
-		</Style>
-		
-		<!-- Checkbox border box -->
-		<Style Selector="CheckBox /template/ Border#NormalRectangle">
-			<Setter Property="BorderBrush" Value="#CCCCCC"/>
-			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="Background" Value="White"/>
-			<Setter Property="CornerRadius" Value="4"/>
-			<Setter Property="Width" Value="20"/>
-			<Setter Property="Height" Value="20"/>
-		</Style>
-		
-		<!-- Checked state - blue background -->
-		<Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
-			<Setter Property="Background" Value="#007ACC"/>
-			<Setter Property="BorderBrush" Value="#007ACC"/>
-		</Style>
-		
-		<!-- White checkmark -->
-		<Style Selector="CheckBox:checked /template/ Path#CheckGlyph">
-			<Setter Property="Fill" Value="#FFFFFF"/>
-			<Setter Property="Stroke" Value="#FFFFFF"/>
-			<Setter Property="StrokeThickness" Value="1.5"/>
-		</Style>
-		
-		<!-- Hover effect -->
-		<Style Selector="CheckBox:pointerover /template/ Border#NormalRectangle">
-			<Setter Property="BorderBrush" Value="#007ACC"/>
-		</Style>
+    <Setter Property="MinWidth" Value="20"/>
+    <Setter Property="MinHeight" Value="20"/>
+    <Setter Property="Padding" Value="8,0,0,0"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="Template">
+        <ControlTemplate>
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Grid.Column="0"
+                        Name="PART_Border"
+                        Width="20"
+                        Height="20"
+                        Background="#FFFFFF"
+                        BorderBrush="#CCCCCC"
+                        BorderThickness="2"
+                        CornerRadius="4">
+                    <Path Name="PART_Check"
+                          Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Fill="#FFFFFF"
+                          Stroke="#FFFFFF"
+                          StrokeThickness="1.5"
+                          IsVisible="False"
+                          Data="M0,5 L3,8 L8,0"/>
+                </Border>
+                <ContentPresenter Grid.Column="1"
+                                  Content="{TemplateBinding Content}"
+                                  Margin="{TemplateBinding Padding}"/>
+            </Grid>
+        </ControlTemplate>
+    </Setter>
+</Style>
+
+<Style Selector="CheckBox:pointerover /template/ Border#PART_Border">
+    <Setter Property="BorderBrush" Value="#007ACC"/>
+</Style>
+
+<Style Selector="CheckBox:checked /template/ Border#PART_Border">
+    <Setter Property="Background" Value="#007ACC"/>
+    <Setter Property="BorderBrush" Value="#007ACC"/>
+</Style>
+
+<Style Selector="CheckBox:checked /template/ Path#PART_Check">
+    <Setter Property="IsVisible" Value="True"/>
+</Style>
+
+<Style Selector="CheckBox:disabled /template/ Border#PART_Border">
+    <Setter Property="Background" Value="#F5F5F5"/>
+    <Setter Property="BorderBrush" Value="#E0E0E0"/>
+</Style>
+
+<Style Selector="CheckBox:disabled:checked /template/ Border#PART_Border">
+    <Setter Property="Background" Value="#B0B0B0"/>
+    <Setter Property="BorderBrush" Value="#B0B0B0"/>
+</Style>
+
+<Style Selector="CheckBox:disabled:checked /template/ Path#PART_Check">
+    <Setter Property="IsVisible" Value="True"/>
+</Style>
+
+<Style Selector="TimePicker:disabled">
+    <Setter Property="Opacity" Value="1"/>
+</Style>
+
+<Style Selector="TimePicker:disabled /template/ Button#PART_FlyoutButton">
+    <Setter Property="Background" Value="#F5F5F5"/>
+    <Setter Property="Foreground" Value="#999999"/>
+    <Setter Property="BorderBrush" Value="#E0E0E0"/>
+    <Setter Property="Opacity" Value="1"/>
+</Style>
+
+<Style Selector="TimePicker:disabled TextBlock">
+    <Setter Property="Foreground" Value="#999999"/>
+    <Setter Property="Opacity" Value="1"/>
+</Style>
+
+<Style Selector="TimePicker:disabled /template/ Border">
+    <Setter Property="Background" Value="#F5F5F5"/>
+    <Setter Property="BorderBrush" Value="#E0E0E0"/>
+    <Setter Property="Opacity" Value="1"/>
+</Style>
 
 	</Window.Styles>
 
