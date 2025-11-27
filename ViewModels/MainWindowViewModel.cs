@@ -456,7 +456,6 @@ namespace AkademiTrack.ViewModels
         private DateTime _lastUpdateCheck = DateTime.MinValue;
         private const string UPDATE_JSON_URL = "https://cybergutta.github.io/AkademietTrack/update.json";
         private readonly ApplicationInfo _applicationInfo;
-
         private bool _autoStartTriggered = false;
         private readonly object _autoStartLock = new object();
 
@@ -535,12 +534,16 @@ namespace AkademiTrack.ViewModels
             _notifications = new ObservableCollection<NotificationEntry>();
             _applicationInfo = new ApplicationInfo();
             StartAutomationCommand = new SimpleCommand(StartAutomationAsync);
+            BackToDashboardCommand = new SimpleCommand(BackToDashboardAsync);
             StopAutomationCommand = new SimpleCommand(StopAutomationAsync);
             OpenSettingsCommand = new SimpleCommand(OpenSettingsAsync);
             ClearLogsCommand = new SimpleCommand(ClearLogsAsync);
             ToggleDetailedLogsCommand = new SimpleCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new SimpleCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new SimpleCommand(ToggleThemeAsync);
+            OpenTutorialCommand = new SimpleCommand(OpenTutorialAsync);
+            RefreshDataCommand = new SimpleCommand(RefreshDataAsync);
+
 
             // Start authentication flow instead of logging "ready"
             _ = InitializeAsync();
@@ -583,7 +586,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // NEW: Authentication state property
         public bool IsAuthenticated
         {
             get => _isAuthenticated;
@@ -596,6 +598,37 @@ namespace AkademiTrack.ViewModels
                 }
             }
         }
+
+        // Tutorial navigation properties
+        private bool _showDashboard = true;
+        private bool _showTutorial = false;
+
+        public bool ShowDashboard
+        {
+            get => _showDashboard;
+            set
+            {
+                if (_showDashboard != value)
+                {
+                    _showDashboard = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+public bool ShowTutorial
+{
+    get => _showTutorial;
+    set
+    {
+        if (_showTutorial != value)
+        {
+            _showTutorial = value;
+            OnPropertyChanged();
+        }
+    }
+}
+
 
         // NEW: Initialize authentication on startup
         private async Task InitializeAsync()
@@ -1032,12 +1065,16 @@ namespace AkademiTrack.ViewModels
         }
 
         public ICommand StartAutomationCommand { get; }
+        public ICommand BackToDashboardCommand { get; }
+
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand ToggleThemeCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
+        public ICommand OpenTutorialCommand { get; }
+        public ICommand RefreshDataCommand { get; }
 
         private Task DismissCurrentNotificationAsync()
         {
@@ -2008,6 +2045,208 @@ namespace AkademiTrack.ViewModels
             LogInfo($"Viser oppdateringsvarsel: {updateInfo.latest_version}");
             NativeNotificationService.Show(title, message, "INFO");
         }
+
+
+    private Task OpenTutorialAsync()
+    {
+        LogInfo("Åpner veiledning...");
+        
+        ShowDashboard = false;
+        ShowTutorial = true;
+
+        return Task.CompletedTask;
+    }
+
+    private Task BackToDashboardAsync()
+    {
+        LogInfo("Tilbake til dashboard...");
+        
+        ShowTutorial = false;
+        ShowDashboard = true;
+        
+        return Task.CompletedTask;
+    }
+
+
+    private async Task RefreshDataAsync()
+    {
+        try
+        {
+            LogInfo("🔄 Oppdaterer data...");
+            StatusMessage = "Oppdaterer...";
+
+            // Check if we have valid cookies
+            var cookies = await SecureCredentialStorage.LoadCookiesAsync();
+
+            if (cookies == null || cookies.Count == 0)
+            {
+                LogInfo("Ingen cookies funnet - autentiserer på nytt...");
+                await ReauthenticateAsync();
+                return;
+            }
+
+            // Test if cookies are still valid by trying to fetch data
+            var attendanceService = new AttendanceDataService();
+            
+            var servicesUserParams = new Services.UserParameters
+            {
+                FylkeId = _userParameters?.FylkeId,
+                PlanPeri = _userParameters?.PlanPeri,
+                SkoleId = _userParameters?.SkoleId
+            };
+            
+            attendanceService.SetCredentials(servicesUserParams, cookies);
+            
+            // Try to fetch summary to test cookies
+            var summary = await attendanceService.GetAttendanceSummaryAsync();
+            
+            if (summary == null)
+            {
+                LogInfo("Cookies er utløpt - autentiserer på nytt i bakgrunnen...");
+                await ReauthenticateAsync();
+                return;
+            }
+
+            // Cookies are valid, refresh dashboard
+            LogInfo("📊 Henter fersk data...");
+            await Dashboard.RefreshDataAsync();
+            
+            LogSuccess("✓ Data oppdatert!");
+            StatusMessage = "Data oppdatert!";
+            
+            NativeNotificationService.Show(
+                "Data Oppdatert",
+                "Dashboard-data er oppdatert med fersk informasjon.",
+                "SUCCESS"
+            );
+
+            // Reset status after 3 seconds
+            await Task.Delay(3000);
+            if (StatusMessage == "Data oppdatert!")
+            {
+                StatusMessage = IsAutomationRunning ? "Automatisering kjører..." : "Klar til å starte";
+            }
+        }
+        catch (Exception ex)
+        {
+            LogError($"Feil ved oppdatering: {ex.Message}");
+            StatusMessage = "Oppdatering mislyktes";
+            
+            NativeNotificationService.Show(
+                "Oppdateringsfeil",
+                "Kunne ikke oppdatere data. Prøver å autentisere på nytt...",
+                "WARNING"
+            );
+            
+            await Task.Delay(1000);
+            await ReauthenticateAsync();
+        }
+    }
+
+    private async Task ReauthenticateAsync()
+    {
+        try
+        {
+            LogInfo("🔐 Starter re-autentisering...");
+            StatusMessage = "Autentiserer...";
+
+            // Create NEW authentication service
+            _authService = new AuthenticationService();
+
+            LogInfo("Åpner nettleser for innlogging...");
+            
+            // This will actually open the browser and perform full authentication
+            var authResult = await _authService.AuthenticateAsync();
+
+            // Check if we got valid cookies (most important!)
+            if (authResult.Success && authResult.Cookies != null && authResult.Cookies.Count > 0)
+            {
+                LogSuccess($"✓ Autentisering fullført! Fikk {authResult.Cookies.Count} cookies");
+
+                // If we got NEW parameters, use them
+                if (authResult.Parameters != null && authResult.Parameters.IsComplete)
+                {
+                    LogSuccess("✓ Nye parametere mottatt fra autentisering");
+                    _userParameters = authResult.Parameters;
+                    LogInfo($"Parametere oppdatert: fylkeid={authResult.Parameters.FylkeId}, planperi={authResult.Parameters.PlanPeri}, skoleid={authResult.Parameters.SkoleId}");
+                }
+                else
+                {
+                    // No new parameters, but that's OK - we keep the existing ones
+                    LogInfo("Ingen nye parametere fra autentisering - bruker eksisterende parametere");
+                    
+                    // If we don't have ANY parameters at all, that's a problem
+                    if (_userParameters == null || !_userParameters.IsComplete)
+                    {
+                        LogError("Ingen gyldige parametere tilgjengelig - kan ikke fortsette");
+                        StatusMessage = "Mangler parametere";
+                        
+                        NativeNotificationService.Show(
+                            "Parameterfeil",
+                            "Kunne ikke hente nødvendige parametere. Vennligst restart applikasjonen.",
+                            "ERROR"
+                        );
+                        return;
+                    }
+                }
+
+                // Update dashboard credentials with NEW cookies
+                var servicesUserParams = new Services.UserParameters
+                {
+                    FylkeId = _userParameters.FylkeId,
+                    PlanPeri = _userParameters.PlanPeri,
+                    SkoleId = _userParameters.SkoleId
+                };
+
+                Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
+
+                // Refresh dashboard data with new credentials
+                LogInfo("📊 Laster dashboard data med nye cookies...");
+                await Dashboard.RefreshDataAsync();
+
+                LogSuccess("✓ Alt er oppdatert!");
+                StatusMessage = "Oppdatert!";
+
+                NativeNotificationService.Show(
+                    "Oppdatering Vellykket",
+                    "Nye cookies hentet og data oppdatert.",
+                    "SUCCESS"
+                );
+
+                await Task.Delay(3000);
+                if (StatusMessage == "Oppdatert!")
+                {
+                    StatusMessage = IsAutomationRunning ? "Automatisering kjører..." : "Klar til å starte";
+                }
+            }
+            else
+            {
+                LogError($"❌ Autentisering mislyktes - Success: {authResult.Success}, Cookies: {authResult.Cookies?.Count ?? 0}");
+                StatusMessage = "Autentisering mislyktes";
+                
+                NativeNotificationService.Show(
+                    "Autentisering Mislyktes",
+                    "Kunne ikke hente nye cookies. Vennligst prøv igjen.",
+                    "ERROR"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            LogError($"Re-autentisering feil: {ex.Message}");
+            if (ShowDetailedLogs)
+            {
+                LogDebug($"Stack trace: {ex.StackTrace}");
+            }
+            StatusMessage = "Autentisering feilet";
+            
+            NativeNotificationService.Show(
+                "Autentiseringsfeil",
+                "En feil oppstod under autentisering. Prøv igjen senere.",
+                "ERROR"
+            );
+        }
+    }
 
         public void Dispose()
         {

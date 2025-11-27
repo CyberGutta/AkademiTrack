@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AkademiTrack.ViewModels"
+        xmlns:views="using:AkademiTrack.Views"
         xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -201,266 +202,298 @@
 
 	</Window.Styles>
 
-	<Grid Margin="30,20">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-			<RowDefinition Height="Auto"/>
-		</Grid.RowDefinitions>
+	<!-- Main Grid that switches between Dashboard and Tutorial -->
+	<Grid>
+		<!-- Dashboard Content -->
+		<Grid Margin="30,20" IsVisible="{Binding ShowDashboard}">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 
-		<!-- Header -->
-		<Grid Grid.Row="0" Margin="0,0,0,30">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*"/>
-				<ColumnDefinition Width="Auto"/>
-			</Grid.ColumnDefinitions>
+			<!-- Header -->
+			<Grid Grid.Row="0" Margin="0,0,0,30">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
 
-			<!-- Title Section -->
-			<StackPanel Grid.Column="0" VerticalAlignment="Center">
-				<TextBlock Text="AkademiTrack" Classes="main-title"/>
-				<TextBlock Text="Automatisk oppmøte-system - Akademiet" Classes="subtitle" Margin="0,4,0,0"/>
-			</StackPanel>
-
-			<!-- Theme Toggle -->
-			<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
-				<Button Classes="theme-toggle"
-						Content="⚙️"
-						Command="{Binding OpenSettingsCommand}"
-						Width="45"
-						Height="45"
-						FontSize="20"
-						ToolTip.Tip="Innstillinger"
-						Cursor="Hand"/>
-
-				<Button Classes="theme-toggle"
-						Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
-						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
-						Command="{Binding ToggleThemeCommand}"
-						Width="45"
-						Height="45"
-						FontSize="24"
-						ToolTip.Tip="Toggle dark/light mode"
-						Cursor="Hand"/>
-			</StackPanel>
-		</Grid>
-
-		<!-- Main Content Area -->
-		<Grid Grid.Row="1">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="360"/>
-				<ColumnDefinition Width="*"/>
-			</Grid.ColumnDefinitions>
-
-			<!-- Left Panel - Automation Controls -->
-			<Border Grid.Column="0" Classes="dashboard-card" Margin="0,0,15,0">
-				<StackPanel Spacing="16">
-					<TextBlock Text="Automatisering" Classes="section-title"/>
-
-					<Button Content="▶ Start automatisering"
-							Classes="start-button"
-							Command="{Binding StartAutomationCommand}"
-							IsEnabled="{Binding !IsAutomationRunning}"
-							HorizontalAlignment="Stretch"/>
-
-					<Button Content="■ Stopp automatisering"
-							Classes="stop-button"
-							Command="{Binding StopAutomationCommand}"
-							IsEnabled="{Binding IsAutomationRunning}"
-							HorizontalAlignment="Stretch"/>
-
-					<!-- Status Box -->
-					<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-							CornerRadius="6"
-							Padding="16,12"
-							BorderThickness="1"
-							BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-							Margin="0,8,0,0">
-						<StackPanel Spacing="6">
-							<TextBlock Text="Gjeldende status:"
-									Classes="status-label"/>
-							<TextBlock Text="{Binding StatusMessage}"
-									Classes="status"
-									HorizontalAlignment="Center"
-									TextWrapping="Wrap"/>
-						</StackPanel>
-					</Border>
+				<!-- Title Section -->
+				<StackPanel Grid.Column="0" VerticalAlignment="Center">
+					<TextBlock Text="AkademiTrack" Classes="main-title"/>
+					<TextBlock Text="Automatisk oppmøte-system - Akademiet" Classes="subtitle" Margin="0,4,0,0"/>
 				</StackPanel>
-			</Border>
 
-			<!-- Right Panel - Statistics Cards -->
-			<StackPanel Grid.Column="1" Spacing="15">
-				<!-- Top Row Stats -->
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*"/>
-						<ColumnDefinition Width="15"/>
-						<ColumnDefinition Width="*"/>
-					</Grid.ColumnDefinitions>
+				<!-- Action Buttons -->
+				<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+					<!-- Tutorial Button -->
+					<Button Classes="theme-toggle"
+							Content="📖"
+							Command="{Binding OpenTutorialCommand}"
+							Width="45"
+							Height="45"
+							FontSize="20"
+							ToolTip.Tip="Veiledning"
+							Cursor="Hand"/>
 
-					<!-- Today Card - DYNAMIC -->
-					<Border Grid.Column="0" Classes="dashboard-card">
-						<StackPanel>
-							<Grid>
-								<TextBlock Text="I DAG" Classes="card-label"/>
-								<TextBlock Text="📅" FontSize="20" HorizontalAlignment="Right"/>
-							</Grid>
-							<TextBlock Text="{Binding Dashboard.TodayDisplay}" Classes="card-value green"/>
-							<TextBlock Text="{Binding Dashboard.TodayStatus}" Classes="card-subtext"/>
-						</StackPanel>
-					</Border>
+					<!-- Refresh Button -->
+					<Button Classes="theme-toggle"
+							Content="🔄"
+							Command="{Binding RefreshDataCommand}"
+							Width="45"
+							Height="45"
+							FontSize="20"
+							ToolTip.Tip="Oppdater data"
+							Cursor="Hand"/>
 
-					<!-- Next Class Card - DYNAMIC -->
-					<Border Grid.Column="2" Classes="dashboard-card">
-						<StackPanel>
-							<Grid>
-								<TextBlock Text="NESTE TIME" Classes="card-label"/>
-								<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
-							</Grid>
-							<TextBlock Text="{Binding Dashboard.NextClassName}"
-									FontSize="24"
-									FontWeight="Bold"
-									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-							<TextBlock Text="{Binding Dashboard.NextClassTime}"
-									FontSize="16"
-									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									Margin="0,4,0,0"/>
-							<TextBlock Text="{Binding Dashboard.NextClassRoom}"
-									FontSize="13"
-									Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									Margin="0,2,0,0"
-									IsVisible="{Binding Dashboard.NextClassRoom, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-						</StackPanel>
-					</Border>
-				</Grid>
+					<!-- Settings Button -->
+					<Button Classes="theme-toggle"
+							Content="⚙️"
+							Command="{Binding OpenSettingsCommand}"
+							Width="45"
+							Height="45"
+							FontSize="20"
+							ToolTip.Tip="Innstillinger"
+							Cursor="Hand"/>
 
-				<!-- Bottom Row Stats -->
-				<Grid>
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*"/>
-						<ColumnDefinition Width="15"/>
-						<ColumnDefinition Width="*"/>
-					</Grid.ColumnDefinitions>
-
-					<!-- This Month Card - DYNAMIC -->
-					<Border Grid.Column="0" Classes="dashboard-card">
-						<StackPanel>
-							<Grid>
-								<TextBlock Text="DENNE MÅNEDEN" Classes="card-label"/>
-								<TextBlock Text="📝" FontSize="20" HorizontalAlignment="Right"/>
-							</Grid>
-							<TextBlock Text="{Binding Dashboard.MonthlyDisplay}" Classes="card-value orange"/>
-							<TextBlock Text="{Binding Dashboard.MonthlyStatus}" Classes="card-subtext"/>
-						</StackPanel>
-					</Border>
-
-					<!-- Over/Undertid Card - DYNAMIC -->
-					<Border Grid.Column="2" Classes="dashboard-card">
-						<StackPanel>
-							<Grid>
-								<TextBlock Text="OVER-/UNDERTID" Classes="card-label"/>
-								<TextBlock Text="⚠️" FontSize="20" HorizontalAlignment="Right"/>
-							</Grid>
-							<TextBlock Text="{Binding Dashboard.OvertimeValue}" 
-									Classes="card-value"
-									Foreground="{Binding Dashboard.OvertimeColor, Converter={StaticResource ColorNameToBrushConverter}}"/>
-							<TextBlock Text="{Binding Dashboard.OvertimeStatus}" Classes="card-subtext"/>
-						</StackPanel>
-					</Border>
-				</Grid>
-			</StackPanel>
-		</Grid>
-
-		<!-- Weekly Progress Bar - FULL WIDTH AT THE BOTTOM -->
-		<Border Grid.Row="2" Classes="dashboard-card" Margin="0,25,0,0">
-			<StackPanel Spacing="12">
-				<Grid>
-					<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
-					<TextBlock Text="{Binding Dashboard.WeeklyPercentage}"
+					<!-- Theme Toggle Button -->
+					<Button Classes="theme-toggle"
+							Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
+							Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
+							Command="{Binding ToggleThemeCommand}"
+							Width="45"
+							Height="45"
 							FontSize="24"
-							FontWeight="Bold"
-							Foreground="#4CAF50"
-							HorizontalAlignment="Right"
-							VerticalAlignment="Center"/>
-				</Grid>
+							ToolTip.Tip="Toggle dark/light mode"
+							Cursor="Hand"/>
+				</StackPanel>
+			</Grid>
 
-				<TextBlock Text="{Binding Dashboard.WeeklyDisplay}"
-						FontSize="12"
-						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+			<!-- Main Content Area -->
+			<Grid Grid.Row="1">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="360"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-				<!-- Progress Bar -->
-				<Border Height="8" 
-						Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}" 
-						CornerRadius="4">
-					<Border HorizontalAlignment="Left"
-							Background="#4CAF50"
-							CornerRadius="4">
-						<Border.Width>
-							<MultiBinding Converter="{StaticResource PercentageToWidthConverter}">
-								<Binding Path="Dashboard.WeeklyPercentage"/>
-								<Binding RelativeSource="{RelativeSource AncestorType=Border}" Path="Bounds.Width"/>
-							</MultiBinding>
-						</Border.Width>
-					</Border>
+				<!-- Left Panel - Automation Controls -->
+				<Border Grid.Column="0" Classes="dashboard-card" Margin="0,0,15,0">
+					<StackPanel Spacing="16">
+						<TextBlock Text="Automatisering" Classes="section-title"/>
+
+						<Button Content="▶ Start automatisering"
+								Classes="start-button"
+								Command="{Binding StartAutomationCommand}"
+								IsEnabled="{Binding !IsAutomationRunning}"
+								HorizontalAlignment="Stretch"/>
+
+						<Button Content="■ Stopp automatisering"
+								Classes="stop-button"
+								Command="{Binding StopAutomationCommand}"
+								IsEnabled="{Binding IsAutomationRunning}"
+								HorizontalAlignment="Stretch"/>
+
+						<!-- Status Box -->
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								CornerRadius="6"
+								Padding="16,12"
+								BorderThickness="1"
+								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+								Margin="0,8,0,0">
+							<StackPanel Spacing="6">
+								<TextBlock Text="Gjeldende status:"
+										Classes="status-label"/>
+								<TextBlock Text="{Binding StatusMessage}"
+										Classes="status"
+										HorizontalAlignment="Center"
+										TextWrapping="Wrap"/>
+							</StackPanel>
+						</Border>
+					</StackPanel>
 				</Border>
 
-				<!-- Weekly Grid Visualization - 5 Days (Mon-Fri) -->
-				<ItemsControl ItemsSource="{Binding Dashboard.WeeklyDays}">
-					<ItemsControl.ItemsPanel>
-						<ItemsPanelTemplate>
-							<UniformGrid Rows="1" Columns="5"/>
-						</ItemsPanelTemplate>
-					</ItemsControl.ItemsPanel>
-					<ItemsControl.ItemTemplate>
-						<DataTemplate DataType="services:DailyAttendance">
-							<Border Height="60" Margin="2" CornerRadius="6" ClipToBounds="True"
-									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}">
-								<Grid>
-									<!-- Filled portion based on percentage -->
-									<Border VerticalAlignment="Bottom"
-											Background="#4CAF50"
-											CornerRadius="0,0,6,6">
-										<Border.Height>
-											<MultiBinding Converter="{StaticResource PercentageToHeightConverter}">
-												<Binding Path="FillPercentage"/>
-												<Binding RelativeSource="{RelativeSource AncestorType=Border}" Path="Bounds.Height"/>
-											</MultiBinding>
-										</Border.Height>
-									</Border>
-									
-									<!-- Day label overlay -->
-									<TextBlock Text="{Binding DayOfWeek, Converter={StaticResource DayOfWeekConverter}}"
-											FontSize="10"
-											FontWeight="SemiBold"
-											Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-											HorizontalAlignment="Center"
-											VerticalAlignment="Top"
-											Margin="0,4,0,0"/>
-									
-									<!-- Session count overlay -->
-									<TextBlock HorizontalAlignment="Center"
-											VerticalAlignment="Bottom"
-											Margin="0,0,0,4"
-											FontSize="9"
-											Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
-										<TextBlock.Text>
-											<MultiBinding StringFormat="{}{0}/{1}">
-												<Binding Path="RegisteredSessions"/>
-												<Binding Path="TotalSessions"/>
-											</MultiBinding>
-										</TextBlock.Text>
-									</TextBlock>
-								</Grid>
-							</Border>
-						</DataTemplate>
-					</ItemsControl.ItemTemplate>
-				</ItemsControl>
+				<!-- Right Panel - Statistics Cards -->
+				<StackPanel Grid.Column="1" Spacing="15">
+					<!-- Top Row Stats -->
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="15"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 
-				<TextBlock Text="{Binding Dashboard.WeeklyRemaining}"
-						FontSize="11"
-						Margin="0,4,0,0"
-						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-						HorizontalAlignment="Right"/>
-			</StackPanel>
-		</Border>
+						<!-- Today Card - DYNAMIC -->
+						<Border Grid.Column="0" Classes="dashboard-card">
+							<StackPanel>
+								<Grid>
+									<TextBlock Text="I DAG" Classes="card-label"/>
+									<TextBlock Text="📅" FontSize="20" HorizontalAlignment="Right"/>
+								</Grid>
+								<TextBlock Text="{Binding Dashboard.TodayDisplay}" Classes="card-value green"/>
+								<TextBlock Text="{Binding Dashboard.TodayStatus}" Classes="card-subtext"/>
+							</StackPanel>
+						</Border>
+
+						<!-- Next Class Card - DYNAMIC -->
+						<Border Grid.Column="2" Classes="dashboard-card">
+							<StackPanel>
+								<Grid>
+									<TextBlock Text="NESTE TIME" Classes="card-label"/>
+									<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
+								</Grid>
+								<TextBlock Text="{Binding Dashboard.NextClassName}"
+										FontSize="24"
+										FontWeight="Bold"
+										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock Text="{Binding Dashboard.NextClassTime}"
+										FontSize="16"
+										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										Margin="0,4,0,0"/>
+								<TextBlock Text="{Binding Dashboard.NextClassRoom}"
+										FontSize="13"
+										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										Margin="0,2,0,0"
+										IsVisible="{Binding Dashboard.NextClassRoom, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+							</StackPanel>
+						</Border>
+					</Grid>
+
+					<!-- Bottom Row Stats -->
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="15"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+
+						<!-- This Month Card - DYNAMIC -->
+						<Border Grid.Column="0" Classes="dashboard-card">
+							<StackPanel>
+								<Grid>
+									<TextBlock Text="DENNE MÅNEDEN" Classes="card-label"/>
+									<TextBlock Text="📝" FontSize="20" HorizontalAlignment="Right"/>
+								</Grid>
+								<TextBlock Text="{Binding Dashboard.MonthlyDisplay}" Classes="card-value orange"/>
+								<TextBlock Text="{Binding Dashboard.MonthlyStatus}" Classes="card-subtext"/>
+							</StackPanel>
+						</Border>
+
+						<!-- Over/Undertid Card - DYNAMIC -->
+						<Border Grid.Column="2" Classes="dashboard-card">
+							<StackPanel>
+								<Grid>
+									<TextBlock Text="OVER-/UNDERTID" Classes="card-label"/>
+									<TextBlock Text="⚠️" FontSize="20" HorizontalAlignment="Right"/>
+								</Grid>
+								<TextBlock Text="{Binding Dashboard.OvertimeValue}" 
+										Classes="card-value"
+										Foreground="{Binding Dashboard.OvertimeColor, Converter={StaticResource ColorNameToBrushConverter}}"/>
+								<TextBlock Text="{Binding Dashboard.OvertimeStatus}" Classes="card-subtext"/>
+							</StackPanel>
+						</Border>
+					</Grid>
+				</StackPanel>
+			</Grid>
+
+			<!-- Weekly Progress Bar - FULL WIDTH AT THE BOTTOM -->
+			<Border Grid.Row="2" Classes="dashboard-card" Margin="0,25,0,0">
+				<StackPanel Spacing="12">
+					<Grid>
+						<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
+						<TextBlock Text="{Binding Dashboard.WeeklyPercentage}"
+								FontSize="24"
+								FontWeight="Bold"
+								Foreground="#4CAF50"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"/>
+					</Grid>
+
+					<TextBlock Text="{Binding Dashboard.WeeklyDisplay}"
+							FontSize="12"
+							Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+
+					<!-- Progress Bar -->
+					<Border Height="8" 
+							Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}" 
+							CornerRadius="4">
+						<Border HorizontalAlignment="Left"
+								Background="#4CAF50"
+								CornerRadius="4">
+							<Border.Width>
+								<MultiBinding Converter="{StaticResource PercentageToWidthConverter}">
+									<Binding Path="Dashboard.WeeklyPercentage"/>
+									<Binding RelativeSource="{RelativeSource AncestorType=Border}" Path="Bounds.Width"/>
+								</MultiBinding>
+							</Border.Width>
+						</Border>
+					</Border>
+
+					<!-- Weekly Grid Visualization - 5 Days (Mon-Fri) -->
+					<ItemsControl ItemsSource="{Binding Dashboard.WeeklyDays}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<UniformGrid Rows="1" Columns="5"/>
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+						<ItemsControl.ItemTemplate>
+							<DataTemplate DataType="services:DailyAttendance">
+								<Border Height="60" Margin="2" CornerRadius="6" ClipToBounds="True"
+										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}">
+									<Grid>
+										<!-- Filled portion based on percentage -->
+										<Border VerticalAlignment="Bottom"
+												Background="#4CAF50"
+												CornerRadius="0,0,6,6">
+											<Border.Height>
+												<MultiBinding Converter="{StaticResource PercentageToHeightConverter}">
+													<Binding Path="FillPercentage"/>
+													<Binding RelativeSource="{RelativeSource AncestorType=Border}" Path="Bounds.Height"/>
+												</MultiBinding>
+											</Border.Height>
+										</Border>
+										
+										<!-- Day label overlay -->
+										<TextBlock Text="{Binding DayOfWeek, Converter={StaticResource DayOfWeekConverter}}"
+												FontSize="10"
+												FontWeight="SemiBold"
+												Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+												HorizontalAlignment="Center"
+												VerticalAlignment="Top"
+												Margin="0,4,0,0"/>
+										
+										<!-- Session count overlay -->
+										<TextBlock HorizontalAlignment="Center"
+												VerticalAlignment="Bottom"
+												Margin="0,0,0,4"
+												FontSize="9"
+												Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+											<TextBlock.Text>
+												<MultiBinding StringFormat="{}{0}/{1}">
+													<Binding Path="RegisteredSessions"/>
+													<Binding Path="TotalSessions"/>
+												</MultiBinding>
+											</TextBlock.Text>
+										</TextBlock>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+
+					<TextBlock Text="{Binding Dashboard.WeeklyRemaining}"
+							FontSize="11"
+							Margin="0,4,0,0"
+							Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+							HorizontalAlignment="Right"/>
+				</StackPanel>
+			</Border>
+		</Grid>
+		
+		<!-- Tutorial Content (shown when ShowTutorial is true) -->
+		<Grid Margin="0" IsVisible="{Binding ShowTutorial}">
+			<views:TutorialView DataContext="{Binding}"/>
+		</Grid>
 	</Grid>
+	
 </Window>

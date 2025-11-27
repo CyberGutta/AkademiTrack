@@ -1,0 +1,353 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:services="using:AkademiTrack.Services"
+             xmlns:vm="using:AkademiTrack.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
+             x:Class="AkademiTrack.Views.TutorialView"
+             x:DataType="vm:MainWindowViewModel">
+
+	<UserControl.Styles>
+		<!-- Theme Toggle Button -->
+		<Style Selector="Button.theme-toggle">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="22.5"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Padding" Value="0"/>
+		</Style>
+
+		<Style Selector="Button.theme-toggle:pointerover">
+			<Setter Property="Opacity" Value="0.9"/>
+		</Style>
+
+		<!-- Dashboard Card Style -->
+		<Style Selector="Border.dashboard-card">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="12"/>
+			<Setter Property="Padding" Value="20"/>
+		</Style>
+
+		<!-- Back Button -->
+		<Style Selector="Button.back-button">
+			<Setter Property="Background" Value="#5B9BFF"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+
+		<Style Selector="Button.back-button:pointerover">
+			<Setter Property="Background" Value="#4080E8"/>
+			<Setter Property="Opacity" Value="0.9"/>
+		</Style>
+
+		<!-- Title Styles -->
+		<Style Selector="TextBlock.main-title">
+			<Setter Property="FontSize" Value="32"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="TextBlock.subtitle">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="Normal"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+		</Style>
+
+		<Style Selector="TextBlock.section-title">
+			<Setter Property="FontSize" Value="20"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Margin" Value="0,0,0,12"/>
+		</Style>
+
+		<Style Selector="TextBlock.tutorial-text">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="LineHeight" Value="22"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="TextBlock.step-number">
+			<Setter Property="FontSize" Value="18"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="Foreground" Value="#5B9BFF"/>
+			<Setter Property="Width" Value="35"/>
+			<Setter Property="Height" Value="35"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Grid Margin="30,20">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<!-- Header -->
+		<Grid Grid.Row="0" Margin="0,0,0,30">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+
+			<!-- Title Section -->
+			<StackPanel Grid.Column="0" VerticalAlignment="Center">
+				<TextBlock Text="📖 Veiledning" Classes="main-title"/>
+				<TextBlock Text="Lær hvordan du bruker AkademiTrack" Classes="subtitle" Margin="0,4,0,0"/>
+			</StackPanel>
+
+			<!-- Action Buttons -->
+			<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+				<!-- Back to Dashboard Button -->
+				<Button Classes="theme-toggle"
+						Content="←"
+						Command="{Binding BackToDashboardCommand}"
+						Width="45"
+						Height="45"
+						FontSize="24"
+						ToolTip.Tip="Tilbake til dashboard"
+						Cursor="Hand"/>
+
+				<!-- Theme Toggle Button -->
+				<Button Classes="theme-toggle"
+						Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
+						Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
+						Command="{Binding ToggleThemeCommand}"
+						Width="45"
+						Height="45"
+						FontSize="24"
+						ToolTip.Tip="Toggle dark/light mode"
+						Cursor="Hand"/>
+			</StackPanel>
+		</Grid>
+
+		<!-- Tutorial Content -->
+		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+			<StackPanel Spacing="20" Margin="0,0,10,0">
+				
+				<!-- Welcome Section -->
+				<Border Classes="dashboard-card">
+					<StackPanel Spacing="12">
+						<TextBlock Text="Velkommen til AkademiTrack! 👋" Classes="section-title"/>
+						<TextBlock Classes="tutorial-text">
+							AkademiTrack er et automatisk oppmøte-system designet spesielt for elever ved Akademiet. 
+							Systemet registrerer automatisk ditt fremmøte for STU (studietid) økter, slik at du slipper å gjøre det manuelt hver gang.
+						</TextBlock>
+					</StackPanel>
+				</Border>
+
+				<!-- Getting Started -->
+				<Border Classes="dashboard-card">
+					<StackPanel Spacing="16">
+						<TextBlock Text="🚀 Kom i gang" Classes="section-title"/>
+						
+						<!-- Step 1 -->
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
+							
+							<Border Grid.Column="0" 
+									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+									CornerRadius="17.5"
+									Width="35"
+									Height="35"
+									Margin="0,0,12,0">
+								<TextBlock Text="1" Classes="step-number"/>
+							</Border>
+							
+							<StackPanel Grid.Column="1" Spacing="4">
+								<TextBlock Text="Første gangs oppsett" 
+										   FontWeight="SemiBold" 
+										   FontSize="15"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock Classes="tutorial-text">
+									Første gang du starter applikasjonen, må du logge inn med dine Feide-detaljer. 
+									Dette gjøres automatisk ved oppstart, og credentials blir lagret sikkert på din maskin.
+								</TextBlock>
+							</StackPanel>
+						</Grid>
+
+						<!-- Step 2 -->
+						<Grid Margin="0,8,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
+							
+							<Border Grid.Column="0" 
+									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+									CornerRadius="17.5"
+									Width="35"
+									Height="35"
+									Margin="0,0,12,0">
+								<TextBlock Text="2" Classes="step-number"/>
+							</Border>
+							
+							<StackPanel Grid.Column="1" Spacing="4">
+								<TextBlock Text="Start automatisering" 
+										   FontWeight="SemiBold" 
+										   FontSize="15"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock Classes="tutorial-text">
+									Klikk på "▶ Start automatisering" knappen for å aktivere automatisk oppmøteregistrering. 
+									Systemet vil overvåke dine STU-økter og registrere deg automatisk når registreringsvinduet åpner.
+								</TextBlock>
+							</StackPanel>
+						</Grid>
+
+						<!-- Step 3 -->
+						<Grid Margin="0,8,0,0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="Auto"/>
+								<ColumnDefinition Width="*"/>
+							</Grid.ColumnDefinitions>
+							
+							<Border Grid.Column="0" 
+									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+									CornerRadius="17.5"
+									Width="35"
+									Height="35"
+									Margin="0,0,12,0">
+								<TextBlock Text="3" Classes="step-number"/>
+							</Border>
+							
+							<StackPanel Grid.Column="1" Spacing="4">
+								<TextBlock Text="La applikasjonen kjøre" 
+										   FontWeight="SemiBold" 
+										   FontSize="15"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock Classes="tutorial-text">
+									Hold applikasjonen åpen mens du er på skolen. Den vil automatisk registrere fremmøte 
+									for alle dine STU-økter når riktig tid kommer. Du får varsler når registreringer er fullført.
+								</TextBlock>
+							</StackPanel>
+						</Grid>
+					</StackPanel>
+				</Border>
+
+				<!-- Dashboard Overview -->
+				<Border Classes="dashboard-card">
+					<StackPanel Spacing="12">
+						<TextBlock Text="📊 Dashboard Oversikt" Classes="section-title"/>
+						
+						<StackPanel Spacing="8">
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">I DAG:</Run>
+								<Run> Viser hvor mange STU-økter du har registrert i dag av totalt antall økter.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">NESTE TIME:</Run>
+								<Run> Viser din neste time (både STU og vanlige fag).</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">DENNE MÅNEDEN:</Run>
+								<Run> Totalt antall registrerte STU-økter denne måneden med prosentvis fremmøte.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">OVER-/UNDERTID:</Run>
+								<Run> Viser om du er foran eller bak på dine påkrevde timer. Grønn = over målet, Orange = under målet.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">UKENS FREMMØTE:</Run>
+								<Run> Visualisering av ditt fremmøte for hele uken (mandag-fredag) med prosentvis fullføring.</Run>
+							</TextBlock>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<!-- Features -->
+				<Border Classes="dashboard-card">
+					<StackPanel Spacing="12">
+						<TextBlock Text="⚙️ Funksjoner" Classes="section-title"/>
+						
+						<StackPanel Spacing="8">
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">🔄 Oppdater data:</Run>
+								<Run> Henter fersk data fra iskole.net. Hvis cookies er utløpt, re-autentiserer systemet automatisk i bakgrunnen.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">⚙️ Innstillinger:</Run>
+								<Run> Konfigurer auto-start, notifikasjoner, og andre preferanser.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">🌙/☀️ Tema:</Run>
+								<Run> Bytt mellom mørk og lys modus.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">Auto-restart:</Run>
+								<Run> Hvis aktivert i innstillinger, starter automatiseringen automatisk på skoledager innenfor skoletid.</Run>
+							</TextBlock>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<!-- Important Notes -->
+				<Border Classes="dashboard-card" BorderBrush="#FF9800" BorderThickness="2">
+					<StackPanel Spacing="12">
+						<TextBlock Text="⚠️ Viktig å vite" Classes="section-title"/>
+						
+						<StackPanel Spacing="8">
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">• Skolens nettverk:</Run>
+								<Run> Du MÅ være tilkoblet skolens WiFi for at registreringen skal fungere. Appen fortsetter å kjøre hvis du ikke er tilkoblet, men vil ikke kunne registrere før du kobler til.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">• Konflikter:</Run>
+								<Run> Systemet registrerer IKKE STU-økter som overlapper med andre fag. Du må møte opp i det andre faget.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">• Registreringsvindu:</Run>
+								<Run> Hver STU-økt har et spesifikt tidsvindu for registrering. Systemet registrerer automatisk når vinduet åpner.</Run>
+							</TextBlock>
+							
+							<TextBlock Classes="tutorial-text">
+								<Run FontWeight="SemiBold">• Hold appen åpen:</Run>
+								<Run> For at automatiseringen skal fungere, må appen kjøre. På Mac kan du minimere den, og den vil fortsette å fungere i bakgrunnen.</Run>
+							</TextBlock>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<!-- Support -->
+				<Border Classes="dashboard-card">
+					<StackPanel Spacing="12">
+						<TextBlock Text="💬 Trenger du hjelp?" Classes="section-title"/>
+						<TextBlock Classes="tutorial-text">
+							Hvis du opplever problemer eller har spørsmål, kan du kontakte utvikleren eller sjekke logger i innstillinger for mer detaljert informasjon om hva som skjer.
+						</TextBlock>
+					</StackPanel>
+				</Border>
+
+				<!-- Back Button at Bottom -->
+				<Button Content="← Tilbake til Dashboard"
+						Classes="back-button"
+						Command="{Binding BackToDashboardCommand}"
+						HorizontalAlignment="Center"
+						Margin="0,10,0,20"/>
+
+			</StackPanel>
+		</ScrollViewer>
+	</Grid>
+</UserControl>
