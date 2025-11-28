@@ -449,7 +449,7 @@
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderBrush" Value="#CCCCCC"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="4"/>
+    <Setter Property="CornerRadius" Value="3"/>
     <Setter Property="Width" Value="18"/>
     <Setter Property="Height" Value="18"/>
 </Style>
@@ -464,7 +464,7 @@
 </Style>
 
 <Style Selector="CheckBox /template/ Path#PART_Check">
-    <Setter Property="Data" Value="M 3,8 L 6,11 L 13,4"/>
+    <Setter Property="Data" Value="M 4,9 L 7,12 L 14,4"/>
     <Setter Property="Stroke" Value="White"/>
     <Setter Property="StrokeThickness" Value="2"/>
     <Setter Property="StrokeLineCap" Value="Round"/>
