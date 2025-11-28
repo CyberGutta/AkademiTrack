@@ -231,19 +231,20 @@
 	<!-- Main Grid that switches between Dashboard and Tutorial -->
 	<Grid>
 		<!-- Dashboard Content -->
-		<Grid Margin="30,20" IsVisible="{Binding ShowDashboard}">
-			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="*"/>
-				<RowDefinition Height="Auto"/>
-			</Grid.RowDefinitions>
+		<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+			<Grid Margin="30,20,30,20" MinWidth="840" IsVisible="{Binding ShowDashboard}">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto" MinHeight="280"/>
+					<RowDefinition Height="Auto" MinHeight="200"/>
+				</Grid.RowDefinitions>
 
-			<!-- Header -->
-			<Grid Grid.Row="0" Margin="0,0,0,30">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="Auto"/>
-				</Grid.ColumnDefinitions>
+				<!-- Header -->
+				<Grid Grid.Row="0" Margin="0,0,0,20">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="Auto"/>
+					</Grid.ColumnDefinitions>
 
 				<!-- Title Section -->
 				<StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -297,37 +298,39 @@
 			</Grid>
 
 			<!-- Main Content Area -->
-			<Grid Grid.Row="1">
+			<Grid Grid.Row="1" Height="280">
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="360"/>
-					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="3*" MinWidth="350"/>
+					<ColumnDefinition Width="5*" MinWidth="480"/>
 				</Grid.ColumnDefinitions>
 
 				<!-- Left Panel - Automation Controls -->
 				<Border Grid.Column="0" Classes="dashboard-card" Margin="0,0,15,0">
-					<StackPanel Spacing="16">
+					<StackPanel Spacing="18">
 						<TextBlock Text="Automatisering" Classes="section-title"/>
 
 						<Button Content="▶ Start automatisering"
 								Classes="start-button"
 								Command="{Binding StartAutomationCommand}"
 								IsEnabled="{Binding !IsAutomationRunning}"
-								HorizontalAlignment="Stretch"/>
+								HorizontalAlignment="Stretch"
+								Height="42"/>
 
 						<Button Content="■ Stopp automatisering"
 								Classes="stop-button"
 								Command="{Binding StopAutomationCommand}"
 								IsEnabled="{Binding IsAutomationRunning}"
-								HorizontalAlignment="Stretch"/>
+								HorizontalAlignment="Stretch"
+								Height="42"/>
 
 						<!-- Status Box -->
 						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-								CornerRadius="6"
-								Padding="16,12"
+								CornerRadius="8"
+								Padding="18,14"
 								BorderThickness="1"
 								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-								Margin="0,8,0,0">
-							<StackPanel Spacing="6">
+								Margin="0,10,0,0">
+							<StackPanel Spacing="8">
 								<TextBlock Text="Gjeldende status:"
 										Classes="status-label"/>
 								<TextBlock Text="{Binding StatusMessage}"
@@ -340,9 +343,14 @@
 				</Border>
 
 				<!-- Right Panel - Statistics Cards -->
-				<StackPanel Grid.Column="1" Spacing="15">
+				<Grid Grid.Column="1">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="*"/>
+						<RowDefinition Height="15"/>
+						<RowDefinition Height="*"/>
+					</Grid.RowDefinitions>
 					<!-- Top Row Stats -->
-					<Grid>
+					<Grid Grid.Row="0">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*"/>
 							<ColumnDefinition Width="15"/>
@@ -351,7 +359,7 @@
 
 						<!-- Today Card - DYNAMIC -->
 						<Border Grid.Column="0" Classes="dashboard-card">
-							<StackPanel>
+							<StackPanel VerticalAlignment="Center">
 								<Grid>
 									<TextBlock Text="I DAG" Classes="card-label"/>
 									<TextBlock Text="📅" FontSize="20" HorizontalAlignment="Right"/>
@@ -363,7 +371,7 @@
 
 						<!-- Next Class Card - DYNAMIC -->
 						<Border Grid.Column="2" Classes="dashboard-card">
-							<StackPanel>
+							<StackPanel VerticalAlignment="Center">
 								<Grid>
 									<TextBlock Text="NESTE TIME" Classes="card-label"/>
 									<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
@@ -386,7 +394,7 @@
 					</Grid>
 
 					<!-- Bottom Row Stats -->
-					<Grid>
+					<Grid Grid.Row="2">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="*"/>
 							<ColumnDefinition Width="15"/>
@@ -395,7 +403,7 @@
 
 						<!-- This Month Card - DYNAMIC -->
 						<Border Grid.Column="0" Classes="dashboard-card">
-							<StackPanel>
+							<StackPanel VerticalAlignment="Center">
 								<Grid>
 									<TextBlock Text="DENNE MÅNEDEN" Classes="card-label"/>
 									<TextBlock Text="📝" FontSize="20" HorizontalAlignment="Right"/>
@@ -407,10 +415,14 @@
 
 						<!-- Over/Undertid Card - DYNAMIC -->
 						<Border Grid.Column="2" Classes="dashboard-card">
-							<StackPanel>
+							<StackPanel VerticalAlignment="Center">
 								<Grid>
 									<TextBlock Text="OVER-/UNDERTID" Classes="card-label"/>
-									<TextBlock Text="⚠️" FontSize="20" HorizontalAlignment="Right"/>
+									<TextBlock Text="⚠" 
+											FontSize="20" 
+											HorizontalAlignment="Right" 
+											VerticalAlignment="Top"
+											Foreground="#FF9800"/>
 								</Grid>
 								<TextBlock Text="{Binding Dashboard.OvertimeValue}" 
 										Classes="card-value"
@@ -419,11 +431,11 @@
 							</StackPanel>
 						</Border>
 					</Grid>
-				</StackPanel>
+				</Grid>
 			</Grid>
 
 			<!-- Weekly Progress Bar - FULL WIDTH AT THE BOTTOM -->
-			<Border Grid.Row="2" Classes="dashboard-card" Margin="0,25,0,0">
+			<Border Grid.Row="2" Classes="dashboard-card" Margin="0,15,0,0">
 				<StackPanel Spacing="12">
 					<Grid>
 						<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
@@ -515,6 +527,7 @@
 				</StackPanel>
 			</Border>
 		</Grid>
+		</ScrollViewer>
 		
 		<!-- Tutorial Content (shown when ShowTutorial is true) -->
 		<Grid Margin="0" IsVisible="{Binding ShowTutorial}">
