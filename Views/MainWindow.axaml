@@ -50,7 +50,7 @@
 						<Grid>
 							<Border Name="PART_HoverOverlay"
 									CornerRadius="{TemplateBinding CornerRadius}"
-									Background="#000000"
+									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
 									Opacity="0">
 								<Border.Transitions>
 									<Transitions>
@@ -99,11 +99,24 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 
 		<Style Selector="Button.start-button:pointerover">
 			<Setter Property="Background" Value="#4080E8"/>
-			<Setter Property="Opacity" Value="0.9"/>
 		</Style>
 
 		<Style Selector="Button.start-button:disabled">
@@ -121,11 +134,24 @@
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 
 		<Style Selector="Button.stop-button:pointerover">
 			<Setter Property="Background" Value="#545B62"/>
-			<Setter Property="Opacity" Value="0.9"/>
 		</Style>
 
 		<Style Selector="Button.stop-button:disabled">
