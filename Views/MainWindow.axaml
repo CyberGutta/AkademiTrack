@@ -231,12 +231,12 @@
 	<!-- Main Grid that switches between Dashboard and Tutorial -->
 	<Grid>
 		<!-- Dashboard Content -->
-		<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-			<Grid Margin="30,20,30,20" MinWidth="840" IsVisible="{Binding ShowDashboard}">
+		<Grid IsVisible="{Binding ShowDashboard}">
+			<Grid Margin="30,20,30,20" MinWidth="840">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="Auto" MinHeight="280"/>
-					<RowDefinition Height="Auto" MinHeight="200"/>
+					<RowDefinition Height="*"/>
+					<RowDefinition Height="Auto"/>
 				</Grid.RowDefinitions>
 
 				<!-- Header -->
@@ -298,15 +298,15 @@
 			</Grid>
 
 			<!-- Main Content Area -->
-			<Grid Grid.Row="1" Height="280">
+			<Grid Grid.Row="1" Margin="0,0,0,15">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="3*" MinWidth="350"/>
 					<ColumnDefinition Width="5*" MinWidth="480"/>
 				</Grid.ColumnDefinitions>
 
 				<!-- Left Panel - Automation Controls -->
-				<Border Grid.Column="0" Classes="dashboard-card" Margin="0,0,15,0">
-					<StackPanel Spacing="18">
+				<Border Grid.Column="0" Classes="dashboard-card" Margin="0,0,15,0" VerticalAlignment="Stretch">
+					<StackPanel Spacing="18" VerticalAlignment="Center">
 						<TextBlock Text="Automatisering" Classes="section-title"/>
 
 						<Button Content="▶ Start automatisering"
@@ -343,7 +343,7 @@
 				</Border>
 
 				<!-- Right Panel - Statistics Cards -->
-				<Grid Grid.Column="1">
+				<Grid Grid.Column="1" VerticalAlignment="Stretch">
 					<Grid.RowDefinitions>
 						<RowDefinition Height="*"/>
 						<RowDefinition Height="15"/>
@@ -435,7 +435,7 @@
 			</Grid>
 
 			<!-- Weekly Progress Bar - FULL WIDTH AT THE BOTTOM -->
-			<Border Grid.Row="2" Classes="dashboard-card" Margin="0,15,0,0">
+			<Border Grid.Row="2" Classes="dashboard-card">
 				<StackPanel Spacing="12">
 					<Grid>
 						<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
@@ -527,7 +527,7 @@
 				</StackPanel>
 			</Border>
 		</Grid>
-		</ScrollViewer>
+		</Grid>
 		
 		<!-- Tutorial Content (shown when ShowTutorial is true) -->
 		<Grid Margin="0" IsVisible="{Binding ShowTutorial}">
