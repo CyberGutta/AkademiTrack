@@ -720,7 +720,7 @@
                        TextWrapping="Wrap"
                        LineHeight="19"
                        MaxWidth="750">
-                <Run Text="Sett når automatiseringen skal starte og slutte for hver dag."/>
+                <Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
                 <LineBreak/>
                 <Run Text="Deaktiver dager når du ikke har skole."/>
             </TextBlock>
