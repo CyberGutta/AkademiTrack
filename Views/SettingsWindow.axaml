@@ -456,6 +456,11 @@
 
 <Style Selector="CheckBox:checked /template/ Path#PART_Check">
     <Setter Property="IsVisible" Value="True"/>
+    <Setter Property="Stretch" Value="Uniform"/>
+    <Setter Property="Fill" Value="White"/>
+    <Setter Property="Data" Value="M 0,4 L 3,7 L 8,0"/>
+    <Setter Property="Stroke" Value="White"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
 </Style>
 
 <Style Selector="CheckBox:disabled /template/ Border#PART_Border">
@@ -470,6 +475,11 @@
 
 <Style Selector="CheckBox:disabled:checked /template/ Path#PART_Check">
     <Setter Property="IsVisible" Value="True"/>
+    <Setter Property="Stretch" Value="Uniform"/>
+    <Setter Property="Fill" Value="White"/>
+    <Setter Property="Data" Value="M 0,4 L 3,7 L 8,0"/>
+    <Setter Property="Stroke" Value="White"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
 </Style>
 
 <Style Selector="TimePicker:disabled">
