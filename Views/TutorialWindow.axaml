@@ -18,11 +18,13 @@
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
 			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Effect" Value="{x:Null}"/>
 		</Style>
 
 		<Style Selector="Button.theme-toggle:pointerover">
 			<Setter Property="Opacity" Value="0.85"/>
 			<Setter Property="BorderBrush" Value="#999999"/>
+			<Setter Property="Effect" Value="{x:Null}"/>
 		</Style>
 
 		<!-- Dashboard Card Style -->
@@ -34,7 +36,7 @@
 			<Setter Property="Padding" Value="20"/>
 		</Style>
 
-		<!-- Back Button -->
+		<!-- Back Button - Fixed for both light and dark modes -->
 		<Style Selector="Button.back-button">
 			<Setter Property="Background" Value="#5B9BFF"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -46,9 +48,14 @@
 			<Setter Property="Cursor" Value="Hand"/>
 		</Style>
 
-		<Style Selector="Button.back-button:pointerover">
+		<Style Selector="Button.back-button:pointerover /template/ ContentPresenter">
 			<Setter Property="Background" Value="#4080E8"/>
-			<Setter Property="Opacity" Value="0.9"/>
+			<Setter Property="TextBlock.Foreground" Value="White"/>
+		</Style>
+
+		<Style Selector="Button.back-button:pressed /template/ ContentPresenter">
+			<Setter Property="Background" Value="#3670D8"/>
+			<Setter Property="TextBlock.Foreground" Value="White"/>
 		</Style>
 
 		<!-- Title Styles -->
@@ -347,7 +354,9 @@
 						Classes="back-button"
 						Command="{Binding BackToDashboardCommand}"
 						HorizontalAlignment="Center"
-						Margin="0,10,0,20"/>
+						Margin="0,10,0,20"
+						Background="#5B9BFF"
+						Foreground="White"/>
 
 			</StackPanel>
 		</ScrollViewer>
