@@ -3,6 +3,7 @@ using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Converters;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
@@ -15,6 +16,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -23,7 +25,6 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Velopack;
 using Velopack.Sources;
-using System.Security;
 
 namespace AkademiTrack.ViewModels
 {
@@ -693,7 +694,7 @@ Terminal=false
                 if (_isRunningDiagnostics != value)
                 {
                     _isRunningDiagnostics = value;
-                    OnPropertyChanged(nameof(IsRunningDiagnostics));
+                    OnPropertyChanged();
                 }
             }
         }
@@ -707,7 +708,7 @@ Terminal=false
                 if (_diagnosticsCompleted != value)
                 {
                     _diagnosticsCompleted = value;
-                    OnPropertyChanged(nameof(DiagnosticsCompleted));
+                    OnPropertyChanged();
                 }
             }
         }
@@ -725,6 +726,9 @@ Terminal=false
                 }
             }
         }
+
+        private DateTime _lastDiagnosticsRun = DateTime.MinValue;
+        private const int DIAGNOSTICS_COOLDOWN_SECONDS = 5;
 
 
         public bool StartMinimized
@@ -1097,7 +1101,8 @@ Terminal=false
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
-            RunDiagnosticsCommand = new RelayCommand(async () => await RunDiagnosticsAsync());
+            RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
+
 
 
             _ = LoadSchoolHoursAsync();
@@ -1107,9 +1112,24 @@ Terminal=false
 
         private async Task RunDiagnosticsAsync()
         {
+            if (IsRunningDiagnostics)
+            {
+                //Debug.WriteLine("Diagnostics already running - ignoring duplicate request");
+                return;
+            }
+
+            var timeSinceLastRun = (DateTime.Now - _lastDiagnosticsRun).TotalSeconds;
+            if (timeSinceLastRun < DIAGNOSTICS_COOLDOWN_SECONDS)
+            {
+                var waitTime = DIAGNOSTICS_COOLDOWN_SECONDS - (int)timeSinceLastRun;
+                //Debug.WriteLine($"Diagnostics on cooldown - wait {waitTime} more seconds");
+            }
+
             IsRunningDiagnostics = true;
             DiagnosticsCompleted = false;
             HealthCheckResults.Clear();
+
+            _lastDiagnosticsRun = DateTime.Now;
 
             try
             {
@@ -1122,10 +1142,12 @@ Terminal=false
                 }
 
                 DiagnosticsCompleted = true;
+                Debug.WriteLine("✓ Diagnostics completed successfully");
             }
             catch (Exception ex)
             {
-                // Log error
+                Debug.WriteLine($"Diagnostics error: {ex.Message}");
+
                 HealthCheckResults.Add(new HealthCheckResult
                 {
                     ComponentName = "Diagnose",
@@ -1133,6 +1155,8 @@ Terminal=false
                     Message = "Feil under diagnose",
                     Details = ex.Message
                 });
+
+                DiagnosticsCompleted = true;
             }
             finally
             {

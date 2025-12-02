@@ -33,7 +33,7 @@ namespace AkademiTrack.Services
         {
             var handler = new HttpClientHandler
             {
-                AllowAutoRedirect = false
+                AllowAutoRedirect = false // Don't follow redirects automatically
             };
 
             _httpClient = new HttpClient(handler)
@@ -104,12 +104,13 @@ namespace AkademiTrack.Services
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var response = await _httpClient.GetAsync("https://idp.feide.no/simplesaml/module.php/core/frontpage_welcome.php");
+                var response = await _httpClient.GetAsync("https://idp.feide.no");
                 stopwatch.Stop();
 
                 var responseTime = stopwatch.ElapsedMilliseconds;
 
-                
+                // Feide often returns 404 on root, but this means the server is reachable
+                // Accept 200, 302, 301, 404 as "working"
                 if (response.IsSuccessStatusCode ||
                     response.StatusCode == HttpStatusCode.NotFound ||
                     response.StatusCode == HttpStatusCode.Redirect ||
@@ -331,6 +332,7 @@ namespace AkademiTrack.Services
 
         public async Task<HealthCheckResult[]> RunFullHealthCheckAsync()
         {
+            
             var tasks = new[]
             {
                 CheckInternetConnectivityAsync(),
