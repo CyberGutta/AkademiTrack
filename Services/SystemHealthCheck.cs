@@ -33,7 +33,7 @@ namespace AkademiTrack.Services
         {
             var handler = new HttpClientHandler
             {
-                AllowAutoRedirect = false // Don't follow redirects automatically
+                AllowAutoRedirect = true // Allow redirects for Feide
             };
 
             _httpClient = new HttpClient(handler)
@@ -104,17 +104,20 @@ namespace AkademiTrack.Services
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var response = await _httpClient.GetAsync("https://idp.feide.no");
+                // Use the ACTUAL Feide login URL that your app uses
+                // Based on AuthenticationService, this is the correct endpoint
+                var response = await _httpClient.GetAsync("https://innsyn.feide.no/");
                 stopwatch.Stop();
 
                 var responseTime = stopwatch.ElapsedMilliseconds;
 
-                // Feide often returns 404 on root, but this means the server is reachable
-                // Accept 200, 302, 301, 404 as "working"
+                // Feide auth endpoint will redirect or return 400 (bad request) without params
+                // Both mean the server is working
                 if (response.IsSuccessStatusCode ||
-                    response.StatusCode == HttpStatusCode.NotFound ||
+                    response.StatusCode == HttpStatusCode.BadRequest ||
                     response.StatusCode == HttpStatusCode.Redirect ||
-                    response.StatusCode == HttpStatusCode.Moved)
+                    response.StatusCode == HttpStatusCode.Moved ||
+                    response.StatusCode == HttpStatusCode.Found)
                 {
                     if (responseTime < 2000)
                     {
@@ -182,6 +185,7 @@ namespace AkademiTrack.Services
             var stopwatch = Stopwatch.StartNew();
             try
             {
+                // Check the actual iSkole endpoint
                 var response = await _httpClient.GetAsync("https://iskole.net");
                 stopwatch.Stop();
 
@@ -193,7 +197,8 @@ namespace AkademiTrack.Services
                     response.StatusCode == HttpStatusCode.Moved ||
                     response.StatusCode == HttpStatusCode.MovedPermanently ||
                     response.StatusCode == HttpStatusCode.Redirect ||
-                    response.StatusCode == HttpStatusCode.RedirectMethod)
+                    response.StatusCode == HttpStatusCode.RedirectMethod ||
+                    response.StatusCode == HttpStatusCode.Found)
                 {
                     if (responseTime < 3000)
                     {
@@ -332,7 +337,6 @@ namespace AkademiTrack.Services
 
         public async Task<HealthCheckResult[]> RunFullHealthCheckAsync()
         {
-            
             var tasks = new[]
             {
                 CheckInternetConnectivityAsync(),
