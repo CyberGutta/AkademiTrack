@@ -104,8 +104,7 @@ namespace AkademiTrack.Services
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                // Use the ACTUAL Feide login URL that your app uses
-                // Based on AuthenticationService, this is the correct endpoint
+                
                 var response = await _httpClient.GetAsync("https://innsyn.feide.no/");
                 stopwatch.Stop();
 
