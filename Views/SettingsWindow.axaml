@@ -1159,6 +1159,9 @@
 								   Classes="section-header"
 								   Margin="0,0,0,12"/>
 
+
+
+
 						<!-- Delete Local Data -->
 						<Border Classes="setting-card">
 							<StackPanel Spacing="5">
@@ -1197,7 +1200,96 @@
 										Background="#FF9800"
 										Margin="0,8,0,20"/>
 							</StackPanel>
+
 						</Border>
+
+
+						<TextBlock Text="Systemdiagnose"
+           Classes="section-header"
+           Margin="0,0,0,12"/>
+
+<Border Classes="setting-card">
+    <StackPanel Spacing="12">
+        <TextBlock Text="AkademiTrack-diagnose" Classes="setting-title"/>
+        <TextBlock Classes="setting-description">
+            <Run Text="Sjekker internettilkobling, Feide-innlogging og AkademiTrack-funksjonalitet."/>
+        </TextBlock>
+
+        <!-- Running indicator -->
+        <StackPanel Orientation="Horizontal" 
+                    Spacing="10"
+                    IsVisible="{Binding IsRunningDiagnostics}">
+            <TextBlock Text="⏳" FontSize="16" VerticalAlignment="Center"/>
+            <TextBlock Text="Kjører systemdiagnose..."
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="#007ACC"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <Button Content="Kjør diagnose"
+                Classes="settings-action"
+                Command="{Binding RunDiagnosticsCommand}"
+                IsEnabled="{Binding !IsRunningDiagnostics}"
+                Background="#007ACC"
+                Margin="0,0,0,0"/>
+
+        <!-- Results Section -->
+        <StackPanel Spacing="12" IsVisible="{Binding DiagnosticsCompleted}">
+            <TextBlock Text="📊 Diagnoseresultater"
+                       FontWeight="SemiBold"
+                       FontSize="15"
+                       Margin="0,8,0,0"
+                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+
+            <!-- Results List -->
+            <ItemsControl ItemsSource="{Binding HealthCheckResults}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+                                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="14"
+                                Margin="0,0,0,10">
+                            <StackPanel Spacing="8">
+                                <!-- Component and Message -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+                                        <Run Text="{Binding ComponentName}"/>
+                                    </TextBlock>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Message}"
+                                               FontSize="13"
+                                               FontWeight="Medium"
+                                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                                </Grid>
+
+                                <!-- Response Time -->
+                                <TextBlock FontSize="12"
+                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}">
+                                    <Run Text="⏱️ Responstid:"/>
+                                    <Run Text="{Binding ResponseTimeMs}"/>
+                                    <Run Text="ms"/>
+                                </TextBlock>
+
+                                <!-- Details -->
+                                <TextBlock Text="{Binding Details}"
+                                           FontSize="12"
+                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</Border>
+
 						<Rectangle Height="140" Fill="Transparent"/>
 					</StackPanel>
 

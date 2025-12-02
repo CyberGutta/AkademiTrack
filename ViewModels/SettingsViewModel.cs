@@ -684,6 +684,48 @@ Terminal=false
             set { if (_sundayEnd != value) { _sundayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
         }
 
+        private bool _isRunningDiagnostics;
+        public bool IsRunningDiagnostics
+        {
+            get => _isRunningDiagnostics;
+            set
+            {
+                if (_isRunningDiagnostics != value)
+                {
+                    _isRunningDiagnostics = value;
+                    OnPropertyChanged(nameof(IsRunningDiagnostics));
+                }
+            }
+        }
+
+        private bool _diagnosticsCompleted;
+        public bool DiagnosticsCompleted
+        {
+            get => _diagnosticsCompleted;
+            set
+            {
+                if (_diagnosticsCompleted != value)
+                {
+                    _diagnosticsCompleted = value;
+                    OnPropertyChanged(nameof(DiagnosticsCompleted));
+                }
+            }
+        }
+
+        private ObservableCollection<HealthCheckResult> _healthCheckResults = new();
+        public ObservableCollection<HealthCheckResult> HealthCheckResults
+        {
+            get => _healthCheckResults;
+            set
+            {
+                if (_healthCheckResults != value)
+                {
+                    _healthCheckResults = value;
+                    OnPropertyChanged(nameof(HealthCheckResults));
+                }
+            }
+        }
+
 
         public bool StartMinimized
         {
@@ -770,6 +812,8 @@ Terminal=false
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
         public ICommand ResetSchoolHoursCommand { get; }
+        public ICommand RunDiagnosticsCommand { get; }
+
 
 
 
@@ -1053,10 +1097,47 @@ Terminal=false
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
-            
+            RunDiagnosticsCommand = new RelayCommand(async () => await RunDiagnosticsAsync());
+
+
             _ = LoadSchoolHoursAsync();
 
             _ = LoadSettingsAsync();
+        }
+
+        private async Task RunDiagnosticsAsync()
+        {
+            IsRunningDiagnostics = true;
+            DiagnosticsCompleted = false;
+            HealthCheckResults.Clear();
+
+            try
+            {
+                var healthCheck = new SystemHealthCheck();
+                var results = await healthCheck.RunFullHealthCheckAsync();
+
+                foreach (var result in results)
+                {
+                    HealthCheckResults.Add(result);
+                }
+
+                DiagnosticsCompleted = true;
+            }
+            catch (Exception ex)
+            {
+                // Log error
+                HealthCheckResults.Add(new HealthCheckResult
+                {
+                    ComponentName = "Diagnose",
+                    Status = HealthStatus.Error,
+                    Message = "Feil under diagnose",
+                    Details = ex.Message
+                });
+            }
+            finally
+            {
+                IsRunningDiagnostics = false;
+            }
         }
 
         private void ToggleStartMinimized() => StartMinimized = !StartMinimized;
