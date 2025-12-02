@@ -10,10 +10,11 @@
 
 	<UserControl.Styles>
 		<!-- Theme Toggle Button -->
+		
 		<Style Selector="Button.theme-toggle">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
-			<Setter Property="BorderBrush" Value="#CCCCCC"/>
-			<Setter Property="BorderThickness" Value="1.5"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="CornerRadius" Value="22.5"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -23,7 +24,7 @@
 
 		<Style Selector="Button.theme-toggle:pointerover">
 			<Setter Property="Opacity" Value="0.85"/>
-			<Setter Property="BorderBrush" Value="#999999"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="Effect" Value="{x:Null}"/>
 		</Style>
 
