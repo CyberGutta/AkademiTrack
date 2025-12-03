@@ -1,0 +1,101 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="AkademiTrack.ExportLogsDialog"
+        Title="Eksporter logger"
+        Width="400"
+        Height="650"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Icon="/Assets/AT-Transparrent.png">
+
+    <Window.Styles>
+        <Style Selector="RadioButton">
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="#007ACC"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+        
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="#6C757D"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+    </Window.Styles>
+
+    <Border Padding="30">
+        <StackPanel Spacing="20">
+            <TextBlock Text="Eksporter aktivitetslogg"
+                       FontSize="20"
+                       FontWeight="Bold"/>
+
+            <StackPanel Spacing="12">
+                <TextBlock Text="Velg format:"
+                           FontSize="15"
+                           FontWeight="SemiBold"/>
+                
+                <RadioButton x:Name="TextFormatRadio"
+                             Content="📄 Ren tekst (.txt)"
+                             GroupName="Format"
+                             IsChecked="True"/>
+                
+                <RadioButton x:Name="JsonFormatRadio"
+                             Content="📋 JSON-format (.json)"
+                             GroupName="Format"/>
+                
+                <RadioButton x:Name="ReportFormatRadio"
+                             Content="📊 Formatert rapport (.txt)"
+                             GroupName="Format"/>
+            </StackPanel>
+
+            <!-- Destination Selection -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Velg destinasjon:"
+                           FontSize="15"
+                           FontWeight="SemiBold"/>
+                
+                <RadioButton x:Name="DesktopRadio"
+                             Content="💻 Skrivebordet"
+                             GroupName="Destination"
+                             IsChecked="True"/>
+                
+                <RadioButton x:Name="DocumentsRadio"
+                             Content="📁 Dokumenter/AkademiTrack/Logs"
+                             GroupName="Destination"/>
+                
+                <RadioButton x:Name="ClipboardRadio"
+                             Content="📋 Utklippstavle (kun kopier)"
+                             GroupName="Destination"/>
+                
+                <RadioButton x:Name="CustomRadio"
+                             Content="📂 Velg selv..."
+                             GroupName="Destination"/>
+            </StackPanel>
+
+            <!-- Buttons -->
+            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
+                <Button Grid.Column="1"
+                        Content="Eksporter"
+                        Classes="primary"
+                        Click="OnExportClick"
+                        Margin="0,0,10,0"/>
+                
+                <Button Grid.Column="2"
+                        Content="Avbryt"
+                        Classes="secondary"
+                        Click="OnCancelClick"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+  
+</Window>

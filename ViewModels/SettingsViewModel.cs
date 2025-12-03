@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -25,6 +26,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Velopack;
 using Velopack.Sources;
+using static AkademiTrack.ExportLogsDialog;
 
 namespace AkademiTrack.ViewModels
 {
@@ -804,9 +806,7 @@ Terminal=false
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand ToggleActivityLogCommand { get; }
-        public ICommand CopyLogsAsTextCommand { get; }
-        public ICommand CopyLogsAsJsonCommand { get; }
-        public ICommand CopyLogsAsReportCommand { get; }
+        public ICommand ExportLogsCommand { get; }
         public ICommand ToggleAutoStartCommand { get; }
         public ICommand ToggleAutoStartAutomationCommand { get; }
         public ICommand OpenWebsiteCommand { get; }
@@ -1092,9 +1092,7 @@ Terminal=false
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
-            CopyLogsAsTextCommand = new RelayCommand(async () => await CopyLogsAsTextAsync());
-            CopyLogsAsJsonCommand = new RelayCommand(async () => await CopyLogsAsJsonAsync());
-            CopyLogsAsReportCommand = new RelayCommand(async () => await CopyLogsAsReportAsync());
+            ExportLogsCommand = new RelayCommand(async () => await ExportLogsAsync());
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
             OpenWebsiteCommand = new RelayCommand(OpenWebsite);
@@ -1964,190 +1962,274 @@ Terminal=false
             _displayedLogEntries.Clear();
         }
 
-        private async Task CopyLogsAsTextAsync()
+        private async Task ExportLogsAsync()
         {
             try
             {
                 if (_allLogEntries == null || _allLogEntries.Count == 0)
                 {
-                    await SetClipboardTextAsync("Ingen logger tilgjengelig");
+                    await ShowErrorDialog("Ingen logger", "Det finnes ingen logger å eksportere.");
                     return;
                 }
 
-                var sb = new StringBuilder();
-                sb.AppendLine("=== AkademiTrack Aktivitetslogg ===");
-                sb.AppendLine($"Eksportert: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                sb.AppendLine($"Versjon: {ApplicationInfo.Version}");
-                sb.AppendLine($"Totalt antall logger: {_allLogEntries.Count}");
-                sb.AppendLine(new string('=', 50));
-                sb.AppendLine();
+                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
+                    : null;
 
-                foreach (var log in _allLogEntries)
+                if (window == null)
                 {
-                    sb.AppendLine(log.FormattedMessage);
-                }
-
-                await SetClipboardTextAsync(sb.ToString());
-                Debug.WriteLine("✓ Logs copied as plain text");
-
-                NativeNotificationService.Show(
-                    "Logger kopiert",
-                    "Aktivitetsloggen er kopiert som ren tekst",
-                    "SUCCESS"
-                );
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error copying logs as text: {ex.Message}");
-                NativeNotificationService.Show(
-                    "Feil ved kopiering",
-                    "Kunne ikke kopiere logger til utklippstavlen",
-                    "ERROR"
-                );
-            }
-        }
-
-        private async Task CopyLogsAsJsonAsync()
-        {
-            try
-            {
-                if (_allLogEntries == null || _allLogEntries.Count == 0)
-                {
-                    await SetClipboardTextAsync("[]");
+                    Debug.WriteLine("Could not find settings window");
                     return;
                 }
 
-                var exportData = new
+                var dialog = new ExportLogsDialog();
+                var result = await dialog.ShowDialog<ExportLogsResult?>(window);
+
+                if (result == null || result.Cancelled)
                 {
-                    exportedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    version = ApplicationInfo.Version,
-                    totalLogs = _allLogEntries.Count,
-                    logs = _allLogEntries.Select(log => new
+                    Debug.WriteLine("Export cancelled by user");
+                    return;
+                }
+
+                string content;
+                string defaultFileName;
+                string fileExtension;
+
+                switch (result.Format)
+                {
+                    case "json":
+                        content = GenerateJsonExport();
+                        defaultFileName = $"akademitrack_logs_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+                        fileExtension = "json";
+                        break;
+
+                    case "report":
+                        content = GenerateReportExport();
+                        defaultFileName = $"akademitrack_rapport_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                        fileExtension = "txt";
+                        break;
+
+                    default: // "text"
+                        content = GenerateTextExport();
+                        defaultFileName = $"akademitrack_logs_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                        fileExtension = "txt";
+                        break;
+                }
+
+                // Handle destination
+                string? filePath = null;
+
+                if (result.Destination == "desktop")
+                {
+                    var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    filePath = Path.Combine(desktopPath, defaultFileName);
+                }
+                else if (result.Destination == "documents")
+                {
+                    var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    var appFolder = Path.Combine(documentsPath, "AkademiTrack", "Logs");
+                    Directory.CreateDirectory(appFolder);
+                    filePath = Path.Combine(appFolder, defaultFileName);
+                }
+                else if (result.Destination == "clipboard")
+                {
+                    await SetClipboardTextAsync(content);
+                    NativeNotificationService.Show(
+                        "Logger kopiert",
+                        "Aktivitetsloggen er kopiert til utklippstavlen",
+                        "SUCCESS"
+                    );
+                    Debug.WriteLine("✓ Logs copied to clipboard");
+                    return;
+                }
+                else // custom
+                {
+                    var saveDialog = new Avalonia.Controls.SaveFileDialog
                     {
-                        timestamp = log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff"),
-                        level = log.Level,
-                        message = log.Message
-                    }).ToList()
-                };
-
-                var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions
+                        Title = "Lagre logger",
+                        DefaultExtension = fileExtension,
+                        InitialFileName = defaultFileName,
+                        Filters = new List<Avalonia.Controls.FileDialogFilter>
                 {
-                    WriteIndented = true
-                });
-
-                await SetClipboardTextAsync(json);
-                Debug.WriteLine("✓ Logs copied as JSON");
-
-                NativeNotificationService.Show(
-                    "Logger kopiert",
-                    "Aktivitetsloggen er kopiert som JSON",
-                    "SUCCESS"
-                );
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error copying logs as JSON: {ex.Message}");
-                NativeNotificationService.Show(
-                    "Feil ved kopiering",
-                    "Kunne ikke kopiere logger til utklippstavlen",
-                    "ERROR"
-                );
-            }
-        }
-
-        private async Task CopyLogsAsReportAsync()
-        {
-            try
-            {
-                if (_allLogEntries == null || _allLogEntries.Count == 0)
-                {
-                    await SetClipboardTextAsync("Ingen logger tilgjengelig");
-                    return;
-                }
-
-                var sb = new StringBuilder();
-
-                // Header
-                sb.AppendLine("╔═══════════════════════════════════════════════════════════════╗");
-                sb.AppendLine("║          AKADEMITRACK DIAGNOSTIKKRAPPORT                      ║");
-                sb.AppendLine("╚═══════════════════════════════════════════════════════════════╝");
-                sb.AppendLine();
-
-                // System info
-                sb.AppendLine("📊 SYSTEMINFORMASJON");
-                sb.AppendLine(new string('-', 60));
-                sb.AppendLine($"Versjon:        {ApplicationInfo.Version}");
-                sb.AppendLine($"Plattform:      {Environment.OSVersion}");
-                sb.AppendLine($"Arkitektur:     {RuntimeInformation.OSArchitecture}");
-                sb.AppendLine($"Rapport dato:   {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                sb.AppendLine($"Totalt logger:  {_allLogEntries.Count}");
-                sb.AppendLine();
-
-                // Log statistics
-                var errorCount = _allLogEntries.Count(l => l.Level == "ERROR");
-                var successCount = _allLogEntries.Count(l => l.Level == "SUCCESS");
-                var infoCount = _allLogEntries.Count(l => l.Level == "INFO");
-                var debugCount = _allLogEntries.Count(l => l.Level == "DEBUG");
-
-                sb.AppendLine("📈 LOGGSTATISTIKK");
-                sb.AppendLine(new string('-', 60));
-                sb.AppendLine($"❌ Feil:        {errorCount}");
-                sb.AppendLine($"✅ Suksess:     {successCount}");
-                sb.AppendLine($"ℹ️  Info:        {infoCount}");
-                sb.AppendLine($"🔧 Debug:       {debugCount}");
-                sb.AppendLine();
-
-                // Recent errors (if any)
-                var recentErrors = _allLogEntries.Where(l => l.Level == "ERROR").Take(10).ToList();
-                if (recentErrors.Any())
-                {
-                    sb.AppendLine("🚨 SISTE FEIL (maks 10)");
-                    sb.AppendLine(new string('-', 60));
-                    foreach (var error in recentErrors)
+                    new Avalonia.Controls.FileDialogFilter
                     {
-                        sb.AppendLine($"[{error.Timestamp:HH:mm:ss}] {error.Message}");
+                        Name = fileExtension.ToUpper() + " filer",
+                        Extensions = new List<string> { fileExtension }
+                    },
+                    new Avalonia.Controls.FileDialogFilter
+                    {
+                        Name = "Alle filer",
+                        Extensions = new List<string> { "*" }
                     }
-                    sb.AppendLine();
                 }
-
-                // Full log
-                sb.AppendLine("📜 FULLSTENDIG LOGG");
-                sb.AppendLine(new string('-', 60));
-                foreach (var log in _allLogEntries)
-                {
-                    var icon = log.Level switch
-                    {
-                        "ERROR" => "❌",
-                        "SUCCESS" => "✅",
-                        "INFO" => "ℹ️",
-                        "DEBUG" => "🔧",
-                        _ => "•"
                     };
-                    sb.AppendLine($"{icon} {log.FormattedMessage}");
+
+                    filePath = await saveDialog.ShowAsync(window);
+
+                    if (string.IsNullOrEmpty(filePath))
+                    {
+                        Debug.WriteLine("Save cancelled by user");
+                        return;
+                    }
                 }
 
-                sb.AppendLine();
-                sb.AppendLine(new string('=', 60));
-                sb.AppendLine("Slutt på rapport");
+                // Save file
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    await File.WriteAllTextAsync(filePath, content);
+                    Debug.WriteLine($"✓ Logs exported to: {filePath}");
 
-                await SetClipboardTextAsync(sb.ToString());
-                Debug.WriteLine("✓ Logs copied as formatted report");
+                    var openFile = await ShowConfirmationDialog(
+                        "Logger eksportert! ✓",
+                        $"Loggene er lagret til:\n\n{filePath}\n\n" +
+                        "Vil du åpne mappen der filen er lagret?",
+                        false
+                    );
 
-                NativeNotificationService.Show(
-                    "Rapport kopiert",
-                    "Fullstendig diagnostikkrapport er kopiert",
-                    "SUCCESS"
-                );
+                    if (openFile)
+                    {
+                        try
+                        {
+                            var directory = Path.GetDirectoryName(filePath);
+                            if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+                            {
+                                Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = directory,
+                                    UseShellExecute = true
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error opening folder: {ex.Message}");
+                        }
+                    }
+
+                    NativeNotificationService.Show(
+                        "Logger eksportert",
+                        $"Filen er lagret som {Path.GetFileName(filePath)}",
+                        "SUCCESS"
+                    );
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error copying logs as report: {ex.Message}");
-                NativeNotificationService.Show(
-                    "Feil ved kopiering",
-                    "Kunne ikke kopiere rapport til utklippstavlen",
-                    "ERROR"
+                Debug.WriteLine($"Error exporting logs: {ex.Message}");
+                await ShowErrorDialog(
+                    "Eksport feilet",
+                    $"Kunne ikke eksportere logger:\n\n{ex.Message}"
                 );
             }
+        }
+
+        private string GenerateTextExport()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== AkademiTrack Aktivitetslogg ===");
+            sb.AppendLine($"Eksportert: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Versjon: {ApplicationInfo.Version}");
+            sb.AppendLine($"Totalt antall logger: {_allLogEntries.Count}");
+            sb.AppendLine(new string('=', 50));
+            sb.AppendLine();
+
+            foreach (var log in _allLogEntries)
+            {
+                sb.AppendLine(log.FormattedMessage);
+            }
+
+            return sb.ToString();
+        }
+
+        private string GenerateJsonExport()
+        {
+            var exportData = new
+            {
+                exportedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                version = ApplicationInfo.Version,
+                totalLogs = _allLogEntries.Count,
+                logs = _allLogEntries.Select(log => new
+                {
+                    timestamp = log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                    level = log.Level,
+                    message = log.Message
+                }).ToList()
+            };
+
+            return JsonSerializer.Serialize(exportData, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+
+        private string GenerateReportExport()
+        {
+            var sb = new StringBuilder();
+
+            // Header
+            sb.AppendLine("╔═══════════════════════════════════════════════════════════════╗");
+            sb.AppendLine("║          AKADEMITRACK DIAGNOSTIKKRAPPORT                      ║");
+            sb.AppendLine("╚═══════════════════════════════════════════════════════════════╝");
+            sb.AppendLine();
+
+            // System info
+            sb.AppendLine("📊 SYSTEMINFORMASJON");
+            sb.AppendLine(new string('-', 60));
+            sb.AppendLine($"Versjon:        {ApplicationInfo.Version}");
+            sb.AppendLine($"Plattform:      {Environment.OSVersion}");
+            sb.AppendLine($"Arkitektur:     {RuntimeInformation.OSArchitecture}");
+            sb.AppendLine($"Rapport dato:   {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Totalt logger:  {_allLogEntries.Count}");
+            sb.AppendLine();
+
+            // Log statistics
+            var errorCount = _allLogEntries.Count(l => l.Level == "ERROR");
+            var successCount = _allLogEntries.Count(l => l.Level == "SUCCESS");
+            var infoCount = _allLogEntries.Count(l => l.Level == "INFO");
+            var debugCount = _allLogEntries.Count(l => l.Level == "DEBUG");
+
+            sb.AppendLine("📈 LOGGSTATISTIKK");
+            sb.AppendLine(new string('-', 60));
+            sb.AppendLine($"❌ Feil:        {errorCount}");
+            sb.AppendLine($"✅ Suksess:     {successCount}");
+            sb.AppendLine($"ℹ️  Info:        {infoCount}");
+            sb.AppendLine($"🔧 Debug:       {debugCount}");
+            sb.AppendLine();
+
+            // Recent errors (if any)
+            var recentErrors = _allLogEntries.Where(l => l.Level == "ERROR").Take(10).ToList();
+            if (recentErrors.Any())
+            {
+                sb.AppendLine("🚨 SISTE FEIL (maks 10)");
+                sb.AppendLine(new string('-', 60));
+                foreach (var error in recentErrors)
+                {
+                    sb.AppendLine($"[{error.Timestamp:HH:mm:ss}] {error.Message}");
+                }
+                sb.AppendLine();
+            }
+
+            // Full log
+            sb.AppendLine("📜 FULLSTENDIG LOGG");
+            sb.AppendLine(new string('-', 60));
+            foreach (var log in _allLogEntries)
+            {
+                var icon = log.Level switch
+                {
+                    "ERROR" => "❌",
+                    "SUCCESS" => "✅",
+                    "INFO" => "ℹ️",
+                    "DEBUG" => "🔧",
+                    _ => "•"
+                };
+                sb.AppendLine($"{icon} {log.FormattedMessage}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine(new string('=', 60));
+            sb.AppendLine("Slutt på rapport");
+
+            return sb.ToString();
         }
 
         private async Task SetClipboardTextAsync(string text)

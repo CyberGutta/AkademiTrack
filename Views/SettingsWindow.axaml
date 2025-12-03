@@ -1086,12 +1086,12 @@
 								<Grid.RowDefinitions>
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
-									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
 
 								<Grid Grid.Row="0" Margin="0,0,0,16">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="Auto"/>
 										<ColumnDefinition Width="Auto"/>
 									</Grid.ColumnDefinitions>
 									<TextBlock Grid.Column="0"
@@ -1100,50 +1100,26 @@
 											   FontSize="16"
 											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									<Button Grid.Column="1"
+											Content="Eksporter"
+											Classes="settings-action"
+											Command="{Binding ExportLogsCommand}"
+											Padding="14,10"
+											MinWidth="100"
+											Background="#28A745"
+											Margin="0,0,8,0"
+											ToolTip.Tip="Eksporter logger til fil eller utklippstavle"/>
+									<Button Grid.Column="2"
 											Content="Tøm logg"
 											Classes="settings-action"
 											Command="{Binding ClearLogsCommand}"
 											Padding="14,10"
-											MinWidth="100"/>
+											MinWidth="100"
+											Background="#DC3545"/>
 								</Grid>
 
-								<!-- Export Buttons -->
-								<StackPanel Grid.Row="1" 
-											Orientation="Horizontal" 
-											Spacing="8" 
-											Margin="0,0,0,16">
-									<TextBlock Text="📋 Kopier logger som:"
-											   FontSize="13"
-											   FontWeight="SemiBold"
-											   VerticalAlignment="Center"
-											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-									
-									<Button Content="Tekst"
-											Command="{Binding CopyLogsAsTextCommand}"
-											Classes="settings-action"
-											Padding="12,8"
-											MinWidth="80"
-											Background="#6C757D"
-											ToolTip.Tip="Kopier som ren tekst"/>
-									
-									<Button Content="JSON"
-											Command="{Binding CopyLogsAsJsonCommand}"
-											Classes="settings-action"
-											Padding="12,8"
-											MinWidth="80"
-											Background="#007ACC"
-											ToolTip.Tip="Kopier som JSON-format"/>
-									
-									<Button Content="Rapport"
-											Command="{Binding CopyLogsAsReportCommand}"
-											Classes="settings-action"
-											Padding="12,8"
-											MinWidth="80"
-											Background="#28A745"
-											ToolTip.Tip="Kopier som formatert rapport"/>
-								</StackPanel>
+								<!-- Remove the export buttons row completely -->
 
-								<Border Grid.Row="2"
+								<Border Grid.Row="1"
 									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
 									BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 									BorderThickness="1"
