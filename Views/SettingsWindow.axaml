@@ -1086,6 +1086,7 @@
 								<Grid.RowDefinitions>
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
+									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
 
 								<Grid Grid.Row="0" Margin="0,0,0,16">
@@ -1106,7 +1107,43 @@
 											MinWidth="100"/>
 								</Grid>
 
-								<Border Grid.Row="1"
+								<!-- Export Buttons -->
+								<StackPanel Grid.Row="1" 
+											Orientation="Horizontal" 
+											Spacing="8" 
+											Margin="0,0,0,16">
+									<TextBlock Text="📋 Kopier logger som:"
+											   FontSize="13"
+											   FontWeight="SemiBold"
+											   VerticalAlignment="Center"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									
+									<Button Content="Tekst"
+											Command="{Binding CopyLogsAsTextCommand}"
+											Classes="settings-action"
+											Padding="12,8"
+											MinWidth="80"
+											Background="#6C757D"
+											ToolTip.Tip="Kopier som ren tekst"/>
+									
+									<Button Content="JSON"
+											Command="{Binding CopyLogsAsJsonCommand}"
+											Classes="settings-action"
+											Padding="12,8"
+											MinWidth="80"
+											Background="#007ACC"
+											ToolTip.Tip="Kopier som JSON-format"/>
+									
+									<Button Content="Rapport"
+											Command="{Binding CopyLogsAsReportCommand}"
+											Classes="settings-action"
+											Padding="12,8"
+											MinWidth="80"
+											Background="#28A745"
+											ToolTip.Tip="Kopier som formatert rapport"/>
+								</StackPanel>
+
+								<Border Grid.Row="2"
 									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
 									BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 									BorderThickness="1"
