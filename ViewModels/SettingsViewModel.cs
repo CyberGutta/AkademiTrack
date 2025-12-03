@@ -1123,6 +1123,7 @@ Terminal=false
             {
                 var waitTime = DIAGNOSTICS_COOLDOWN_SECONDS - (int)timeSinceLastRun;
                 //Debug.WriteLine($"Diagnostics on cooldown - wait {waitTime} more seconds");
+                return;
             }
 
             IsRunningDiagnostics = true;
@@ -1130,6 +1131,8 @@ Terminal=false
             HealthCheckResults.Clear();
 
             _lastDiagnosticsRun = DateTime.Now;
+
+            (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
 
             try
             {
@@ -1142,11 +1145,11 @@ Terminal=false
                 }
 
                 DiagnosticsCompleted = true;
-                Debug.WriteLine("✓ Diagnostics completed successfully");
+                //Debug.WriteLine("✓ Diagnostics completed successfully");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Diagnostics error: {ex.Message}");
+                //Debug.WriteLine($"Diagnostics error: {ex.Message}");
 
                 HealthCheckResults.Add(new HealthCheckResult
                 {
@@ -1161,6 +1164,11 @@ Terminal=false
             finally
             {
                 IsRunningDiagnostics = false;
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                });
             }
         }
 
