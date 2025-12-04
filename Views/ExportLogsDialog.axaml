@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:services="using:AkademiTrack.Services"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="AkademiTrack.ExportLogsDialog"
         Title="Eksporter logger"
@@ -9,40 +10,143 @@
         Height="650"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Icon="/Assets/AT-Transparrent.png">
+        Icon="/Assets/AT-Transparrent.png"
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}">
 
     <Window.Styles>
-        <Style Selector="RadioButton">
-            <Setter Property="Margin" Value="0,8,0,0"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
-        
+        <!-- Button Styles matching MainWindow -->
         <Style Selector="Button.primary">
-            <Setter Property="Background" Value="#007ACC"/>
+            <Setter Property="Background" Value="#5B9BFF"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="24,12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalContentAlignment="Center"
+                                          VerticalContentAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
         </Style>
-        
+
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Background" Value="#4080E8"/>
+        </Style>
+
         <Style Selector="Button.secondary">
             <Setter Property="Background" Value="#6C757D"/>
             <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalContentAlignment="Center"
+                                          VerticalContentAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.secondary:pointerover">
+            <Setter Property="Background" Value="#545B62"/>
+        </Style>
+
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+        </Style>
+
+        <Style Selector="TextBlock.section-label">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+        </Style>
+
+        <Style Selector="RadioButton">
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="Transparent" Padding="4">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <!-- Outer Circle Border -->
+                            <Ellipse Grid.Column="0"
+                                    Name="OuterCircle"
+                                    Width="20"
+                                    Height="20"
+                                    Margin="0,0,10,0"
+                                    Stroke="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                    StrokeThickness="2"
+                                    Fill="Transparent"/>
+                            
+                            <!-- Inner Dot -->
+                            <Ellipse Grid.Column="0"
+                                     Name="CheckedIndicator"
+                                     Width="10"
+                                     Height="10"
+                                     Margin="0,0,10,0"
+                                     Fill="#5B9BFF"
+                                     IsVisible="False"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                            
+                            <ContentPresenter Grid.Column="1"
+                                              Content="{TemplateBinding Content}"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        
+        <Style Selector="RadioButton:pointerover /template/ Ellipse#OuterCircle">
+            <Setter Property="Stroke" Value="#5B9BFF"/>
+        </Style>
+        
+        <Style Selector="RadioButton:checked /template/ Ellipse#OuterCircle">
+            <Setter Property="Stroke" Value="#5B9BFF"/>
+        </Style>
+        
+        <Style Selector="RadioButton:checked /template/ Ellipse#CheckedIndicator">
+            <Setter Property="IsVisible" Value="True"/>
         </Style>
     </Window.Styles>
 
     <Border Padding="30">
         <StackPanel Spacing="20">
             <TextBlock Text="Eksporter aktivitetslogg"
-                       FontSize="20"
-                       FontWeight="Bold"/>
+                       Classes="title"/>
 
             <StackPanel Spacing="12">
                 <TextBlock Text="Velg format:"
-                           FontSize="15"
-                           FontWeight="SemiBold"/>
+                           Classes="section-label"/>
                 
                 <RadioButton x:Name="TextFormatRadio"
                              Content="📄 Ren tekst (.txt)"
@@ -61,8 +165,7 @@
             <!-- Destination Selection -->
             <StackPanel Spacing="12">
                 <TextBlock Text="Velg destinasjon:"
-                           FontSize="15"
-                           FontWeight="SemiBold"/>
+                           Classes="section-label"/>
                 
                 <RadioButton x:Name="DesktopRadio"
                              Content="💻 Skrivebordet"
