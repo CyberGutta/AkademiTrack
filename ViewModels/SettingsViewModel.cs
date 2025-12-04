@@ -1546,7 +1546,24 @@ Terminal=false
 
         private async Task ShowErrorDialog(string title, string message)
         {
-            await ShowConfirmationDialog(title, message, true);
+            try
+            {
+                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
+                    : null;
+
+                if (window == null)
+                {
+                    Debug.WriteLine("Could not find settings window for dialog");
+                    return;
+                }
+
+                await ErrorDialog.ShowAsync(window, title, message);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error showing error dialog: {ex.Message}");
+            }
         }
 
 

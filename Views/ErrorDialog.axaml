@@ -1,0 +1,88 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:services="using:AkademiTrack.Services"
+        x:Class="AkademiTrack.Views.ErrorDialog"
+        Title="Feil"
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground}"
+        Width="480"
+        Height="300"
+        MinWidth="450"
+        MinHeight="280"
+        MaxWidth="550"
+        MaxHeight="450"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    
+    <Window.Styles>
+        <Style Selector="Button.dialog-button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="24,12"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        
+        <Style Selector="Button.ok-button">
+            <Setter Property="Background" Value="#007ACC"/>
+        </Style>
+        
+        <Style Selector="Button.ok-button /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#007ACC"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        
+        <Style Selector="Button.ok-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#005A9E"/>
+        </Style>
+    </Window.Styles>
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Icon -->
+        <TextBlock x:Name="IconText"
+                   Grid.Row="0"
+                   Text="❌"
+                   FontSize="42"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,14"/>
+        
+        <!-- Message -->
+        <Border Grid.Row="1"
+                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                Margin="0,0,0,18">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          MaxHeight="150">
+                <TextBlock x:Name="MessageText"
+                           Text="En feil har oppstått"
+                           FontSize="13.5"
+                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                           TextWrapping="Wrap"
+                           LineHeight="20"/>
+            </ScrollViewer>
+        </Border>
+        
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Spacing="12">
+            <Button x:Name="OkButton"
+                    Content="OK"
+                    Classes="dialog-button ok-button"
+                    Click="OkButton_Click"
+                    IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
