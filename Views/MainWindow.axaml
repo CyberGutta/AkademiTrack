@@ -533,6 +533,10 @@
 		<Grid Margin="0" IsVisible="{Binding ShowTutorial}">
 			<views:TutorialView DataContext="{Binding}"/>
 		</Grid>
+
+		<Grid Margin="0" IsVisible="{Binding ShowSettings}">
+        <views:SettingsWindow DataContext="{Binding SettingsViewModel}"/>
+		</Grid>
 	</Grid>
 	
 </Window>

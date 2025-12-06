@@ -802,6 +802,8 @@ Terminal=false
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
 
         public ICommand CloseCommand { get; }
+        public ICommand BackToDashboardCommand { get; }
+        public ICommand ToggleThemeCommand { get; }
         public ICommand OpenProgramFolderCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
@@ -1088,6 +1090,8 @@ Terminal=false
         {
             ApplicationInfo = new ApplicationInfo();
             CloseCommand = new RelayCommand(CloseWindow);
+            BackToDashboardCommand = new RelayCommand(BackToDashboard);  // Add this
+            ToggleThemeCommand = new RelayCommand(ToggleTheme);          // Add this
             OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
@@ -1112,6 +1116,17 @@ Terminal=false
             _ = LoadSchoolHoursAsync();
 
             _ = LoadSettingsAsync();
+        }
+
+        private void BackToDashboard()
+        {
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ToggleTheme()
+        {
+            Services.ThemeManager.Instance.ToggleTheme();
+            Debug.WriteLine($"Theme changed to {(Services.ThemeManager.Instance.IsDarkMode ? "dark" : "light")} mode");
         }
 
         private async Task RunDiagnosticsAsync()

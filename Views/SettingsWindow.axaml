@@ -1,25 +1,17 @@
-<Window xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AkademiTrack.ViewModels"
         xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
         x:Class="AkademiTrack.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Icon="/Assets/AT-Transparrent.png"
-        Title="Innstillinger - AkademiTrack"
-        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
-        Width="900"
-        Height="700"
-        MinWidth="800"
-        MinHeight="650"
-        CanResize="True"
-        WindowStartupLocation="CenterOwner">
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}">
 	<Design.DataContext>
 		<vm:SettingsViewModel/>
 	</Design.DataContext>
-	<Window.Styles>
+	<UserControl.Styles>
 		<!-- Input Field Styles -->
 		<Style Selector="TextBox.credential-input">
 			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
@@ -511,7 +503,7 @@
     <Setter Property="Opacity" Value="1"/>
 </Style>
 
-	</Window.Styles>
+	</UserControl.Styles>
 
 	<Grid>
 		<Grid.ColumnDefinitions>
@@ -1457,19 +1449,51 @@
 
 			<!-- Footer Buttons -->
 			<Border Grid.Row="1"
-					Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-					BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-					BorderThickness="0,1.5,0,0"
-					Padding="32,20,32,20">
-				<StackPanel Orientation="Horizontal"
-							HorizontalAlignment="Right"
-							Spacing="12">
-					<Button Content="Lukk"
-							Classes="cancel"
-							Command="{Binding CloseCommand}"
-							IsDefault="True"/>
-				</StackPanel>
-			</Border>
+        Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+        BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+        BorderThickness="0,1.5,0,0"
+        Padding="32,20,32,20">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left side: Back button -->
+        <Button Grid.Column="0"
+                Content="◄ Tilbake"
+                Classes="cancel"
+                Command="{Binding BackToDashboardCommand}"
+                MinWidth="110"/>
+
+        <!-- Center: Theme toggle -->
+        <Button Grid.Column="1"
+                Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
+                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
+                Command="{Binding ToggleThemeCommand}"
+                Width="45"
+                Height="45"
+                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+                BorderThickness="1"
+                CornerRadius="22.5"
+                FontSize="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Toggle dark/light mode"
+                Cursor="Hand"
+                Padding="0"/>
+
+        <!-- Right side: Close button -->
+        <Button Grid.Column="2"
+                Content="Lukk"
+                Classes="cancel"
+                Command="{Binding CloseCommand}"
+                IsDefault="True"
+                MinWidth="110"/>
+    </Grid>
+</Border>
 		</Grid>
 	</Grid>
-</Window>
+</UserControl>

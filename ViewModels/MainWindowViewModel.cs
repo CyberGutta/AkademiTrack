@@ -24,6 +24,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Security;
+using OpenQA.Selenium.DevTools.V140.DOM;
 
 
 namespace AkademiTrack.ViewModels
@@ -601,6 +602,7 @@ namespace AkademiTrack.ViewModels
 
         // Tutorial navigation properties
         private bool _showDashboard = true;
+        private bool _showSettings = false;
         private bool _showTutorial = false;
 
         public bool ShowDashboard
@@ -616,18 +618,31 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-public bool ShowTutorial
-{
-    get => _showTutorial;
-    set
-    {
-        if (_showTutorial != value)
+        public bool ShowSettings
         {
-            _showTutorial = value;
-            OnPropertyChanged();
+            get => _showSettings;
+            set
+            {
+                if (_showSettings != value)
+                {
+                    _showSettings = value;
+                    OnPropertyChanged();
+                }
+            }
         }
-    }
-}
+
+        public bool ShowTutorial
+        {
+            get => _showTutorial;
+            set
+            {
+                if (_showTutorial != value)
+                {
+                    _showTutorial = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
 
         // NEW: Initialize authentication on startup
@@ -1448,69 +1463,6 @@ public bool ShowTutorial
             return Task.CompletedTask;
         }
 
-        private async Task OpenSettingsAsync()
-        {
-            try
-            {
-                var settingsWindow = new SettingsWindow();
-                var settingsViewModel = new SettingsViewModel();
-
-                settingsViewModel.SetLogEntries(this.LogEntries);
-                settingsViewModel.ShowDetailedLogs = this.ShowDetailedLogs;
-
-                settingsWindow.DataContext = settingsViewModel;
-
-                settingsViewModel.CloseRequested += (s, e) => settingsWindow.Close();
-
-                settingsViewModel.PropertyChanged += (s, e) =>
-                {
-                    if (e.PropertyName == nameof(SettingsViewModel.ShowDetailedLogs))
-                    {
-                        this.ShowDetailedLogs = settingsViewModel.ShowDetailedLogs;
-                    }
-                };
-
-                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    var mainWindow = desktop.MainWindow;
-
-                    if (mainWindow != null && mainWindow.IsVisible)
-                    {
-                        await settingsWindow.ShowDialog(mainWindow);
-                    }
-                    else
-                    {
-                        LogDebug("Main window not ready - showing settings as standalone window");
-                        settingsWindow.Show();
-                    }
-                }
-                else
-                {
-                    settingsWindow.Show();
-                }
-
-            }
-            catch (Exception ex)
-            {
-                LogError($"Kunne ikke åpne innstillinger vindu: {ex.Message}");
-
-                try
-                {
-                    var settingsWindow = new SettingsWindow();
-                    var settingsViewModel = new SettingsViewModel();
-                    settingsViewModel.SetLogEntries(this.LogEntries);
-                    settingsViewModel.ShowDetailedLogs = this.ShowDetailedLogs;
-                    settingsWindow.DataContext = settingsViewModel;
-                    settingsViewModel.CloseRequested += (s, e) => settingsWindow.Close();
-                    settingsWindow.Show();
-                }
-                catch (Exception fallbackEx)
-                {
-                    LogError($"Critical error opening settings: {fallbackEx.Message}");
-                }
-            }
-        }
-
         private bool HasConflictingClass(ScheduleItem stuSession, List<ScheduleItem> allScheduleItems)
         {
             try
@@ -2047,25 +1999,47 @@ public bool ShowTutorial
         }
 
 
-    private Task OpenTutorialAsync()
-    {
-        LogInfo("Åpner veiledning...");
+        private Task OpenTutorialAsync()
+        {
+            LogInfo("Åpner veiledning...");
         
-        ShowDashboard = false;
-        ShowTutorial = true;
+            ShowDashboard = false;
+            ShowSettings = false;
+            ShowTutorial = true;
 
-        return Task.CompletedTask;
-    }
+            return Task.CompletedTask;
+        }
 
-    private Task BackToDashboardAsync()
-    {
-        LogInfo("Tilbake til dashboard...");
+        private Task OpenSettingsAsync()
+        {
+            LogInfo("Åpner innstillinger...");
+
+            ShowDashboard = false;
+            ShowTutorial = false;
+            ShowSettings = true;
+
+            // Subscribe to close event if not already subscribed
+            SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
+            SettingsViewModel.CloseRequested += OnSettingsCloseRequested;
+
+            return Task.CompletedTask;
+        }
+
+        private void OnSettingsCloseRequested(object? sender, EventArgs e)
+        {
+            _ = BackToDashboardAsync();
+        }
+
+        private Task BackToDashboardAsync()
+        {
+            LogInfo("Tilbake til dashboard...");
         
-        ShowTutorial = false;
-        ShowDashboard = true;
+            ShowTutorial = false;
+            ShowSettings = false;
+            ShowDashboard = true;
         
-        return Task.CompletedTask;
-    }
+            return Task.CompletedTask;
+        }
 
 
     private async Task RefreshDataAsync()

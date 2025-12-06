@@ -4,13 +4,13 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using MsBox.Avalonia;
-using MsBox.Avalonia.Dto;
 using MsBox.Avalonia.Enums;
 
 namespace AkademiTrack.Views
 {
-    public partial class SettingsWindow : Window
+    public partial class SettingsWindow : UserControl
     {
         private string _selectedCategory = "login";
         private bool _isPasswordVisible = false;
@@ -22,21 +22,21 @@ namespace AkademiTrack.Views
             var viewModel = new SettingsViewModel();
             DataContext = viewModel;
 
-            viewModel.CloseRequested += (sender, args) => Close();
+            // Close via parent window
+            viewModel.CloseRequested += (sender, args) =>
+            {
+                var window = this.FindAncestorOfType<Window>();
+                window?.Close();
+            };
+
+            // Load settings once attached to visual tree
+            this.AttachedToVisualTree += async (_, _) =>
+            {
+                await viewModel.LoadSettingsAsync();
+            };
 
             SetupCategoryButtons();
             UpdateCategorySelection();
-
-            this.Opened += async (_, _) => await viewModel.LoadSettingsAsync();
-        }
-
-        public SettingsWindow(Window owner) : this()
-        {
-            // Set the owner for proper modal behavior
-            if (owner != null)
-            {
-                this.Owner = owner;
-            }
         }
 
         private void SetupCategoryButtons()
@@ -46,14 +46,14 @@ namespace AkademiTrack.Views
             var systemBtn = this.FindControl<Button>("SystemButton");
             var advancedBtn = this.FindControl<Button>("AdvancedButton");
             var aboutBtn = this.FindControl<Button>("AboutButton");
-            var updatesBtn = this.FindControl<Button>("UpdatesButton");  // ADD THIS
+            var updatesBtn = this.FindControl<Button>("UpdatesButton");
 
-            if (loginBtn != null) loginBtn.Click += (s, e) => SelectCategory("login");
-            if (automationBtn != null) automationBtn.Click += (s, e) => SelectCategory("automation");
-            if (systemBtn != null) systemBtn.Click += (s, e) => SelectCategory("system");
-            if (advancedBtn != null) advancedBtn.Click += (s, e) => SelectCategory("advanced");
-            if (aboutBtn != null) aboutBtn.Click += (s, e) => SelectCategory("about");
-            if (updatesBtn != null) updatesBtn.Click += (s, e) => SelectCategory("updates");  // ADD THIS
+            if (loginBtn != null) loginBtn.Click += (_, _) => SelectCategory("login");
+            if (automationBtn != null) automationBtn.Click += (_, _) => SelectCategory("automation");
+            if (systemBtn != null) systemBtn.Click += (_, _) => SelectCategory("system");
+            if (advancedBtn != null) advancedBtn.Click += (_, _) => SelectCategory("advanced");
+            if (aboutBtn != null) aboutBtn.Click += (_, _) => SelectCategory("about");
+            if (updatesBtn != null) updatesBtn.Click += (_, _) => SelectCategory("updates");
         }
 
         private void SelectCategory(string category)
@@ -64,21 +64,19 @@ namespace AkademiTrack.Views
 
         private void UpdateCategorySelection()
         {
-            // Update button selection state
             UpdateButtonClass("LoginButton", "login");
             UpdateButtonClass("AutomationButton", "automation");
             UpdateButtonClass("SystemButton", "system");
             UpdateButtonClass("AdvancedButton", "advanced");
             UpdateButtonClass("AboutButton", "about");
-            UpdateButtonClass("UpdatesButton", "updates");  // ADD THIS
+            UpdateButtonClass("UpdatesButton", "updates");
 
-            // Update content visibility
             UpdateSectionVisibility("LoginSection", "login");
             UpdateSectionVisibility("AutomationSection", "automation");
             UpdateSectionVisibility("SystemSection", "system");
             UpdateSectionVisibility("AdvancedSection", "advanced");
             UpdateSectionVisibility("AboutSection", "about");
-            UpdateSectionVisibility("UpdatesSection", "updates");  // ADD THIS
+            UpdateSectionVisibility("UpdatesSection", "updates");
         }
 
         private void UpdateButtonClass(string buttonName, string category)
@@ -88,9 +86,7 @@ namespace AkademiTrack.Views
             {
                 button.Classes.Remove("selected");
                 if (category == _selectedCategory)
-                {
                     button.Classes.Add("selected");
-                }
             }
         }
 
@@ -108,7 +104,8 @@ namespace AkademiTrack.Views
             var passwordTextBox = this.FindControl<TextBox>("PasswordTextBox");
             var eyeIcon = this.FindControl<Path>("EyeIcon");
 
-            if (passwordTextBox == null || eyeIcon == null) return;
+            if (passwordTextBox == null || eyeIcon == null)
+                return;
 
             if (!_isPasswordVisible)
             {
@@ -117,11 +114,10 @@ namespace AkademiTrack.Views
 
                 if (!verified)
                 {
-                    var box = MessageBoxManager
-                        .GetMessageBoxStandard(
-                            "Sikkerhet",
-                            "Autentisering mislyktes",
-                            ButtonEnum.Ok);
+                    var box = MessageBoxManager.GetMessageBoxStandard(
+                        "Sikkerhet",
+                        "Autentisering mislyktes",
+                        ButtonEnum.Ok);
 
                     await box.ShowAsync();
                     return;
@@ -133,16 +129,15 @@ namespace AkademiTrack.Views
             if (_isPasswordVisible)
             {
                 passwordTextBox.PasswordChar = '\0';
-                eyeIcon.Data = Geometry.Parse("M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z");
-
+                eyeIcon.Data = Geometry.Parse(
+                    "M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z");
             }
             else
             {
                 passwordTextBox.PasswordChar = '•';
-                eyeIcon.Data = Geometry.Parse("M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z");
+                eyeIcon.Data = Geometry.Parse(
+                    "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z");
             }
         }
-
-
     }
 }
