@@ -572,8 +572,48 @@
 			</StackPanel>
 		</Border>
 
+		<Grid Grid.Column="1" 
+      Height="60" 
+      VerticalAlignment="Top" 
+      Margin="24,20,24,0"
+      ZIndex="100">
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+    </Grid.ColumnDefinitions>
+    
+    <!-- Action Buttons -->
+    <StackPanel Grid.Column="1" 
+                Orientation="Horizontal" 
+                Spacing="12" 
+                VerticalAlignment="Top">
+        <!-- Back to Dashboard Button -->
+        <Button Classes="theme-toggle"
+                Content="←"
+                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                Command="{Binding BackToDashboardCommand}"
+                Width="45"
+                Height="45"
+                FontSize="24"
+                ToolTip.Tip="Tilbake til dashboard"
+                Cursor="Hand"/>
+
+        <!-- Theme Toggle Button -->
+        <Button Classes="theme-toggle"
+                Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
+                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
+                Command="{Binding ToggleThemeCommand}"
+                Width="45"
+                Height="45"
+                FontSize="24"
+                ToolTip.Tip="Toggle dark/light mode"
+                Cursor="Hand"/>
+    </StackPanel>
+</Grid>
+
 		<!-- Right Content Area -->
-		<Grid Grid.Column="1">
+		<Grid Grid.Column="1" Margin="0,20,0,0">
+
 			<Grid.RowDefinitions>
 				<RowDefinition Height="*"/>
 				<RowDefinition Height="Auto"/>

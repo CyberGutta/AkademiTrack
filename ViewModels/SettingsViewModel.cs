@@ -1118,6 +1118,22 @@ Terminal=false
             _ = LoadSettingsAsync();
         }
 
+        public void ConnectToMainViewModel(MainWindowViewModel mainViewModel)
+        {
+            if (mainViewModel?.LogEntries != null)
+            {
+                SetLogEntries(mainViewModel.LogEntries);
+                Debug.WriteLine($"✓ Connected to MainViewModel - {mainViewModel.LogEntries.Count} log entries");
+
+                // Force refresh the displayed logs
+                RefreshDisplayedLogs();
+            }
+            else
+            {
+                Debug.WriteLine("⚠️ MainViewModel or LogEntries is null");
+            }
+        }
+
         private void BackToDashboard()
         {
             CloseRequested?.Invoke(this, EventArgs.Empty);

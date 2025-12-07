@@ -1536,6 +1536,10 @@ namespace AkademiTrack.ViewModels
             if (todaysStuSessions.Count == 0)
             {
                 LogInfo("Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering");
+
+                await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                LogInfo("✓ Merket dagen som fullført (ingen STU-økter)");
+
                 NativeNotificationService.Show("Ingen STUDIE-økter funnet for i dag",
                     "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.", "INFO");
                 return;
@@ -1557,6 +1561,10 @@ namespace AkademiTrack.ViewModels
             if (validStuSessions.Count == 0)
             {
                 LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
+
+                await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                LogInfo("✓ Merket dagen som fullført (ingen gyldige økter)");
+
                 NativeNotificationService.Show("Ingen gyldige STU-økter",
                     "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.", "WARNING");
                 return;
@@ -1663,6 +1671,30 @@ namespace AkademiTrack.ViewModels
                                 $"Alle {validStuSessions.Count} gyldige STU-økter har passert registreringsvinduet. Ingen flere å registrere i dag.", "INFO");
                         }
                         break;
+                    }
+                    if (validStuSessions.Count == 0)
+                    {
+                        LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
+
+                        // IMPORTANT: Mark today as completed so auto-start doesn't keep triggering
+                        await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        LogInfo("✓ Merket dagen som fullført (ingen gyldige økter)");
+
+                        NativeNotificationService.Show("Ingen gyldige STU-økter",
+                            "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.", "WARNING");
+                        return;
+                    }
+                    if (todaysStuSessions.Count == 0)
+                    {
+                        LogInfo("Ingen STUDIE-økter funnet for i dag - viser melding og stopper automatisering");
+
+                        // IMPORTANT: Mark today as completed so auto-start doesn't keep triggering
+                        await Services.SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        LogInfo("✓ Merket dagen som fullført (ingen STU-økter)");
+
+                        NativeNotificationService.Show("Ingen STUDIE-økter funnet for i dag",
+                            "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.", "INFO");
+                        return;
                     }
 
                     LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte - neste sjekk om 30s");
@@ -2013,6 +2045,9 @@ namespace AkademiTrack.ViewModels
         private Task OpenSettingsAsync()
         {
             LogInfo("Åpner innstillinger...");
+
+            // IMPORTANT: Connect SettingsViewModel to this ViewModel's logs
+            SettingsViewModel.ConnectToMainViewModel(this);
 
             ShowDashboard = false;
             ShowTutorial = false;

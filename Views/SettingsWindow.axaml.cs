@@ -1,12 +1,15 @@
 using AkademiTrack.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
+using System;
+using System.Diagnostics;
 
 namespace AkademiTrack.Views
 {
@@ -19,24 +22,44 @@ namespace AkademiTrack.Views
         {
             InitializeComponent();
 
-            var viewModel = new SettingsViewModel();
-            DataContext = viewModel;
+            // DON'T create a new ViewModel here!
+            // The DataContext will be set by MainWindow.xaml binding
 
-            // Close via parent window
-            viewModel.CloseRequested += (sender, args) =>
-            {
-                var window = this.FindAncestorOfType<Window>();
-                window?.Close();
-            };
-
-            // Load settings once attached to visual tree
+            // Just setup UI interactions
             this.AttachedToVisualTree += async (_, _) =>
             {
-                await viewModel.LoadSettingsAsync();
+                if (DataContext is SettingsViewModel viewModel)
+                {
+                    await viewModel.LoadSettingsAsync();
+                }
             };
 
             SetupCategoryButtons();
             UpdateCategorySelection();
+        }
+
+        private MainWindowViewModel? GetMainWindowViewModel()
+        {
+            try
+            {
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var mainWindow = desktop.MainWindow as MainWindow;
+                    var viewModel = mainWindow?.DataContext as MainWindowViewModel;
+
+                    if (viewModel != null)
+                    {
+                        Debug.WriteLine($"✓ Found MainWindowViewModel with {viewModel.LogEntries?.Count ?? 0} log entries");
+                    }
+
+                    return viewModel;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting MainWindowViewModel: {ex.Message}");
+            }
+            return null;
         }
 
         private void SetupCategoryButtons()
