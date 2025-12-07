@@ -1080,10 +1080,8 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
             }
         }
-
         public ICommand StartAutomationCommand { get; }
         public ICommand BackToDashboardCommand { get; }
-
         public ICommand StopAutomationCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand ToggleThemeCommand { get; }
