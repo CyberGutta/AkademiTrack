@@ -505,11 +505,15 @@
 
 	</UserControl.Styles>
 
+
+
 	<Grid>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="240"/>
 			<ColumnDefinition Width="*"/>
 		</Grid.ColumnDefinitions>
+
+
 
 		<!-- Left Sidebar - Navigation -->
 		<Border Grid.Column="0"
@@ -1453,46 +1457,7 @@
         BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
         BorderThickness="0,1.5,0,0"
         Padding="32,20,32,20">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
-
-        <!-- Left side: Back button -->
-        <Button Grid.Column="0"
-                Content="◄ Tilbake"
-                Classes="cancel"
-                Command="{Binding BackToDashboardCommand}"
-                MinWidth="110"/>
-
-        <!-- Center: Theme toggle -->
-        <Button Grid.Column="1"
-                Content="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIcon}"
-                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ThemeIconColor}"
-                Command="{Binding ToggleThemeCommand}"
-                Width="45"
-                Height="45"
-                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-                BorderThickness="1"
-                CornerRadius="22.5"
-                FontSize="24"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                ToolTip.Tip="Toggle dark/light mode"
-                Cursor="Hand"
-                Padding="0"/>
-
-        <!-- Right side: Close button -->
-        <Button Grid.Column="2"
-                Content="Lukk"
-                Classes="cancel"
-                Command="{Binding CloseCommand}"
-                IsDefault="True"
-                MinWidth="110"/>
-    </Grid>
+    
 </Border>
 		</Grid>
 	</Grid>
