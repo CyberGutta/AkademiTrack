@@ -1551,13 +1551,11 @@ Terminal=false
         {
             try
             {
-                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
-                    : null;
+                var window = GetParentWindow();
 
                 if (window == null)
                 {
-                    Debug.WriteLine("Could not find settings window for dialog");
+                    Debug.WriteLine("Could not find parent window for dialog");
                     return false;
                 }
 
@@ -1579,13 +1577,11 @@ Terminal=false
         {
             try
             {
-                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
-                    : null;
+                var window = GetParentWindow();
 
                 if (window == null)
                 {
-                    Debug.WriteLine("Could not find settings window for dialog");
+                    Debug.WriteLine("Could not find parent window for dialog");
                     return;
                 }
 
@@ -1597,6 +1593,37 @@ Terminal=false
             }
         }
 
+        private Avalonia.Controls.Window? GetParentWindow()
+        {
+            try
+            {
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    // First try to find MainWindow
+                    var mainWindow = desktop.MainWindow;
+                    if (mainWindow != null && mainWindow.IsVisible)
+                    {
+                        return mainWindow;
+                    }
+
+                    // Otherwise get any active window
+                    var activeWindow = desktop.Windows.FirstOrDefault(w => w.IsActive);
+                    if (activeWindow != null)
+                    {
+                        return activeWindow;
+                    }
+
+                    // Fallback to first visible window
+                    return desktop.Windows.FirstOrDefault(w => w.IsVisible);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error finding parent window: {ex.Message}");
+            }
+
+            return null;
+        }
 
         public async Task CheckForUpdatesAsync()
         {
@@ -2020,13 +2047,11 @@ Terminal=false
                     return;
                 }
 
-                var window = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                    ? desktop.Windows.FirstOrDefault(w => w is SettingsWindow)
-                    : null;
+                var window = GetParentWindow();
 
                 if (window == null)
                 {
-                    Debug.WriteLine("Could not find settings window");
+                    Debug.WriteLine("Could not find parent window");
                     return;
                 }
 
@@ -2284,14 +2309,11 @@ Terminal=false
         {
             try
             {
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                var window = GetParentWindow();
+                if (window?.Clipboard != null)
                 {
-                    var window = desktop.Windows.FirstOrDefault(w => w is SettingsWindow);
-                    if (window?.Clipboard != null)
-                    {
-                        await window.Clipboard.SetTextAsync(text);
-                        return;
-                    }
+                    await window.Clipboard.SetTextAsync(text);
+                    return;
                 }
 
                 Debug.WriteLine("Could not access clipboard");

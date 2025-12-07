@@ -186,6 +186,8 @@ namespace AkademiTrack.ViewModels
                 MaxWidth = 280
             };
 
+            
+
             Grid.SetColumn(messageBlock, 1);
             Grid.SetRow(messageBlock, 1);
             layoutGrid.Children.Add(messageBlock);
