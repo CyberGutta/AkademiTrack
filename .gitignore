@@ -379,3 +379,4 @@ AkademiTrack-macOS.zip
 /publish-mac-arm
 .DS_Store
 AkademiTrack-1.1.0-osx-Setup.pkg
+complete-build-sign.sh
