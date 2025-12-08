@@ -689,21 +689,21 @@ def create_velopack_package(bundle_dir, version):
     print("=" * 50)
 
     try:
-        subprocess.run(["vpk"], capture_output=True, text=True)
-        print(f"✅ Velopack (vpk) found")
+        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True)
+        print(f"✅ Velopack found: {result.stdout.strip()}")
     except FileNotFoundError:
         print("❌ Velopack (vpk) not found!")
         print("Install it with: dotnet tool install -g vpk")
         return None
 
-    # Create a temporary directory for Velopack
+    # Create a temporary directory for Velopack with LOOSE FILES (not .app bundle)
     publish_dir = Path("./publish-mac-arm")
     
     if publish_dir.exists():
         shutil.rmtree(publish_dir)
     publish_dir.mkdir(parents=True)
 
-    print(f"📂 Copying complete .app bundle for Velopack...")
+    print(f"📂 Copying application files for Velopack...")
     
     macos_source = bundle_dir / "Contents" / "MacOS"
     
@@ -711,7 +711,7 @@ def create_velopack_package(bundle_dir, version):
         print(f"❌ MacOS directory not found in bundle")
         return None
     
-    # Copy all files from MacOS to publish dir
+    # Copy all files from MacOS to publish dir (Velopack will create the .app structure)
     for item in macos_source.iterdir():
         dest = publish_dir / item.name
         if item.is_dir():
@@ -723,24 +723,49 @@ def create_velopack_package(bundle_dir, version):
 
     print(f"📦 Creating VPK package (version {version})...")
 
-    icon_path = Path(ICON_PATH)
+    icon_path = Path(ICON_PATH).absolute()
+    
+    # Verify icon exists
+    if not icon_path.exists():
+        print(f"⚠️  Icon not found at {icon_path}, continuing without icon")
+        icon_path = None
 
+    # Pass the folder with loose files, NOT a .app bundle
+    # Velopack will create the .app structure itself
     vpk_cmd = [
         "vpk", "pack",
         "--packId", "AkademiTrack",
         "--packVersion", version,
         "--packDir", str(publish_dir),
         "--mainExe", APP_NAME,
-        "--icon", str(icon_path.absolute())
+        "--bundleId", BUNDLE_IDENTIFIER,
+        "--noInst",  # <-- CORRECT FLAG: Skip .pkg creation (we make our own)
+        "--verbose"
     ]
+    
+    if icon_path:
+        vpk_cmd.extend(["--icon", str(icon_path)])
 
+    print(f"Running command: {' '.join(vpk_cmd)}")
     result = subprocess.run(vpk_cmd, capture_output=True, text=True)
 
+    # Show output for debugging
+    if result.stdout:
+        print("STDOUT:", result.stdout)
+    if result.stderr:
+        print("STDERR:", result.stderr)
+
     if result.returncode != 0:
-        print(f"❌ VPK pack failed: {result.stderr}")
+        print(f"❌ VPK pack failed with code {result.returncode}")
+        print("\n💡 Try running manually to see full output:")
+        print(f"   {' '.join(vpk_cmd)}")
         return None
 
     print("✅ VPK package created successfully")
+    
+    # Clean up temporary directory
+    if publish_dir.exists():
+        shutil.rmtree(publish_dir)
     
     # Rename to match convention
     nupkg_file = list(Path(".").glob("AkademiTrack.*.nupkg"))
@@ -758,6 +783,9 @@ def create_velopack_package(bundle_dir, version):
             original_resources = bundle_dir / "Contents" / "Resources"
             
             if original_resources.exists():
+                # Ensure Resources directory exists
+                releases_resources.mkdir(parents=True, exist_ok=True)
+                
                 entitlements_src = original_resources / "entitlements.plist"
                 if entitlements_src.exists():
                     shutil.copy2(entitlements_src, releases_resources / "entitlements.plist")
