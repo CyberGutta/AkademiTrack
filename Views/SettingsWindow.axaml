@@ -790,7 +790,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -829,7 +829,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -868,7 +868,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -907,7 +907,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -946,7 +946,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -985,7 +985,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -1024,7 +1024,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
+                               Margin="16,20,100,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
