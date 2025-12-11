@@ -803,26 +803,81 @@ namespace AkademiTrack.ViewModels
                         return;
 
                     var result = await Services.SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
-                    
+
                     if (result.shouldStart)
                     {
                         await Dispatcher.UIThread.InvokeAsync(async () =>
                         {
                             if (!IsAutomationRunning)
                             {
-                                LogInfo("[AUTO-RESTART] Conditions met - starting automation");
-                                
+                                LogInfo("[AUTO-RESTART] Conditions met - refreshing authentication before starting");
+
                                 if (IsAuthenticated && _userParameters != null && _userParameters.IsComplete)
                                 {
                                     LogInfo($"Auto-restart: {result.reason}");
-                                    
-                                    NativeNotificationService.Show(
-                                        "Auto-restart aktivert", 
-                                        result.reason,
-                                        "SUCCESS"
-                                    );
 
-                                    await StartAutomationAsync();
+                                    // CRITICAL FIX: Refresh cookies before auto-starting
+                                    LogInfo("🔐 Refreshing authentication for auto-start...");
+
+                                    try
+                                    {
+                                        // Create NEW authentication service
+                                        _authService = new AuthenticationService();
+
+                                        // Perform fresh authentication
+                                        var authResult = await _authService.AuthenticateAsync();
+
+                                        if (authResult.Success && authResult.Cookies != null && authResult.Cookies.Count > 0)
+                                        {
+                                            LogSuccess($"✓ Fresh cookies obtained - {authResult.Cookies.Count} cookies");
+
+                                            // Update parameters if we got new ones
+                                            if (authResult.Parameters != null && authResult.Parameters.IsComplete)
+                                            {
+                                                _userParameters = authResult.Parameters;
+                                                LogInfo("✓ Parameters refreshed");
+                                            }
+
+                                            // Update dashboard with fresh credentials
+                                            var servicesUserParams = new Services.UserParameters
+                                            {
+                                                FylkeId = _userParameters.FylkeId,
+                                                PlanPeri = _userParameters.PlanPeri,
+                                                SkoleId = _userParameters.SkoleId
+                                            };
+
+                                            Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
+                                            await Dashboard.RefreshDataAsync();
+
+                                            LogSuccess("✓ Authentication refreshed - starting automation");
+
+                                            NativeNotificationService.Show(
+                                                "Auto-start aktivert",
+                                                result.reason,
+                                                "SUCCESS"
+                                            );
+
+                                            await StartAutomationAsync();
+                                        }
+                                        else
+                                        {
+                                            LogError("Failed to refresh authentication for auto-start");
+                                            NativeNotificationService.Show(
+                                                "Auto-start feilet",
+                                                "Kunne ikke oppdatere autentisering. Prøv manuell start.",
+                                                "ERROR"
+                                            );
+                                        }
+                                    }
+                                    catch (Exception authEx)
+                                    {
+                                        LogError($"Authentication refresh failed: {authEx.Message}");
+                                        NativeNotificationService.Show(
+                                            "Auto-start feilet",
+                                            "Autentiseringsfeil. Vennligst start manuelt.",
+                                            "ERROR"
+                                        );
+                                    }
                                 }
                                 else
                                 {
@@ -840,15 +895,15 @@ namespace AkademiTrack.ViewModels
                     {
                         var now = DateTime.Now;
                         var hoursSinceLastLog = (now - _lastDailyLogTime).TotalHours;
-                        
-                        if (hoursSinceLastLog >= 12) 
+
+                        if (hoursSinceLastLog >= 12)
                         {
                             _lastDailyLogTime = now;
-                            
+
                             await Dispatcher.UIThread.InvokeAsync(() =>
                             {
                                 LogInfo($"Auto-start status: {result.reason}");
-                                
+
                                 var timeUntil = result.nextStartTime.Value - now;
                                 if (timeUntil.TotalHours < 24)
                                 {
