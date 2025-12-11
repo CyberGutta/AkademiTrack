@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
 using AkademiTrack.Services;
@@ -15,7 +16,7 @@ namespace AkademiTrack.ViewModels
         // Today's STU sessions
         private string _todayDisplay = "0/0";
         private string _todayStatus = "Venter på data...";
-        
+
         // Next class
         private string _nextClassName = "Ingen time";
         private string _nextClassTime = "--:-- - --:--";
@@ -90,7 +91,7 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged(nameof(WeeklyDays));
             }
         }
-        
+
         // Over/Undertid
         private string _overtimeValue = "0.0";
         private string _overtimeStatus = "Balansert";
@@ -101,7 +102,7 @@ namespace AkademiTrack.ViewModels
         public DashboardViewModel()
         {
             _attendanceService = new AttendanceDataService();
-            
+
             _weeklyDays = InitializeEmptyWeek();
         }
 
@@ -244,13 +245,10 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        
-
-
         private void UpdateTodayDisplay(TodayScheduleData data)
         {
             TodayDisplay = $"{data.RegisteredStuSessions}/{data.TotalStuSessions}";
-            
+
             if (data.RegisteredStuSessions == data.TotalStuSessions && data.TotalStuSessions > 0)
             {
                 TodayStatus = "✓ Alle registrert";
@@ -272,15 +270,40 @@ namespace AkademiTrack.ViewModels
 
         private void UpdateNextClassDisplay(TodayScheduleData data)
         {
-            // Prioritize NextClass, but fall back to CurrentClass if no next class
-            var displayClass = data.NextClass ?? data.CurrentClass;
+
+            Services.ScheduleItem? displayClass = null;
+
+            if (data.CurrentClass != null)
+            {
+                if (data.CurrentClass.KNavn != "STU")
+                {
+                    displayClass = data.CurrentClass;
+                }
+                else if (data.NextClass != null && data.NextClass.KNavn != "STU")
+                {
+                    if (DoClassesOverlap(data.CurrentClass, data.NextClass))
+                    {
+                        displayClass = data.NextClass;
+                    }
+                    else
+                    {
+                        displayClass = data.CurrentClass;
+                    }
+                }
+                else
+                {
+                    displayClass = data.CurrentClass;
+                }
+            }
+            else if (data.NextClass != null)
+            {
+                displayClass = data.NextClass;
+            }
 
             if (displayClass != null)
             {
-                // Get full subject name from Fag field if available
                 NextClassName = GetSubjectDisplayName(displayClass);
 
-                // Format time (from "1015" to "10:15")
                 if (!string.IsNullOrEmpty(displayClass.StartKl) && !string.IsNullOrEmpty(displayClass.SluttKl))
                 {
                     string startTime = FormatTime(displayClass.StartKl);
@@ -292,8 +315,7 @@ namespace AkademiTrack.ViewModels
                     NextClassTime = "--:-- - --:--";
                 }
 
-                // Room information isn't in the API response, so we'll leave it empty or use a placeholder
-                NextClassRoom = ""; // Can be updated if room data becomes available
+                NextClassRoom = "";
             }
             else
             {
@@ -303,20 +325,40 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private bool DoClassesOverlap(Services.ScheduleItem class1, Services.ScheduleItem class2)
+        {
+            try
+            {
+                if (!TimeSpan.TryParse(class1.StartKl, out var start1) ||
+                    !TimeSpan.TryParse(class1.SluttKl, out var end1) ||
+                    !TimeSpan.TryParse(class2.StartKl, out var start2) ||
+                    !TimeSpan.TryParse(class2.SluttKl, out var end2))
+                {
+                    return false;
+                }
+
+                return start1 < end2 && start2 < end1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void UpdateMonthlyDisplay(MonthlyAttendanceData data)
         {
             MonthlyDisplay = $"{data.RegisteredSessions}/{data.TotalSessions}";
             MonthlyStatus = $"{data.AttendancePercentage:F1}% fremmøte";
         }
-        
+
         private void UpdateWeeklyDisplay(WeeklyAttendanceData data)
         {
             WeeklyPercentage = $"{data.WeeklyPercentage:F0}%";
             WeeklyDisplay = $"{data.TotalRegistered} av {data.TotalSessions} økter registrert";
-            
+
             int remaining = data.TotalSessions - data.TotalRegistered;
             WeeklyRemaining = remaining > 0 ? $"{remaining} økter gjenstår" : "Alle økter fullført!";
-            
+
             WeeklyDays = data.DailyAttendance ?? new List<DailyAttendance>();
         }
 
@@ -348,7 +390,6 @@ namespace AkademiTrack.ViewModels
                 return subjectMap[item.KNavn];
             }
 
-            // If not in map, return the KNavn as-is
             return item.KNavn ?? "Ukjent fag";
         }
 
@@ -363,11 +404,9 @@ namespace AkademiTrack.ViewModels
         private void UpdateOvertimeDisplay(AttendanceSummary summary)
         {
             double saldo = summary.Saldo;
-            
-            // Format to 1 decimal place, with sign
+
             OvertimeValue = saldo >= 0 ? $"+{saldo:F1}" : $"{saldo:F1}";
-            
-            // Determine status and color
+
             if (saldo > 0)
             {
                 OvertimeStatus = "Du er over målet! ✓";
@@ -401,7 +440,7 @@ namespace AkademiTrack.ViewModels
             var dayOfWeek = (int)today.DayOfWeek;
             var daysUntilMonday = dayOfWeek == 0 ? -6 : -(dayOfWeek - 1);
             var monday = today.AddDays(daysUntilMonday);
-            
+
             var emptyWeek = new List<DailyAttendance>();
             for (int i = 0; i < 5; i++)
             {
