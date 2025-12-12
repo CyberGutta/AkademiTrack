@@ -264,20 +264,24 @@ namespace AkademiTrack.Services
         {
             var stopwatch = Stopwatch.StartNew();
             ChromeDriver? driver = null;
+            ChromeDriverService? service = null;
 
             try
             {
+                // Create ChromeDriverService and hide the console window
+                service = ChromeDriverService.CreateDefaultService();
+                service.HideCommandPromptWindow = true; // This prevents the CMD popup on Windows
+
                 var options = new ChromeOptions();
                 options.AddArgument("--headless");
                 options.AddArgument("--disable-gpu");
                 options.AddArgument("--no-sandbox");
                 options.AddArgument("--disable-dev-shm-usage");
 
-                driver = new ChromeDriver(options);
+                driver = new ChromeDriver(service, options);
                 driver.Navigate().GoToUrl("about:blank");
 
                 stopwatch.Stop();
-
                 return new HealthCheckResult
                 {
                     ComponentName = "Selenium Driver",
@@ -329,6 +333,7 @@ namespace AkademiTrack.Services
                 {
                     driver?.Quit();
                     driver?.Dispose();
+                    service?.Dispose();
                 }
                 catch { }
             }
