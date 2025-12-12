@@ -21,10 +21,15 @@ namespace AkademiTrack.Services
 
                 string icon = level switch
                 {
-                    "SUCCESS" => "✅",
-                    "ERROR" => "❌",
-                    "WARNING" => "⚠️",
-                    _ => "ℹ️"
+                    "SUCCESS" => "",
+                    "ERROR" => "",
+                    "WARNING" => "",
+                    _ => ""
+
+                    //"SUCCESS" => "✅",
+                    //"ERROR" => "❌",
+                    //"WARNING" => "⚠️",
+                    //_ => "ℹ️"
                 };
 
                 string fullTitle = $"{icon} {title}";

@@ -1250,7 +1250,7 @@
 												   LineHeight="18">
 											<Run Text="AkademiTrack er designet for å bruke minimale ressurser i bakgrunnen."/>
 											<LineBreak/>
-											<Run Text="Normal bruker typisk 1% CPU og 100-350 MB RAM."/>
+											<Run Text="Normal bruk ligger typisk på 1% CPU og 100-400 MB RAM."/>
 										</TextBlock>
 									</StackPanel>
 								</Border>
