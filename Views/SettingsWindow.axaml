@@ -569,6 +569,12 @@
 						<TextBlock Text="Om" VerticalAlignment="Center"/>
 					</StackPanel>
 				</Button>
+				<Button x:Name="HelpButton" Classes="category-tab" Tag="help">
+				<StackPanel Orientation="Horizontal">
+					<TextBlock Text="❓" Classes="nav-icon"/>
+					<TextBlock Text="Hjelp og FAQ" VerticalAlignment="Center"/>
+				</StackPanel>
+			</Button>
 			</StackPanel>
 		</Border>
 
@@ -1449,6 +1455,8 @@
                 Background="#007ACC"
                 Margin="0,0,0,0"/>
 
+
+
         <!-- Results Section -->
         <StackPanel Spacing="12" IsVisible="{Binding DiagnosticsCompleted}">
             <TextBlock Text="📊 Diagnoseresultater"
@@ -1653,6 +1661,263 @@
 										Command="{Binding OpenWebsiteCommand}"/>
 							</StackPanel>
 						</Border>
+					</StackPanel>
+					<StackPanel x:Name="HelpSection" Spacing="16" IsVisible="False">
+						<TextBlock Text="Hjelp og Feilsøking" Classes="section-header"/>
+
+						<Border Classes="info-panel">
+							<StackPanel Spacing="10">
+								<TextBlock Text="📚 Vanlige spørsmål"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#007ACC"/>
+								<TextBlock Text="Her finner du svar på vanlige problemer og spørsmål om AkademiTrack."
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="19"/>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 1: Network Error -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="❌ Registrering feiler med nettverksfeil"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#DC3545"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Løsning:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Sjekk internettforbindelsen din"/>
+									<LineBreak/>
+									<Run Text="• Kjør diagnose i Avansert → Systemdiagnose"/>
+									<LineBreak/>
+									<Run Text="• Kontroller at FEIDE-systemet er tilgjengelig"/>
+									<LineBreak/>
+									<Run Text="• Sjekk om brannmuren blokkerer programmet"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 2: Window Closed -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="🪟 Registreringsvindu lukket uventet"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#DC3545"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Løsning:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Ikke lukk nettleservinduet under registrering"/>
+									<LineBreak/>
+									<Run Text="• Vent til du ser suksessmelding"/>
+									<LineBreak/>
+									<Run Text="• Hvis det skjer automatisk, sjekk aktivitetsloggen"/>
+									<LineBreak/>
+									<Run Text="• Kontroller at systemet ikke går i dvale"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 3: Invalid Credentials -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="🔐 Ugyldige innloggingsopplysninger"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#DC3545"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Løsning:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Gå til Innlogging og sjekk opplysningene dine"/>
+									<LineBreak/>
+									<Run Text="• Verifiser at skolenavn er riktig (f.eks. 'Akademiet Drammen AS')"/>
+									<LineBreak/>
+									<Run Text="• Prøv å logge inn manuelt på FEIDE for å teste"/>
+									<LineBreak/>
+									<Run Text="• Sjekk om du har endret passord nylig"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 4: Timeout -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="⏱️ Tidsavbrudd under registrering"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#FF9800"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Løsning:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Sakte internettforbindelse kan forårsake dette"/>
+									<LineBreak/>
+									<Run Text="• FEIDE-serveren kan være treg eller overbelastet"/>
+									<LineBreak/>
+									<Run Text="• Prøv å registrere manuelt hvis problemet vedvarer"/>
+									<LineBreak/>
+									<Run Text="• Vent noen minutter og la programmet prøve igjen"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 5: Outside School Hours -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="⏭️ Registrering hoppes over (utenfor skoletid)"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#6C757D"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Dette er normalt!" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="Programmet registrerer bare fremmøte i skoletiden du har satt."/>
+									<LineBreak/>
+									<Run Text="Gå til Automatisering → Skoletider for å justere tidene."/>
+									<LineBreak/>
+									<Run Text="På helger og deaktiverte dager hoppes registrering automatisk over."/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 6: Wrong Network -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="📶 Koblet til feil nettverk"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#FF9800"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Viktig!" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="Registrering kan feile hvis du ikke er koblet til skolens WiFi."/>
+									<LineBreak/>
+									<LineBreak/>
+									<Run Text="• Sørg for at du er på riktig nettverk (f.eks. 'Akademiet-WiFi')"/>
+									<LineBreak/>
+									<Run Text="• Noen systemer krever skolens fysiske nettverk"/>
+									<LineBreak/>
+									<Run Text="• Mobildata eller hjemme-WiFi fungerer ofte ikke"/>
+									<LineBreak/>
+									<Run Text="• Sjekk nettverkstilkobling i systeminnstillingene"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 7: Mac Sleep Mode -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="💤 Mac i dvalemodus (lokk lukket)"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#DC3545"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Registrering fungerer ikke hvis:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• MacBook-lokket er lukket og maskinen går i dvale"/>
+									<LineBreak/>
+									<Run Text="• Datamaskinen går i hvilemodus automatisk"/>
+									<LineBreak/>
+									<Run Text="• Skjermen er låst og systemet suspenderer prosesser"/>
+									<LineBreak/>
+									<LineBreak/>
+									<Run Text="Løsning:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Hold Mac-en åpen og våken under skoletid"/>
+									<LineBreak/>
+									<Run Text="• Juster energiinnstillinger: Systeminnstillinger → Batteri"/>
+									<LineBreak/>
+									<Run Text="• Aktiver 'Forhindre dvale når skjermen er av'"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- FAQ Item 8: PC Off -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="10">
+								<TextBlock Text="🖥️ Datamaskinen er slått av eller frakoblet"
+										   FontWeight="SemiBold"
+										   FontSize="15"
+										   Foreground="#DC3545"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   LineHeight="20">
+									<Run Text="Åpenbart, men viktig:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Programmet kan ikke registrere hvis PC-en er av"/>
+									<LineBreak/>
+									<Run Text="• Internettforbindelse må være aktiv"/>
+									<LineBreak/>
+									<Run Text="• Programmet må kjøre i bakgrunnen"/>
+									<LineBreak/>
+									<LineBreak/>
+									<Run Text="Sørg for at:" FontWeight="SemiBold"/>
+									<LineBreak/>
+									<Run Text="• Datamaskinen er på i skoletiden"/>
+									<LineBreak/>
+									<Run Text="• AkademiTrack kjører (sjekk systemstatusfeltet)"/>
+									<LineBreak/>
+									<Run Text="• 'Start automatisering ved oppstart' er aktivert"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- General Tips -->
+						<Border Background="#E3F2FD"
+								BorderBrush="#007ACC"
+								BorderThickness="1.5"
+								CornerRadius="10"
+								Padding="18"
+								Margin="0,8,0,0">
+							<StackPanel Spacing="10">
+								<TextBlock Text="💡 Generelle tips for feilsøking"
+										   FontWeight="Bold"
+										   FontSize="16"
+										   Foreground="#007ACC"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="14"
+										   Foreground="#1565C0"
+										   LineHeight="22">
+									<Run Text="1. Sjekk aktivitetsloggen (Avansert) for detaljerte feilmeldinger" FontWeight="Medium"/>
+									<LineBreak/>
+									<Run Text="2. Kjør systemdiagnose (Avansert) for å teste komponenter" FontWeight="Medium"/>
+									<LineBreak/>
+									<Run Text="3. Verifiser at du er på skolens WiFi-nettverk" FontWeight="Medium"/>
+									<LineBreak/>
+									<Run Text="4. Hold datamaskinen våken og tilkoblet i skoletiden" FontWeight="Medium"/>
+									<LineBreak/>
+									<Run Text="5. Sjekk at innloggingsopplysninger er korrekte" FontWeight="Medium"/>
+									<LineBreak/>
+									<Run Text="6. Kontakt oss hvis problemet vedvarer" FontWeight="Medium"/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<Rectangle Height="140" Fill="Transparent"/>
 					</StackPanel>
 				</StackPanel>
 			</ScrollViewer>

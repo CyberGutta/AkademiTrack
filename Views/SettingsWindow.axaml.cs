@@ -68,15 +68,17 @@ namespace AkademiTrack.Views
             var automationBtn = this.FindControl<Button>("AutomationButton");
             var systemBtn = this.FindControl<Button>("SystemButton");
             var advancedBtn = this.FindControl<Button>("AdvancedButton");
-            var aboutBtn = this.FindControl<Button>("AboutButton");
             var updatesBtn = this.FindControl<Button>("UpdatesButton");
+            var aboutBtn = this.FindControl<Button>("AboutButton");
+            var helpBtn = this.FindControl<Button>("HelpButton");
 
             if (loginBtn != null) loginBtn.Click += (_, _) => SelectCategory("login");
             if (automationBtn != null) automationBtn.Click += (_, _) => SelectCategory("automation");
             if (systemBtn != null) systemBtn.Click += (_, _) => SelectCategory("system");
             if (advancedBtn != null) advancedBtn.Click += (_, _) => SelectCategory("advanced");
-            if (aboutBtn != null) aboutBtn.Click += (_, _) => SelectCategory("about");
             if (updatesBtn != null) updatesBtn.Click += (_, _) => SelectCategory("updates");
+            if (aboutBtn != null) aboutBtn.Click += (_, _) => SelectCategory("about");
+            if (helpBtn != null) helpBtn.Click += (_, _) => SelectCategory("help");
         }
 
         private void SelectCategory(string category)
@@ -91,15 +93,17 @@ namespace AkademiTrack.Views
             UpdateButtonClass("AutomationButton", "automation");
             UpdateButtonClass("SystemButton", "system");
             UpdateButtonClass("AdvancedButton", "advanced");
-            UpdateButtonClass("AboutButton", "about");
             UpdateButtonClass("UpdatesButton", "updates");
+            UpdateButtonClass("AboutButton", "about");
+            UpdateButtonClass("HelpButton", "help");
 
             UpdateSectionVisibility("LoginSection", "login");
             UpdateSectionVisibility("AutomationSection", "automation");
             UpdateSectionVisibility("SystemSection", "system");
             UpdateSectionVisibility("AdvancedSection", "advanced");
-            UpdateSectionVisibility("AboutSection", "about");
             UpdateSectionVisibility("UpdatesSection", "updates");
+            UpdateSectionVisibility("AboutSection", "about");
+            UpdateSectionVisibility("HelpSection", "help");
         }
 
         private void UpdateButtonClass(string buttonName, string category)
@@ -162,5 +166,7 @@ namespace AkademiTrack.Views
                     "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z");
             }
         }
+
+        
     }
 }
