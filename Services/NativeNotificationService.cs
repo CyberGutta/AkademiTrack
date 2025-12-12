@@ -8,17 +8,23 @@ namespace AkademiTrack.Services
 {
     public static class NativeNotificationService
     {
-
         public static async Task ShowAsync(string title, string message = "", string level = "INFO")
         {
             try
             {
+                // Check if notifications are enabled
+                if (!await AreNotificationsEnabledAsync())
+                {
+                    Debug.WriteLine($"[NOTIFICATION SKIPPED] {title}: {message}");
+                    return;
+                }
+
                 string icon = level switch
                 {
-                    "SUCCESS" => "",
-                    "ERROR" => "",
-                    "WARNING" => "",
-                    _ => ""
+                    "SUCCESS" => "✅",
+                    "ERROR" => "❌",
+                    "WARNING" => "⚠️",
+                    _ => "ℹ️"
                 };
 
                 string fullTitle = $"{icon} {title}";
@@ -45,6 +51,20 @@ namespace AkademiTrack.Services
         public static void Show(string title, string message = "", string level = "INFO")
         {
             _ = ShowAsync(title, message, level);
+        }
+
+        private static async Task<bool> AreNotificationsEnabledAsync()
+        {
+            try
+            {
+                var settings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                return settings.EnableNotifications;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking notification settings: {ex.Message}");
+                return true; // Default to enabled if we can't read settings
+            }
         }
 
         private static async Task ShowMacNotificationAsync(string title, string message)
@@ -79,7 +99,6 @@ namespace AkademiTrack.Services
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    
                     _ = Task.Run(async () =>
                     {
                         await process.WaitForExitAsync();
@@ -92,13 +111,12 @@ namespace AkademiTrack.Services
             }
         }
 
-
         private static async Task ShowWindowsNotificationAsync(string title, string message)
         {
             try
             {
                 OsNotifications.Notifications.ShowNotification(title, message);
-                await Task.Delay(1000); 
+                await Task.Delay(1000);
                 Console.WriteLine($"✓ Windows notification shown: {title}");
             }
             catch (Exception ex)

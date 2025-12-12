@@ -30,6 +30,8 @@ using static AkademiTrack.ExportLogsDialog;
 
 namespace AkademiTrack.ViewModels
 {
+
+
     public class AppSettings
     {
         public bool ShowActivityLog { get; set; } = false;
@@ -37,11 +39,10 @@ namespace AkademiTrack.ViewModels
         public bool StartWithSystem { get; set; } = true;
         public bool AutoStartAutomation { get; set; } = false;
         public bool StartMinimized { get; set; } = false;
+        public bool EnableNotifications { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public bool InitialSetupCompleted { get; set; } = false;
     }
-
-
 
     public static class AutoStartManager
     {
@@ -524,6 +525,21 @@ Terminal=false
         private bool _isDeleting = false;
         private bool _startMinimized = false;
 
+        private bool _enableNotifications = true;
+        public bool EnableNotifications
+        {
+            get => _enableNotifications;
+            set
+            {
+                if (_enableNotifications != value)
+                {
+                    _enableNotifications = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         private SchoolHoursSettings _schoolHours = new SchoolHoursSettings();
 
         // Monday
@@ -820,6 +836,8 @@ Terminal=false
         public ICommand ExportDataAsJsonCommand { get; }
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
+        public ICommand ToggleNotificationsCommand { get; }
+
         public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
 
@@ -1090,8 +1108,8 @@ Terminal=false
         {
             ApplicationInfo = new ApplicationInfo();
             CloseCommand = new RelayCommand(CloseWindow);
-            BackToDashboardCommand = new RelayCommand(BackToDashboard);  // Add this
-            ToggleThemeCommand = new RelayCommand(ToggleTheme);          // Add this
+            BackToDashboardCommand = new RelayCommand(BackToDashboard);  
+            ToggleThemeCommand = new RelayCommand(ToggleTheme);
             OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
@@ -1108,6 +1126,7 @@ Terminal=false
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
+            ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
             RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
 
@@ -1117,6 +1136,8 @@ Terminal=false
 
             _ = LoadSettingsAsync();
         }
+
+        private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
 
         public void ConnectToMainViewModel(MainWindowViewModel mainViewModel)
         {
@@ -2338,6 +2359,8 @@ Terminal=false
                 _startWithSystem      = settings.StartWithSystem;
                 _autoStartAutomation  = settings.AutoStartAutomation;
                 _startMinimized       = settings.StartMinimized;
+                _enableNotifications = settings.EnableNotifications;
+
 
                 var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")   ?? "";
                 var pass    = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
@@ -2361,6 +2384,7 @@ Terminal=false
                     OnPropertyChanged(nameof(StartWithSystem));
                     OnPropertyChanged(nameof(AutoStartAutomation));
                     OnPropertyChanged(nameof(StartMinimized));
+                    OnPropertyChanged(nameof(EnableNotifications));
                     OnPropertyChanged(nameof(LoginEmail));
                     OnPropertyChanged(nameof(LoginPassword));
                     OnPropertyChanged(nameof(SchoolName));
@@ -2386,6 +2410,7 @@ Terminal=false
                     StartWithSystem      = _startWithSystem,
                     AutoStartAutomation  = _autoStartAutomation,
                     StartMinimized       = _startMinimized,
+                    EnableNotifications = _enableNotifications,
                     InitialSetupCompleted = true,
                     LastUpdated          = DateTime.Now
                 };

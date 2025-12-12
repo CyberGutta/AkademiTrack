@@ -1083,6 +1083,46 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Add this in the SystemSection StackPanel, after the Start Minimized card -->
+
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
+								<TextBlock Text="Skrivebordsvarsler" Classes="setting-title"/>
+								<TextBlock Classes="setting-description">
+									<Run Text="Aktiver eller deaktiver systemvarsler fra AkademiTrack."/>
+									<LineBreak/>
+									<Run Text="Når aktivert vil programmet vise viktige meldinger som skrivebordsvarsler."/>
+								</TextBlock>
+        
+								<Border Classes="info-panel-compact" Margin="0,0,0,8">
+									<StackPanel Spacing="6">
+										<TextBlock Text="💡 Mottar du ikke varsler?"
+												   FontWeight="SemiBold"
+												   FontSize="13"
+												   Foreground="#007ACC"/>
+										<TextBlock FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   TextWrapping="Wrap"
+												   LineHeight="18">
+											<Run Text="Hvis du ikke mottar varsler selv når denne innstillingen er på:"/>
+											<LineBreak/>
+											<Run Text="• Windows: Gå til Innstillinger → System → Varslinger → AkademiTrack"/>
+											<LineBreak/>
+											<Run Text="• macOS: Gå til Systeminnstillinger → Varslinger → AkademiTrack"/>
+											<LineBreak/>
+											<Run Text="• Linux: Sjekk systemets varslingsinnstillinger"/>
+										</TextBlock>
+									</StackPanel>
+								</Border>
+        
+								<Button Content="{Binding EnableNotifications, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+										Classes="toggle-button"
+										Classes.enabled="{Binding EnableNotifications}"
+										Classes.disabled="{Binding !EnableNotifications}"
+										Command="{Binding ToggleNotificationsCommand}"/>
+							</StackPanel>
+						</Border>
+
 						<Border Classes="setting-card">
 							<StackPanel Spacing="12">
 								<TextBlock Text="Programfiler" Classes="setting-title"/>
