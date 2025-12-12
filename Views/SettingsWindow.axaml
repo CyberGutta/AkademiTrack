@@ -1083,8 +1083,6 @@
 							</StackPanel>
 						</Border>
 
-						<!-- Add this in the SystemSection StackPanel, after the Start Minimized card -->
-
 						<Border Classes="setting-card">
 							<StackPanel Spacing="12">
 								<TextBlock Text="Skrivebordsvarsler" Classes="setting-title"/>
@@ -1123,6 +1121,8 @@
 							</StackPanel>
 						</Border>
 
+
+
 						<Border Classes="setting-card">
 							<StackPanel Spacing="12">
 								<TextBlock Text="Programfiler" Classes="setting-title"/>
@@ -1133,8 +1133,134 @@
 										Command="{Binding OpenProgramFolderCommand}"/>
 							</StackPanel>
 						</Border>
-						<Rectangle Height="100" Fill="Transparent"/>
+
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
+								<TextBlock Text="Ressursbruk" Classes="setting-title"/>
+								<TextBlock Text="Sanntidsovervåking av CPU- og minnebruk for AkademiTrack."
+										   Classes="setting-description"/>
+        
+								<!-- Resource Usage Display -->
+								<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
+									<!-- CPU Usage -->
+									<Border Grid.Column="0" Grid.Row="0"
+											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+											BorderThickness="1"
+											CornerRadius="8"
+											Padding="16"
+											Margin="0,0,6,12">
+										<StackPanel Spacing="8">
+											<TextBlock Text="💻 CPU"
+													   FontSize="13"
+													   FontWeight="SemiBold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+                    
+											<TextBlock FontSize="28"
+													   FontWeight="Bold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+												<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"/>
+												<Run Text="%" FontSize="18"/>
+											</TextBlock>
+                    
+											<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"
+														 Minimum="0"
+														 Maximum="100"
+														 Height="6"
+														 CornerRadius="3"
+														 Foreground="#007ACC"
+														 Background="#E0E0E0"/>
+										</StackPanel>
+									</Border>
+            
+									<!-- Memory Usage -->
+									<Border Grid.Column="1" Grid.Row="0"
+											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+											BorderThickness="1"
+											CornerRadius="8"
+											Padding="16"
+											Margin="6,0,0,12">
+										<StackPanel Spacing="8">
+											<TextBlock Text="🧠 Minne"
+													   FontSize="13"
+													   FontWeight="SemiBold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+                    
+											<TextBlock FontSize="28"
+													   FontWeight="Bold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+												<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryUsageMB, Mode=OneWay}"/>
+												<Run Text="MB" FontSize="14"/>
+											</TextBlock>
+                    
+											<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryPercentage, Mode=OneWay}"
+														 Minimum="0"
+														 Maximum="100"
+														 Height="6"
+														 CornerRadius="3"
+														 Foreground="#28A745"
+														 Background="#E0E0E0"/>
+										</StackPanel>
+									</Border>
+            
+									<!-- Uptime -->
+									<Border Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2"
+											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+											BorderThickness="1"
+											CornerRadius="8"
+											Padding="16">
+										<Grid ColumnDefinitions="Auto,*">
+											<StackPanel Grid.Column="0" Spacing="4">
+												<TextBlock Text="⏱️ Oppetid"
+														   FontSize="13"
+														   FontWeight="SemiBold"
+														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+												<TextBlock Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=UptimeFormatted, Mode=OneWay}"
+														   FontSize="20"
+														   FontWeight="Bold"
+														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+											</StackPanel>
+                    
+											<StackPanel Grid.Column="1" 
+														VerticalAlignment="Center"
+														HorizontalAlignment="Right"
+														Spacing="2">
+												<TextBlock Text="Oppdateres hvert 2. sekund"
+														   FontSize="11"
+														   FontStyle="Italic"
+														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+														   HorizontalAlignment="Right"/>
+											</StackPanel>
+										</Grid>
+									</Border>
+								</Grid>
+        
+								<!-- Info Panel -->
+								<Border Classes="info-panel-compact" Margin="0,8,0,0">
+									<StackPanel Spacing="6">
+										<TextBlock Text="💡 Om ressursbruk"
+												   FontWeight="SemiBold"
+												   FontSize="13"
+												   Foreground="#007ACC"/>
+										<TextBlock FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   TextWrapping="Wrap"
+												   LineHeight="18">
+											<Run Text="AkademiTrack er designet for å bruke minimale ressurser i bakgrunnen."/>
+											<LineBreak/>
+											<Run Text="Normal bruker typisk 1% CPU og 100-350 MB RAM."/>
+										</TextBlock>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
+						<Rectangle Height="120" Fill="Transparent"/>
 					</StackPanel>
+
+
 
 					<!-- Advanced Category -->
 					<StackPanel x:Name="AdvancedSection" Spacing="16" IsVisible="False">

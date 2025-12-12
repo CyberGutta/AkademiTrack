@@ -268,9 +268,8 @@ namespace AkademiTrack.Services
 
             try
             {
-                // Create ChromeDriverService and hide the console window
                 service = ChromeDriverService.CreateDefaultService();
-                service.HideCommandPromptWindow = true; // This prevents the CMD popup on Windows
+                service.HideCommandPromptWindow = true;
 
                 var options = new ChromeOptions();
                 options.AddArgument("--headless");

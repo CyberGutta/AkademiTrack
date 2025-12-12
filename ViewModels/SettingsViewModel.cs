@@ -1135,6 +1135,9 @@ Terminal=false
             _ = LoadSchoolHoursAsync();
 
             _ = LoadSettingsAsync();
+
+            Services.ResourceMonitor.Instance.StartMonitoring();
+            Debug.WriteLine("✓ Resource monitoring started for Settings window");
         }
 
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
@@ -2482,8 +2485,12 @@ Terminal=false
             // Securely dispose of the password
             _loginPasswordSecure?.Dispose();
             _loginPasswordSecure = null;
-            
+
+            Services.ResourceMonitor.Instance.StopMonitoring();
+
             Debug.WriteLine("SettingsViewModel disposed - password cleared from memory");
+            Debug.WriteLine("SettingsViewModel disposed - password cleared from memory and monitoring stopped");
+
         }
     }  
 }
