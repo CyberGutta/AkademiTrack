@@ -656,23 +656,31 @@
 						  HorizontalScrollBarVisibility="Disabled"
 						  Padding="24,20,24,80">
 				<StackPanel Spacing="16" HorizontalAlignment="Stretch" MaxWidth="800">
-					<!-- Login Category -->
-					<StackPanel x:Name="LoginSection" Spacing="12">
-						<TextBlock Text="Innloggingsinformasjon" Classes="section-header" Margin="0,0,0,12"/>
+					<!-- LOGIN SECTION -->
+				<StackPanel x:Name="LoginSection" Spacing="12">
+					<TextBlock Text="Innloggingsinformasjon" Classes="section-header" Margin="0,0,0,12"/>
 
-						<Border Classes="warning-panel-compact">
-							<StackPanel Spacing="6">
-								<TextBlock Text="🔒 Sikkerhetsinformasjon"
+					<Border Classes="warning-panel-compact">
+						<StackPanel Spacing="6">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Lock" 
+														   Width="16" 
+														   Height="16"
+														   Foreground="#FF9800"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Sikkerhetsinformasjon"
 										   FontWeight="SemiBold"
 										   FontSize="13"
-										   Foreground="#FF9800"/>
-								<TextBlock Text="Dine innloggingsopplysninger blir automatisk kryptert og lagret sikkert på din datamaskin."
-										   FontSize="12"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="18"/>
+										   Foreground="#FF9800"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock Text="Dine innloggingsopplysninger blir automatisk kryptert og lagret sikkert på din datamaskin."
+									   FontSize="12"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   TextWrapping="Wrap"
+									   LineHeight="18"/>
+						</StackPanel>
+					</Border>
 
 						<!-- School Name Field -->
 						<Border Classes="setting-item-compact">
@@ -686,7 +694,7 @@
 							</StackPanel>
 						</Border>
 
-						<!-- Email Field -->
+						<!-- Brukernavn Field -->
 						<Border Classes="setting-item-compact">
 							<StackPanel Spacing="8">
 								<TextBlock Text="Brukernavn" Classes="setting-title"/>
@@ -772,27 +780,35 @@
                Margin="0,8,0,12"/>
 
     <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-            BorderBrush="#007ACC"
-            BorderThickness="1.5"
-            CornerRadius="8"
-            Padding="14"
-            Margin="0,0,0,12">
-        <StackPanel Spacing="7">
-            <TextBlock Text="ℹ️ Tilpass skoletider"
-                       FontWeight="SemiBold"
-                       FontSize="14"
-                       Foreground="#007ACC"/>
-            <TextBlock FontSize="13"
-                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-                       TextWrapping="Wrap"
-                       LineHeight="19"
-                       MaxWidth="750">
-                <Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
-                <LineBreak/>
-                <Run Text="Deaktiver dager når du ikke har skole."/>
-            </TextBlock>
-        </StackPanel>
-    </Border>
+			BorderBrush="#007ACC"
+			BorderThickness="1.5"
+			CornerRadius="8"
+			Padding="14"
+			Margin="0,0,0,12">
+		<StackPanel Spacing="7">
+			<StackPanel Orientation="Horizontal" Spacing="8">
+				<materialIcons:MaterialIcon Kind="InformationOutline" 
+										   Width="16" 
+										   Height="16"
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
+				<TextBlock Text="Tilpass skoletider"
+						   FontWeight="SemiBold"
+						   FontSize="14"
+						   Foreground="#007ACC"
+						   VerticalAlignment="Center"/>
+			</StackPanel>
+			<TextBlock FontSize="13"
+					   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+					   TextWrapping="Wrap"
+					   LineHeight="19"
+					   MaxWidth="750">
+				<Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
+				<LineBreak/>
+				<Run Text="Deaktiver dager når du ikke har skole."/>
+			</TextBlock>
+		</StackPanel>
+	</Border>
 
     <!-- Days of the week -->
     <StackPanel Spacing="8">
@@ -1082,233 +1098,271 @@
 
 					<!-- System Category -->
 					<StackPanel x:Name="SystemSection" Spacing="16" IsVisible="False">
-						<TextBlock Text="Systemintegrasjon" Classes="section-header"/>
+					<TextBlock Text="Systemintegrasjon" Classes="section-header"/>
 
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Åpne appen automatisk ved oppstart" Classes="setting-title"/>
-								<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp."
-										   Classes="setting-description"/>
-								<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
-										Classes="toggle-button"
-										Classes.enabled="{Binding StartWithSystem}"
-										Classes.disabled="{Binding !StartWithSystem}"
-										Command="{Binding ToggleAutoStartCommand}"/>
-							</StackPanel>
-						</Border>
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Åpne appen automatisk ved oppstart" Classes="setting-title"/>
+							<TextBlock Text="Automatisk start av AkademiTrack når datamaskinen starter opp."
+									   Classes="setting-description"/>
+							<Button Content="{Binding StartWithSystem, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+									Classes="toggle-button"
+									Classes.enabled="{Binding StartWithSystem}"
+									Classes.disabled="{Binding !StartWithSystem}"
+									Command="{Binding ToggleAutoStartCommand}"/>
+						</StackPanel>
+					</Border>
 
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Start minimert til systemstatusfeltet" Classes="setting-title"/>
-								<TextBlock Classes="setting-description">
-									<Run Text="Start applikasjonen minimert i systemstatusfeltet når datamaskinen starter."/>
-									<LineBreak/>
-									<Run Text="Krever at 'Åpne appen automatisk ved oppstart' er aktivert."/>
-								</TextBlock>
-								<Button Content="{Binding StartMinimized, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
-										Classes="toggle-button"
-										Classes.enabled="{Binding StartMinimized}"
-										Classes.disabled="{Binding !StartMinimized}"
-										Command="{Binding ToggleStartMinimizedCommand}"
-										IsEnabled="{Binding StartWithSystem}"/>
-							</StackPanel>
-						</Border>
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Start minimert til systemstatusfeltet" Classes="setting-title"/>
+							<TextBlock Classes="setting-description">
+								<Run Text="Start applikasjonen minimert i systemstatusfeltet når datamaskinen starter."/>
+								<LineBreak/>
+								<Run Text="Krever at 'Åpne appen automatisk ved oppstart' er aktivert."/>
+							</TextBlock>
+							<Button Content="{Binding StartMinimized, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+									Classes="toggle-button"
+									Classes.enabled="{Binding StartMinimized}"
+									Classes.disabled="{Binding !StartMinimized}"
+									Command="{Binding ToggleStartMinimizedCommand}"
+									IsEnabled="{Binding StartWithSystem}"/>
+						</StackPanel>
+					</Border>
 
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Skrivebordsvarsler" Classes="setting-title"/>
-								<TextBlock Classes="setting-description">
-									<Run Text="Aktiver eller deaktiver systemvarsler fra AkademiTrack."/>
-									<LineBreak/>
-									<Run Text="Når aktivert vil programmet vise viktige meldinger som skrivebordsvarsler."/>
-								</TextBlock>
-        
-								<Border Classes="info-panel-compact" Margin="0,0,0,8">
-									<StackPanel Spacing="6">
-										<TextBlock Text="💡 Mottar du ikke varsler?"
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Skrivebordsvarsler" Classes="setting-title"/>
+							<TextBlock Classes="setting-description">
+								<Run Text="Aktiver eller deaktiver systemvarsler fra AkademiTrack."/>
+								<LineBreak/>
+								<Run Text="Når aktivert vil programmet vise viktige meldinger som skrivebordsvarsler."/>
+							</TextBlock>
+
+							<Border Classes="info-panel-compact" Margin="0,0,0,8">
+								<StackPanel Spacing="6">
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="Lightbulb" 
+																   Width="16" 
+																   Height="16"
+																   Foreground="#007ACC"
+																   VerticalAlignment="Center"/>
+										<TextBlock Text="Mottar du ikke varsler?"
 												   FontWeight="SemiBold"
 												   FontSize="13"
-												   Foreground="#007ACC"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="Hvis du ikke mottar varsler selv når denne innstillingen er på:"/>
-											<LineBreak/>
-											<Run Text="• Windows: Gå til Innstillinger → System → Varslinger → AkademiTrack"/>
-											<LineBreak/>
-											<Run Text="• macOS: Gå til Systeminnstillinger → Varslinger → AkademiTrack"/>
-											<LineBreak/>
-											<Run Text="• Linux: Sjekk systemets varslingsinnstillinger"/>
+												   Foreground="#007ACC"
+												   VerticalAlignment="Center"/>
+									</StackPanel>
+									<TextBlock FontSize="12"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+											   TextWrapping="Wrap"
+											   LineHeight="18">
+										<Run Text="Hvis du ikke mottar varsler selv når denne innstillingen er på:"/>
+										<LineBreak/>
+										<Run Text="• Windows: Gå til Innstillinger → System → Varslinger → AkademiTrack"/>
+										<LineBreak/>
+										<Run Text="• macOS: Gå til Systeminnstillinger → Varslinger → AkademiTrack"/>
+										<LineBreak/>
+										<Run Text="• Linux: Sjekk systemets varslingsinnstillinger"/>
+									</TextBlock>
+								</StackPanel>
+							</Border>
+
+							<Button Content="{Binding EnableNotifications, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+									Classes="toggle-button"
+									Classes.enabled="{Binding EnableNotifications}"
+									Classes.disabled="{Binding !EnableNotifications}"
+									Command="{Binding ToggleNotificationsCommand}"/>
+						</StackPanel>
+					</Border>
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Programfiler" Classes="setting-title"/>
+							<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
+									   Classes="setting-description"/>
+							<Button Content="Åpne Programmappe"
+									Classes="settings-action"
+									Command="{Binding OpenProgramFolderCommand}"/>
+						</StackPanel>
+					</Border>
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Ressursbruk" Classes="setting-title"/>
+							<TextBlock Text="Sanntidsovervåking av CPU- og minnebruk for AkademiTrack."
+									   Classes="setting-description"/>
+
+							<!-- Resource Usage Display -->
+							<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
+								<!-- CPU Usage -->
+								<Border Grid.Column="0" Grid.Row="0"
+										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+										BorderThickness="1"
+										CornerRadius="8"
+										Padding="16"
+										Margin="0,0,6,12">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Monitor" 
+																	   Width="16" 
+																	   Height="16"
+																	   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+																	   VerticalAlignment="Center"/>
+											<TextBlock Text="CPU"
+													   FontSize="13"
+													   FontWeight="SemiBold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+													   VerticalAlignment="Center"/>
+										</StackPanel>
+
+										<TextBlock FontSize="28"
+												   FontWeight="Bold"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+											<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"/>
+											<Run Text="%" FontSize="18"/>
 										</TextBlock>
+
+										<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"
+													 Minimum="0"
+													 Maximum="100"
+													 Height="6"
+													 CornerRadius="3"
+													 Foreground="#007ACC"
+													 Background="#E0E0E0"/>
 									</StackPanel>
 								</Border>
-        
-								<Button Content="{Binding EnableNotifications, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
-										Classes="toggle-button"
-										Classes.enabled="{Binding EnableNotifications}"
-										Classes.disabled="{Binding !EnableNotifications}"
-										Command="{Binding ToggleNotificationsCommand}"/>
-							</StackPanel>
-						</Border>
 
-
-
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Programfiler" Classes="setting-title"/>
-								<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
-										   Classes="setting-description"/>
-								<Button Content="Åpne Programmappe"
-										Classes="settings-action"
-										Command="{Binding OpenProgramFolderCommand}"/>
-							</StackPanel>
-						</Border>
-
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Ressursbruk" Classes="setting-title"/>
-								<TextBlock Text="Sanntidsovervåking av CPU- og minnebruk for AkademiTrack."
-										   Classes="setting-description"/>
-        
-								<!-- Resource Usage Display -->
-								<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,8,0,0">
-									<!-- CPU Usage -->
-									<Border Grid.Column="0" Grid.Row="0"
-											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
-											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-											BorderThickness="1"
-											CornerRadius="8"
-											Padding="16"
-											Margin="0,0,6,12">
-										<StackPanel Spacing="8">
-											<TextBlock Text="💻 CPU"
+								<!-- Memory Usage -->
+								<Border Grid.Column="1" Grid.Row="0"
+										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+										BorderThickness="1"
+										CornerRadius="8"
+										Padding="16"
+										Margin="6,0,0,12">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Memory" 
+																	   Width="16" 
+																	   Height="16"
+																	   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+																	   VerticalAlignment="Center"/>
+											<TextBlock Text="Minne"
 													   FontSize="13"
 													   FontWeight="SemiBold"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    
-											<TextBlock FontSize="28"
-													   FontWeight="Bold"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
-												<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"/>
-												<Run Text="%" FontSize="18"/>
-											</TextBlock>
-                    
-											<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=CpuUsage, Mode=OneWay}"
-														 Minimum="0"
-														 Maximum="100"
-														 Height="6"
-														 CornerRadius="3"
-														 Foreground="#007ACC"
-														 Background="#E0E0E0"/>
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+													   VerticalAlignment="Center"/>
 										</StackPanel>
-									</Border>
-            
-									<!-- Memory Usage -->
-									<Border Grid.Column="1" Grid.Row="0"
-											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
-											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-											BorderThickness="1"
-											CornerRadius="8"
-											Padding="16"
-											Margin="6,0,0,12">
-										<StackPanel Spacing="8">
-											<TextBlock Text="🧠 Minne"
-													   FontSize="13"
-													   FontWeight="SemiBold"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    
-											<TextBlock FontSize="28"
-													   FontWeight="Bold"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
-												<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryUsageMB, Mode=OneWay}"/>
-												<Run Text="MB" FontSize="14"/>
-											</TextBlock>
-                    
-											<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryPercentage, Mode=OneWay}"
-														 Minimum="0"
-														 Maximum="100"
-														 Height="6"
-														 CornerRadius="3"
-														 Foreground="#28A745"
-														 Background="#E0E0E0"/>
-										</StackPanel>
-									</Border>
-            
-									<!-- Uptime -->
-									<Border Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2"
-											Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
-											BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-											BorderThickness="1"
-											CornerRadius="8"
-											Padding="16">
-										<Grid ColumnDefinitions="Auto,*">
-											<StackPanel Grid.Column="0" Spacing="4">
-												<TextBlock Text="⏱️ Oppetid"
+
+										<TextBlock FontSize="28"
+												   FontWeight="Bold"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+											<Run Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryUsageMB, Mode=OneWay}"/>
+											<Run Text="MB" FontSize="14"/>
+										</TextBlock>
+
+										<ProgressBar Value="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=MemoryPercentage, Mode=OneWay}"
+													 Minimum="0"
+													 Maximum="100"
+													 Height="6"
+													 CornerRadius="3"
+													 Foreground="#28A745"
+													 Background="#E0E0E0"/>
+									</StackPanel>
+								</Border>
+
+								<!-- Uptime -->
+								<Border Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2"
+										Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+										BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+										BorderThickness="1"
+										CornerRadius="8"
+										Padding="16">
+									<Grid ColumnDefinitions="Auto,*">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<materialIcons:MaterialIcon Kind="ClockOutline" 
+																		   Width="16" 
+																		   Height="16"
+																		   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+																		   VerticalAlignment="Center"/>
+												<TextBlock Text="Oppetid"
 														   FontSize="13"
 														   FontWeight="SemiBold"
-														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-												<TextBlock Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=UptimeFormatted, Mode=OneWay}"
-														   FontSize="20"
-														   FontWeight="Bold"
-														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-											</StackPanel>
-                    
-											<StackPanel Grid.Column="1" 
-														VerticalAlignment="Center"
-														HorizontalAlignment="Right"
-														Spacing="2">
-												<TextBlock Text="Oppdateres hvert 2. sekund"
-														   FontSize="11"
-														   FontStyle="Italic"
 														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-														   HorizontalAlignment="Right"/>
+														   VerticalAlignment="Center"/>
 											</StackPanel>
-										</Grid>
-									</Border>
-								</Grid>
-        
-								<!-- Info Panel -->
-								<Border Classes="info-panel-compact" Margin="0,8,0,0">
-									<StackPanel Spacing="6">
-										<TextBlock Text="💡 Om ressursbruk"
+											<TextBlock Text="{Binding Source={x:Static services:ResourceMonitor.Instance}, Path=UptimeFormatted, Mode=OneWay}"
+													   FontSize="20"
+													   FontWeight="Bold"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+										</StackPanel>
+
+										<StackPanel Grid.Column="1" 
+													VerticalAlignment="Center"
+													HorizontalAlignment="Right"
+													Spacing="2">
+											<TextBlock Text="Oppdateres hvert 2. sekund"
+													   FontSize="11"
+													   FontStyle="Italic"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+													   HorizontalAlignment="Right"/>
+										</StackPanel>
+									</Grid>
+								</Border>
+							</Grid>
+
+							<!-- Info Panel -->
+							<Border Classes="info-panel-compact" Margin="0,8,0,0">
+								<StackPanel Spacing="6">
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="Lightbulb" 
+																   Width="16" 
+																   Height="16"
+																   Foreground="#007ACC"
+																   VerticalAlignment="Center"/>
+										<TextBlock Text="Om ressursbruk"
 												   FontWeight="SemiBold"
 												   FontSize="13"
-												   Foreground="#007ACC"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="AkademiTrack er designet for å bruke minimale ressurser i bakgrunnen."/>
-											<LineBreak/>
-											<Run Text="Normal bruk ligger typisk på 1% CPU og 100-400 MB RAM."/>
-										</TextBlock>
+												   Foreground="#007ACC"
+												   VerticalAlignment="Center"/>
 									</StackPanel>
-								</Border>
-							</StackPanel>
-						</Border>
+									<TextBlock FontSize="12"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+											   TextWrapping="Wrap"
+											   LineHeight="18">
+										<Run Text="AkademiTrack er designet for å bruke minimale ressurser i bakgrunnen."/>
+										<LineBreak/>
+										<Run Text="Normal bruk ligger typisk på 1% CPU og 100-400 MB RAM."/>
+									</TextBlock>
+								</StackPanel>
+							</Border>
+						</StackPanel>
+					</Border>
 
-						<Rectangle Height="120" Fill="Transparent"/>
-					</StackPanel>
+					<Rectangle Height="120" Fill="Transparent"/>
+				</StackPanel>
 
 
 
 					<!-- Advanced Category -->
 					<StackPanel x:Name="AdvancedSection" Spacing="16" IsVisible="False">
-						<TextBlock Text="Avanserte innstillinger" Classes="section-header"/>
+					<TextBlock Text="Avanserte innstillinger" Classes="section-header"/>
 
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Aktivitetslogg" Classes="setting-title"/>
-								<TextBlock Text="Vis teknisk aktivitetslogg for feilsøking og diagnostikk."
-										   Classes="setting-description"/>
-								<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis logg|Skjul logg'}"
-										Classes="settings-action"
-										Command="{Binding ToggleActivityLogCommand}"/>
-							</StackPanel>
-						</Border>
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Aktivitetslogg" Classes="setting-title"/>
+							<TextBlock Text="Vis teknisk aktivitetslogg for feilsøking og diagnostikk."
+									   Classes="setting-description"/>
+							<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis logg|Skjul logg'}"
+									Classes="settings-action"
+									Command="{Binding ToggleActivityLogCommand}"/>
+						</StackPanel>
+					</Border>
 
-						<!-- Activity Log Panel -->
+					<!-- Activity Log Panel -->
 						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
 								BorderThickness="1"
@@ -1398,552 +1452,700 @@
 							</Grid>
 						</Border>
 
-						
+					<!-- DATA MANAGEMENT SECTION -->
+					<TextBlock Text="Databehandling"
+							   Classes="section-header"
+							   Margin="0,0,0,12"/>
 
-						<!-- DATA MANAGEMENT SECTION -->
-						<TextBlock Text="Databehandling"
-								   Classes="section-header"
-								   Margin="0,0,0,12"/>
+					<!-- Delete Local Data -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="5">
+							<TextBlock Text="Slett lokal data" Classes="setting-title"/>
+							<TextBlock Classes="setting-description">
+								<Run Text="Fjern all lagret data fra denne maskinen, inkludert innloggingsopplysninger,"/>
+								<LineBreak/>
+								<Run Text="cookies, og innstillinger. Du må logge inn på nytt etter sletting."/>
+							</TextBlock>
 
-
-
-
-						<!-- Delete Local Data -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="5">
-								<TextBlock Text="Slett lokal data" Classes="setting-title"/>
-								<TextBlock Classes="setting-description">
-									<Run Text="Fjern all lagret data fra denne maskinen, inkludert innloggingsopplysninger,"/>
-									<LineBreak/>
-									<Run Text="cookies, og innstillinger. Du må logge inn på nytt etter sletting."/>
-								</TextBlock>
-
-								<Border Classes="info-panel-compact" Margin="0,8,0,0">
-									<StackPanel Spacing="6">
-										<TextBlock Text="ℹ️ Dette sletter:"
+							<Border Classes="info-panel-compact" Margin="0,8,0,0">
+								<StackPanel Spacing="6">
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="InformationOutline" 
+																   Width="16" 
+																   Height="16"
+																   Foreground="#007ACC"
+																   VerticalAlignment="Center"/>
+										<TextBlock Text="Dette sletter:"
 												   FontWeight="SemiBold"
 												   FontSize="13"
-												   Foreground="#007ACC"/>
-										<TextBlock FontSize="12"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-												   TextWrapping="Wrap"
-												   LineHeight="18">
-											<Run Text="• Lagrede FEIDE-innloggingsopplysninger"/>
-											<LineBreak/>
-											<Run Text="• Cookies og tokens"/>
-											<LineBreak/>
-											<Run Text="• Alle appinnstillinger"/>
-											<LineBreak/>
-											<Run Text="• Cache-filer"/>
-										</TextBlock>
+												   Foreground="#007ACC"
+												   VerticalAlignment="Center"/>
 									</StackPanel>
-								</Border>
+									<TextBlock FontSize="12"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+											   TextWrapping="Wrap"
+											   LineHeight="18">
+										<Run Text="• Lagrede FEIDE-innloggingsopplysninger"/>
+										<LineBreak/>
+										<Run Text="• Cookies og tokens"/>
+										<LineBreak/>
+										<Run Text="• Alle appinnstillinger"/>
+										<LineBreak/>
+										<Run Text="• Cache-filer"/>
+									</TextBlock>
+								</StackPanel>
+							</Border>
 
-								<Button Content="Slett lokal data"
-										Classes="settings-action"
-										Command="{Binding DeleteLocalDataCommand}"
-										IsEnabled="{Binding !IsDeleting}"
-										Background="#FF9800"
-										Margin="0,8,0,20"/>
+							<Button Content="Slett lokal data"
+									Classes="settings-action"
+									Command="{Binding DeleteLocalDataCommand}"
+									IsEnabled="{Binding !IsDeleting}"
+									Background="#FF9800"
+									Margin="0,8,0,20"/>
+						</StackPanel>
+					</Border>
+
+					<TextBlock Text="Systemdiagnose"
+							   Classes="section-header"
+							   Margin="0,0,0,12"/>
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="AkademiTrack-diagnose" Classes="setting-title"/>
+							<TextBlock Classes="setting-description">
+								<Run Text="Sjekker internettilkobling, Feide-innlogging og AkademiTrack-funksjonalitet."/>
+							</TextBlock>
+
+							<!-- Running indicator -->
+							<StackPanel Orientation="Horizontal" 
+										Spacing="10"
+										IsVisible="{Binding IsRunningDiagnostics}">
+								<materialIcons:MaterialIcon Kind="ProgressClock" 
+														   Width="16" 
+														   Height="16"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Kjører systemdiagnose..."
+										   FontSize="13"
+										   FontWeight="SemiBold"
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
 
-						</Border>
+							<Button Content="Kjør diagnose"
+									Classes="settings-action"
+									Command="{Binding RunDiagnosticsCommand}"
+									IsEnabled="{Binding !IsRunningDiagnostics}"
+									Background="#007ACC"
+									Margin="0,0,0,0"/>
 
+							<!-- Results Section -->
+							<StackPanel Spacing="12" IsVisible="{Binding DiagnosticsCompleted}">
+								<StackPanel Orientation="Horizontal" Spacing="8">
+									<materialIcons:MaterialIcon Kind="ChartBox" 
+															   Width="18" 
+															   Height="18"
+															   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+															   VerticalAlignment="Center"/>
+									<TextBlock Text="Diagnoseresultater"
+											   FontWeight="SemiBold"
+											   FontSize="15"
+											   Margin="0,8,0,0"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+											   VerticalAlignment="Center"/>
+								</StackPanel>
 
-						<TextBlock Text="Systemdiagnose"
-           Classes="section-header"
-           Margin="0,0,0,12"/>
+								<!-- Results List -->
+								<ItemsControl ItemsSource="{Binding HealthCheckResults}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
+													BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+													BorderThickness="1"
+													CornerRadius="6"
+													Padding="14"
+													Margin="0,0,0,10">
+												<StackPanel Spacing="8">
+													<!-- Component and Message -->
+													<Grid ColumnDefinitions="*,Auto">
+														<TextBlock Grid.Column="0"
+																   FontWeight="SemiBold"
+																   FontSize="14"
+																   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
+															<Run Text="{Binding ComponentName}"/>
+														</TextBlock>
+														<TextBlock Grid.Column="1"
+																   Text="{Binding Message}"
+																   FontSize="13"
+																   FontWeight="Medium"
+																   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+													</Grid>
 
-<Border Classes="setting-card">
-    <StackPanel Spacing="12">
-        <TextBlock Text="AkademiTrack-diagnose" Classes="setting-title"/>
-        <TextBlock Classes="setting-description">
-            <Run Text="Sjekker internettilkobling, Feide-innlogging og AkademiTrack-funksjonalitet."/>
-        </TextBlock>
+													<!-- Response Time -->
+													<StackPanel Orientation="Horizontal" Spacing="6">
+														<materialIcons:MaterialIcon Kind="ClockOutline" 
+																				   Width="14" 
+																				   Height="14"
+																				   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+																				   VerticalAlignment="Center"/>
+														<TextBlock FontSize="12"
+																   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+																   VerticalAlignment="Center">
+															<Run Text="Responstid:"/>
+															<Run Text="{Binding ResponseTimeMs}"/>
+															<Run Text="ms"/>
+														</TextBlock>
+													</StackPanel>
 
-        <!-- Running indicator -->
-        <StackPanel Orientation="Horizontal" 
-                    Spacing="10"
-                    IsVisible="{Binding IsRunningDiagnostics}">
-            <TextBlock Text="⏳" FontSize="16" VerticalAlignment="Center"/>
-            <TextBlock Text="Kjører systemdiagnose..."
-                       FontSize="13"
-                       FontWeight="SemiBold"
-                       Foreground="#007ACC"
-                       VerticalAlignment="Center"/>
-        </StackPanel>
+													<!-- Details -->
+													<TextBlock Text="{Binding Details}"
+															   FontSize="12"
+															   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+															   TextWrapping="Wrap"/>
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</StackPanel>
+						</StackPanel>
+					</Border>
 
-        <Button Content="Kjør diagnose"
-                Classes="settings-action"
-                Command="{Binding RunDiagnosticsCommand}"
-                IsEnabled="{Binding !IsRunningDiagnostics}"
-                Background="#007ACC"
-                Margin="0,0,0,0"/>
-
-
-
-        <!-- Results Section -->
-        <StackPanel Spacing="12" IsVisible="{Binding DiagnosticsCompleted}">
-            <TextBlock Text="📊 Diagnoseresultater"
-                       FontWeight="SemiBold"
-                       FontSize="15"
-                       Margin="0,8,0,0"
-                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-
-            <!-- Results List -->
-            <ItemsControl ItemsSource="{Binding HealthCheckResults}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"
-                                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="14"
-                                Margin="0,0,0,10">
-                            <StackPanel Spacing="8">
-                                <!-- Component and Message -->
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0"
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}">
-                                        <Run Text="{Binding ComponentName}"/>
-                                    </TextBlock>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding Message}"
-                                               FontSize="13"
-                                               FontWeight="Medium"
-                                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                                </Grid>
-
-                                <!-- Response Time -->
-                                <TextBlock FontSize="12"
-                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}">
-                                    <Run Text="⏱️ Responstid:"/>
-                                    <Run Text="{Binding ResponseTimeMs}"/>
-                                    <Run Text="ms"/>
-                                </TextBlock>
-
-                                <!-- Details -->
-                                <TextBlock Text="{Binding Details}"
-                                           FontSize="12"
-                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
-    </StackPanel>
-</Border>
-
-						<Rectangle Height="140" Fill="Transparent"/>
-					</StackPanel>
+					<Rectangle Height="140" Fill="Transparent"/>
+				</StackPanel>
 
 					<!-- Updates Category -->
 					<StackPanel x:Name="UpdatesSection" Spacing="16" IsVisible="False">
-						<TextBlock Text="Programoppdateringer" Classes="section-header"/>
+					<TextBlock Text="Programoppdateringer" Classes="section-header"/>
 
-						<!-- Current Version -->
-						<Border Classes="info-panel">
-							<StackPanel Spacing="10">
-								<TextBlock Text="📦 Gjeldende versjon"
+					<!-- Current Version -->
+					<Border Classes="info-panel">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Package" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Gjeldende versjon"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#007ACC"/>
-								<TextBlock Text="{Binding ApplicationInfo.Version, StringFormat='Versjon {0}'}"
-										   FontSize="14"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock Text="{Binding ApplicationInfo.Version, StringFormat='Versjon {0}'}"
+									   FontSize="14"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+						</StackPanel>
+					</Border>
 
-						<!-- Update Status -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="12">
-								<TextBlock Text="Oppdateringsstatus" Classes="setting-title"/>
+					<!-- Update Status -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Oppdateringsstatus" Classes="setting-title"/>
 
-								<TextBlock Text="{Binding UpdateStatus}"
-										   FontSize="14"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-										   TextWrapping="Wrap"/>
+							<TextBlock Text="{Binding UpdateStatus}"
+									   FontSize="14"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+									   TextWrapping="Wrap"/>
 
-								<Button Content="Sjekk etter oppdateringer"
-										Classes="settings-action"
-										Command="{Binding CheckForUpdatesCommand}"
-										IsEnabled="{Binding !IsCheckingForUpdates}"/>
+							<Button Content="Sjekk etter oppdateringer"
+									Classes="settings-action"
+									Command="{Binding CheckForUpdatesCommand}"
+									IsEnabled="{Binding !IsCheckingForUpdates}"/>
 
-								<!-- Update Available -->
-								<StackPanel Spacing="10" IsVisible="{Binding UpdateAvailable}">
-									<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-											BorderBrush="#28A745"
-											BorderThickness="1.5"
-											CornerRadius="8"
-											Padding="14"
-											Margin="0,8,0,0">
-										<StackPanel Spacing="8">
-											<TextBlock Text="✅ Ny versjon tilgjengelig!"
+							<!-- Update Available -->
+							<StackPanel Spacing="10" IsVisible="{Binding UpdateAvailable}">
+								<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+										BorderBrush="#28A745"
+										BorderThickness="1.5"
+										CornerRadius="8"
+										Padding="14"
+										Margin="0,8,0,0">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="CheckCircle" 
+																	   Width="18" 
+																	   Height="18"
+																	   Foreground="#28A745"
+																	   VerticalAlignment="Center"/>
+											<TextBlock Text="Ny versjon tilgjengelig!"
 													   FontWeight="SemiBold"
 													   FontSize="14"
-													   Foreground="#28A745"/>
-											<TextBlock Text="{Binding AvailableVersion, StringFormat='Versjon {0} er klar'}"
-													   FontSize="13"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-													   TextWrapping="Wrap"/>
+													   Foreground="#28A745"
+													   VerticalAlignment="Center"/>
 										</StackPanel>
-									</Border>
+										<TextBlock Text="{Binding AvailableVersion, StringFormat='Versjon {0} er klar'}"
+												   FontSize="13"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   TextWrapping="Wrap"/>
+									</StackPanel>
+								</Border>
 
-									<Button Content="Last ned og installer oppdatering"
-											Classes="settings-action"
-											Command="{Binding DownloadAndInstallUpdateCommand}"
-											IsEnabled="{Binding !IsCheckingForUpdates}"
-											Background="#28A745"
-											Margin="0,8,0,0"/>
-								</StackPanel>
+								<Button Content="Last ned og installer oppdatering"
+										Classes="settings-action"
+										Command="{Binding DownloadAndInstallUpdateCommand}"
+										IsEnabled="{Binding !IsCheckingForUpdates}"
+										Background="#28A745"
+										Margin="0,8,0,0"/>
 							</StackPanel>
-						</Border>
+						</StackPanel>
+					</Border>
 
-						<!-- Info -->
-						<Border Classes="info-panel">
-							<StackPanel Spacing="8">
-								<TextBlock Text="💡 Om automatiske oppdateringer"
+					<!-- Info -->
+					<Border Classes="info-panel">
+						<StackPanel Spacing="8">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Lightbulb" 
+														   Width="16" 
+														   Height="16"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Om automatiske oppdateringer"
 										   FontWeight="SemiBold"
 										   FontSize="14"
-										   Foreground="#007ACC"/>
-								<TextBlock Text="AkademiTrack sjekker automatisk etter oppdateringer ved oppstart."
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="19"/>
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
-					</StackPanel>
+							<TextBlock Text="AkademiTrack sjekker automatisk etter oppdateringer ved oppstart."
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   TextWrapping="Wrap"
+									   LineHeight="19"/>
+						</StackPanel>
+					</Border>
+				</StackPanel>
 
 					<!-- About Category -->
 					<StackPanel x:Name="AboutSection" Spacing="16" IsVisible="False">
-						<TextBlock Text="Om AkademiTrack" Classes="section-header"/>
+					<TextBlock Text="Om AkademiTrack" Classes="section-header"/>
 
-						<Border Classes="info-panel">
-							<StackPanel Spacing="10">
-								<TextBlock Text="📋 Applikasjonsinformasjon"
+					<Border Classes="info-panel">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="ClipboardText" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Applikasjonsinformasjon"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#007ACC"/>
-								
-								<TextBlock Text="{Binding ApplicationInfo.NameAndDescription}"
-										   FontSize="14"
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
+							</StackPanel>
+            
+							<TextBlock Text="{Binding ApplicationInfo.NameAndDescription}"
+									   FontSize="14"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+									   TextWrapping="Wrap"
+									   LineHeight="22"/>
+						</StackPanel>
+					</Border>
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="FileDocument" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Lisens"
+										   FontWeight="SemiBold"
+										   FontSize="15"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-										   TextWrapping="Wrap"
-										   LineHeight="22"/>
-								
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock Text="Dette programmet er gratis og kan brukes av alle studenter ved Akademiet."
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   TextWrapping="Wrap"
+									   LineHeight="20"/>
+						</StackPanel>
+					</Border>
 
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="📜 Lisens"
+					<Border Classes="setting-card" Margin="0,0,0,180">
+						<StackPanel Spacing="12">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Email" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Kontakt oss" 
+										   Classes="setting-title"
+										   VerticalAlignment="Center"/>
+							</StackPanel>
+
+							<TextBlock Text="Har du spørsmål, tilbakemeldinger eller trenger support?"
+									   Classes="setting-description"/>
+
+							<StackPanel Spacing="8">
+								<TextBlock Text="For rask support:"
+										   FontSize="13"
 										   FontWeight="SemiBold"
-										   FontSize="15"
 										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-								<TextBlock Text="Dette programmet er gratis og kan brukes av alle studenter ved Akademiet."
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="20"/>
+								<TextBlock Text="Gå til nettsiden vår og deretter gå til kontakt oss siden. Fyll ut skjemaet om du behøver hjelp."
+										   Classes="setting-description"
+										   Margin="0,0,0,0"/>
 							</StackPanel>
-						</Border>
 
-						<Border Classes="setting-card" Margin="0,0,0,180">
-							<StackPanel Spacing="12">
-								<TextBlock Text="📧 Kontakt oss" Classes="setting-title"/>
-
-								<TextBlock Text="Har du spørsmål, tilbakemeldinger eller trenger support?"
-										   Classes="setting-description"/>
-
-								<StackPanel Spacing="8">
-									<TextBlock Text="For rask support:"
-											   FontSize="13"
-											   FontWeight="SemiBold"
-											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-									<TextBlock Text="Gå til nettsiden vår og deretter gå til kontakt oss siden. Fyll ut skjemaet om du behøver hjelp."
-											   Classes="setting-description"
-											   Margin="0,0,0,0"/>
-								</StackPanel>
-
-								<StackPanel Orientation="Horizontal" Spacing="5">
-									<TextBlock Text="Alternativt kan du sende epost til oss:"
-											   Classes="setting-description"
-											   VerticalAlignment="Center"
-											   Margin="0,1,0,0"/>
-									<Button Content="cyberbrothershq@gmail.com"
-											Command="{Binding OpenEmailCommand}"
-											Classes="email-link"
-											VerticalAlignment="Center"/>
-								</StackPanel>
-
-								<Button Content="Besøk nettsiden"
-										Classes="settings-action"
-										Command="{Binding OpenWebsiteCommand}"/>
+							<StackPanel Orientation="Horizontal" Spacing="5">
+								<TextBlock Text="Alternativt kan du sende epost til oss:"
+										   Classes="setting-description"
+										   VerticalAlignment="Center"
+										   Margin="0,1,0,0"/>
+								<Button Content="cyberbrothershq@gmail.com"
+										Command="{Binding OpenEmailCommand}"
+										Classes="email-link"
+										VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
-					</StackPanel>
+
+							<Button Content="Besøk nettsiden"
+									Classes="settings-action"
+									Command="{Binding OpenWebsiteCommand}"/>
+						</StackPanel>
+					</Border>
+				</StackPanel>
+
 					<StackPanel x:Name="HelpSection" Spacing="16" IsVisible="False">
-						<TextBlock Text="Hjelp og Feilsøking" Classes="section-header"/>
+					<TextBlock Text="Hjelp og Feilsøking" Classes="section-header"/>
 
-						<Border Classes="info-panel">
-							<StackPanel Spacing="10">
-								<TextBlock Text="📚 Vanlige spørsmål"
+					<Border Classes="info-panel">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="BookOpenPageVariant" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Vanlige spørsmål"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#007ACC"/>
-								<TextBlock Text="Her finner du svar på vanlige problemer og spørsmål om AkademiTrack."
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="19"/>
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock Text="Her finner du svar på vanlige problemer og spørsmål om AkademiTrack."
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   TextWrapping="Wrap"
+									   LineHeight="19"/>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 1: Network Error -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="❌ Registrering feiler med nettverksfeil"
+					<!-- FAQ Item 1: Network Error -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="CloseCircle" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#DC3545"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Registrering feiler med nettverksfeil"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#DC3545"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Løsning:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Sjekk internettforbindelsen din"/>
-									<LineBreak/>
-									<Run Text="• Kjør diagnose i Avansert → Systemdiagnose"/>
-									<LineBreak/>
-									<Run Text="• Kontroller at FEIDE-systemet er tilgjengelig"/>
-									<LineBreak/>
-									<Run Text="• Sjekk om brannmuren blokkerer programmet"/>
-								</TextBlock>
+										   Foreground="#DC3545"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Løsning:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Sjekk internettforbindelsen din"/>
+								<LineBreak/>
+								<Run Text="• Kjør diagnose i Avansert → Systemdiagnose"/>
+								<LineBreak/>
+								<Run Text="• Kontroller at FEIDE-systemet er tilgjengelig"/>
+								<LineBreak/>
+								<Run Text="• Sjekk om brannmuren blokkerer programmet"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 2: Window Closed -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="🪟 Registreringsvindu lukket uventet"
+					<!-- FAQ Item 2: Window Closed -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="WindowClose" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#DC3545"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Registreringsvindu lukket uventet"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#DC3545"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Løsning:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Ikke lukk nettleservinduet under registrering"/>
-									<LineBreak/>
-									<Run Text="• Vent til du ser suksessmelding"/>
-									<LineBreak/>
-									<Run Text="• Hvis det skjer automatisk, sjekk aktivitetsloggen"/>
-									<LineBreak/>
-									<Run Text="• Kontroller at systemet ikke går i dvale"/>
-								</TextBlock>
+										   Foreground="#DC3545"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Løsning:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Ikke lukk nettleservinduet under registrering"/>
+								<LineBreak/>
+								<Run Text="• Vent til du ser suksessmelding"/>
+								<LineBreak/>
+								<Run Text="• Hvis det skjer automatisk, sjekk aktivitetsloggen"/>
+								<LineBreak/>
+								<Run Text="• Kontroller at systemet ikke går i dvale"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 3: Invalid Credentials -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="🔐 Ugyldige innloggingsopplysninger"
+					<!-- FAQ Item 3: Invalid Credentials -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="LockAlert" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#DC3545"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Ugyldige innloggingsopplysninger"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#DC3545"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Løsning:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Gå til Innlogging og sjekk opplysningene dine"/>
-									<LineBreak/>
-									<Run Text="• Verifiser at skolenavn er riktig (f.eks. 'Akademiet Drammen AS')"/>
-									<LineBreak/>
-									<Run Text="• Prøv å logge inn manuelt på FEIDE for å teste"/>
-									<LineBreak/>
-									<Run Text="• Sjekk om du har endret passord nylig"/>
-								</TextBlock>
+										   Foreground="#DC3545"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Løsning:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Gå til Innlogging og sjekk opplysningene dine"/>
+								<LineBreak/>
+								<Run Text="• Verifiser at skolenavn er riktig (f.eks. 'Akademiet Drammen AS')"/>
+								<LineBreak/>
+								<Run Text="• Prøv å logge inn manuelt på FEIDE for å teste"/>
+								<LineBreak/>
+								<Run Text="• Sjekk om du har endret passord nylig"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 4: Timeout -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="⏱️ Tidsavbrudd under registrering"
+					<!-- FAQ Item 4: Timeout -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="TimerSand" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#FF9800"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Tidsavbrudd under registrering"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#FF9800"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Løsning:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Sakte internettforbindelse kan forårsake dette"/>
-									<LineBreak/>
-									<Run Text="• FEIDE-serveren kan være treg eller overbelastet"/>
-									<LineBreak/>
-									<Run Text="• Prøv å registrere manuelt hvis problemet vedvarer"/>
-									<LineBreak/>
-									<Run Text="• Vent noen minutter og la programmet prøve igjen"/>
-								</TextBlock>
+										   Foreground="#FF9800"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Løsning:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Sakte internettforbindelse kan forårsake dette"/>
+								<LineBreak/>
+								<Run Text="• FEIDE-serveren kan være treg eller overbelastet"/>
+								<LineBreak/>
+								<Run Text="• Prøv å registrere manuelt hvis problemet vedvarer"/>
+								<LineBreak/>
+								<Run Text="• Vent noen minutter og la programmet prøve igjen"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 5: Outside School Hours -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="⏭️ Registrering hoppes over (utenfor skoletid)"
+					<!-- FAQ Item 5: Outside School Hours -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="SkipNext" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#6C757D"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Registrering hoppes over (utenfor skoletid)"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#6C757D"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Dette er normalt!" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="Programmet registrerer bare fremmøte i skoletiden du har satt."/>
-									<LineBreak/>
-									<Run Text="Gå til Automatisering → Skoletider for å justere tidene."/>
-									<LineBreak/>
-									<Run Text="På helger og deaktiverte dager hoppes registrering automatisk over."/>
-								</TextBlock>
+										   Foreground="#6C757D"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Dette er normalt!" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="Programmet registrerer bare fremmøte i skoletiden du har satt."/>
+								<LineBreak/>
+								<Run Text="Gå til Automatisering → Skoletider for å justere tidene."/>
+								<LineBreak/>
+								<Run Text="På helger og deaktiverte dager hoppes registrering automatisk over."/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 6: Wrong Network -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="📶 Koblet til feil nettverk"
+					<!-- FAQ Item 6: Wrong Network -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="WifiAlert" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#FF9800"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Koblet til feil nettverk"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#FF9800"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Viktig!" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="Registrering kan feile hvis du ikke er koblet til skolens WiFi."/>
-									<LineBreak/>
-									<LineBreak/>
-									<Run Text="• Sørg for at du er på riktig nettverk (f.eks. 'Akademiet-WiFi')"/>
-									<LineBreak/>
-									<Run Text="• Noen systemer krever skolens fysiske nettverk"/>
-									<LineBreak/>
-									<Run Text="• Mobildata eller hjemme-WiFi fungerer ofte ikke"/>
-									<LineBreak/>
-									<Run Text="• Sjekk nettverkstilkobling i systeminnstillingene"/>
-								</TextBlock>
+										   Foreground="#FF9800"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Viktig!" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="Registrering kan feile hvis du ikke er koblet til skolens WiFi."/>
+								<LineBreak/>
+								<LineBreak/>
+								<Run Text="• Sørg for at du er på riktig nettverk (f.eks. 'Akademiet-WiFi')"/>
+								<LineBreak/>
+								<Run Text="• Noen systemer krever skolens fysiske nettverk"/>
+								<LineBreak/>
+								<Run Text="• Mobildata eller hjemme-WiFi fungerer ofte ikke"/>
+								<LineBreak/>
+								<Run Text="• Sjekk nettverkstilkobling i systeminnstillingene"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 7: Mac Sleep Mode -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="💤 Mac i dvalemodus (lokk lukket)"
+					<!-- FAQ Item 7: Mac Sleep Mode -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Sleep" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#DC3545"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Mac i dvalemodus (lokk lukket)"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#DC3545"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Registrering fungerer ikke hvis:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• MacBook-lokket er lukket og maskinen går i dvale"/>
-									<LineBreak/>
-									<Run Text="• Datamaskinen går i hvilemodus automatisk"/>
-									<LineBreak/>
-									<Run Text="• Skjermen er låst og systemet suspenderer prosesser"/>
-									<LineBreak/>
-									<LineBreak/>
-									<Run Text="Løsning:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Hold Mac-en åpen og våken under skoletid"/>
-									<LineBreak/>
-									<Run Text="• Juster energiinnstillinger: Systeminnstillinger → Batteri"/>
-									<LineBreak/>
-									<Run Text="• Aktiver 'Forhindre dvale når skjermen er av'"/>
-								</TextBlock>
+										   Foreground="#DC3545"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Registrering fungerer ikke hvis:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• MacBook-lokket er lukket og maskinen går i dvale"/>
+								<LineBreak/>
+								<Run Text="• Datamaskinen går i hvilemodus automatisk"/>
+								<LineBreak/>
+								<Run Text="• Skjermen er låst og systemet suspenderer prosesser"/>
+								<LineBreak/>
+								<LineBreak/>
+								<Run Text="Løsning:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Hold Mac-en åpen og våken under skoletid"/>
+								<LineBreak/>
+								<Run Text="• Juster energiinnstillinger: Systeminnstillinger → Batteri"/>
+								<LineBreak/>
+								<Run Text="• Aktiver 'Forhindre dvale når skjermen er av'"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- FAQ Item 8: PC Off -->
-						<Border Classes="setting-card">
-							<StackPanel Spacing="10">
-								<TextBlock Text="🖥️ Datamaskinen er slått av eller frakoblet"
+					<!-- FAQ Item 8: PC Off -->
+					<Border Classes="setting-card">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="PowerOff" 
+														   Width="18" 
+														   Height="18"
+														   Foreground="#DC3545"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Datamaskinen er slått av eller frakoblet"
 										   FontWeight="SemiBold"
 										   FontSize="15"
-										   Foreground="#DC3545"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   LineHeight="20">
-									<Run Text="Åpenbart, men viktig:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Programmet kan ikke registrere hvis PC-en er av"/>
-									<LineBreak/>
-									<Run Text="• Internettforbindelse må være aktiv"/>
-									<LineBreak/>
-									<Run Text="• Programmet må kjøre i bakgrunnen"/>
-									<LineBreak/>
-									<LineBreak/>
-									<Run Text="Sørg for at:" FontWeight="SemiBold"/>
-									<LineBreak/>
-									<Run Text="• Datamaskinen er på i skoletiden"/>
-									<LineBreak/>
-									<Run Text="• AkademiTrack kjører (sjekk systemstatusfeltet)"/>
-									<LineBreak/>
-									<Run Text="• 'Start automatisering ved oppstart' er aktivert"/>
-								</TextBlock>
+										   Foreground="#DC3545"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="13"
+									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+									   LineHeight="20">
+								<Run Text="Åpenbart, men viktig:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Programmet kan ikke registrere hvis PC-en er av"/>
+								<LineBreak/>
+								<Run Text="• Internettforbindelse må være aktiv"/>
+								<LineBreak/>
+								<Run Text="• Programmet må kjøre i bakgrunnen"/>
+								<LineBreak/>
+								<LineBreak/>
+								<Run Text="Sørg for at:" FontWeight="SemiBold"/>
+								<LineBreak/>
+								<Run Text="• Datamaskinen er på i skoletiden"/>
+								<LineBreak/>
+								<Run Text="• AkademiTrack kjører (sjekk systemstatusfeltet)"/>
+								<LineBreak/>
+								<Run Text="• 'Start automatisering ved oppstart' er aktivert"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<!-- General Tips -->
-						<Border Background="#E3F2FD"
-								BorderBrush="#007ACC"
-								BorderThickness="1.5"
-								CornerRadius="10"
-								Padding="18"
-								Margin="0,8,0,0">
-							<StackPanel Spacing="10">
-								<TextBlock Text="💡 Generelle tips for feilsøking"
+					<!-- General Tips -->
+					<Border Background="#E3F2FD"
+							BorderBrush="#007ACC"
+							BorderThickness="1.5"
+							CornerRadius="10"
+							Padding="18"
+							Margin="0,8,0,0">
+						<StackPanel Spacing="10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<materialIcons:MaterialIcon Kind="Lightbulb" 
+														   Width="20" 
+														   Height="20"
+														   Foreground="#007ACC"
+														   VerticalAlignment="Center"/>
+								<TextBlock Text="Generelle tips for feilsøking"
 										   FontWeight="Bold"
 										   FontSize="16"
-										   Foreground="#007ACC"/>
-								<TextBlock TextWrapping="Wrap"
-										   FontSize="14"
-										   Foreground="#1565C0"
-										   LineHeight="22">
-									<Run Text="1. Sjekk aktivitetsloggen (Avansert) for detaljerte feilmeldinger" FontWeight="Medium"/>
-									<LineBreak/>
-									<Run Text="2. Kjør systemdiagnose (Avansert) for å teste komponenter" FontWeight="Medium"/>
-									<LineBreak/>
-									<Run Text="3. Verifiser at du er på skolens WiFi-nettverk" FontWeight="Medium"/>
-									<LineBreak/>
-									<Run Text="4. Hold datamaskinen våken og tilkoblet i skoletiden" FontWeight="Medium"/>
-									<LineBreak/>
-									<Run Text="5. Sjekk at innloggingsopplysninger er korrekte" FontWeight="Medium"/>
-									<LineBreak/>
-									<Run Text="6. Kontakt oss hvis problemet vedvarer" FontWeight="Medium"/>
-								</TextBlock>
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"/>
 							</StackPanel>
-						</Border>
+							<TextBlock TextWrapping="Wrap"
+									   FontSize="14"
+									   Foreground="#1565C0"
+									   LineHeight="22">
+								<Run Text="1. Sjekk aktivitetsloggen (Avansert) for detaljerte feilmeldinger" FontWeight="Medium"/>
+								<LineBreak/>
+								<Run Text="2. Kjør systemdiagnose (Avansert) for å teste komponenter" FontWeight="Medium"/>
+								<LineBreak/>
+								<Run Text="3. Verifiser at du er på skolens WiFi-nettverk" FontWeight="Medium"/>
+								<LineBreak/>
+								<Run Text="4. Hold datamaskinen våken og tilkoblet i skoletiden" FontWeight="Medium"/>
+								<LineBreak/>
+								<Run Text="5. Sjekk at innloggingsopplysninger er korrekte" FontWeight="Medium"/>
+								<LineBreak/>
+								<Run Text="6. Kontakt oss hvis problemet vedvarer" FontWeight="Medium"/>
+							</TextBlock>
+						</StackPanel>
+					</Border>
 
-						<Rectangle Height="140" Fill="Transparent"/>
-					</StackPanel>
+					<Rectangle Height="140" Fill="Transparent"/>
+				</StackPanel>
 				</StackPanel>
 			</ScrollViewer>
 
