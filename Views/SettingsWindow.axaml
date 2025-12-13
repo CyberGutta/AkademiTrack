@@ -4,6 +4,7 @@
         xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
         x:Class="AkademiTrack.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
@@ -516,67 +517,89 @@
 
 
 		<!-- Left Sidebar - Navigation -->
-		<Border Grid.Column="0"
-				Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-				BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-				BorderThickness="0,0,1.5,0"
-				Padding="20,24">
-			<StackPanel Spacing="4">
-				<TextBlock Text="Innstillinger"
-						   FontSize="22"
-						   FontWeight="Bold"
-						   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-						   Margin="8,0,0,28"/>
-
-				<Button x:Name="LoginButton" Classes="category-tab selected" Tag="login">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="🔑" Classes="nav-icon"/>
-						<TextBlock Text="Innlogging" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-
-				<Button x:Name="AutomationButton" Classes="category-tab" Tag="automation">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="⚡" Classes="nav-icon"/>
-						<TextBlock Text="Automatisering" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-
-				<Button x:Name="SystemButton" Classes="category-tab" Tag="system">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="💻" Classes="nav-icon"/>
-						<TextBlock Text="System" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-
-				<Button x:Name="AdvancedButton" Classes="category-tab" Tag="advanced">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="⚙️" Classes="nav-icon"/>
-						<TextBlock Text="Avansert" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-
-				<Button x:Name="UpdatesButton" Classes="category-tab" Tag="updates">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="🔄" Classes="nav-icon"/>
-						<TextBlock Text="Oppdateringer" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-
-				<Button x:Name="AboutButton" Classes="category-tab" Tag="about">
-					<StackPanel Orientation="Horizontal">
-						<TextBlock Text="ℹ️" Classes="nav-icon"/>
-						<TextBlock Text="Om" VerticalAlignment="Center"/>
-					</StackPanel>
-				</Button>
-				<Button x:Name="HelpButton" Classes="category-tab" Tag="help">
-				<StackPanel Orientation="Horizontal">
-					<TextBlock Text="❓" Classes="nav-icon"/>
-					<TextBlock Text="Hjelp og FAQ" VerticalAlignment="Center"/>
-				</StackPanel>
-			</Button>
-			</StackPanel>
-		</Border>
+        <Border Grid.Column="0"
+                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+                BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+                BorderThickness="0,0,1.5,0"
+                Padding="20,24">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Innstillinger"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                           Margin="8,0,0,28"/>
+                
+                <Button x:Name="LoginButton" Classes="category-tab selected" Tag="login">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="Key" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Innlogging" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="AutomationButton" Classes="category-tab" Tag="automation">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="LightningBolt" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Automatisering" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="SystemButton" Classes="category-tab" Tag="system">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="Monitor" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="System" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="AdvancedButton" Classes="category-tab" Tag="advanced">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="Cog" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Avansert" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="UpdatesButton" Classes="category-tab" Tag="updates">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="Refresh" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Oppdateringer" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="AboutButton" Classes="category-tab" Tag="about">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="InformationOutline" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Om" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button x:Name="HelpButton" Classes="category-tab" Tag="help">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <materialIcons:MaterialIcon Kind="HelpCircleOutline" 
+                                                   Width="20" 
+                                                   Height="20"
+                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+                        <TextBlock Text="Hjelp og FAQ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
 
 		<Grid Grid.Column="1" 
       Height="60" 
@@ -593,6 +616,8 @@
                 Orientation="Horizontal" 
                 Spacing="12" 
                 VerticalAlignment="Top">
+
+
         <!-- Back to Dashboard Button -->
         <Button Classes="theme-toggle"
                 Content="←"

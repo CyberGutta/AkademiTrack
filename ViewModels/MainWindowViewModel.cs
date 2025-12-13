@@ -24,7 +24,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Security;
-using OpenQA.Selenium.DevTools.V140.DOM;
 
 
 namespace AkademiTrack.ViewModels

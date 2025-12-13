@@ -1,5 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="AkademiTrack.App"
              xmlns:local="using:AkademiTrack"
              RequestedThemeVariant="Default"
@@ -12,6 +13,8 @@
   
     <Application.Styles>
         <FluentTheme />
+        <!-- ADD THIS LINE -->
+        <materialIcons:MaterialIconStyles />
     </Application.Styles>
 
     <!-- macOS Native Menu -->
