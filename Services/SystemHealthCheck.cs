@@ -105,7 +105,7 @@ namespace AkademiTrack.Services
             try
             {
                 
-                var response = await _httpClient.GetAsync("https://innsyn.feide.no/");
+                var response = await _httpClient.GetAsync("https://iskole.net/iskole_login/dataporten_login?RelayState=/elev");
                 stopwatch.Stop();
 
                 var responseTime = stopwatch.ElapsedMilliseconds;

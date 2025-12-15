@@ -1366,7 +1366,7 @@ namespace AkademiTrack.ViewModels
             // CHECK: Ensure we're authenticated
             if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
             {
-                LogError("Ikke autentisert - kan ikke starte automatisering");
+                LogError("Ikke autentisert - kan ikke starte automatisering, kan være mulig at Iskole er nede");
                 NativeNotificationService.Show(
                     "Autentiseringsfeil",
                     "Du må være innlogget for å starte automatisering",
