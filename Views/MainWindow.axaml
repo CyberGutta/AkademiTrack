@@ -7,7 +7,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
         x:Class="AkademiTrack.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
+        x:DataType="vm:RefactoredMainWindowViewModel"
         Icon="/Assets/AT-Transparrent.png"
         Title="AkademiTrack - Akademiet"
         Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=WindowBackground, Mode=OneWay}"
@@ -17,7 +17,7 @@
         MinHeight="705">
 
 	<Design.DataContext>
-		<vm:MainWindowViewModel/>
+		<vm:RefactoredMainWindowViewModel/>
 	</Design.DataContext>
 
 	<Window.Resources>

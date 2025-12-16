@@ -6,7 +6,7 @@
              xmlns:vm="using:AkademiTrack.ViewModels"
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
              x:Class="AkademiTrack.Views.TutorialView"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:RefactoredMainWindowViewModel">
 
 	<UserControl.Styles>
 		<!-- Theme Toggle Button -->

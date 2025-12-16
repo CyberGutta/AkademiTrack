@@ -26,6 +26,9 @@ namespace AkademiTrack
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
+            
+            // Initialize services
+            Services.ServiceLocator.InitializeServices();
         }
 
         public override void OnFrameworkInitializationCompleted()
@@ -85,7 +88,7 @@ namespace AkademiTrack
                         Debug.WriteLine("[App] Creating main window...");
                         var mainWindow = new MainWindow
                         {
-                            DataContext = new MainWindowViewModel()
+                            DataContext = new RefactoredMainWindowViewModel()
                         };
                         
                         // Set as MainWindow first
@@ -127,7 +130,7 @@ namespace AkademiTrack
         private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized)
         {
             var settingsViewModel = new SettingsViewModel(); 
-            var mainWindowViewModel = new MainWindowViewModel
+            var mainWindowViewModel = new RefactoredMainWindowViewModel
             {
                 SettingsViewModel = settingsViewModel
             };
@@ -190,7 +193,7 @@ namespace AkademiTrack
                 if (File.Exists(settingsPath))
                 {
                     string json = File.ReadAllText(settingsPath);
-                    var settings = JsonSerializer.Deserialize<AppSettings>(json, new JsonSerializerOptions
+                    var settings = JsonSerializer.Deserialize<ViewModels.AppSettings>(json, new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     });
@@ -245,8 +248,8 @@ github.com/CyberGutta/AkademiTrack";
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
                     
-                    // Trigger OpenSettingsCommand from MainWindowViewModel
-                    if (desktop.MainWindow?.DataContext is MainWindowViewModel mainViewModel)
+                    // Trigger OpenSettingsCommand from RefactoredMainWindowViewModel
+                    if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel mainViewModel)
                     {
                         mainViewModel.OpenSettingsCommand?.Execute(null);
                     }
@@ -263,7 +266,7 @@ github.com/CyberGutta/AkademiTrack";
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
                     
-                    if (desktop.MainWindow?.DataContext is MainWindowViewModel viewModel)
+                    if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
                     {
                         if (viewModel.SettingsViewModel == null)
                         {
@@ -338,13 +341,5 @@ github.com/CyberGutta/AkademiTrack";
                 Debug.WriteLine($"[App] Failed to open URL: {ex.Message}");
             }
         }
-    }
-
-    public class AppSettings
-    {
-        public bool InitialSetupCompleted { get; set; }
-        public bool StartMinimized { get; set; }
-        public bool StartWithSystem { get; set; }
-        public DateTime? LastUpdated { get; set; }
     }
 }

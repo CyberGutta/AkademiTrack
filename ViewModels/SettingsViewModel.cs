@@ -1043,7 +1043,7 @@ Terminal=false
                     if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
                         var mainWindow = desktop.MainWindow as MainWindow;
-                        if (mainWindow?.DataContext is MainWindowViewModel viewModel)
+                        if (mainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
                         {
                             Debug.WriteLine("[SETTINGS] Auto-start setting changed - triggering immediate refresh");
                             await viewModel.RefreshAutoStartStatusAsync();
@@ -1142,19 +1142,21 @@ Terminal=false
 
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
 
-        public void ConnectToMainViewModel(MainWindowViewModel mainViewModel)
+
+
+        public void ConnectToMainViewModel(RefactoredMainWindowViewModel mainViewModel)
         {
             if (mainViewModel?.LogEntries != null)
             {
                 SetLogEntries(mainViewModel.LogEntries);
-                Debug.WriteLine($"✓ Connected to MainViewModel - {mainViewModel.LogEntries.Count} log entries");
+                Debug.WriteLine($"✓ Connected to RefactoredMainViewModel - {mainViewModel.LogEntries.Count} log entries");
 
                 // Force refresh the displayed logs
                 RefreshDisplayedLogs();
             }
             else
             {
-                Debug.WriteLine("⚠️ MainViewModel or LogEntries is null");
+                Debug.WriteLine("⚠️ RefactoredMainViewModel or LogEntries is null");
             }
         }
 
@@ -1191,7 +1193,7 @@ Terminal=false
 
             _lastDiagnosticsRun = DateTime.Now;
 
-            (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+            // (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
 
             try
             {
@@ -1226,7 +1228,7 @@ Terminal=false
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                    // (RunDiagnosticsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
                 });
             }
         }

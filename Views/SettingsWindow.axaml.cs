@@ -38,18 +38,18 @@ namespace AkademiTrack.Views
             UpdateCategorySelection();
         }
 
-        private MainWindowViewModel? GetMainWindowViewModel()
+        private RefactoredMainWindowViewModel? GetMainWindowViewModel()
         {
             try
             {
                 if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     var mainWindow = desktop.MainWindow as MainWindow;
-                    var viewModel = mainWindow?.DataContext as MainWindowViewModel;
+                    var viewModel = mainWindow?.DataContext as RefactoredMainWindowViewModel;
 
                     if (viewModel != null)
                     {
-                        Debug.WriteLine($"✓ Found MainWindowViewModel with {viewModel.LogEntries?.Count ?? 0} log entries");
+                        Debug.WriteLine($"✓ Found RefactoredMainWindowViewModel with {viewModel.LogEntries?.Count ?? 0} log entries");
                     }
 
                     return viewModel;
@@ -57,7 +57,7 @@ namespace AkademiTrack.Views
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error getting MainWindowViewModel: {ex.Message}");
+                Debug.WriteLine($"Error getting RefactoredMainWindowViewModel: {ex.Message}");
             }
             return null;
         }

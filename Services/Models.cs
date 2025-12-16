@@ -27,4 +27,23 @@ namespace AkademiTrack.Services
         public DateTime SavedAt { get; set; }
         public string? SchoolYear { get; set; }
     }
+
+    public class LogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string? Message { get; set; }
+        public string? Level { get; set; }
+        public string FormattedMessage => $"[{Timestamp:HH:mm:ss}] [{Level}] {Message}";
+    }
+
+    public class NotificationEntry
+    {
+        public int Id { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string? Title { get; set; }
+        public string? Message { get; set; }
+        public string? Level { get; set; }
+        public bool IsVisible { get; set; } = true;
+        public TimeSpan? Duration { get; set; }
+    }
 }
