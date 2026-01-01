@@ -41,6 +41,7 @@ namespace AkademiTrack.ViewModels
         private bool _showDashboard = true;
         private bool _showSettings = false;
         private bool _showTutorial = false;
+        private bool _showFeide = false;
         
         // Current notification
         private NotificationEntry? _currentNotification;
@@ -106,6 +107,12 @@ namespace AkademiTrack.ViewModels
             set => SetProperty(ref _showTutorial, value);
         }
 
+        public bool ShowFeide
+        {
+            get => _showFeide;
+            set => SetProperty(ref _showFeide, value);
+        }
+
         // Automation
         public bool IsAutomationRunning => _automationService?.IsRunning ?? false;
 
@@ -129,6 +136,7 @@ namespace AkademiTrack.ViewModels
         // ViewModels
         public SettingsViewModel SettingsViewModel { get; set; }
         public DashboardViewModel Dashboard { get; private set; }
+        public FeideWindowViewModel FeideViewModel { get; set; }
 
         // Application Info
         public string Greeting => "AkademiTrack - STU Tidsregistrering";
@@ -140,6 +148,7 @@ namespace AkademiTrack.ViewModels
         public ICommand StopAutomationCommand { get; }
         public ICommand BackToDashboardCommand { get; }
         public ICommand OpenSettingsCommand { get; }
+        public ICommand OpenFeideCommand { get; }
         public ICommand OpenTutorialCommand { get; }
         public ICommand RefreshDataCommand { get; }
         public ICommand ClearLogsCommand { get; }
@@ -150,7 +159,7 @@ namespace AkademiTrack.ViewModels
         #endregion
 
         #region Constructor
-        public RefactoredMainWindowViewModel()
+        public RefactoredMainWindowViewModel(bool skipInitialization = false)
         {
             // Get services from service locator
             _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
@@ -165,12 +174,14 @@ namespace AkademiTrack.ViewModels
             // Initialize ViewModels
             SettingsViewModel = new SettingsViewModel();
             Dashboard = new DashboardViewModel();
+            FeideViewModel = new FeideWindowViewModel();
 
             // Initialize Commands
             StartAutomationCommand = new AsyncRelayCommand(StartAutomationAsync, () => IsAuthenticated && !IsAutomationRunning);
             StopAutomationCommand = new AsyncRelayCommand(StopAutomationAsync, () => IsAutomationRunning);
             BackToDashboardCommand = new AsyncRelayCommand(BackToDashboardAsync);
             OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync);
+            OpenFeideCommand = new AsyncRelayCommand(OpenFeideAsync);
             OpenTutorialCommand = new AsyncRelayCommand(OpenTutorialAsync);
             RefreshDataCommand = new AsyncRelayCommand(RefreshDataAsync);
             ClearLogsCommand = new AsyncRelayCommand(ClearLogsAsync);
@@ -182,8 +193,22 @@ namespace AkademiTrack.ViewModels
             // Subscribe to service events
             SubscribeToServiceEvents();
 
-            // Start initialization
-            _ = InitializeAsync();
+            // Only start initialization if not skipping (i.e., not showing Feide setup)
+            if (!skipInitialization)
+            {
+                _ = InitializeAsync();
+            }
+        }
+        #endregion
+
+        #region Public Methods
+        /// <summary>
+        /// Starts the authentication and initialization process manually.
+        /// Used when the ViewModel was created with skipInitialization=true.
+        /// </summary>
+        public async Task StartInitializationAsync()
+        {
+            await InitializeAsync();
         }
         #endregion
 
@@ -432,6 +457,7 @@ namespace AkademiTrack.ViewModels
             
             ShowTutorial = false;
             ShowSettings = false;
+            ShowFeide = false;
             ShowDashboard = true;
             
             return Task.CompletedTask;
@@ -446,11 +472,28 @@ namespace AkademiTrack.ViewModels
 
             ShowDashboard = false;
             ShowTutorial = false;
+            ShowFeide = false;
             ShowSettings = true;
 
             // Subscribe to close event
             SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
             SettingsViewModel.CloseRequested += OnSettingsCloseRequested;
+
+            return Task.CompletedTask;
+        }
+
+        private Task OpenFeideAsync()
+        {
+            _loggingService.LogInfo("Åpner Feide-pålogging...");
+
+            ShowDashboard = false;
+            ShowSettings = false;
+            ShowTutorial = false;
+            ShowFeide = true;
+
+            // Subscribe to events
+            FeideViewModel.SetupCompleted -= OnFeideSetupCompleted;
+            FeideViewModel.SetupCompleted += OnFeideSetupCompleted;
 
             return Task.CompletedTask;
         }
@@ -461,6 +504,7 @@ namespace AkademiTrack.ViewModels
             
             ShowDashboard = false;
             ShowSettings = false;
+            ShowFeide = false;
             ShowTutorial = true;
 
             return Task.CompletedTask;
@@ -558,6 +602,22 @@ namespace AkademiTrack.ViewModels
         {
             _ = BackToDashboardAsync();
         }
+
+        private void OnFeideSetupCompleted(object? sender, FeideSetupCompletedEventArgs e)
+        {
+            if (e.Success)
+            {
+                _loggingService.LogSuccess($"✓ Feide-oppsett fullført for {e.UserEmail}");
+                
+                // Reset retry count
+                _initializationRetryCount = 0;
+                // Note: Navigation and StartInitializationAsync() is handled by App.axaml.cs
+            }
+            else
+            {
+                _loggingService.LogError("❌ Feide-oppsett mislyktes");
+            }
+        }
         #endregion
 
         #region Helper Methods
@@ -608,6 +668,7 @@ namespace AkademiTrack.ViewModels
         {
             _httpClient?.Dispose();
             _authService?.Dispose();
+            FeideViewModel?.Dispose();
         }
 
         public async Task RefreshAutoStartStatusAsync()

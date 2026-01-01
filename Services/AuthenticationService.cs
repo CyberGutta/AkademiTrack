@@ -31,8 +31,15 @@ namespace AkademiTrack.Services
                 // Load credentials
                 _loginEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
                 var passwordPlain = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
-                _loginPasswordSecure = StringToSecureString(passwordPlain);
-                passwordPlain = null;
+                try
+                {
+                    _loginPasswordSecure = StringToSecureString(passwordPlain);
+                }
+                finally
+                {
+                    // Immediately clear plaintext password from memory
+                    passwordPlain = null;
+                }
                 _schoolName = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
 
                 // Try loading existing cookies ONCE and cache them
@@ -220,12 +227,20 @@ namespace AkademiTrack.Services
                     if (_credentialsWereRejected)
                     {
                         Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately (no manual login wait)");
-                        return new AuthenticationResult { Success = false };
+                        return new AuthenticationResult 
+                        { 
+                            Success = false, 
+                            ErrorMessage = "Feil brukernavn eller passord. Vennligst sjekk dine Feide-innloggingsdata og prøv igjen." 
+                        };
                     }
                     
                     // For automation service, we should NOT wait for manual login - just fail
                     Console.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
-                    return new AuthenticationResult { Success = false };
+                    return new AuthenticationResult 
+                    { 
+                        Success = false, 
+                        ErrorMessage = "Innlogging mislyktes. Sjekk nettverksforbindelse og prøv igjen." 
+                    };
                 }
 
                 var parameters = await QuickParameterCapture();
@@ -480,8 +495,15 @@ namespace AkademiTrack.Services
                 passwordField.Clear();
                 await Task.Delay(200);
                 var passwordPlain = SecureStringToString(_loginPasswordSecure);
-                passwordField.SendKeys(passwordPlain);
-                passwordPlain = null;
+                try
+                {
+                    passwordField.SendKeys(passwordPlain);
+                }
+                finally
+                {
+                    // Immediately clear plaintext password from memory
+                    passwordPlain = null;
+                }
 
                 await Task.Delay(500);
                 passwordField.SendKeys(Keys.Enter);

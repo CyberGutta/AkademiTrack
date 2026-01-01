@@ -7,17 +7,19 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using AkademiTrack.Services;
 using System.Diagnostics;
+using System.Security;
 
 namespace AkademiTrack.ViewModels
 {
-    public class FeideWindowViewModel : ViewModelBase, INotifyPropertyChanged
+    public class FeideWindowViewModel : ViewModelBase, INotifyPropertyChanged, IDisposable
     {
         private string _schoolName = string.Empty;
         private string _feideUsername = string.Empty;
-        private string _feidePassword = string.Empty;
+        private SecureString? _feidePasswordSecure = new SecureString();
         private string _errorMessage = string.Empty;
         private bool _isLoading = false;
         private bool _isPasswordVisible = false;
+        private bool _isRestarting = false;
 
         public new event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler<FeideSetupCompletedEventArgs>? SetupCompleted;
@@ -84,10 +86,11 @@ namespace AkademiTrack.ViewModels
 
         public string FeidePassword
         {
-            get => _feidePassword;
+            get => SecureStringToString(_feidePasswordSecure);
             set
             {
-                _feidePassword = value;
+                _feidePasswordSecure?.Dispose();
+                _feidePasswordSecure = StringToSecureString(value);
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanSave));
                 (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -131,16 +134,30 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        public bool IsRestarting
+        {
+            get => _isRestarting;
+            set
+            {
+                _isRestarting = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SaveButtonText));
+                OnPropertyChanged(nameof(CanSave));
+            }
+        }
+
         public char PasswordChar => IsPasswordVisible ? '\0' : '•';
 
         public ICommand TogglePasswordCommand { get; }
 
-        public bool CanSave => !IsLoading &&
+        public bool CanSave => !IsLoading && !IsRestarting &&
                                !string.IsNullOrWhiteSpace(SchoolName) &&
                                !string.IsNullOrWhiteSpace(FeideUsername) &&
                                !string.IsNullOrWhiteSpace(FeidePassword);
 
-        public string SaveButtonText => IsLoading ? "Lagrer..." : "Lagre og fortsett";
+        public string SaveButtonText => IsRestarting ? "Starter appen på nytt..." : 
+                                       IsLoading ? "Tester innlogging..." : 
+                                       "Lagre og fortsett";
 
         public ICommand SaveCommand { get; }
         public ICommand ExitCommand { get; }
@@ -173,28 +190,73 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                Debug.WriteLine($"[FeideWindow] Saving credentials for user: {FeideUsername}");
+                Debug.WriteLine($"[FeideWindow] Testing credentials for user: {FeideUsername}");
                 
-                // Save credentials
-                await SaveCredentialsToSettingsAsync();
+                // Step 1: Save credentials temporarily (without marking setup as complete)
+                await SaveCredentialsTemporarilyAsync();
+                Debug.WriteLine("[FeideWindow] Credentials saved temporarily for testing");
 
-                Debug.WriteLine("[FeideWindow] Credentials saved successfully!");
-
-                // Notify success
-                SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
+                // Step 2: Test the credentials with AuthenticationService
+                var authService = new AuthenticationService();
+                var testResult = await authService.AuthenticateAsync();
+                
+                if (testResult.Success)
                 {
-                    Success = true,
-                    UserEmail = FeideUsername
-                });
+                    Debug.WriteLine("[FeideWindow] ✓ Credentials test successful!");
+                    
+                    // Step 3a: Mark setup as complete since credentials work
+                    await MarkSetupAsCompleteAsync();
+                    Debug.WriteLine("[FeideWindow] ✓ Setup marked as complete");
 
-                // Close this window and show main window
-                Debug.WriteLine("[FeideWindow] Requesting window close...");
-                CloseRequested?.Invoke(this, EventArgs.Empty);
+                    // Show restart message
+                    IsRestarting = true;
+                    Debug.WriteLine("[FeideWindow] Showing restart message to user");
+
+                    // Notify success (this will trigger app restart)
+                    SetupCompleted?.Invoke(this, new FeideSetupCompletedEventArgs
+                    {
+                        Success = true,
+                        UserEmail = FeideUsername
+                    });
+
+                    Debug.WriteLine("[FeideWindow] Setup completed successfully - app will restart!");
+                }
+                else
+                {
+                    Debug.WriteLine("[FeideWindow] ❌ Credentials test failed!");
+                    
+                    // Step 3b: Delete the invalid credentials
+                    await DeleteCredentialsAsync();
+                    Debug.WriteLine("[FeideWindow] Invalid credentials deleted");
+                    
+                    // Show error message to user
+                    string errorMsg;
+                    if (!string.IsNullOrEmpty(testResult.ErrorMessage))
+                    {
+                        errorMsg = testResult.ErrorMessage;
+                    }
+                    else
+                    {
+                        // Default message if no specific error
+                        errorMsg = "Feil brukernavn eller passord. Vennligst sjekk dine Feide-innloggingsdata og prøv igjen.";
+                    }
+                    
+                    ErrorMessage = errorMsg;
+                    Debug.WriteLine($"[FeideWindow] Error shown to user: {errorMsg}");
+                }
             }
             catch (Exception ex)
             {
-                ErrorMessage = $"Feil ved lagring: {ex.Message}";
-                Debug.WriteLine($"[FeideWindow] Error saving credentials: {ex}");
+                Debug.WriteLine($"[FeideWindow] Error during credential testing: {ex}");
+                
+                // Clean up any partially saved credentials
+                try
+                {
+                    await DeleteCredentialsAsync();
+                }
+                catch { }
+                
+                ErrorMessage = $"Feil ved testing av innloggingsdata: {ex.Message}";
             }
             finally
             {
@@ -202,23 +264,38 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task SaveCredentialsToSettingsAsync()
+        private async Task SaveCredentialsTemporarilyAsync()
         {
             try
             {
-                Debug.WriteLine("[FeideWindow] Starting credential save process...");
+                Debug.WriteLine("[FeideWindow] Saving credentials temporarily for testing...");
                 
-                // 1. Save to secure storage
+                // Save credentials to secure storage (but don't mark setup as complete yet)
                 await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", FeideUsername);
                 Debug.WriteLine($"[FeideWindow] ✓ Saved LoginEmail: {FeideUsername}");
                 
-                await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", FeidePassword);
+                // Convert SecureString to plaintext temporarily for saving
+                var passwordPlain = SecureStringToString(_feidePasswordSecure);
+                await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", passwordPlain);
+                // Immediately clear the plaintext password
+                passwordPlain = null;
                 Debug.WriteLine("[FeideWindow] ✓ Saved LoginPassword (hidden)");
                 
                 await SecureCredentialStorage.SaveCredentialAsync("SchoolName", SchoolName);
                 Debug.WriteLine($"[FeideWindow] ✓ Saved SchoolName: {SchoolName}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FeideWindow] FAILED to save credentials temporarily: {ex}");
+                throw;
+            }
+        }
 
-                // 2. Update settings.json to mark setup as complete
+        private async Task MarkSetupAsCompleteAsync()
+        {
+            try
+            {
+                // Update settings.json to mark setup as complete
                 var settings = new AppSettings
                 {
                     InitialSetupCompleted = true,
@@ -227,13 +304,34 @@ namespace AkademiTrack.ViewModels
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
                 Debug.WriteLine("[FeideWindow] ✓ Updated settings.json - setup marked complete");
-                
-                Debug.WriteLine("[FeideWindow] All credentials saved successfully!");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FeideWindow] FAILED to save credentials: {ex}");
+                Debug.WriteLine($"[FeideWindow] FAILED to mark setup as complete: {ex}");
                 throw;
+            }
+        }
+
+        private async Task DeleteCredentialsAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[FeideWindow] Deleting invalid credentials...");
+                
+                // Delete credentials from secure storage
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
+                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
+                
+                // Also delete any cached cookies
+                await SecureCredentialStorage.DeleteCookiesAsync();
+                
+                Debug.WriteLine("[FeideWindow] ✓ Invalid credentials deleted");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FeideWindow] Error deleting credentials: {ex}");
+                // Don't throw here - this is cleanup
             }
         }
 
@@ -250,6 +348,49 @@ namespace AkademiTrack.ViewModels
         {
             IsPasswordVisible = !IsPasswordVisible;
             Debug.WriteLine($"[FeideWindow] Password visibility toggled: {IsPasswordVisible}");
+        }
+
+        #region SecureString Helpers
+        
+        private static SecureString StringToSecureString(string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return new SecureString();
+
+            var secure = new SecureString();
+            foreach (char c in str)
+            {
+                secure.AppendChar(c);
+            }
+            secure.MakeReadOnly();
+            return secure;
+        }
+
+        private static string SecureStringToString(SecureString? secure)
+        {
+            if (secure == null || secure.Length == 0)
+                return string.Empty;
+
+            IntPtr ptr = IntPtr.Zero;
+            try
+            {
+                ptr = System.Runtime.InteropServices.Marshal.SecureStringToBSTR(secure);
+                return System.Runtime.InteropServices.Marshal.PtrToStringBSTR(ptr) ?? string.Empty;
+            }
+            finally
+            {
+                if (ptr != IntPtr.Zero)
+                {
+                    System.Runtime.InteropServices.Marshal.ZeroFreeBSTR(ptr);
+                }
+            }
+        }
+
+        #endregion
+
+        public void Dispose()
+        {
+            _feidePasswordSecure?.Dispose();
         }
     }
     

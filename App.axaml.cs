@@ -54,86 +54,43 @@ namespace AkademiTrack
             bool startMinimized = await ShouldStartMinimized();
             Debug.WriteLine($"[App] Should start minimized: {startMinimized}");
 
-            if (!hasFeideCredentials)
-            {
-                Debug.WriteLine("[App] No Feide credentials - showing setup window");
-                ShowFeideSetupWindow(desktop);
-            }
-            else
-            {
-                Debug.WriteLine("[App] Credentials found - showing main window");
-                ShowMainWindow(desktop, startMinimized);
-            }
+            // Always show main window, but determine which view to show
+            ShowMainWindow(desktop, startMinimized, !hasFeideCredentials);
         }
 
-        private void ShowFeideSetupWindow(IClassicDesktopStyleApplicationLifetime desktop)
+        private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized, bool showFeideSetup = false)
         {
-            var feideWindow = new FeideWindow
+            var settingsViewModel = new SettingsViewModel(); 
+            var mainWindowViewModel = new RefactoredMainWindowViewModel(skipInitialization: showFeideSetup)
             {
-                DataContext = new FeideWindowViewModel()
+                SettingsViewModel = settingsViewModel
             };
 
-            var viewModel = feideWindow.DataContext as FeideWindowViewModel;
-            if (viewModel != null)
+            // If we need to show Feide setup, set it up
+            if (showFeideSetup)
             {
-                // Handle successful setup completion
-                viewModel.SetupCompleted += async (sender, e) =>
+                Debug.WriteLine("[App] No Feide credentials - will show Feide setup in main window");
+                
+                // Subscribe to Feide setup completion
+                mainWindowViewModel.FeideViewModel.SetupCompleted += async (sender, e) =>
                 {
                     if (e.Success)
                     {
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
+                        Debug.WriteLine("[App] Restarting application to load all services with new credentials...");
                         
-                        // IMPORTANT: Create and set MainWindow BEFORE closing FeideWindow
-                        // Otherwise the app will shut down due to ShutdownMode.OnLastWindowClose
-                        Debug.WriteLine("[App] Creating main window...");
-                        var mainWindow = new MainWindow
-                        {
-                            DataContext = new RefactoredMainWindowViewModel()
-                        };
+                        // Small delay to let user see success
+                        await Task.Delay(1000);
                         
-                        // Set as MainWindow first
-                        desktop.MainWindow = mainWindow;
-                        Debug.WriteLine("[App] Main window set as MainWindow");
-                        
-                        // Initialize tray icon
-                        AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
-                        Debug.WriteLine("[App] TrayIconManager initialized");
-                        
-                        // Show the main window
-                        mainWindow.Show();
-                        Debug.WriteLine("[App] Main window shown");
-                        
-                        // Small delay for smooth transition
-                        await Task.Delay(200);
-                        
-                        // NOW it's safe to close Feide window
-                        Debug.WriteLine("[App] Closing Feide window...");
-                        feideWindow.Close();
-                        
-                        Debug.WriteLine("[App] Transition from Feide to Main window complete!");
+                        // Restart the application
+                        RestartApplication();
                     }
                 };
-
-                // Handle window close request from ViewModel
-                viewModel.CloseRequested += (sender, e) =>
-                {
-                    Debug.WriteLine("[App] CloseRequested event received from FeideWindowViewModel");
-                    // Window will close itself, event is just for logging
-                };
+                
+                // Show Feide view initially
+                mainWindowViewModel.ShowFeide = true;
+                mainWindowViewModel.ShowDashboard = false;
             }
-
-            desktop.MainWindow = feideWindow;
-            feideWindow.Show();
-            Debug.WriteLine("[App] Feide window shown");
-        }
-
-        private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized)
-        {
-            var settingsViewModel = new SettingsViewModel(); 
-            var mainWindowViewModel = new RefactoredMainWindowViewModel
-            {
-                SettingsViewModel = settingsViewModel
-            };
 
             var mainWindow = new MainWindow
             {
@@ -146,7 +103,7 @@ namespace AkademiTrack
             AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
             Debug.WriteLine("[App] TrayIconManager initialized");
 
-            if (startMinimized)
+            if (startMinimized && !showFeideSetup) // Don't start minimized if showing Feide setup
             {
                 Debug.WriteLine("[App] Starting minimized to tray...");
 
@@ -162,8 +119,64 @@ namespace AkademiTrack
                 Debug.WriteLine("[App] Main window shown normally");
             }
 
-            // ✅ Trigger update check after window is shown
-            _ = settingsViewModel.CheckForUpdatesAsync();
+            // ✅ Trigger update check after window is shown (only if not showing Feide setup)
+            if (!showFeideSetup)
+            {
+                _ = settingsViewModel.CheckForUpdatesAsync();
+            }
+        }
+
+        private void RestartApplication()
+        {
+            try
+            {
+                Debug.WriteLine("[App] Starting application restart process...");
+                
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    // Get the current executable path
+                    var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+                    var executablePath = currentProcess.MainModule?.FileName;
+                    
+                    if (!string.IsNullOrEmpty(executablePath))
+                    {
+                        Debug.WriteLine($"[App] Executable path: {executablePath}");
+                        
+                        // Start new instance
+                        var startInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = executablePath,
+                            UseShellExecute = true,
+                            WorkingDirectory = System.IO.Directory.GetCurrentDirectory()
+                        };
+                        
+                        Debug.WriteLine("[App] Starting new application instance...");
+                        System.Diagnostics.Process.Start(startInfo);
+                        
+                        // Shutdown current instance
+                        Debug.WriteLine("[App] Shutting down current instance...");
+                        _isShuttingDown = true;
+                        desktop.Shutdown();
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[App] ERROR: Could not determine executable path for restart");
+                        // Fallback: just shutdown (user can manually restart)
+                        _isShuttingDown = true;
+                        desktop.Shutdown();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] Error during restart: {ex.Message}");
+                // Fallback: just shutdown
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    _isShuttingDown = true;
+                    desktop.Shutdown();
+                }
+            }
         }
 
         private async Task<bool> ShouldStartMinimized()

@@ -1,0 +1,349 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:AkademiTrack.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="705"
+             x:Class="AkademiTrack.Views.FeideView"
+             x:DataType="vm:FeideWindowViewModel">
+
+	<UserControl.Styles>
+		<!-- TextBox Styles -->
+		<Style Selector="TextBox">
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="CaretBrush" Value="#333333"/>
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="TextBox /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#4A90E2"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
+
+		<Style Selector="TextBox:focus">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#999999"/>
+		</Style>
+
+		<Style Selector="TextBox:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<!-- ComboBox Styles -->
+		<Style Selector="ComboBox">
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="PlaceholderForeground" Value="#999999"/>
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Border#Background">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="ComboBox:focus /template/ Border#Background">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#4A90E2"/>
+			<Setter Property="BorderThickness" Value="2"/>
+		</Style>
+
+		<Style Selector="ComboBox:pointerover /template/ Border#Background">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#999999"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Popup > Border">
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Popup ScrollViewer">
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="White"/>
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinHeight" Value="36"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="White"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#E8F0F8"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#E8F0F8"/>
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#D0E7FF"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#D0E7FF"/>
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Background" Value="#B8D8FF"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#B8D8FF"/>
+			<Setter Property="Foreground" Value="#333333"/>
+		</Style>
+
+		<!-- Label Styles -->
+		<Style Selector="TextBlock.label">
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Foreground" Value="#333333"/>
+			<Setter Property="Margin" Value="0,0,0,6"/>
+		</Style>
+
+		<!-- Primary Button Styles -->
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#4A90E2"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+
+		<Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#3A7BC8"/>
+		</Style>
+
+		<Style Selector="Button.primary:pressed /template/ ContentPresenter">
+			<Setter Property="Background" Value="#2A6BA8"/>
+		</Style>
+
+		<Style Selector="Button.primary:disabled /template/ ContentPresenter">
+			<Setter Property="Background" Value="#CCCCCC"/>
+		</Style>
+
+		<Style Selector="Button.primary:disabled">
+			<Setter Property="Foreground" Value="#666666"/>
+			<Setter Property="Cursor" Value="Arrow"/>
+		</Style>
+
+		<!-- Secondary Button -->
+		<Style Selector="Button.secondary">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Foreground" Value="#666666"/>
+			<Setter Property="BorderBrush" Value="#CCCCCC"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="FontSize" Value="13"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+
+		<Style Selector="Button.secondary:pointerover">
+			<Setter Property="Background" Value="#F5F5F5"/>
+			<Setter Property="BorderBrush" Value="#999999"/>
+		</Style>
+
+		<Style Selector="Button.secondary:pressed">
+			<Setter Property="Background" Value="#E0E0E0"/>
+		</Style>
+
+		<!-- Password Toggle Button -->
+		<Style Selector="Button.passwordToggle">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="8"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Width" Value="36"/>
+			<Setter Property="Height" Value="36"/>
+		</Style>
+
+		<Style Selector="Button.passwordToggle:pointerover">
+			<Setter Property="Background" Value="#F0F0F0"/>
+		</Style>
+
+		<Style Selector="Button.passwordToggle:pressed">
+			<Setter Property="Background" Value="#E0E0E0"/>
+		</Style>
+	</UserControl.Styles>
+
+	<!-- Main Content - Centered in the window -->
+	<Grid HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="500">
+		<Border Background="White" 
+				CornerRadius="12" 
+				BoxShadow="0 4 20 0 #20000000"
+				Padding="0">
+			
+			<Grid RowDefinitions="Auto,*,Auto">
+				<!-- Header -->
+				<Border Grid.Row="0" Background="#4A90E2" Padding="30,25" CornerRadius="12,12,0,0">
+					<StackPanel Spacing="8">
+						<TextBlock Text="Feide Pålogging"
+								   FontSize="24"
+								   FontWeight="Bold"
+								   Foreground="White"/>
+						<TextBlock Text="Vennligst logg inn med din Feide-konto"
+								   FontSize="13"
+								   Foreground="#E8F0F8"/>
+					</StackPanel>
+				</Border>
+
+				<!-- Content -->
+				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+					<StackPanel Margin="30,30,30,20" Spacing="20">
+
+						<!-- Info Box -->
+						<Border Background="#F0F7FF"
+								BorderBrush="#4A90E2"
+								BorderThickness="1"
+								CornerRadius="6"
+								Padding="15">
+							<StackPanel Spacing="8">
+								<TextBlock Text="ℹ️ Informasjon"
+										   FontWeight="SemiBold"
+										   FontSize="13"
+										   Foreground="#2C5F8D"/>
+								<TextBlock TextWrapping="Wrap"
+										   FontSize="12"
+										   Foreground="#2C5F8D">
+									Oppgi dine Feide-innloggingsdetaljer. Disse vil lagres kryptert lokalt på din enhet og brukes for automatisk fremmøteregistrering.
+								</TextBlock>
+							</StackPanel>
+						</Border>
+
+						<!-- School Name -->
+						<StackPanel Spacing="8">
+							<TextBlock Text="Skolenavn" Classes="label"/>
+							<ComboBox Name="SchoolNameComboBox"
+									  ItemsSource="{Binding Schools}"
+									  SelectedItem="{Binding SchoolName}"
+									  PlaceholderText="Velg din skole"
+									  HorizontalAlignment="Stretch"
+									  MaxDropDownHeight="300"/>
+							<TextBlock Text="Velg din skole eller utdanningsinstitusjon"
+									   FontSize="11"
+									   Foreground="#666666"
+									   Margin="0,2,0,0"/>
+						</StackPanel>
+
+						<!-- Username -->
+						<StackPanel Spacing="8">
+							<TextBlock Text="Feide Brukernavn" Classes="label"/>
+							<TextBox Name="UsernameTextBox"
+									 Watermark="F.eks: 78abcdef"
+									 Text="{Binding FeideUsername}"/>
+							<TextBlock Text="Skriv inn ditt Feide brukernavn."
+									   FontSize="11"
+									   Foreground="#666666"
+									   Margin="0,2,0,0"/>
+						</StackPanel>
+
+						<!-- Password with Toggle -->
+						<StackPanel Spacing="8">
+							<TextBlock Text="Feide Passord" Classes="label"/>
+							<Grid>
+								<TextBox Name="PasswordTextBox"
+										Watermark="Ditt Feide-passord"
+										PasswordChar="{Binding PasswordChar}"
+										Text="{Binding FeidePassword}"
+										Padding="12,10,48,10"/>
+
+								<Button Name="TogglePasswordButton"
+										Classes="passwordToggle"
+										HorizontalAlignment="Right"
+										VerticalAlignment="Center"
+										Margin="0,0,4,0"
+										Command="{Binding TogglePasswordCommand}"
+										ToolTip.Tip="Vis/skjul passord">
+									<Path Name="EyeIcon"
+											Fill="#666666"
+											Data="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+											Stretch="Uniform"
+											Width="20"
+											Height="20"/>
+								</Button>
+							</Grid>
+							<TextBlock Text="Ditt Feide-passord lagres kryptert"
+									   FontSize="11"
+									   Foreground="#666666"
+									   Margin="0,2,0,0"/>
+						</StackPanel>
+
+						<!-- Error Message -->
+						<Border Background="#FFE8E8"
+								BorderBrush="#FF4444"
+								BorderThickness="1"
+								CornerRadius="6"
+								Padding="12"
+								IsVisible="{Binding HasError}">
+							<TextBlock Text="{Binding ErrorMessage}"
+									   Foreground="#CC0000"
+									   TextWrapping="Wrap"
+									   FontSize="12"/>
+						</Border>
+
+					</StackPanel>
+				</ScrollViewer>
+
+				<!-- Footer -->
+				<Border Grid.Row="2"
+						Background="#F9F9F9"
+						BorderBrush="#E0E0E0"
+						BorderThickness="0,1,0,0"
+						Padding="30,20"
+						CornerRadius="0,0,12,12">
+					<Grid ColumnDefinitions="*,Auto">
+
+						<!-- Save Button -->
+						<Button Grid.Column="1"
+								Content="{Binding SaveButtonText}"
+								Command="{Binding SaveCommand}"
+								IsEnabled="{Binding CanSave}"
+								Classes="primary"
+								MinWidth="140"/>
+					</Grid>
+				</Border>
+			</Grid>
+		</Border>
+	</Grid>
+</UserControl>

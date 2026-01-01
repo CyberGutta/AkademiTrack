@@ -2005,10 +2005,18 @@ Terminal=false
             await CheckForUpdatesAsync();
         }
 
-        public (string email, string password, string school) GetDecryptedCredentials()
+        public void UseCredentialsSecurely(Action<string, string, string> action)
         {
-            var password = SecureStringToString(_loginPasswordSecure);
-            return (_loginEmail, password, _schoolName);
+            var passwordPlain = SecureStringToString(_loginPasswordSecure);
+            try
+            {
+                action(_loginEmail, passwordPlain, _schoolName);
+            }
+            finally
+            {
+                // Immediately clear the plaintext password
+                passwordPlain = null;
+            }
         }
         public void SetLogEntries(ObservableCollection<LogEntry> logEntries)
         {
@@ -2427,11 +2435,16 @@ Terminal=false
 
                 // Convert SecureString to plain string temporarily for saving
                 var passwordPlain = SecureStringToString(_loginPasswordSecure);
-                if (!string.IsNullOrEmpty(passwordPlain))
+                try
                 {
-                    await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", passwordPlain);
-                    
-                    // Clear the temporary plaintext password
+                    if (!string.IsNullOrEmpty(passwordPlain))
+                    {
+                        await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", passwordPlain);
+                    }
+                }
+                finally
+                {
+                    // Immediately clear the temporary plaintext password
                     passwordPlain = null;
                 }
 
