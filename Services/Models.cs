@@ -19,6 +19,7 @@ namespace AkademiTrack.Services
         public bool Success { get; set; }
         public Dictionary<string, string>? Cookies { get; set; }
         public UserParameters? Parameters { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 
     public class SavedParameterData

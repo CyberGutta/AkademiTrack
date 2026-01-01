@@ -19,11 +19,15 @@ namespace AkademiTrack.Services
         private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
         private Dictionary<string, string>? _cachedCookies;
+        private bool _credentialsWereRejected = false; // Track if credentials were explicitly rejected
 
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
             try
             {
+                // Reset credentials rejected flag at start of new authentication attempt
+                _credentialsWereRejected = false;
+                
                 // Load credentials
                 _loginEmail = await SecureCredentialStorage.GetCredentialAsync("LoginEmail") ?? "";
                 var passwordPlain = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
@@ -64,6 +68,18 @@ namespace AkademiTrack.Services
                                     _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
                                     !string.IsNullOrEmpty(_schoolName);
 
+                Console.WriteLine($"[AUTH] Credential check - Email: {(!string.IsNullOrEmpty(_loginEmail) ? "✓" : "✗")}, Password: {(_loginPasswordSecure != null && _loginPasswordSecure.Length > 0 ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(_schoolName) ? "✓" : "✗")}");
+
+                if (!hasCredentials)
+                {
+                    Console.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
+                    return new AuthenticationResult 
+                    { 
+                        Success = false, 
+                        ErrorMessage = "Mangler innloggingsdata. Vennligst gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn." 
+                    };
+                }
+
                 var loginResult = await PerformBrowserLoginAsync(hasCredentials);
                 
                 if (loginResult.Success)
@@ -72,12 +88,21 @@ namespace AkademiTrack.Services
                     return loginResult;
                 }
                 
-                return new AuthenticationResult { Success = false };
+                // Return the specific error message from login attempt
+                return new AuthenticationResult 
+                { 
+                    Success = false, 
+                    ErrorMessage = loginResult.ErrorMessage ?? "Ukjent feil under autentisering" 
+                };
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Authentication error: {ex.Message}");
-                return new AuthenticationResult { Success = false };
+                Console.WriteLine($"[AUTH] Authentication error: {ex.Message}");
+                return new AuthenticationResult 
+                { 
+                    Success = false, 
+                    ErrorMessage = $"Teknisk feil: {ex.Message}" 
+                };
             }
             finally
             {
@@ -148,16 +173,8 @@ namespace AkademiTrack.Services
                 options.AddArgument("--disable-blink-features=AutomationControlled");
                 options.AddExcludedArgument("enable-automation");
                 options.AddArgument("--disable-gpu");
-
-                if (hasCredentials)
-                {
-                    options.AddArgument("--headless=new");
-                    options.AddArgument("--window-size=1920,1080");
-                }
-                else
-                {
-                    options.AddArgument("--start-maximized");
-                }
+                options.AddArgument("--headless"); // COMMENTED OUT FOR DEBUGGING - no visible browser windows
+                options.AddArgument("--window-size=1920,1080");
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
@@ -179,21 +196,36 @@ namespace AkademiTrack.Services
                 {
                     try
                     {
+                        Console.WriteLine("[AUTH] Starting PerformFastAutomaticLoginAsync...");
                         loginSuccess = await PerformFastAutomaticLoginAsync();
+                        Console.WriteLine($"[AUTH] PerformFastAutomaticLoginAsync returned: {loginSuccess}");
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message == "INVALID_CREDENTIALS")
+                    {
+                        Console.WriteLine("[AUTH] ❌ INVALID CREDENTIALS DETECTED - returning failure immediately");
+                        return new AuthenticationResult { Success = false };
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Auto-login failed: {ex.Message}");
+                        Console.WriteLine($"[AUTH] Auto-login failed with exception: {ex.Message}");
                         loginSuccess = false;
                     }
                 }
 
                 if (!loginSuccess)
                 {
-                    if (!await WaitForTargetUrlAsync())
+                    Console.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
+                    
+                    // If credentials were explicitly rejected, don't wait for manual login
+                    if (_credentialsWereRejected)
                     {
+                        Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately (no manual login wait)");
                         return new AuthenticationResult { Success = false };
                     }
+                    
+                    // For automation service, we should NOT wait for manual login - just fail
+                    Console.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
+                    return new AuthenticationResult { Success = false };
                 }
 
                 var parameters = await QuickParameterCapture();
@@ -218,7 +250,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Login error: {ex.Message}");
+                Console.WriteLine($"[AUTH] Login error: {ex.Message}");
                 return new AuthenticationResult { Success = false };
             }
         }
@@ -272,7 +304,9 @@ namespace AkademiTrack.Services
                 }
 
                 // Fill login form
+                Console.WriteLine("[AUTH] Calling HandleFastFeideLoginFormAsync...");
                 var loginResult = await HandleFastFeideLoginFormAsync();
+                Console.WriteLine($"[AUTH] HandleFastFeideLoginFormAsync returned: {loginResult}");
                 return loginResult;
             }
             catch
@@ -451,29 +485,189 @@ namespace AkademiTrack.Services
 
                 await Task.Delay(500);
                 passwordField.SendKeys(Keys.Enter);
+                
+                Console.WriteLine("[AUTH] ========== LOGIN FORM SUBMITTED ==========");
+                Console.WriteLine("[AUTH] Waiting for Feide response...");
+                
+                // Wait a bit for the page to process the login
+                await Task.Delay(2000);
 
-                for (int i = 0; i < 15; i++)
+                for (int i = 0; i < 25; i++)
                 {
                     await Task.Delay(1000);
                     var currentUrl = _webDriver.Url;
                     
+                    Console.WriteLine($"[AUTH] Checking login status... attempt {i + 1}/25");
+                    Console.WriteLine($"[AUTH] Current URL: {currentUrl}");
+                    
+                    // Check for success first
                     if (currentUrl.Contains("isFeideinnlogget=true") || 
                         currentUrl.Contains("ojr=timeplan"))
                     {
+                        Console.WriteLine("[AUTH] ✓ SUCCESS: Login successful - found success URL");
                         return true;
                     }
                     
-                    try
+                    // DEBUG: After 5 seconds, dump page content to see what's actually there
+                    if (i == 4) // 5th attempt (5 seconds)
                     {
-                        var errorElement = _webDriver.FindElement(By.ClassName("error"));
-                        if (errorElement != null && errorElement.Displayed)
+                        try
                         {
-                            return false;
+                            var pageSource = _webDriver.PageSource;
+                            Console.WriteLine("[AUTH] ========== PAGE SOURCE DUMP (after 5 seconds) ==========");
+                            Console.WriteLine($"[AUTH] Page title: {_webDriver.Title}");
+                            Console.WriteLine($"[AUTH] Current URL: {currentUrl}");
+                            
+                            // Look for any error-related content
+                            if (pageSource.Contains("Innlogging feilet"))
+                            {
+                                Console.WriteLine("[AUTH] ❌ FOUND 'Innlogging feilet' in page source!");
+                                var startIndex = Math.Max(0, pageSource.IndexOf("Innlogging feilet") - 200);
+                                var endIndex = Math.Min(pageSource.Length, pageSource.IndexOf("Innlogging feilet") + 200);
+                                var context = pageSource.Substring(startIndex, endIndex - startIndex);
+                                Console.WriteLine($"[AUTH] Context around error: {context}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("[AUTH] No 'Innlogging feilet' found in page source");
+                            }
+                            
+                            // Check for dialog elements
+                            if (pageSource.Contains("dialog"))
+                            {
+                                Console.WriteLine("[AUTH] Found 'dialog' in page source");
+                            }
+                            
+                            if (pageSource.Contains("error"))
+                            {
+                                Console.WriteLine("[AUTH] Found 'error' in page source");
+                            }
+                            
+                            Console.WriteLine("[AUTH] ========== END PAGE SOURCE DUMP ==========");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[AUTH] Error dumping page source: {ex.Message}");
                         }
                     }
-                    catch { }
+                    
+                    // Check for Feide login error dialog using the exact structure provided by user
+                    // <div class="dialog panel error" data-type="panel error">
+                    try
+                    {
+                        // First, check if page source contains the error text (fastest check)
+                        var pageSource = _webDriver.PageSource;
+                        if (pageSource.Contains("Innlogging feilet"))
+                        {
+                            Console.WriteLine("[AUTH] ❌ CONFIRMED: Found 'Innlogging feilet' in page source - INVALID CREDENTIALS!");
+                            Console.WriteLine("[AUTH] ❌ RETURNING FALSE FROM HandleFastFeideLoginFormAsync");
+                            _credentialsWereRejected = true;
+                            return false;
+                        }
+                        
+                        // Try multiple CSS selectors to catch the error dialog
+                        var selectors = new[]
+                        {
+                            "div.dialog.panel.error",           // Main selector
+                            "div[data-type='panel error']",     // Data attribute selector
+                            "div.dialog.error",                 // Simplified selector
+                            ".dialog.panel.error",              // Class-based selector
+                            ".error",                           // Generic error class
+                            "[class*='error']"                  // Any element with 'error' in class
+                        };
+                        
+                        foreach (var selector in selectors)
+                        {
+                            try
+                            {
+                                var errorElements = _webDriver.FindElements(By.CssSelector(selector));
+                                if (errorElements.Count > 0)
+                                {
+                                    Console.WriteLine($"[AUTH] Found {errorElements.Count} potential error element(s) using selector: {selector}");
+                                    
+                                    foreach (var errorElement in errorElements)
+                                    {
+                                        if (errorElement.Displayed)
+                                        {
+                                            var elementText = errorElement.Text;
+                                            Console.WriteLine($"[AUTH] Error element text: '{elementText}'");
+                                            
+                                            if (elementText.Contains("Innlogging feilet") || 
+                                                elementText.Contains("feil brukernavn eller passord") ||
+                                                elementText.Contains("Dette kan skyldes feil brukernavn"))
+                                            {
+                                                Console.WriteLine("[AUTH] ❌ CONFIRMED: Error text detected - INVALID CREDENTIALS!");
+                                                _credentialsWereRejected = true;
+                                                return false;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[AUTH] Selector '{selector}' failed: {ex.Message}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AUTH] Error checking for error dialog: {ex.Message}");
+                    }
+                    
+                    // Also check for any element containing "Innlogging feilet" text (fallback)
+                    try
+                    {
+                        var errorElements = _webDriver.FindElements(By.XPath("//*[contains(text(), 'Innlogging feilet')]"));
+                        if (errorElements.Count > 0)
+                        {
+                            Console.WriteLine($"[AUTH] Found {errorElements.Count} element(s) with 'Innlogging feilet' text");
+                            
+                            foreach (var element in errorElements)
+                            {
+                                if (element.Displayed)
+                                {
+                                    Console.WriteLine($"[AUTH] ❌ CONFIRMED: Found visible 'Innlogging feilet' text - INVALID CREDENTIALS!");
+                                    Console.WriteLine($"[AUTH] Element tag: {element.TagName}, text: '{element.Text}'");
+                                    _credentialsWereRejected = true;
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AUTH] Error checking for 'Innlogging feilet' text: {ex.Message}");
+                    }
+                    
+                    // Check for h2 with "Innlogging feilet" (specific to the error structure)
+                    try
+                    {
+                        var h2Elements = _webDriver.FindElements(By.XPath("//h2[contains(text(), 'Innlogging feilet')]"));
+                        if (h2Elements.Count > 0)
+                        {
+                            Console.WriteLine($"[AUTH] Found {h2Elements.Count} h2 element(s) with 'Innlogging feilet'");
+                            
+                            foreach (var h2 in h2Elements)
+                            {
+                                if (h2.Displayed)
+                                {
+                                    Console.WriteLine($"[AUTH] ❌ CONFIRMED: Found h2 with 'Innlogging feilet' - INVALID CREDENTIALS!");
+                                    _credentialsWereRejected = true;
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AUTH] Error checking for h2 'Innlogging feilet': {ex.Message}");
+                    }
+                    
+                    Console.WriteLine($"[AUTH] No success or error detected yet, continuing to wait...");
                 }
 
+                Console.WriteLine("[AUTH] ❌ LOGIN TIMEOUT - no success or error detected after 25 attempts");
                 return false;
             }
             catch

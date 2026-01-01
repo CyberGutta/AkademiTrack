@@ -56,13 +56,29 @@ namespace AkademiTrack.ViewModels
         public bool IsLoading
         {
             get => _isLoading;
-            private set => SetProperty(ref _isLoading, value);
+            private set 
+            { 
+                if (SetProperty(ref _isLoading, value))
+                {
+                    // Update command states when loading changes
+                    ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         public bool IsAuthenticated
         {
             get => _isAuthenticated;
-            private set => SetProperty(ref _isAuthenticated, value);
+            private set 
+            { 
+                if (SetProperty(ref _isAuthenticated, value))
+                {
+                    // Update command states when authentication changes
+                    ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         public string StatusMessage
@@ -130,6 +146,7 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
+        public ICommand RetryAuthenticationCommand { get; }
         #endregion
 
         #region Constructor
@@ -160,6 +177,7 @@ namespace AkademiTrack.ViewModels
             ToggleDetailedLogsCommand = new AsyncRelayCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
+            RetryAuthenticationCommand = new AsyncRelayCommand(RetryAuthenticationAsync, () => !IsAuthenticated && !IsLoading);
 
             // Subscribe to service events
             SubscribeToServiceEvents();
@@ -170,12 +188,15 @@ namespace AkademiTrack.ViewModels
         #endregion
 
         #region Initialization
+        private int _initializationRetryCount = 0;
+        private const int MAX_RETRY_ATTEMPTS = 3;
+        
         private async Task InitializeAsync()
         {
             try
             {
                 IsLoading = true;
-                _loggingService.LogInfo("🚀 Starter AkademiTrack...");
+                _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
                 // Initialize authentication service
                 _authService = new AuthenticationService();
@@ -210,20 +231,47 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogSuccess("✓ Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
                     
+                    // Reset retry count on success
+                    _initializationRetryCount = 0;
+                    
                     await Task.Delay(500);
                     IsLoading = false;
                 }
                 else
                 {
-                    _loggingService.LogError("❌ Autentisering mislyktes - kan ikke starte applikasjon");
+                    _initializationRetryCount++;
+                    
+                    // Use specific error message if available
+                    string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage) 
+                        ? authResult.ErrorMessage 
+                        : "Kunne ikke autentisere med iskole.net. Sjekk innloggingsdata i innstillinger.";
+                    
+                    if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
+                    {
+                        _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
+                        _loggingService.LogError($"Feilmelding: {errorMessage}");
+                        await _notificationService.ShowNotificationAsync(
+                            "Autentisering mislyktes",
+                            $"Etter {MAX_RETRY_ATTEMPTS} forsøk: {errorMessage}",
+                            NotificationLevel.Error
+                        );
+                        
+                        StatusMessage = "Autentisering mislyktes - sjekk innstillinger";
+                        IsLoading = false;
+                        return; // Stop retrying
+                    }
+                    
+                    _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
+                    _loggingService.LogError($"Feilmelding: {errorMessage}");
                     await _notificationService.ShowNotificationAsync(
                         "Autentisering mislyktes",
-                        "Kunne ikke autentisere med iskole.net. Vennligst prøv igjen.",
-                        NotificationLevel.Error
+                        $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} mislyktes. Prøver igjen...",
+                        NotificationLevel.Warning
                     );
                     
-                    await Task.Delay(3000);
-                    await InitializeAsync(); // Retry
+                    // Exponential backoff: 3s, 6s, 9s
+                    await Task.Delay(3000 * _initializationRetryCount);
+                    await InitializeAsync(); // Retry with increased delay
                 }
             }
             catch (Exception ex)
@@ -482,6 +530,26 @@ namespace AkademiTrack.ViewModels
             Services.ThemeManager.Instance.ToggleTheme();
             _loggingService.LogInfo($"Theme changed to {(Services.ThemeManager.Instance.IsDarkMode ? "dark" : "light")} mode");
             return Task.CompletedTask;
+        }
+
+        private async Task RetryAuthenticationAsync()
+        {
+            _loggingService.LogInfo("🔄 Manuell retry av autentisering startet...");
+            
+            // Reset retry count for manual retry
+            _initializationRetryCount = 0;
+            
+            // Reset authentication state
+            IsAuthenticated = false;
+            _userParameters = null;
+            
+            // Update command states
+            ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
+            ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+            ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
+            
+            // Start initialization again
+            await InitializeAsync();
         }
         #endregion
 
