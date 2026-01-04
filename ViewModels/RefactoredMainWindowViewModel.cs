@@ -33,6 +33,7 @@ namespace AkademiTrack.ViewModels
         private readonly HttpClient _httpClient;
         private AuthenticationService? _authService;
         private UserParameters? _userParameters;
+        private UpdateCheckerService? _updateChecker;
         private bool _isLoading = true;
         private bool _isAuthenticated = false;
         private string _statusMessage = "Ready";
@@ -173,6 +174,7 @@ namespace AkademiTrack.ViewModels
             
             // Initialize ViewModels
             SettingsViewModel = new SettingsViewModel();
+            _updateChecker = new UpdateCheckerService(SettingsViewModel);
             Dashboard = new DashboardViewModel();
             FeideViewModel = new FeideWindowViewModel();
 
@@ -255,7 +257,10 @@ namespace AkademiTrack.ViewModels
                     
                     _loggingService.LogSuccess("✓ Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
-                    
+
+                    _updateChecker?.StartPeriodicChecks();
+                    _loggingService.LogInfo("Update checker ready");
+
                     // Reset retry count on success
                     _initializationRetryCount = 0;
                     
@@ -666,6 +671,7 @@ namespace AkademiTrack.ViewModels
         #region Disposal
         public void Dispose()
         {
+            _updateChecker?.Dispose();
             _httpClient?.Dispose();
             _authService?.Dispose();
             FeideViewModel?.Dispose();

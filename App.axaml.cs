@@ -26,7 +26,7 @@ namespace AkademiTrack
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
-            
+
             // Initialize services
             Services.ServiceLocator.InitializeServices();
         }
@@ -60,17 +60,14 @@ namespace AkademiTrack
 
         private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized, bool showFeideSetup = false)
         {
-            var settingsViewModel = new SettingsViewModel(); 
-            var mainWindowViewModel = new RefactoredMainWindowViewModel(skipInitialization: showFeideSetup)
-            {
-                SettingsViewModel = settingsViewModel
-            };
+            // ✅ Create viewmodel (it already has SettingsViewModel initialized in its constructor)
+            var mainWindowViewModel = new RefactoredMainWindowViewModel(skipInitialization: showFeideSetup);
 
             // If we need to show Feide setup, set it up
             if (showFeideSetup)
             {
                 Debug.WriteLine("[App] No Feide credentials - will show Feide setup in main window");
-                
+
                 // Subscribe to Feide setup completion
                 mainWindowViewModel.FeideViewModel.SetupCompleted += async (sender, e) =>
                 {
@@ -78,15 +75,15 @@ namespace AkademiTrack
                     {
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
                         Debug.WriteLine("[App] Restarting application to load all services with new credentials...");
-                        
+
                         // Small delay to let user see success
                         await Task.Delay(1000);
-                        
+
                         // Restart the application
                         RestartApplication();
                     }
                 };
-                
+
                 // Show Feide view initially
                 mainWindowViewModel.ShowFeide = true;
                 mainWindowViewModel.ShowDashboard = false;
@@ -118,12 +115,6 @@ namespace AkademiTrack
                 mainWindow.Show();
                 Debug.WriteLine("[App] Main window shown normally");
             }
-
-            // ✅ Trigger update check after window is shown (only if not showing Feide setup)
-            if (!showFeideSetup)
-            {
-                _ = settingsViewModel.CheckForUpdatesAsync();
-            }
         }
 
         private void RestartApplication()
@@ -131,17 +122,17 @@ namespace AkademiTrack
             try
             {
                 Debug.WriteLine("[App] Starting application restart process...");
-                
+
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     // Get the current executable path
                     var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
                     var executablePath = currentProcess.MainModule?.FileName;
-                    
+
                     if (!string.IsNullOrEmpty(executablePath))
                     {
                         Debug.WriteLine($"[App] Executable path: {executablePath}");
-                        
+
                         // Start new instance
                         var startInfo = new System.Diagnostics.ProcessStartInfo
                         {
@@ -149,10 +140,10 @@ namespace AkademiTrack
                             UseShellExecute = true,
                             WorkingDirectory = System.IO.Directory.GetCurrentDirectory()
                         };
-                        
+
                         Debug.WriteLine("[App] Starting new application instance...");
                         System.Diagnostics.Process.Start(startInfo);
-                        
+
                         // Shutdown current instance
                         Debug.WriteLine("[App] Shutting down current instance...");
                         _isShuttingDown = true;
@@ -215,7 +206,7 @@ namespace AkademiTrack
                     Debug.WriteLine($"[App] InitialSetupCompleted from settings.json: {hasCredentials}");
                     return hasCredentials;
                 }
-                
+
                 Debug.WriteLine("[App] settings.json not found - no credentials");
                 return false;
             }
@@ -260,7 +251,7 @@ github.com/CyberGutta/AkademiTrack";
                     // Ensure main window is visible
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
-                    
+
                     // Trigger OpenSettingsCommand from RefactoredMainWindowViewModel
                     if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel mainViewModel)
                     {
@@ -278,17 +269,11 @@ github.com/CyberGutta/AkademiTrack";
                 {
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
-                    
+
                     if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
                     {
-                        if (viewModel.SettingsViewModel == null)
-                        {
-                            viewModel.SettingsViewModel = new SettingsViewModel();
-                        }
-                        
                         await viewModel.SettingsViewModel.CheckForUpdatesAsync();
-                        
-                        var status = viewModel.SettingsViewModel.UpdateStatus;
+
                         if (viewModel.SettingsViewModel.UpdateAvailable)
                         {
                             NativeNotificationService.Show(
