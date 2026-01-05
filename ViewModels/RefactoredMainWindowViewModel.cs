@@ -286,7 +286,8 @@ namespace AkademiTrack.ViewModels
                             NotificationLevel.Error
                         );
                         
-                        StatusMessage = "Autentisering mislyktes - sjekk innstillinger";
+                        
+                        StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
                         IsLoading = false;
                         return; // Stop retrying
                     }
@@ -426,7 +427,7 @@ namespace AkademiTrack.ViewModels
             {
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering feilet",
-                    result.Message ?? "Ukjent feil",
+                    result.Message ?? "Nettverk eller autentiseringsfeil ved start av automatisering",
                     NotificationLevel.Error
                 );
             }
