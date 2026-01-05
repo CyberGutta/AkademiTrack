@@ -96,10 +96,10 @@ namespace AkademiTrack.Services
                 }
                 
                 // Return the specific error message from login attempt
-                return new AuthenticationResult 
-                { 
+                return new AuthenticationResult {   
                     Success = false, 
-                    ErrorMessage = loginResult.ErrorMessage ?? "Ukjent feil under autentisering" 
+                    ErrorMessage = loginResult.ErrorMessage ?? "ERROR: Sjekk om du er på et gyldig nettverk" 
+
                 };
             }
             catch (Exception ex)
