@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -158,6 +159,7 @@ namespace AkademiTrack.ViewModels
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
         public ICommand RetryAuthenticationCommand { get; }
+        public ICommand ShowNotificationPermissionDialogCommand { get; }
         #endregion
 
         #region Constructor
@@ -193,6 +195,7 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
             RetryAuthenticationCommand = new AsyncRelayCommand(RetryAuthenticationAsync, () => !IsAuthenticated && !IsLoading);
+            ShowNotificationPermissionDialogCommand = new AsyncRelayCommand(ShowNotificationPermissionDialogAsync);
 
             // Subscribe to service events
             SubscribeToServiceEvents();
@@ -273,6 +276,9 @@ namespace AkademiTrack.ViewModels
 
                     _updateChecker?.StartPeriodicChecks();
                     _loggingService.LogInfo("Update checker ready");
+
+                    // Check notification permissions on macOS
+                    await CheckNotificationPermissionsAsync();
 
                     // Reset retry count on success
                     _initializationRetryCount = 0;
@@ -658,6 +664,54 @@ namespace AkademiTrack.ViewModels
             // Start initialization again
             await InitializeAsync();
         }
+
+        private async Task ShowNotificationPermissionDialogAsync()
+        {
+            _loggingService.LogInfo("🔔 Manually showing notification permission dialog...");
+            
+            // Reset the dismissed flag so the dialog can be shown again
+            await NotificationPermissionChecker.ResetDialogDismissedAsync();
+            
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                try
+                {
+                    // Check if dialog is already open to prevent duplicates
+                    if (Views.NotificationPermissionDialog.IsDialogCurrentlyOpen)
+                    {
+                        _loggingService.LogInfo("Notification permission dialog already open - skipping");
+                        return;
+                    }
+
+                    var dialog = new Views.NotificationPermissionDialog();
+                    
+                    // Get the main window to set as owner
+                    if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                        desktop.MainWindow != null)
+                    {
+                        await dialog.ShowDialog(desktop.MainWindow);
+                        
+                        if (dialog.UserGrantedPermission)
+                        {
+                            _loggingService.LogSuccess("✓ User granted notification permissions");
+                            await _notificationService.ShowNotificationAsync(
+                                "Varsler aktivert",
+                                "Du vil nå motta viktige varsler fra AkademiTrack",
+                                NotificationLevel.Success
+                            );
+                        }
+                        else
+                        {
+                            _loggingService.LogInfo("User declined notification permissions");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Error showing notification permission dialog: {ex.Message}");
+                }
+            });
+        }
         #endregion
 
         #region Event Handlers
@@ -684,6 +738,165 @@ namespace AkademiTrack.ViewModels
         #endregion
 
         #region Helper Methods
+        private async Task CheckNotificationPermissionsAsync()
+        {
+            try
+            {
+                // Only check once per day to avoid annoying users
+                if (!await ShouldCheckNotificationPermissions())
+                {
+                    _loggingService.LogInfo("🔔 Notification permission check skipped (already checked today)");
+                    return;
+                }
+
+                var permissionStatus = await NotificationPermissionChecker.CheckMacNotificationPermissionAsync();
+                
+                _loggingService.LogInfo($"🔔 Notification permission status: {permissionStatus}");
+                
+                // Mark that we've checked today
+                await MarkNotificationPermissionCheckedToday();
+                
+                if (permissionStatus == NotificationPermissionChecker.PermissionStatus.NotDetermined)
+                {
+                    _loggingService.LogInfo("🔔 Notification permissions not determined - showing permission dialog");
+                    
+                    // Show the notification permission dialog
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        try
+                        {
+                            // Check if dialog is already open to prevent duplicates
+                            if (Views.NotificationPermissionDialog.IsDialogCurrentlyOpen)
+                            {
+                                _loggingService.LogInfo("Notification permission dialog already open - skipping");
+                                return;
+                            }
+
+                            var dialog = new Views.NotificationPermissionDialog();
+                            
+                            // Get the main window to set as owner
+                            if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                                desktop.MainWindow != null)
+                            {
+                                await dialog.ShowDialog(desktop.MainWindow);
+                                
+                                if (dialog.UserGrantedPermission)
+                                {
+                                    _loggingService.LogSuccess("✓ User granted notification permissions");
+                                    await _notificationService.ShowNotificationAsync(
+                                        "Varsler aktivert",
+                                        "Du vil nå motta viktige varsler fra AkademiTrack",
+                                        NotificationLevel.Success
+                                    );
+                                }
+                                else
+                                {
+                                    _loggingService.LogInfo("User declined notification permissions");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogError($"Error showing notification permission dialog: {ex.Message}");
+                        }
+                    });
+                }
+                else if (permissionStatus == NotificationPermissionChecker.PermissionStatus.Authorized)
+                {
+                    _loggingService.LogInfo("✓ Notification permissions already granted");
+                }
+                else if (permissionStatus == NotificationPermissionChecker.PermissionStatus.Denied)
+                {
+                    _loggingService.LogInfo("ℹ️ Notification permissions denied by user - you can re-enable them in settings");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking notification permissions: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> ShouldCheckNotificationPermissions()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                string settingsPath = Path.Combine(appDataDir, "settings.json");
+
+                if (File.Exists(settingsPath))
+                {
+                    string json = await File.ReadAllTextAsync(settingsPath);
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, object>>(json);
+                    
+                    if (settings != null && settings.TryGetValue("LastNotificationPermissionCheck", out var lastCheckObj))
+                    {
+                        if (DateTime.TryParse(lastCheckObj.ToString(), out var lastCheck))
+                        {
+                            // Only check once per day
+                            return DateTime.Now.Date > lastCheck.Date;
+                        }
+                    }
+                }
+                
+                return true; // First time, should check
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking if should check notification permissions: {ex.Message}");
+                return true; // Default to checking if there's an error
+            }
+        }
+
+        private async Task MarkNotificationPermissionCheckedToday()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                
+                if (!Directory.Exists(appDataDir))
+                {
+                    Directory.CreateDirectory(appDataDir);
+                }
+
+                string settingsPath = Path.Combine(appDataDir, "settings.json");
+                
+                var settings = new System.Collections.Generic.Dictionary<string, object>();
+                
+                if (File.Exists(settingsPath))
+                {
+                    string json = await File.ReadAllTextAsync(settingsPath);
+                    try
+                    {
+                        settings = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, object>>(json) 
+                            ?? new System.Collections.Generic.Dictionary<string, object>();
+                    }
+                    catch
+                    {
+                        settings = new System.Collections.Generic.Dictionary<string, object>();
+                    }
+                }
+
+                settings["LastNotificationPermissionCheck"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                
+                string updatedJson = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions 
+                { 
+                    WriteIndented = true 
+                });
+                
+                await File.WriteAllTextAsync(settingsPath, updatedJson);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error marking notification permission checked: {ex.Message}");
+            }
+        }
+
         private bool ShouldShowInStatus(string message, string level)
         {
             if (level == "ERROR" || level == "SUCCESS")

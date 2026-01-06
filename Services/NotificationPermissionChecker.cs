@@ -28,15 +28,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                // First check: Has user dismissed the dialog before?
-                var hasDismissed = await HasDismissedDialog();
-                if (hasDismissed)
-                {
-                    Debug.WriteLine("[PermissionChecker] User has dismissed dialog before, not showing again");
-                    return PermissionStatus.Authorized; // Don't bother them again
-                }
-
-                // Second check: Try to detect if notifications are actually enabled
+                // Check if notifications are actually enabled first
                 var isEnabled = await CheckIfNotificationsEnabled();
                 if (isEnabled)
                 {
@@ -44,7 +36,15 @@ namespace AkademiTrack.Services
                     return PermissionStatus.Authorized;
                 }
 
-                Debug.WriteLine("[PermissionChecker] Notifications not enabled, should show dialog");
+                // If not enabled, check if user has dismissed the dialog before
+                var hasDismissed = await HasDismissedDialog();
+                if (hasDismissed)
+                {
+                    Debug.WriteLine("[PermissionChecker] User has dismissed dialog before, but notifications still not enabled - returning Denied");
+                    return PermissionStatus.Denied; // User dismissed but notifications still not enabled
+                }
+
+                Debug.WriteLine("[PermissionChecker] Notifications not enabled and user hasn't dismissed - should show dialog");
                 return PermissionStatus.NotDetermined;
             }
             catch (Exception ex)
@@ -58,6 +58,8 @@ namespace AkademiTrack.Services
         {
             try
             {
+                Debug.WriteLine("[PermissionChecker] Starting notification permission check...");
+                
                 // Check macOS notification database to see if app is registered and enabled
                 var startInfo = new ProcessStartInfo
                 {
@@ -74,38 +76,64 @@ namespace AkademiTrack.Services
                 {
                     await process.WaitForExitAsync();
                     var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
+                    var error = (await process.StandardError.ReadToEndAsync()).Trim();
+
+                    Debug.WriteLine($"[PermissionChecker] First check output: '{output}', error: '{error}'");
 
                     if (output == "enabled")
                     {
-                        Debug.WriteLine("[PermissionChecker] Found enabled notification settings");
+                        Debug.WriteLine("[PermissionChecker] Found enabled notification settings (flags = 16)");
                         return true;
                     }
                 }
 
-                // Fallback: Check if app exists in notification center at all
-                var checkExistsInfo = new ProcessStartInfo
+                // More specific check: Look for the app with enabled flags
+                var detailedCheckInfo = new ProcessStartInfo
                 {
                     FileName = "/bin/bash",
-                    Arguments = "-c \"defaults read ~/Library/Preferences/com.apple.ncprefs.plist 2>/dev/null | grep -q 'AkademiTrack' && echo 'found' || echo 'notfound'\"",
+                    Arguments = "-c \"defaults read ~/Library/Preferences/com.apple.ncprefs.plist 2>/dev/null | grep -A 10 -B 2 'AkademiTrack' | grep -E 'flags.*=.*(16|48|80)' && echo 'enabled' || echo 'disabled'\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
 
-                using var existsProcess = Process.Start(checkExistsInfo);
-                if (existsProcess != null)
+                using var detailedProcess = Process.Start(detailedCheckInfo);
+                if (detailedProcess != null)
                 {
-                    await existsProcess.WaitForExitAsync();
-                    var existsOutput = (await existsProcess.StandardOutput.ReadToEndAsync()).Trim();
+                    await detailedProcess.WaitForExitAsync();
+                    var detailedOutput = (await detailedProcess.StandardOutput.ReadToEndAsync()).Trim();
+                    var detailedError = (await detailedProcess.StandardError.ReadToEndAsync()).Trim();
 
-                    if (existsOutput == "found")
+                    Debug.WriteLine($"[PermissionChecker] Detailed check output: '{detailedOutput}', error: '{detailedError}'");
+
+                    if (detailedOutput == "enabled")
                     {
-                        Debug.WriteLine("[PermissionChecker] App found in notification center (assuming enabled)");
+                        Debug.WriteLine("[PermissionChecker] Found enabled notification settings (detailed check)");
                         return true;
                     }
                 }
 
+                // Debug: Let's see what's actually in the notification preferences
+                var debugInfo = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = "-c \"defaults read ~/Library/Preferences/com.apple.ncprefs.plist 2>/dev/null | grep -A 10 -B 2 'AkademiTrack' || echo 'AkademiTrack not found in notification preferences'\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var debugProcess = Process.Start(debugInfo);
+                if (debugProcess != null)
+                {
+                    await debugProcess.WaitForExitAsync();
+                    var debugOutput = (await debugProcess.StandardOutput.ReadToEndAsync()).Trim();
+                    Debug.WriteLine($"[PermissionChecker] Debug - AkademiTrack in notification prefs: {debugOutput}");
+                }
+
+                Debug.WriteLine("[PermissionChecker] No enabled notification settings found");
                 return false;
             }
             catch (Exception ex)
@@ -184,6 +212,50 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[PermissionChecker] Error marking dialog dismissed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Resets the dismissed dialog flag so the user can see the permission dialog again
+        /// </summary>
+        public static async Task ResetDialogDismissedAsync()
+        {
+            try
+            {
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                
+                string settingsPath = Path.Combine(appDataDir, "settings.json");
+                
+                if (File.Exists(settingsPath))
+                {
+                    string json = await File.ReadAllTextAsync(settingsPath);
+                    try
+                    {
+                        var settings = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, object>>(json) 
+                            ?? new System.Collections.Generic.Dictionary<string, object>();
+                        
+                        settings.Remove("NotificationDialogDismissed");
+                        
+                        string updatedJson = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions 
+                        { 
+                            WriteIndented = true 
+                        });
+                        
+                        await File.WriteAllTextAsync(settingsPath, updatedJson);
+                        Debug.WriteLine("[PermissionChecker] Reset dialog dismissed flag");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[PermissionChecker] Error parsing settings file: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PermissionChecker] Error resetting dialog dismissed: {ex.Message}");
             }
         }
 

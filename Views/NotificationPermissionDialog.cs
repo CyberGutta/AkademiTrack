@@ -7,7 +7,7 @@ using Avalonia.Styling;
 using System;
 using System.Threading.Tasks;
 
-namespace AkademiTrack.ViewModels
+namespace AkademiTrack.Views
 {
     public class NotificationPermissionDialog : Window
     {
