@@ -78,6 +78,7 @@ namespace AkademiTrack.Services
             locator.RegisterFactory<ILoggingService>(() => new LoggingService());
             locator.RegisterFactory<INotificationService>(() => new NotificationService());
             locator.RegisterFactory<ISettingsService>(() => new SettingsService());
+            locator.RegisterFactory<AnalyticsService>(() => new AnalyticsService());
             locator.RegisterFactory<IAutomationService>(() => 
             {
                 var loggingService = locator.GetService<ILoggingService>();
@@ -88,6 +89,10 @@ namespace AkademiTrack.Services
             // Initialize settings service immediately
             var settingsService = locator.GetService<ISettingsService>();
             _ = settingsService.LoadSettingsAsync();
+            
+            // Initialize analytics service and start session
+            var analyticsService = locator.GetService<AnalyticsService>();
+            _ = analyticsService.StartSessionAsync();
         }
 
         /// <summary>

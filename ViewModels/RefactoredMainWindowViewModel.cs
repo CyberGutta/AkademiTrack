@@ -27,6 +27,7 @@ namespace AkademiTrack.ViewModels
         private readonly INotificationService _notificationService;
         private readonly ISettingsService _settingsService;
         private readonly IAutomationService _automationService;
+        private readonly AnalyticsService _analyticsService;
         #endregion
 
         #region Private Fields
@@ -167,6 +168,7 @@ namespace AkademiTrack.ViewModels
             _notificationService = ServiceLocator.Instance.GetService<INotificationService>();
             _settingsService = ServiceLocator.Instance.GetService<ISettingsService>();
             _automationService = ServiceLocator.Instance.GetService<IAutomationService>();
+            _analyticsService = ServiceLocator.Instance.GetService<AnalyticsService>();
             
             // Initialize other services
             _httpClient = new HttpClient();
@@ -225,6 +227,11 @@ namespace AkademiTrack.ViewModels
                 IsLoading = true;
                 _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
+                // Track app initialization
+                await _analyticsService.TrackEventAsync("app_initialization_started", new { 
+                    retry_count = _initializationRetryCount 
+                });
+
                 // Initialize authentication service
                 _authService = new AuthenticationService();
 
@@ -234,6 +241,12 @@ namespace AkademiTrack.ViewModels
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
                 {
                     _loggingService.LogSuccess("✓ Autentisering fullført!");
+                    
+                    // Track successful initialization
+                    await _analyticsService.TrackEventAsync("app_initialization_success", new { 
+                        school_id = authResult.Parameters.SkoleId,
+                        fylke_id = authResult.Parameters.FylkeId 
+                    });
                     
                     IsAuthenticated = true;
                     _userParameters = authResult.Parameters;
@@ -271,6 +284,12 @@ namespace AkademiTrack.ViewModels
                 {
                     _initializationRetryCount++;
                     
+                    // Track initialization failure
+                    await _analyticsService.TrackEventAsync("app_initialization_failed", new { 
+                        retry_count = _initializationRetryCount,
+                        error_message = authResult.ErrorMessage 
+                    });
+                    
                     // Use specific error message if available
                     string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage) 
                         ? authResult.ErrorMessage 
@@ -278,6 +297,12 @@ namespace AkademiTrack.ViewModels
                     
                     if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
                     {
+                        // Only log to error_logs table on final failure (not every retry)
+                        await _analyticsService.LogErrorAsync(
+                            "app_initialization_critical_failure",
+                            $"Failed after {MAX_RETRY_ATTEMPTS} attempts: {errorMessage}"
+                        );
+                        
                         _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
                         _loggingService.LogError($"Feilmelding: {errorMessage}");
                         await _notificationService.ShowNotificationAsync(
@@ -307,6 +332,13 @@ namespace AkademiTrack.ViewModels
             }
             catch (Exception ex)
             {
+                // Log critical exception for developers
+                await _analyticsService.LogErrorAsync(
+                    "app_initialization_exception",
+                    ex.Message,
+                    ex
+                );
+                
                 _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
                 await _notificationService.ShowNotificationAsync(
                     "Oppstartsfeil",
@@ -411,6 +443,12 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
+            // Track automation start
+            await _analyticsService.TrackEventAsync("automation_started", new { 
+                school_id = _userParameters?.SkoleId,
+                manual_start = true 
+            });
+
             // Set credentials in automation service
             if (_automationService is AutomationService automationService)
             {
@@ -425,11 +463,23 @@ namespace AkademiTrack.ViewModels
             
             if (!result.Success)
             {
+                // Log automation failure for developers
+                await _analyticsService.LogErrorAsync(
+                    "automation_start_failure", 
+                    result.Message ?? "Unknown automation start error"
+                );
+                
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering feilet",
                     result.Message ?? "Nettverk eller autentiseringsfeil ved start av automatisering",
                     NotificationLevel.Error
                 );
+                
+                // Track automation start failure
+                await _analyticsService.TrackEventAsync("automation_start_failed", new { 
+                    error = result.Message,
+                    school_id = _userParameters?.SkoleId 
+                });
             }
             
             // Update UI
@@ -440,6 +490,11 @@ namespace AkademiTrack.ViewModels
 
         private async Task StopAutomationAsync()
         {
+            // Track automation stop
+            await _analyticsService.TrackEventAsync("automation_stopped", new { 
+                manual_stop = true 
+            });
+
             var result = await _automationService.StopAsync();
             
             if (!result.Success)
@@ -469,9 +524,12 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        private Task OpenSettingsAsync()
+        private async Task OpenSettingsAsync()
         {
             _loggingService.LogInfo("Åpner innstillinger...");
+            
+            // Track settings navigation
+            await _analyticsService.TrackEventAsync("navigation_settings");
 
             // Connect SettingsViewModel to logging service
             SettingsViewModel.ConnectToMainViewModel(this);
@@ -484,8 +542,6 @@ namespace AkademiTrack.ViewModels
             // Subscribe to close event
             SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
             SettingsViewModel.CloseRequested += OnSettingsCloseRequested;
-
-            return Task.CompletedTask;
         }
 
         private Task OpenFeideAsync()
@@ -504,16 +560,17 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        private Task OpenTutorialAsync()
+        private async Task OpenTutorialAsync()
         {
             _loggingService.LogInfo("Åpner veiledning...");
+            
+            // Track tutorial navigation
+            await _analyticsService.TrackEventAsync("navigation_tutorial");
             
             ShowDashboard = false;
             ShowSettings = false;
             ShowFeide = false;
             ShowTutorial = true;
-
-            return Task.CompletedTask;
         }
 
         private async Task RefreshDataAsync()

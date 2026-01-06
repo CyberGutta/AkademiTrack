@@ -13,6 +13,7 @@ namespace AkademiTrack.ViewModels
 {
     public class FeideWindowViewModel : ViewModelBase, INotifyPropertyChanged, IDisposable
     {
+        private readonly AnalyticsService _analyticsService;
         private string _schoolName = string.Empty;
         private string _feideUsername = string.Empty;
         private SecureString? _feidePasswordSecure = new SecureString();
@@ -32,6 +33,9 @@ namespace AkademiTrack.ViewModels
 
         public FeideWindowViewModel()
         {
+            // Get analytics service
+            _analyticsService = ServiceLocator.Instance.GetService<AnalyticsService>();
+            
             SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
             ExitCommand = new RelayCommand(() => ExitApplication());
             TogglePasswordCommand = new RelayCommand(TogglePasswordVisibility);
@@ -204,6 +208,12 @@ namespace AkademiTrack.ViewModels
                 {
                     Debug.WriteLine("[FeideWindow] ✓ Credentials test successful!");
                     
+                    // Track successful Feide setup
+                    await _analyticsService.TrackEventAsync("feide_setup_completed", new { 
+                        school_name = SchoolName,
+                        username_length = FeideUsername.Length 
+                    });
+                    
                     // Step 3a: Mark setup as complete since credentials work
                     await MarkSetupAsCompleteAsync();
                     Debug.WriteLine("[FeideWindow] ✓ Setup marked as complete");
@@ -224,6 +234,19 @@ namespace AkademiTrack.ViewModels
                 else
                 {
                     Debug.WriteLine("[FeideWindow] ❌ Credentials test failed!");
+                    
+                    // Track failed Feide setup
+                    await _analyticsService.TrackEventAsync("feide_setup_failed", new { 
+                        school_name = SchoolName,
+                        error_type = "authentication_failed",
+                        error_message = testResult.ErrorMessage 
+                    });
+                    
+                    // Log detailed error for developers
+                    await _analyticsService.LogErrorAsync(
+                        "feide_setup_authentication_failure",
+                        testResult.ErrorMessage ?? "Feide authentication failed"
+                    );
                     
                     // Step 3b: Delete the invalid credentials
                     await DeleteCredentialsAsync();
