@@ -270,18 +270,23 @@ namespace AkademiTrack.ViewModels
 
         private void UpdateNextClassDisplay(TodayScheduleData data)
         {
-
             Services.ScheduleItem? displayClass = null;
 
-            if (data.CurrentClass != null)
+            if (data.CurrentClass != null && data.NextClass != null)
             {
-                if (data.CurrentClass.KNavn != "STU")
+                bool overlap = DoClassesOverlap(data.CurrentClass, data.NextClass);
+                
+                if (overlap)
                 {
-                    displayClass = data.CurrentClass;
-                }
-                else if (data.NextClass != null && data.NextClass.KNavn != "STU")
-                {
-                    if (DoClassesOverlap(data.CurrentClass, data.NextClass))
+                    if (data.CurrentClass.KNavn != "STU" && data.NextClass.KNavn != "STU")
+                    {
+                        displayClass = data.CurrentClass;
+                    }
+                    else if (data.CurrentClass.KNavn != "STU")
+                    {
+                        displayClass = data.CurrentClass;
+                    }
+                    else if (data.NextClass.KNavn != "STU")
                     {
                         displayClass = data.NextClass;
                     }
@@ -294,6 +299,10 @@ namespace AkademiTrack.ViewModels
                 {
                     displayClass = data.CurrentClass;
                 }
+            }
+            else if (data.CurrentClass != null)
+            {
+                displayClass = data.CurrentClass;
             }
             else if (data.NextClass != null)
             {
