@@ -228,142 +228,118 @@
 		
 		<!-- Left Side - Login Form -->
 		<Border Grid.Column="0" Background="White" Padding="0">
-			<Grid RowDefinitions="*,Auto">
-				
-				<!-- Form Content - No ScrollViewer, perfect fit -->
-				<StackPanel Grid.Row="0" 
-							Margin="50,60,50,30" 
-							Spacing="24" 
-							MaxWidth="380"
-							VerticalAlignment="Center">
+			
+			<!-- Form Content - No ScrollViewer, perfect fit -->
+			<StackPanel Margin="50,50,50,20" 
+						Spacing="20" 
+						MaxWidth="380"
+						VerticalAlignment="Center">
 
-					<!-- Header -->
-					<StackPanel Spacing="12">
-						<TextBlock Text="Velkommen tilbake"
-								   FontSize="28"
-								   FontWeight="Bold"
-								   Foreground="#1A1A1A"/>
-						<TextBlock Text="Logg inn med din Feide-konto for å fortsette"
-								   FontSize="15"
-								   FontWeight="Regular"
-								   Foreground="#6B7280"
-								   TextWrapping="Wrap"/>
-					</StackPanel>
-
-					<!-- School Selection -->
-					<StackPanel Spacing="8">
-						<TextBlock Text="Utdanningsinstitusjon" Classes="label"/>
-						<ComboBox Name="SchoolNameComboBox"
-								  ItemsSource="{Binding Schools}"
-								  SelectedItem="{Binding SchoolName}"
-								  PlaceholderText="Velg din skole eller institusjon"
-								  HorizontalAlignment="Stretch"
-								  MaxDropDownHeight="280"/>
-						<TextBlock Text="Velg din skole fra listen over tilgjengelige institusjoner"
-								   Classes="helper"/>
-					</StackPanel>
-
-					<!-- Username Field -->
-					<StackPanel Spacing="8">
-						<TextBlock Text="Feide Brukernavn" Classes="label"/>
-						<TextBox Name="UsernameTextBox"
-								 Watermark="Eksempel: 78abcdef"
-								 Text="{Binding FeideUsername}"/>
-						<TextBlock Text="Ditt unike Feide brukernavn fra skolen"
-								   Classes="helper"/>
-					</StackPanel>
-
-					<!-- Password Field -->
-					<StackPanel Spacing="8">
-						<TextBlock Text="Feide Passord" Classes="label"/>
-						<Grid>
-							<TextBox Name="PasswordTextBox"
-									Watermark="Ditt Feide-passord"
-									PasswordChar="{Binding PasswordChar}"
-									Text="{Binding FeidePassword}"
-									Padding="16,14,60,14"/>
-
-							<Button Name="TogglePasswordButton"
-									Classes="passwordToggle"
-									HorizontalAlignment="Right"
-									VerticalAlignment="Center"
-									Margin="0,0,6,0"
-									Command="{Binding TogglePasswordCommand}"
-									ToolTip.Tip="Vis/skjul passord">
-								<Path Name="EyeIcon"
-										Fill="#8E8E93"
-										Data="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
-										Stretch="Uniform"
-										Width="20"
-										Height="20"/>
-							</Button>
-						</Grid>
-						<TextBlock Text="Passordet ditt lagres kryptert og sikkert"
-								   Classes="helper"/>
-					</StackPanel>
-
-					<!-- Error Message - Compact -->
-					<Border Background="#FFF2F2"
-							BorderBrush="#FFB3B3"
-							BorderThickness="1"
-							CornerRadius="8"
-							Padding="12"
-							IsVisible="{Binding HasError}"
-							MaxHeight="60">
-						<StackPanel Orientation="Horizontal" Spacing="8">
-							<TextBlock Text="⚠" 
-									   FontSize="14" 
-									   Foreground="#D70015"
-									   VerticalAlignment="Top"
-									   Margin="0,1,0,0"/>
-							<TextBlock Text="{Binding ErrorMessage}"
-									   Foreground="#D70015"
-									   TextWrapping="Wrap"
-									   FontSize="13"
-									   LineHeight="18"
-									   VerticalAlignment="Top"/>
-						</StackPanel>
-					</Border>
-
-					<!-- Login Button -->
-					<Button Content="{Binding SaveButtonText}"
-							Command="{Binding SaveCommand}"
-							IsEnabled="{Binding CanSave}"
-							Classes="primary"
-							HorizontalAlignment="Stretch"
-							Margin="0,8,0,0"/>
-
+				<!-- Header -->
+				<StackPanel Spacing="10">
+					<TextBlock Text="Velkommen tilbake"
+							   FontSize="26"
+							   FontWeight="Bold"
+							   Foreground="#1A1A1A"/>
+					<TextBlock Text="Logg inn med din Feide-konto for å fortsette"
+							   FontSize="14"
+							   FontWeight="Regular"
+							   Foreground="#6B7280"
+							   TextWrapping="Wrap"/>
 				</StackPanel>
 
-				<!-- Security Info Footer -->
-				<Border Grid.Row="1" 
-						Background="#F8FAFF"
-						BorderBrush="#E3F2FD"
-						BorderThickness="0,1,0,0"
-						Padding="50,20">
+				<!-- School Selection -->
+				<StackPanel Spacing="6">
+					<TextBlock Text="Utdanningsinstitusjon" Classes="label"/>
+					<ComboBox Name="SchoolNameComboBox"
+							  ItemsSource="{Binding Schools}"
+							  SelectedItem="{Binding SchoolName}"
+							  PlaceholderText="Velg din skole eller institusjon"
+							  HorizontalAlignment="Stretch"
+							  MaxDropDownHeight="280"/>
+					<TextBlock Text="Velg din skole fra listen over tilgjengelige institusjoner"
+							   Classes="helper"/>
+				</StackPanel>
+
+				<!-- Username Field -->
+				<StackPanel Spacing="6">
+					<TextBlock Text="Feide Brukernavn" Classes="label"/>
+					<TextBox Name="UsernameTextBox"
+							 Watermark="Eksempel: 78abcdef"
+							 Text="{Binding FeideUsername}"/>
+					<TextBlock Text="Ditt unike Feide brukernavn fra skolen"
+							   Classes="helper"/>
+				</StackPanel>
+
+				<!-- Password Field -->
+				<StackPanel Spacing="6">
+					<TextBlock Text="Feide Passord" Classes="label"/>
+					<Grid>
+						<TextBox Name="PasswordTextBox"
+								Watermark="Ditt Feide-passord"
+								PasswordChar="{Binding PasswordChar}"
+								Text="{Binding FeidePassword}"
+								Padding="16,14,60,14"/>
+
+						<Button Name="TogglePasswordButton"
+								Classes="passwordToggle"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Margin="0,0,6,0"
+								Command="{Binding TogglePasswordCommand}"
+								ToolTip.Tip="Vis/skjul passord">
+							<Path Name="EyeIcon"
+									Fill="#8E8E93"
+									Data="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+									Stretch="Uniform"
+									Width="20"
+									Height="20"/>
+						</Button>
+					</Grid>
+					<TextBlock Text="Passordet ditt lagres kryptert og sikkert"
+							   Classes="helper"/>
+				</StackPanel>
+
+				<!-- Error Message - Clean and simple -->
+				<Border Background="#FFF2F2"
+						BorderBrush="#FFB3B3"
+						BorderThickness="1"
+						CornerRadius="8"
+						Padding="12"
+						IsVisible="{Binding HasError}">
 					<StackPanel Orientation="Horizontal" Spacing="10">
-						<Border Background="#007AFF" 
+						<Border Background="#FF3B30" 
 								CornerRadius="10" 
-								Width="20" 
-								Height="20"
-								VerticalAlignment="Center">
-							<TextBlock Text="🔒" 
-									   FontSize="10" 
+								Width="18" 
+								Height="18"
+								VerticalAlignment="Top"
+								Margin="0,1,0,0">
+							<TextBlock Text="!" 
+									   FontSize="11" 
+									   FontWeight="Bold"
+									   Foreground="White"
 									   HorizontalAlignment="Center" 
 									   VerticalAlignment="Center"/>
 						</Border>
-						<StackPanel VerticalAlignment="Center">
-							<TextBlock Text="Sikker pålogging"
-									   FontWeight="SemiBold"
-									   FontSize="13"
-									   Foreground="#1A1A1A"/>
-							<TextBlock Text="Dine data lagres kryptert i macOS Keychain"
-									   FontSize="11"
-									   Foreground="#6B7280"/>
-						</StackPanel>
+						<TextBlock Text="{Binding ErrorMessage}"
+								   Foreground="#D70015"
+								   TextWrapping="Wrap"
+								   FontSize="13"
+								   LineHeight="18"
+								   VerticalAlignment="Top"
+								   MaxWidth="300"/>
 					</StackPanel>
 				</Border>
-			</Grid>
+
+				<!-- Login Button -->
+				<Button Content="{Binding SaveButtonText}"
+						Command="{Binding SaveCommand}"
+						IsEnabled="{Binding CanSave}"
+						Classes="primary"
+						HorizontalAlignment="Stretch"
+						Margin="0,4,0,0"/>
+
+			</StackPanel>
 		</Border>
 
 		<!-- Right Side - Clean Branding -->
