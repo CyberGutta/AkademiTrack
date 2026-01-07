@@ -1,0 +1,224 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="520"
+        x:Class="AkademiTrack.Views.NotificationPermissionDialog"
+        Title="Varsel Tillatelser"
+        Width="480"
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        SystemDecorations="BorderOnly"
+        Topmost="False"
+        Background="White">
+
+    <Window.Styles>
+        <Style Selector="Border.button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        
+        <Style Selector="Border.button:pointerover">
+            <Setter Property="Background" Value="#0051D5"/>
+        </Style>
+        
+        <Style Selector="Border.button.secondary:pointerover">
+            <Setter Property="Background" Value="#E0E0E0"/>
+        </Style>
+        
+        <Style Selector="Border.button.skip:pointerover">
+            <Setter Property="Background" Value="#F5F5F5"/>
+        </Style>
+        
+        <Style Selector="Border.button.close:pointerover">
+            <Setter Property="Background" Value="#FFEBEE"/>
+        </Style>
+        
+        <Style Selector="Border.button.close:pointerover TextBlock">
+            <Setter Property="Foreground" Value="#FF3B30"/>
+        </Style>
+        
+        <Style Selector="Border.button:disabled">
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+    </Window.Styles>
+
+    <Border Background="White" Padding="25">
+        <Grid>
+            <!-- Close Button -->
+            <Border Classes="button close"
+                    Name="CloseButton"
+                    Width="32"
+                    Height="32"
+                    Background="White"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,-10,-10,0"
+                    PointerPressed="OnCloseButtonPressed">
+                <TextBlock Text="✕"
+                          FontSize="18"
+                          Foreground="#999999"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
+            </Border>
+
+            <!-- Main Content -->
+            <StackPanel Spacing="18">
+                
+                <!-- Icon -->
+                <Border Width="60"
+                        Height="60"
+                        CornerRadius="30"
+                        Background="#1A007AFF"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="🔔"
+                              FontSize="32"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- Title -->
+                <TextBlock Text="Aktiver Varsler"
+                          FontSize="20"
+                          FontWeight="Bold"
+                          HorizontalAlignment="Center"
+                          Foreground="#1A1A1A"/>
+
+                <!-- Description -->
+                <TextBlock TextWrapping="Wrap"
+                          FontSize="13"
+                          Foreground="#666666"
+                          HorizontalAlignment="Center"
+                          TextAlignment="Center"
+                          MaxWidth="380"
+                          LineHeight="20">
+                    <Run Text="AkademiTrack vil holde deg informert om:"/>
+                    <LineBreak/><LineBreak/>
+                    <Run Text="• Automatisk registrering av STU-timer"/>
+                    <LineBreak/>
+                    <Run Text="• Viktige oppdateringer og meldinger"/>
+                    <LineBreak/>
+                    <Run Text="• Status for automatisering"/>
+                </TextBlock>
+
+                <!-- Step Indicator (Initially Hidden) -->
+                <Border Name="StepIndicator"
+                        Background="#E8F5E9"
+                        CornerRadius="8"
+                        Padding="16,12"
+                        IsVisible="False"
+                        MaxWidth="380">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="✓ Testvarsel Sendt!"
+                                  FontSize="14"
+                                  FontWeight="SemiBold"
+                                  Foreground="#2E7D32"/>
+                        <TextBlock Name="InstructionText"
+                                  TextWrapping="Wrap"
+                                  FontSize="12"
+                                  Foreground="#555555"
+                                  LineHeight="18">
+                            <Run Text="1. Åpne Systeminnstillinger"/>
+                            <LineBreak/>
+                            <Run Text="2. Gå til 'Varslinger'"/>
+                            <LineBreak/>
+                            <Run Text="3. Finn 'AkademiTrack'"/>
+                            <LineBreak/>
+                            <Run Text="4. Slå på 'Tillat varsler'"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Button Panel -->
+                <StackPanel Orientation="Vertical"
+                           HorizontalAlignment="Center"
+                           Spacing="10"
+                           Margin="0,8,0,0">
+
+                    <!-- Enable Button -->
+                    <Border Name="EnableButton"
+                            Classes="button"
+                            Width="300"
+                            Height="44"
+                            Background="#007AFF"
+                            CornerRadius="8"
+                            PointerPressed="OnEnableButtonPressed">
+                        <TextBlock Name="EnableButtonText"
+                                  Text="Aktiver Varsler"
+                                  FontSize="15"
+                                  FontWeight="SemiBold"
+                                  Foreground="White"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Settings Button (Initially Hidden) -->
+                    <Border Name="SettingsButton"
+                            Classes="button"
+                            Width="300"
+                            Height="44"
+                            Background="#007AFF"
+                            CornerRadius="8"
+                            IsVisible="False"
+                            PointerPressed="OnSettingsButtonPressed">
+                        <TextBlock Text="→ Åpne Systeminnstillinger"
+                                  FontSize="15"
+                                  FontWeight="SemiBold"
+                                  Foreground="White"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Done Button (Initially Hidden) -->
+                    <Border Name="DoneButton"
+                            Classes="button secondary"
+                            Width="300"
+                            Height="40"
+                            Background="#F5F5F5"
+                            CornerRadius="8"
+                            IsVisible="False"
+                            PointerPressed="OnDoneButtonPressed">
+                        <TextBlock Text="Jeg har aktivert varsler"
+                                  FontSize="13"
+                                  Foreground="#666666"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Skip Button -->
+                    <Border Name="SkipButton"
+                            Classes="button skip"
+                            Width="300"
+                            Height="38"
+                            Background="White"
+                            CornerRadius="8"
+                            PointerPressed="OnSkipButtonPressed">
+                        <TextBlock Text="Hopp over"
+                                  FontSize="13"
+                                  Foreground="#999999"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    </Border>
+
+                </StackPanel>
+
+                <!-- Help Text -->
+                <TextBlock Text="Du kan endre dette senere i Systeminnstillinger"
+                          FontSize="11"
+                          Foreground="#999999"
+                          HorizontalAlignment="Center"
+                          TextAlignment="Center"
+                          Margin="0,2,0,0"/>
+
+            </StackPanel>
+        </Grid>
+    </Border>
+
+</Window>

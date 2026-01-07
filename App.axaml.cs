@@ -114,6 +114,43 @@ namespace AkademiTrack
             {
                 mainWindow.Show();
                 Debug.WriteLine("[App] Main window shown normally");
+                
+                // ✅ NEW: Show notification permission dialog as modal overlay
+                // Only show if not in Feide setup mode
+                if (!showFeideSetup)
+                {
+                    mainWindow.Opened += async (s, e) =>
+                    {
+                        // Small delay to let the main window fully render
+                        await Task.Delay(500);
+                        
+                        try
+                        {
+                            // Check if user needs to be asked about notifications
+                            bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
+                                .ShouldShowPermissionDialogAsync();
+                            
+                            if (shouldShow && !AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen)
+                            {
+                                Debug.WriteLine("[App] Showing notification permission dialog as modal overlay");
+                                var dialog = new AkademiTrack.Views.NotificationPermissionDialog();
+                                
+                                // ShowDialog makes it modal - blocks interaction with parent window
+                                await dialog.ShowDialog(mainWindow);
+                                
+                                Debug.WriteLine($"[App] Dialog closed. User granted permission: {dialog.UserGrantedPermission}");
+                            }
+                            else
+                            {
+                                Debug.WriteLine($"[App] Not showing notification dialog. ShouldShow: {shouldShow}, IsOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[App] Error showing notification dialog: {ex.Message}");
+                        }
+                    };
+                }
             }
         }
 

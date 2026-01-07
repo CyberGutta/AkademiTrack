@@ -215,6 +215,45 @@ namespace AkademiTrack.Services
         }
 
         /// <summary>
+        /// Determines if the permission dialog should be shown to the user
+        /// </summary>
+        public static async Task<bool> ShouldShowPermissionDialogAsync()
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Debug.WriteLine("[PermissionChecker] Not macOS, skipping dialog");
+                return false; // Only show on macOS
+            }
+
+            try
+            {
+                // First check: Has user dismissed the dialog before?
+                var hasDismissed = await HasDismissedDialog();
+                if (hasDismissed)
+                {
+                    Debug.WriteLine("[PermissionChecker] User has dismissed dialog before, not showing again");
+                    return false;
+                }
+
+                // Second check: Are notifications already enabled?
+                var isEnabled = await CheckIfNotificationsEnabled();
+                if (isEnabled)
+                {
+                    Debug.WriteLine("[PermissionChecker] Notifications already enabled, no need to show dialog");
+                    return false;
+                }
+
+                Debug.WriteLine("[PermissionChecker] Should show permission dialog");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PermissionChecker] Error checking if should show dialog: {ex.Message}");
+                return false; // Don't show dialog if we can't determine
+            }
+        }
+
+        /// <summary>
         /// Request notification permission by showing a test notification
         /// This will trigger the macOS permission prompt if not determined
         /// </summary>
