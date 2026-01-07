@@ -58,6 +58,8 @@ namespace AkademiTrack
             ShowMainWindow(desktop, startMinimized, !hasFeideCredentials);
         }
 
+        // Replace your ShowMainWindow method in App.axaml.cs with this:
+
         private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized, bool showFeideSetup = false)
         {
             // ✅ Create viewmodel (it already has SettingsViewModel initialized in its constructor)
@@ -113,43 +115,59 @@ namespace AkademiTrack
             else
             {
                 mainWindow.Show();
-                Debug.WriteLine("[App] Main window shown normally");
+                Console.WriteLine("[App] Main window shown normally");
                 
                 // ✅ NEW: Show notification permission dialog as modal overlay
                 // Only show if not in Feide setup mode
                 if (!showFeideSetup)
                 {
-                    mainWindow.Opened += async (s, e) =>
+                    Console.WriteLine("[App] Not in Feide setup mode - will show notification dialog");
+                    
+                    // Use Dispatcher to show dialog after UI thread is ready
+                    Dispatcher.UIThread.Post(async () =>
                     {
+                        Console.WriteLine("[App] ========== DISPATCHER POST FIRED ==========");
+                        
                         // Small delay to let the main window fully render
-                        await Task.Delay(500);
+                        await Task.Delay(1000);
                         
                         try
                         {
-                            // Check if user needs to be asked about notifications
+                            Console.WriteLine("[App] Checking if notification dialog should be shown...");
+                            
+                            // Check if we should show the dialog
                             bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
                                 .ShouldShowPermissionDialogAsync();
                             
+                            Console.WriteLine($"[App] ShouldShow check result: {shouldShow}");
+                            Console.WriteLine($"[App] IsDialogCurrentlyOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
+                            
                             if (shouldShow && !AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen)
                             {
-                                Debug.WriteLine("[App] Showing notification permission dialog as modal overlay");
+                                Console.WriteLine("[App] Creating notification permission dialog...");
                                 var dialog = new AkademiTrack.Views.NotificationPermissionDialog();
                                 
+                                Console.WriteLine("[App] Calling ShowDialog on main window...");
                                 // ShowDialog makes it modal - blocks interaction with parent window
                                 await dialog.ShowDialog(mainWindow);
                                 
-                                Debug.WriteLine($"[App] Dialog closed. User granted permission: {dialog.UserGrantedPermission}");
+                                Console.WriteLine($"[App] Dialog closed. User granted permission: {dialog.UserGrantedPermission}");
                             }
                             else
                             {
-                                Debug.WriteLine($"[App] Not showing notification dialog. ShouldShow: {shouldShow}, IsOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
+                                Console.WriteLine($"[App] Not showing notification dialog. ShouldShow: {shouldShow}, IsOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[App] Error showing notification dialog: {ex.Message}");
+                            Console.WriteLine($"[App] ERROR showing notification dialog: {ex.Message}");
+                            Console.WriteLine($"[App] Stack trace: {ex.StackTrace}");
                         }
-                    };
+                    }, DispatcherPriority.Background);
+                }
+                else
+                {
+                    Console.WriteLine("[App] In Feide setup mode - skipping notification dialog");
                 }
             }
         }

@@ -34,7 +34,7 @@ namespace AkademiTrack.Views
             {
                 if (_isDialogOpen)
                 {
-                    Debug.WriteLine("[NotificationDialog] Dialog already open - preventing duplicate");
+                    Console.WriteLine("[NotificationDialog] Dialog already open - preventing duplicate");
                     this.IsVisible = false;
                     this.Opened += (s, e) => Close();
                     return;
@@ -42,14 +42,24 @@ namespace AkademiTrack.Views
                 _isDialogOpen = true;
             }
             
+            Console.WriteLine("[NotificationDialog] Initializing dialog...");
             InitializeComponent();
+            
+            // Ensure dialog appears centered over parent, not fullscreen
+            this.Opened += (s, e) =>
+            {
+                Console.WriteLine("[NotificationDialog] Dialog Opened event fired");
+                
+                // Don't use Topmost - it makes it cover everything
+                // ShowDialog already makes it modal over the parent window
+            };
             
             this.Closed += (s, e) =>
             {
                 lock (_dialogLock)
                 {
                     _isDialogOpen = false;
-                    Debug.WriteLine("[NotificationDialog] Dialog closed - lock released");
+                    Console.WriteLine("[NotificationDialog] Dialog closed - lock released");
                 }
             };
             
@@ -64,6 +74,7 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
+                Console.WriteLine("[NotificationDialog] Enable button pressed");
                 await EnableNotificationsAsync();
                 e.Handled = true;
             }
@@ -73,7 +84,7 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Debug.WriteLine("Opening macOS notification settings...");
+                Console.WriteLine("[NotificationDialog] Opening macOS notification settings...");
                 AkademiTrack.Services.NotificationPermissionChecker.OpenMacNotificationSettings();
                 e.Handled = true;
             }
@@ -83,6 +94,7 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
+                Console.WriteLine("[NotificationDialog] Done button pressed");
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
                 Close();
                 e.Handled = true;
@@ -93,8 +105,12 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
+                Console.WriteLine("[NotificationDialog] Skip button pressed - marking as permanently dismissed");
                 UserGrantedPermission = false;
+                
+                // Mark dialog as dismissed so it never shows again
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                
                 Close();
                 e.Handled = true;
             }
@@ -104,8 +120,12 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
+                Console.WriteLine("[NotificationDialog] Close button pressed - marking as permanently dismissed");
                 UserGrantedPermission = false;
+                
+                // Mark dialog as dismissed so it never shows again
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                
                 Close();
                 e.Handled = true;
             }

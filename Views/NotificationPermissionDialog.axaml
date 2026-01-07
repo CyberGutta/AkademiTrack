@@ -11,8 +11,9 @@
         CanResize="False"
         ShowInTaskbar="False"
         SystemDecorations="BorderOnly"
-        Topmost="False"
-        Background="White">
+        Topmost="True"
+        Background="White"
+        ExtendClientAreaToDecorationsHint="False">
 
     <Window.Styles>
         <Style Selector="Border.button">
