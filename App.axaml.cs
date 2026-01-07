@@ -117,13 +117,11 @@ namespace AkademiTrack
                 mainWindow.Show();
                 Console.WriteLine("[App] Main window shown normally");
                 
-                // ✅ NEW: Show notification permission dialog as modal overlay
-                // Only show if not in Feide setup mode
+                // ✅ NEW: Show notification permission overlay INSIDE the app
                 if (!showFeideSetup)
                 {
-                    Console.WriteLine("[App] Not in Feide setup mode - will show notification dialog");
+                    Console.WriteLine("[App] Not in Feide setup mode - will show notification overlay");
                     
-                    // Use Dispatcher to show dialog after UI thread is ready
                     Dispatcher.UIThread.Post(async () =>
                     {
                         Console.WriteLine("[App] ========== DISPATCHER POST FIRED ==========");
@@ -133,41 +131,62 @@ namespace AkademiTrack
                         
                         try
                         {
-                            Console.WriteLine("[App] Checking if notification dialog should be shown...");
+                            Console.WriteLine("[App] Checking if notification overlay should be shown...");
                             
-                            // Check if we should show the dialog
                             bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
                                 .ShouldShowPermissionDialogAsync();
                             
                             Console.WriteLine($"[App] ShouldShow check result: {shouldShow}");
-                            Console.WriteLine($"[App] IsDialogCurrentlyOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
                             
-                            if (shouldShow && !AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen)
+                            if (shouldShow)
                             {
-                                Console.WriteLine("[App] Creating notification permission dialog...");
-                                var dialog = new AkademiTrack.Views.NotificationPermissionDialog();
+                                Console.WriteLine("[App] Creating notification permission overlay...");
                                 
-                                Console.WriteLine("[App] Calling ShowDialog on main window...");
-                                // ShowDialog makes it modal - blocks interaction with parent window
-                                await dialog.ShowDialog(mainWindow);
+                                // Find the overlay container in MainWindow
+                                var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
-                                Console.WriteLine($"[App] Dialog closed. User granted permission: {dialog.UserGrantedPermission}");
+                                if (overlayContainer != null)
+                                {
+                                    Console.WriteLine("[App] Found OverlayContainer - creating overlay...");
+                                    
+                                    // Create overlay control
+                                    var overlay = new AkademiTrack.Views.NotificationPermissionOverlay();
+                                    
+                                    // Handle close event
+                                    overlay.Closed += (s, e) =>
+                                    {
+                                        Console.WriteLine("[App] Overlay closed - hiding container");
+                                        overlayContainer.Content = null;
+                                        overlayContainer.IsVisible = false;
+                                    };
+                                    
+                                    // Show overlay
+                                    overlayContainer.Content = overlay;
+                                    overlayContainer.IsVisible = true;
+                                    
+                                    Console.WriteLine("[App] ✅ Overlay shown successfully!");
+                                }
+                                else
+                                {
+                                    Console.WriteLine("[App] ❌ ERROR: Could not find OverlayContainer in MainWindow");
+                                    Console.WriteLine("[App] Make sure you added <ContentControl Name=\"OverlayContainer\" .../> to MainWindow.axaml");
+                                }
                             }
                             else
                             {
-                                Console.WriteLine($"[App] Not showing notification dialog. ShouldShow: {shouldShow}, IsOpen: {AkademiTrack.Views.NotificationPermissionDialog.IsDialogCurrentlyOpen}");
+                                Console.WriteLine("[App] Not showing notification overlay - user already prompted or not on macOS");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[App] ERROR showing notification dialog: {ex.Message}");
+                            Console.WriteLine($"[App] ❌ ERROR showing notification overlay: {ex.Message}");
                             Console.WriteLine($"[App] Stack trace: {ex.StackTrace}");
                         }
                     }, DispatcherPriority.Background);
                 }
                 else
                 {
-                    Console.WriteLine("[App] In Feide setup mode - skipping notification dialog");
+                    Console.WriteLine("[App] In Feide setup mode - skipping notification overlay");
                 }
             }
         }

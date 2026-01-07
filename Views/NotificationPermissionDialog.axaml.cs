@@ -1,80 +1,40 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Threading;
+using Avalonia.Markup.Xaml;
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace AkademiTrack.Views
 {
-    public partial class NotificationPermissionDialog : Window
+    public partial class NotificationPermissionOverlay : UserControl
     {
+        public event EventHandler? Closed;
         public bool UserGrantedPermission { get; private set; }
         
         private static bool _notificationsEnabled = false;
-        private static bool _isDialogOpen = false;
-        private static readonly object _dialogLock = new object();
-        
-        public static bool IsDialogCurrentlyOpen 
-        { 
-            get 
-            { 
-                lock (_dialogLock) 
-                { 
-                    return _isDialogOpen; 
-                } 
-            } 
-        }
 
-        public NotificationPermissionDialog()
+        public NotificationPermissionOverlay()
         {
-            lock (_dialogLock)
-            {
-                if (_isDialogOpen)
-                {
-                    Console.WriteLine("[NotificationDialog] Dialog already open - preventing duplicate");
-                    this.IsVisible = false;
-                    this.Opened += (s, e) => Close();
-                    return;
-                }
-                _isDialogOpen = true;
-            }
-            
-            Console.WriteLine("[NotificationDialog] Initializing dialog...");
+            Console.WriteLine("[NotificationOverlay] Initializing overlay...");
             InitializeComponent();
             
-            // Ensure dialog appears centered over parent, not fullscreen
-            this.Opened += (s, e) =>
-            {
-                Console.WriteLine("[NotificationDialog] Dialog Opened event fired");
-                
-                // Don't use Topmost - it makes it cover everything
-                // ShowDialog already makes it modal over the parent window
-            };
-            
-            this.Closed += (s, e) =>
-            {
-                lock (_dialogLock)
-                {
-                    _isDialogOpen = false;
-                    Console.WriteLine("[NotificationDialog] Dialog closed - lock released");
-                }
-            };
-            
-            // Restore state if notifications were already enabled
             if (_notificationsEnabled)
             {
                 RestoreEnabledState();
             }
         }
 
+        private void InitializeComponent()
+        {
+            AvaloniaXamlLoader.Load(this);
+        }
+
         private async void OnEnableButtonPressed(object? sender, PointerPressedEventArgs e)
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Console.WriteLine("[NotificationDialog] Enable button pressed");
+                Console.WriteLine("[NotificationOverlay] Enable button pressed");
                 await EnableNotificationsAsync();
                 e.Handled = true;
             }
@@ -84,7 +44,7 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Console.WriteLine("[NotificationDialog] Opening macOS notification settings...");
+                Console.WriteLine("[NotificationOverlay] Opening macOS notification settings...");
                 AkademiTrack.Services.NotificationPermissionChecker.OpenMacNotificationSettings();
                 e.Handled = true;
             }
@@ -94,9 +54,9 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Console.WriteLine("[NotificationDialog] Done button pressed");
+                Console.WriteLine("[NotificationOverlay] Done button pressed");
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                Close();
+                CloseOverlay();
                 e.Handled = true;
             }
         }
@@ -105,13 +65,10 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Console.WriteLine("[NotificationDialog] Skip button pressed - marking as permanently dismissed");
+                Console.WriteLine("[NotificationOverlay] Skip button pressed");
                 UserGrantedPermission = false;
-                
-                // Mark dialog as dismissed so it never shows again
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                
-                Close();
+                CloseOverlay();
                 e.Handled = true;
             }
         }
@@ -120,13 +77,21 @@ namespace AkademiTrack.Views
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                Console.WriteLine("[NotificationDialog] Close button pressed - marking as permanently dismissed");
+                Console.WriteLine("[NotificationOverlay] Close button pressed");
                 UserGrantedPermission = false;
-                
-                // Mark dialog as dismissed so it never shows again
                 await AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
-                
-                Close();
+                CloseOverlay();
+                e.Handled = true;
+            }
+        }
+
+        private void OnBackgroundPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
+                Console.WriteLine("[NotificationOverlay] Background clicked - closing overlay");
+                _ = AkademiTrack.Services.NotificationPermissionChecker.MarkDialogDismissedAsync();
+                CloseOverlay();
                 e.Handled = true;
             }
         }
@@ -138,7 +103,6 @@ namespace AkademiTrack.Views
             _notificationsEnabled = true;
             UserGrantedPermission = true;
             
-            // Disable and update enable button
             var enableButton = this.FindControl<Border>("EnableButton");
             var enableButtonText = this.FindControl<TextBlock>("EnableButtonText");
             
@@ -153,22 +117,16 @@ namespace AkademiTrack.Views
                 enableButtonText.Text = "Sender testvarsel...";
             }
             
-            // Expand window height
-            this.Height = 580;
-            
-            // Show step indicator
             var stepIndicator = this.FindControl<Border>("StepIndicator");
             if (stepIndicator != null)
             {
                 stepIndicator.IsVisible = true;
             }
             
-            // Request permission (sends test notification)
             await AkademiTrack.Services.NotificationPermissionChecker.RequestPermissionAsync();
             
             await Task.Delay(1500);
             
-            // Update UI - hide enable button, show settings and done buttons
             if (enableButton != null)
             {
                 enableButton.IsVisible = false;
@@ -197,9 +155,6 @@ namespace AkademiTrack.Views
 
         private void RestoreEnabledState()
         {
-            // Expand window
-            this.Height = 580;
-            
             var enableButton = this.FindControl<Border>("EnableButton");
             if (enableButton != null)
             {
@@ -229,6 +184,12 @@ namespace AkademiTrack.Views
             {
                 skipButton.IsVisible = false;
             }
+        }
+
+        private void CloseOverlay()
+        {
+            Console.WriteLine("[NotificationOverlay] Closing overlay...");
+            Closed?.Invoke(this, EventArgs.Empty);
         }
     }
 }

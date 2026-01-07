@@ -551,6 +551,12 @@
 		<Grid Margin="0" IsVisible="{Binding ShowSettings}">
         <views:SettingsWindow DataContext="{Binding SettingsViewModel}"/>
 		</Grid>
+
+		<ContentControl Name="OverlayContainer" 
+                        Grid.RowSpan="999"
+                        Grid.ColumnSpan="999"
+                        IsVisible="False"
+                        ZIndex="1000"/>
 	</Grid>
 	
 </Window>
