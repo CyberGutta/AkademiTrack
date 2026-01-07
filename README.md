@@ -28,7 +28,7 @@ AkademiTrack is a desktop automation tool designed for students at Akademiet sch
 - **Cross-Platform** - Native support for Windows, macOS, and Linux
 
 ### Maintenance
-- **Automatic Updates** - Checks for new versions every 30 minutes
+- **Automatic Updates** - Checks for new versions every 10 minutes
 - **One-Click Updates** - Download and install updates with a single button
 - **Configuration Management** - Flexible settings for personalized workflows
 
