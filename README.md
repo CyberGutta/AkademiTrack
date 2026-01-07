@@ -91,7 +91,7 @@ AkademiTrack takes your security seriously:
 
 - **Local Storage Only** - All data stored exclusively on your device
 - **Encrypted Credentials** - Industry-standard encryption for stored passwords
-- **No Telemetry** - Zero data collection or tracking
+- **Telemetry** - We only collect necessary data like error messages and how many users that use the program
 - **Official Authentication** - Uses Feide's official SSO system
 - **Open Source** - Code available for community review
 
