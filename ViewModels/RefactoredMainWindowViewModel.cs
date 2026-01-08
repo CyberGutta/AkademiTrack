@@ -233,7 +233,7 @@ namespace AkademiTrack.ViewModels
                 });
 
                 // Initialize authentication service
-                _authService = new AuthenticationService();
+                _authService = new AuthenticationService(_notificationService);
 
                 // Perform authentication
                 var authResult = await _authService.AuthenticateAsync();

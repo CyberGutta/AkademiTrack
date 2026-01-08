@@ -9,6 +9,7 @@ using OpenQA.Selenium.Support.UI;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security;
+using AkademiTrack.Services.Interfaces;
 
 namespace AkademiTrack.Services
 {
@@ -20,6 +21,12 @@ namespace AkademiTrack.Services
         private string _schoolName = "";
         private Dictionary<string, string>? _cachedCookies;
         private bool _credentialsWereRejected = false; // Track if credentials were explicitly rejected
+        private readonly INotificationService? _notificationService;
+
+        public AuthenticationService(INotificationService? notificationService = null)
+        {
+            _notificationService = notificationService;
+        }
 
         public async Task<AuthenticationResult> AuthenticateAsync()
         {
@@ -80,6 +87,18 @@ namespace AkademiTrack.Services
                 if (!hasCredentials)
                 {
                     Console.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
+                    
+                    // Notify user about missing credentials
+                    if (_notificationService != null)
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Mangler Innloggingsdata",
+                            "Gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn.",
+                            NotificationLevel.Warning,
+                            isHighPriority: true
+                        );
+                    }
+                    
                     return new AuthenticationResult 
                     { 
                         Success = false, 
@@ -227,6 +246,18 @@ namespace AkademiTrack.Services
                     if (_credentialsWereRejected)
                     {
                         Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately (no manual login wait)");
+                        
+                        // Notify user about invalid credentials
+                        if (_notificationService != null)
+                        {
+                            await _notificationService.ShowNotificationAsync(
+                                "Innlogging Feilet",
+                                "Feil brukernavn eller passord. Sjekk dine Feide-innloggingsdata.",
+                                NotificationLevel.Error,
+                                isHighPriority: true
+                            );
+                        }
+                        
                         return new AuthenticationResult 
                         { 
                             Success = false, 

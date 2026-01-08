@@ -15,7 +15,6 @@ namespace AkademiTrack.Services
         private static TimeSpan _onlineTimeOffset = TimeSpan.Zero;
         private static DateTime _lastNotificationTime = DateTime.MinValue;
         private static string _lastNotificationMessage = "";
-        private static bool _hasNotifiedTodayOutsideHours = false;
         private static bool _hasPerformedInitialCheck = false;
 
         private static SchoolHoursSettings? _cachedSchoolHours = null;

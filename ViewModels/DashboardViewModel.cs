@@ -272,41 +272,15 @@ namespace AkademiTrack.ViewModels
         {
             Services.ScheduleItem? displayClass = null;
 
-            if (data.CurrentClass != null && data.NextClass != null)
-            {
-                bool overlap = DoClassesOverlap(data.CurrentClass, data.NextClass);
-                
-                if (overlap)
-                {
-                    if (data.CurrentClass.KNavn != "STU" && data.NextClass.KNavn != "STU")
-                    {
-                        displayClass = data.CurrentClass;
-                    }
-                    else if (data.CurrentClass.KNavn != "STU")
-                    {
-                        displayClass = data.CurrentClass;
-                    }
-                    else if (data.NextClass.KNavn != "STU")
-                    {
-                        displayClass = data.NextClass;
-                    }
-                    else
-                    {
-                        displayClass = data.CurrentClass;
-                    }
-                }
-                else
-                {
-                    displayClass = data.CurrentClass;
-                }
-            }
-            else if (data.CurrentClass != null)
-            {
-                displayClass = data.CurrentClass;
-            }
-            else if (data.NextClass != null)
+            // Always prioritize showing the NEXT class, not the current one
+            if (data.NextClass != null)
             {
                 displayClass = data.NextClass;
+            }
+            else
+            {
+                // Only if there's no next class, show that there are no more classes
+                displayClass = null;
             }
 
             if (displayClass != null)

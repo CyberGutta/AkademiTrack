@@ -15,29 +15,27 @@ namespace AkademiTrack.Services
         private readonly SettingsViewModel _settingsViewModel;
         private Timer? _updateCheckTimer;
 
+        // 🚀 FOR PRODUCTION: Set to 10 minutes for reasonable update checks
         // 🧪 FOR TESTING: Set to 30 seconds to see notifications quickly
-        // 🚀 FOR PRODUCTION: Change to TimeSpan.FromMinutes(10)
-        private readonly TimeSpan _checkInterval = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(10);
 
         private bool _disposed;
         private int _notificationCount = 0;
         private bool _updateAvailable = false;
+        private DateTime _lastUpdateNotification = DateTime.MinValue;
 
         // 🧪 FOR TESTING: Set to true to simulate an available update
         // 🚀 FOR PRODUCTION: Set to false for real update checks
         private const bool SIMULATE_UPDATE_AVAILABLE = false;
 
-        // Escalating notification messages
+        // More reasonable notification messages
         private readonly string[] _notificationMessages = new[]
         {
-            "En ny versjon er tilgjengelig!",
-            "Vennligst oppdater AkademiTrack nå.",
-            "Din versjon er utdatert. Oppdater!",
-            "VIKTIG: Vennligst oppdater til den nyeste versjonen!",
-            "Kritisk: Du må oppdatere AkademiTrack!",
-            "HASTER: Oppdater nå!",
-            "SISTE ADVARSEL: Oppdater umiddelbart!",
-            "KRITISK NIVÅ: Oppdater nå eller risiker feil!"
+            "En ny versjon er tilgjengelig for nedlasting.",
+            "Vennligst oppdater AkademiTrack når det passer deg.",
+            "Ny versjon inneholder viktige forbedringer.",
+            "Anbefaler å oppdatere til nyeste versjon.",
+            "Oppdatering tilgjengelig - inneholder feilrettinger."
         };
 
         public UpdateCheckerService(SettingsViewModel settingsViewModel)
@@ -110,43 +108,36 @@ namespace AkademiTrack.Services
                     Debug.WriteLine($"[UpdateChecker] Real check result: Update={updateDetected}, Version={versionNumber}");
                 }
 
-                // If update is available, BOMBARD the user
+                // If update is available, notify user reasonably
                 if (updateDetected)
                 {
                     _updateAvailable = true;
 
-                    // Get escalating message based on how many times we've notified
-                    string message = GetEscalatingMessage();
-
-                    Debug.WriteLine($"[UpdateChecker] BOMBARDING USER with notification #{_notificationCount + 1}");
-                    Debug.WriteLine($"[UpdateChecker] Update version: v{versionNumber}");
-
-                    // Show notification on UI thread
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    // Only notify once per day to avoid spam
+                    var timeSinceLastNotification = DateTime.Now - _lastUpdateNotification;
+                    if (timeSinceLastNotification.TotalHours >= 24 || _notificationCount == 0)
                     {
-                        NativeNotificationService.Show(
-                            $"Oppdatering #{_notificationCount + 1}",
-                            $"{message}\n\nVersjon {versionNumber} venter!",
-                            _notificationCount < 3 ? "INFO" :
-                            _notificationCount < 6 ? "WARNING" : "ERROR"
-                        );
-                    });
+                        string message = GetReasonableMessage();
 
-                    _notificationCount++;
+                        Debug.WriteLine($"[UpdateChecker] Notifying user about update (notification #{_notificationCount + 1})");
+                        Debug.WriteLine($"[UpdateChecker] Update version: v{versionNumber}");
 
-                    // After 10 notifications, show a special "YOU'RE IGNORING THIS" message
-                    if (_notificationCount >= 10 && _notificationCount % 5 == 0)
-                    {
+                        // Show notification on UI thread
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             NativeNotificationService.Show(
-                                "KRITISK MELDING",
-                                $"Du har ignorert {_notificationCount} oppdateringsmeldinger!\n\n" +
-                                $"Versjon {versionNumber} er tilgjengelig.\n\n" +
-                                "Disse meldingene fortsetter til du oppdaterer!",
-                                "ERROR"
+                                "Oppdatering Tilgjengelig",
+                                $"{message}\n\nVersjon {versionNumber} er klar for nedlasting.",
+                                "INFO"
                             );
                         });
+
+                        _notificationCount++;
+                        _lastUpdateNotification = DateTime.Now;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[UpdateChecker] Update available but not notifying (last notification: {_lastUpdateNotification:HH:mm:ss})");
                     }
                 }
                 else
@@ -157,8 +148,20 @@ namespace AkademiTrack.Services
                     if (_updateAvailable)
                     {
                         Debug.WriteLine("[UpdateChecker] Update was installed! Resetting notification counter.");
+                        
+                        // Notify user that update was successful
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            NativeNotificationService.Show(
+                                "Oppdatering Fullført",
+                                "AkademiTrack er nå oppdatert til nyeste versjon!",
+                                "SUCCESS"
+                            );
+                        });
+                        
                         _notificationCount = 0;
                         _updateAvailable = false;
+                        _lastUpdateNotification = DateTime.MinValue;
                     }
                 }
             }
@@ -169,9 +172,9 @@ namespace AkademiTrack.Services
             }
         }
 
-        private string GetEscalatingMessage()
+        private string GetReasonableMessage()
         {
-            // Return escalating messages, but cap at the most aggressive one
+            // Return reasonable messages, cycling through them
             int index = Math.Min(_notificationCount, _notificationMessages.Length - 1);
             return _notificationMessages[index];
         }

@@ -201,7 +201,7 @@ namespace AkademiTrack.ViewModels
                 Debug.WriteLine("[FeideWindow] Credentials saved temporarily for testing");
 
                 // Step 2: Test the credentials with AuthenticationService
-                var authService = new AuthenticationService();
+                var authService = new AuthenticationService(null);
                 var testResult = await authService.AuthenticateAsync();
                 
                 if (testResult.Success)

@@ -95,6 +95,12 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"Automatisering feil: {ex.Message}");
+                await _notificationService.ShowNotificationAsync(
+                    "Automatisering Feilet",
+                    $"En uventet feil oppstod: {ex.Message}",
+                    NotificationLevel.Error,
+                    isHighPriority: true
+                );
                 return AutomationResult.Failed($"Automation failed: {ex.Message}", ex);
             }
             finally
@@ -137,7 +143,7 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogInfo("🔐 Starter re-autentisering...");
                 
-                var authService = new AuthenticationService();
+                var authService = new AuthenticationService(_notificationService);
                 var authResult = await authService.AuthenticateAsync();
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Cookies.Count > 0)
@@ -291,6 +297,16 @@ namespace AkademiTrack.Services
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
                         $"Syklus #{cycleCount} - Sjekker registreringsvinduer", cycleCount));
 
+                    // Notify user every 10 cycles (5 minutes) that automation is still running
+                    if (cycleCount % 10 == 0)
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Automatisering Aktiv",
+                            $"Overvåker {validStuSessions.Count} STU-økter. Syklus #{cycleCount} fullført.",
+                            NotificationLevel.Info
+                        );
+                    }
+
                     bool allSessionsComplete = true;
                     int openWindows = 0;
                     int closedWindows = 0;
@@ -332,6 +348,11 @@ namespace AkademiTrack.Services
                                 catch (Exception regEx)
                                 {
                                     _loggingService.LogError($"Registrering feilet: {regEx.Message}");
+                                    await _notificationService.ShowNotificationAsync(
+                                        "Registrering Feilet",
+                                        $"Kunne ikke registrere STU {stuSession.StartKl}-{stuSession.SluttKl}: {regEx.Message}",
+                                        NotificationLevel.Error
+                                    );
                                 }
                                 break;
 
@@ -373,6 +394,17 @@ namespace AkademiTrack.Services
                 catch (Exception ex)
                 {
                     _loggingService.LogError($"Overvåkingsfeil: {ex.Message}");
+                    
+                    // Only notify on monitoring errors every 5 minutes to avoid spam
+                    if (cycleCount % 10 == 0)
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Overvåkingsfeil",
+                            $"Feil under overvåking: {ex.Message}. Prøver igjen...",
+                            NotificationLevel.Warning
+                        );
+                    }
+                    
                     await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
                 }
             }
