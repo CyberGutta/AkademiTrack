@@ -5,6 +5,7 @@
         xmlns:services="using:AkademiTrack.Services"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="750"
         x:Class="AkademiTrack.Views.MainWindow"
         x:DataType="vm:RefactoredMainWindowViewModel"
@@ -29,49 +30,43 @@
 	</Window.Resources>
 
 	<Window.Styles>
-		<!-- Theme Toggle Button -->
-		<Style Selector="Button.theme-toggle">
-			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
-			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="22.5"/>
-			<Setter Property="HorizontalContentAlignment" Value="Center"/>
-			<Setter Property="VerticalContentAlignment" Value="Center"/>
-			<Setter Property="Padding" Value="0"/>
-			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-			<Setter Property="Template">
-				<ControlTemplate>
-					<Border Name="PART_Border"
-							Background="{TemplateBinding Background}"
-							BorderBrush="{TemplateBinding BorderBrush}"
-							BorderThickness="{TemplateBinding BorderThickness}"
-							CornerRadius="{TemplateBinding CornerRadius}"
-							Width="{TemplateBinding Width}"
-							Height="{TemplateBinding Height}">
-						<Grid>
-							<Border Name="PART_HoverOverlay"
-									CornerRadius="{TemplateBinding CornerRadius}"
-									Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-									Opacity="0">
-								<Border.Transitions>
-									<Transitions>
-										<DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-									</Transitions>
-								</Border.Transitions>
-							</Border>
-							<Viewbox Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-								<TextBlock Text="{TemplateBinding Content}"
-										   Foreground="{TemplateBinding Foreground}"
-										   FontSize="24"
-										   HorizontalAlignment="Center"
-										   VerticalAlignment="Center"
-										   TextAlignment="Center"/>
-							</Viewbox>
-						</Grid>
-					</Border>
-				</ControlTemplate>
-			</Setter>
-		</Style>
+    <Style Selector="Button.theme-toggle">
+        <Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="22.5"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Border"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Width="{TemplateBinding Width}"
+                        Height="{TemplateBinding Height}">
+                    <Grid>
+                        <Border Name="PART_HoverOverlay"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                                Opacity="0">
+                            <Border.Transitions>
+                                <Transitions>
+                                    <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+                                </Transitions>
+                            </Border.Transitions>
+                        </Border>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
 
 		<Style Selector="Button.theme-toggle:pointerover /template/ Border#PART_HoverOverlay">
 			<Setter Property="Opacity" Value="0.12"/>
@@ -257,33 +252,42 @@
 				<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
 					<!-- Tutorial Button -->
 					<Button Classes="theme-toggle"
-							Content="📖"
 							Command="{Binding OpenTutorialCommand}"
 							Width="45"
 							Height="45"
-							FontSize="20"
 							ToolTip.Tip="Veiledning"
-							Cursor="Hand"/>
+							Cursor="Hand">
+						<materialIcons:MaterialIcon Kind="Book" 
+													Width="24" 
+													Height="24"
+													Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+					</Button>
 
 					<!-- Refresh Button -->
 					<Button Classes="theme-toggle"
-							Content="🔄"
 							Command="{Binding RefreshDataCommand}"
 							Width="45"
 							Height="45"
-							FontSize="20"
 							ToolTip.Tip="Oppdater data"
-							Cursor="Hand"/>
+							Cursor="Hand">
+						<materialIcons:MaterialIcon Kind="Refresh" 
+													Width="24" 
+													Height="24"
+													Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+					</Button>
 
 					<!-- Settings Button -->
 					<Button Classes="theme-toggle"
-							Content="⚙️"
 							Command="{Binding OpenSettingsCommand}"
 							Width="45"
 							Height="45"
-							FontSize="20"
 							ToolTip.Tip="Innstillinger"
-							Cursor="Hand"/>
+							Cursor="Hand">
+						<materialIcons:MaterialIcon Kind="Settings" 
+													Width="24" 
+													Height="24"
+													Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+					</Button>
 
 					<!-- Theme Toggle Button -->
 					<Button Classes="theme-toggle"
@@ -292,7 +296,7 @@
 							Command="{Binding ToggleThemeCommand}"
 							Width="45"
 							Height="45"
-							FontSize="24"
+							FontSize="22"
 							ToolTip.Tip="Toggle dark/light mode"
 							Cursor="Hand"/>
 				</StackPanel>

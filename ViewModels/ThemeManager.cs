@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia.Media;
+using Material.Icons;
 
 namespace AkademiTrack.Services
 {
@@ -39,6 +40,8 @@ namespace AkademiTrack.Services
                     _isDarkMode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(ThemeIcon));
+                    OnPropertyChanged(nameof(ThemeIconKind));
+                    OnPropertyChanged(nameof(ThemeIconColor));
                     OnPropertyChanged(nameof(WindowBackground));
                     OnPropertyChanged(nameof(TextPrimary));
                     OnPropertyChanged(nameof(TextSecondary));
@@ -54,6 +57,10 @@ namespace AkademiTrack.Services
         }
 
         public string ThemeIcon => _isDarkMode ? "🌙" : "☀️";
+        
+        public MaterialIconKind ThemeIconKind => _isDarkMode 
+            ? MaterialIconKind.WeatherNight 
+            : MaterialIconKind.WeatherSunny;
 
         public IBrush ThemeIconColor => new SolidColorBrush(_isDarkMode ? Color.Parse("#FFD700") : Color.Parse("#FFA500"));
 
