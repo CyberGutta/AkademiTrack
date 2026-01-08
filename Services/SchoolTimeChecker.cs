@@ -207,7 +207,7 @@ namespace AkademiTrack.Services
                 }
 
                 if (!silent)
-                    Debug.WriteLine($"[AUTO-START] ✓ Should start - within school hours and not completed today");
+                    Debug.WriteLine($"[AUTO-START] Should start - within school hours and not completed today");
 
                 string startReason = $"Starter automatisering for {GetNorwegianDayName(now.DayOfWeek)} kl. {now:HH:mm}";
 

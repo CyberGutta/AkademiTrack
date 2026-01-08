@@ -371,7 +371,15 @@ namespace AkademiTrack.Services
                                 NotificationLevel.Success
                             );
                         }
-                        break;
+                        else
+                        {
+                            await _notificationService.ShowNotificationAsync(
+                                "Ingen studietimer igjen",
+                                "Ingen STU-økter gjenstår.",
+                                NotificationLevel.Info
+                            );
+                        }
+                            break;
                     }
 
                     _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");

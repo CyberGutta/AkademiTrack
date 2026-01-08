@@ -751,7 +751,6 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
                 
-                _loggingService.LogSuccess("✅ Auto-start is ENABLED - checking school hours...");
                 
                 bool isSchoolHours = await _automationService.CheckSchoolHoursAsync();
                 
@@ -759,7 +758,6 @@ namespace AkademiTrack.ViewModels
                 
                 if (isSchoolHours && !IsAutomationRunning)
                 {
-                    _loggingService.LogSuccess("✅ Current time is WITHIN school hours");
                     _loggingService.LogInfo("🚀 Starting automation automatically...");
                     
                     await Task.Delay(500);
@@ -776,7 +774,7 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogInfo("   Automation will not start automatically");
                 }
                 
-                // ✅ START PERIODIC CHECKING (every 30 seconds)
+                // START PERIODIC CHECKING (every 30 seconds)
                 if (_autoStartCheckTimer == null)
                 {
                     _loggingService.LogInfo("⏰ Starting periodic auto-start checker (checks every 30 seconds)");
