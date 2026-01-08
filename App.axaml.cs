@@ -112,42 +112,42 @@ namespace AkademiTrack
             else
             {
                 mainWindow.Show();
-                Console.WriteLine("[App] Main window shown normally");
+                Debug.WriteLine("[App] Main window shown normally");
                 
                 if (!showFeideSetup)
                 {
-                    Console.WriteLine("[App] Not in Feide setup mode - will show notification overlay");
+                    Debug.WriteLine("[App] Not in Feide setup mode - will show notification overlay");
                     
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        Console.WriteLine("DISPATCHER POST FIRED");
+                        Debug.WriteLine("DISPATCHER POST FIRED");
                         
                         await Task.Delay(1000);
                         
                         try
                         {
-                            Console.WriteLine("[App] Checking if notification overlay should be shown...");
+                            Debug.WriteLine("[App] Checking if notification overlay should be shown...");
                             
                             bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
                                 .ShouldShowPermissionDialogAsync();
                             
-                            Console.WriteLine($"[App] ShouldShow check result: {shouldShow}");
+                            Debug.WriteLine($"[App] ShouldShow check result: {shouldShow}");
                             
                             if (shouldShow)
                             {
-                                Console.WriteLine("[App] Creating notification permission overlay...");
+                                Debug.WriteLine("[App] Creating notification permission overlay...");
                                 
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
                                 if (overlayContainer != null)
                                 {
-                                    Console.WriteLine("[App] Found OverlayContainer - creating overlay...");
+                                    Debug.WriteLine("[App] Found OverlayContainer - creating overlay...");
                                     
                                     var overlay = new AkademiTrack.Views.NotificationPermissionOverlay();
                                     
                                     overlay.Closed += (s, e) =>
                                     {
-                                        Console.WriteLine("[App] Overlay closed - hiding container");
+                                        Debug.WriteLine("[App] Overlay closed - hiding container");
                                         overlayContainer.Content = null;
                                         overlayContainer.IsVisible = false;
                                     };
@@ -155,29 +155,29 @@ namespace AkademiTrack
                                     overlayContainer.Content = overlay;
                                     overlayContainer.IsVisible = true;
                                     
-                                    Console.WriteLine("[App] Overlay shown successfully!");
+                                    Debug.WriteLine("[App] Overlay shown successfully!");
                                 }
                                 else
                                 {
-                                    Console.WriteLine("[App] ❌ ERROR: Could not find OverlayContainer in MainWindow");
-                                    Console.WriteLine("[App] Make sure you added <ContentControl Name=\"OverlayContainer\" .../> to MainWindow.axaml");
+                                    Debug.WriteLine("[App] ❌ ERROR: Could not find OverlayContainer in MainWindow");
+                                    Debug.WriteLine("[App] Make sure you added <ContentControl Name=\"OverlayContainer\" .../> to MainWindow.axaml");
                                 }
                             }
                             else
                             {
-                                Console.WriteLine("[App] Not showing notification overlay - user already prompted or not on macOS");
+                                Debug.WriteLine("[App] Not showing notification overlay - user already prompted or not on macOS");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[App] ❌ ERROR showing notification overlay: {ex.Message}");
-                            Console.WriteLine($"[App] Stack trace: {ex.StackTrace}");
+                            Debug.WriteLine($"[App] ❌ ERROR showing notification overlay: {ex.Message}");
+                            Debug.WriteLine($"[App] Stack trace: {ex.StackTrace}");
                         }
                     }, DispatcherPriority.Background);
                 }
                 else
                 {
-                    Console.WriteLine("[App] In Feide setup mode - skipping notification overlay");
+                    Debug.WriteLine("[App] In Feide setup mode - skipping notification overlay");
                 }
             }
         }
