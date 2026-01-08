@@ -101,6 +101,7 @@ namespace AkademiTrack.Views
                     e.Cancel = true;
                     this.Hide(); 
                     
+                   /*
                     if (!App.HasShownHideNotification)
                     {
                         App.HasShownHideNotification = true;
@@ -110,6 +111,7 @@ namespace AkademiTrack.Views
                             "INFO"
                         );
                     }
+                    */
                     return;
                 }
 
@@ -123,6 +125,7 @@ namespace AkademiTrack.Views
                     e.Cancel = true;
                     AkademiTrack.Services.TrayIconManager.MinimizeToTray();
 
+                   /*
                     if (!_hasShownMinimizeNotification)
                     {
                         AkademiTrack.Services.NativeNotificationService.Show(
@@ -132,6 +135,8 @@ namespace AkademiTrack.Views
                         );
                         _hasShownMinimizeNotification = true;
                     }
+                    */
+                    return;
                 }
                 else
                 {
