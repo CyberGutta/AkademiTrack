@@ -22,12 +22,18 @@ namespace AkademiTrack
     public partial class App : Application
     {
         private bool _isShuttingDown = false;
+        private static bool _hasShownHideNotification = false; 
+        public static bool IsShuttingDown => ((App)Current!)._isShuttingDown;
+        public static bool HasShownHideNotification 
+        { 
+            get => _hasShownHideNotification;
+            set => _hasShownHideNotification = value;
+        }
 
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
 
-            // Initialize services
             Services.ServiceLocator.InitializeServices();
         }
 
@@ -54,23 +60,17 @@ namespace AkademiTrack
             bool startMinimized = await ShouldStartMinimized();
             Debug.WriteLine($"[App] Should start minimized: {startMinimized}");
 
-            // Always show main window, but determine which view to show
             ShowMainWindow(desktop, startMinimized, !hasFeideCredentials);
         }
 
-        // Replace your ShowMainWindow method in App.axaml.cs with this:
-
         private async void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop, bool startMinimized, bool showFeideSetup = false)
         {
-            // ✅ Create viewmodel (it already has SettingsViewModel initialized in its constructor)
             var mainWindowViewModel = new RefactoredMainWindowViewModel(skipInitialization: showFeideSetup);
 
-            // If we need to show Feide setup, set it up
             if (showFeideSetup)
             {
                 Debug.WriteLine("[App] No Feide credentials - will show Feide setup in main window");
 
-                // Subscribe to Feide setup completion
                 mainWindowViewModel.FeideViewModel.SetupCompleted += async (sender, e) =>
                 {
                     if (e.Success)
@@ -78,15 +78,12 @@ namespace AkademiTrack
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
                         Debug.WriteLine("[App] Restarting application to load all services with new credentials...");
 
-                        // Small delay to let user see success
                         await Task.Delay(1000);
 
-                        // Restart the application
                         RestartApplication();
                     }
                 };
 
-                // Show Feide view initially
                 mainWindowViewModel.ShowFeide = true;
                 mainWindowViewModel.ShowDashboard = false;
             }
@@ -102,7 +99,7 @@ namespace AkademiTrack
             AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
             Debug.WriteLine("[App] TrayIconManager initialized");
 
-            if (startMinimized && !showFeideSetup) // Don't start minimized if showing Feide setup
+            if (startMinimized && !showFeideSetup)
             {
                 Debug.WriteLine("[App] Starting minimized to tray...");
 
@@ -117,16 +114,14 @@ namespace AkademiTrack
                 mainWindow.Show();
                 Console.WriteLine("[App] Main window shown normally");
                 
-                // ✅ NEW: Show notification permission overlay INSIDE the app
                 if (!showFeideSetup)
                 {
                     Console.WriteLine("[App] Not in Feide setup mode - will show notification overlay");
                     
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        Console.WriteLine("[App] ========== DISPATCHER POST FIRED ==========");
+                        Console.WriteLine("DISPATCHER POST FIRED");
                         
-                        // Small delay to let the main window fully render
                         await Task.Delay(1000);
                         
                         try
@@ -142,17 +137,14 @@ namespace AkademiTrack
                             {
                                 Console.WriteLine("[App] Creating notification permission overlay...");
                                 
-                                // Find the overlay container in MainWindow
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
                                 if (overlayContainer != null)
                                 {
                                     Console.WriteLine("[App] Found OverlayContainer - creating overlay...");
                                     
-                                    // Create overlay control
                                     var overlay = new AkademiTrack.Views.NotificationPermissionOverlay();
                                     
-                                    // Handle close event
                                     overlay.Closed += (s, e) =>
                                     {
                                         Console.WriteLine("[App] Overlay closed - hiding container");
@@ -160,11 +152,10 @@ namespace AkademiTrack
                                         overlayContainer.IsVisible = false;
                                     };
                                     
-                                    // Show overlay
                                     overlayContainer.Content = overlay;
                                     overlayContainer.IsVisible = true;
                                     
-                                    Console.WriteLine("[App] ✅ Overlay shown successfully!");
+                                    Console.WriteLine("[App] Overlay shown successfully!");
                                 }
                                 else
                                 {
@@ -199,7 +190,6 @@ namespace AkademiTrack
 
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
-                    // Get the current executable path
                     var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
                     var executablePath = currentProcess.MainModule?.FileName;
 
@@ -207,7 +197,6 @@ namespace AkademiTrack
                     {
                         Debug.WriteLine($"[App] Executable path: {executablePath}");
 
-                        // Start new instance
                         var startInfo = new System.Diagnostics.ProcessStartInfo
                         {
                             FileName = executablePath,
@@ -218,7 +207,6 @@ namespace AkademiTrack
                         Debug.WriteLine("[App] Starting new application instance...");
                         System.Diagnostics.Process.Start(startInfo);
 
-                        // Shutdown current instance
                         Debug.WriteLine("[App] Shutting down current instance...");
                         _isShuttingDown = true;
                         desktop.Shutdown();
@@ -226,7 +214,6 @@ namespace AkademiTrack
                     else
                     {
                         Debug.WriteLine("[App] ERROR: Could not determine executable path for restart");
-                        // Fallback: just shutdown (user can manually restart)
                         _isShuttingDown = true;
                         desktop.Shutdown();
                     }
@@ -235,7 +222,6 @@ namespace AkademiTrack
             catch (Exception ex)
             {
                 Debug.WriteLine($"[App] Error during restart: {ex.Message}");
-                // Fallback: just shutdown
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     _isShuttingDown = true;
@@ -322,11 +308,14 @@ github.com/CyberGutta/AkademiTrack";
             {
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
-                    // Ensure main window is visible
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
+                    
+                    if (OperatingSystem.IsMacOS() && desktop.MainWindow != null)
+                    {
+                        desktop.MainWindow.BringIntoView();
+                    }
 
-                    // Trigger OpenSettingsCommand from RefactoredMainWindowViewModel
                     if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel mainViewModel)
                     {
                         mainViewModel.OpenSettingsCommand?.Execute(null);
@@ -343,6 +332,11 @@ github.com/CyberGutta/AkademiTrack";
                 {
                     desktop.MainWindow?.Show();
                     desktop.MainWindow?.Activate();
+                    
+                    if (OperatingSystem.IsMacOS() && desktop.MainWindow != null)
+                    {
+                        desktop.MainWindow.BringIntoView();
+                    }
 
                     if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
                     {
@@ -371,9 +365,11 @@ github.com/CyberGutta/AkademiTrack";
 
         private void QuitApp(object? sender, EventArgs e)
         {
+            Debug.WriteLine("[App] Quit requested from menu");
+            _isShuttingDown = true;
+            
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                _isShuttingDown = true;
                 desktop.Shutdown();
             }
         }

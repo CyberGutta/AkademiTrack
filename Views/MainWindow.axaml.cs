@@ -25,7 +25,6 @@ namespace AkademiTrack.Views
             this.WindowState = WindowState.Normal;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             
-            // Track when window is being legitimately restored
             this.PropertyChanged += MainWindow_PropertyChanged;
 
             _ = LoadSettingsAsync();
@@ -33,26 +32,22 @@ namespace AkademiTrack.Views
 
         private void MainWindow_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
-            // Track window state changes to detect legitimate restore operations
             if (e.Property == WindowStateProperty)
             {
                 var oldState = (WindowState)(e.OldValue ?? WindowState.Normal);
                 var newState = (WindowState)(e.NewValue ?? WindowState.Normal);
 
-                // If transitioning FROM minimized TO normal, this is a legitimate restore
                 if (oldState == WindowState.Minimized && newState == WindowState.Normal)
                 {
                     Debug.WriteLine("[FOCUS] Window being restored from minimized - allowing activation");
                     _isBeingRestored = true;
                     
-                    // Clear the flag after a short delay
                     Dispatcher.UIThread.Post(() => 
                     {
                         _isBeingRestored = false;
                     }, DispatcherPriority.Background);
                 }
                 
-                // Handle minimize to tray
                 if (newState == WindowState.Minimized && _cachedSettings?.StartMinimized == true)
                 {
                     Dispatcher.UIThread.Post(() =>
@@ -77,13 +72,11 @@ namespace AkademiTrack.Views
 
         public async Task RefreshSettingsAsync()
         {
-            // Refresh settings WITHOUT activating the window
             var previousState = this.WindowState;
             var wasVisible = this.IsVisible;
             
             await LoadSettingsAsync();
             
-            // Ensure window state doesn't change
             if (!wasVisible || previousState == WindowState.Minimized)
             {
                 this.WindowState = previousState;
@@ -94,26 +87,35 @@ namespace AkademiTrack.Views
         {
             try
             {
-                if (_isReallyClosing)
+                if (App.IsShuttingDown)
                 {
+                    Debug.WriteLine("[MainWindow] App is shutting down - allowing close");
+                    _isReallyClosing = true;
                     AkademiTrack.Services.TrayIconManager.Dispose();
+                    return;
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && !_isReallyClosing)
+                {
+                    Debug.WriteLine("[MainWindow] macOS: Hiding window instead of closing");
+                    e.Cancel = true;
+                    this.Hide(); 
+                    
+                    if (!App.HasShownHideNotification)
+                    {
+                        App.HasShownHideNotification = true;
+                        AkademiTrack.Services.NativeNotificationService.Show(
+                            "AkademiTrack kjører fortsatt",
+                            "Appen er fortsatt aktiv i bakgrunnen. Bruk dock-ikonet eller menylinjen for å åpne den igjen.",
+                            "INFO"
+                        );
+                    }
                     return;
                 }
 
                 if (_cachedSettings == null)
                 {
                     _cachedSettings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    _isReallyClosing = true;
-                    AkademiTrack.Services.TrayIconManager.Dispose();
-                    if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
-                    {
-                        lifetime.Shutdown();
-                    }
-                    return;
                 }
 
                 if (_cachedSettings.StartMinimized)
@@ -133,6 +135,7 @@ namespace AkademiTrack.Views
                 }
                 else
                 {
+                    // Really close
                     AkademiTrack.Services.TrayIconManager.Dispose();
                 }
             }
