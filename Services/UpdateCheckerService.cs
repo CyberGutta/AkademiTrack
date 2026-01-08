@@ -1,4 +1,5 @@
 ﻿using AkademiTrack.ViewModels;
+using AkademiTrack.Services.Interfaces;
 using Avalonia.Threading;
 using System;
 using System.Diagnostics;
@@ -8,11 +9,12 @@ using System.Threading.Tasks;
 namespace AkademiTrack.Services
 {
     /// <summary>
-    /// Aggressive update checker that BOMBARDS users with notifications every 10 minutes
+    /// Update checker that checks for updates periodically and logs to the app's activity log
     /// </summary>
     public class UpdateCheckerService : IDisposable
     {
         private readonly SettingsViewModel _settingsViewModel;
+        private readonly ILoggingService _loggingService;
         private Timer? _updateCheckTimer;
 
         // 🚀 FOR PRODUCTION: Set to 10 minutes for reasonable update checks
@@ -41,33 +43,63 @@ namespace AkademiTrack.Services
         public UpdateCheckerService(SettingsViewModel settingsViewModel)
         {
             _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
+            _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
         }
 
-    
+        private void Log(string message, string level = "INFO")
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var logMessage = $"[{timestamp}] [UpdateChecker] {message}";
+            
+            // Write to Debug console (for development)
+            Debug.WriteLine(logMessage);
+            
+            // Also write to app's activity log using the logging service
+            switch (level.ToUpper())
+            {
+                case "ERROR":
+                    _loggingService?.LogError($"[UpdateChecker] {message}");
+                    break;
+                case "SUCCESS":
+                    _loggingService?.LogSuccess($"[UpdateChecker] {message}");
+                    break;
+                default:
+                    _loggingService?.LogInfo($"[UpdateChecker] {message}");
+                    break;
+            }
+        }
+
         public void StartPeriodicChecks()
         {
             if (_updateCheckTimer != null)
             {
-                Debug.WriteLine("[UpdateChecker] Already running");
+                Log("⚠️ Already running - timer already exists", "INFO");
                 return;
             }
 
-            Debug.WriteLine($"[UpdateChecker] Starting update checks every {_checkInterval.TotalMinutes:F1} minutes");
-            Debug.WriteLine($"[UpdateChecker] Test mode: {(SIMULATE_UPDATE_AVAILABLE ? "ON" : "OFF")}");
+            Log("🚀 STARTING UPDATE CHECKER SERVICE", "INFO");
+            Log($"Check interval: {_checkInterval.TotalMinutes:F1} minutes", "INFO");
+            Log($"Test mode: {(SIMULATE_UPDATE_AVAILABLE ? "ON" : "OFF")}", "INFO");
+            Log($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "INFO");
+            Log($"Next check at: {DateTime.Now.Add(_checkInterval):yyyy-MM-dd HH:mm:ss}", "INFO");
 
+            // Run first check immediately
+            Log("Running initial update check...", "INFO");
             _ = CheckForUpdatesAsync();
 
+            // Set up periodic checks
             _updateCheckTimer = new Timer(
                 async _ => await CheckForUpdatesAsync(),
                 null,
                 _checkInterval,
                 _checkInterval
             );
+
         }
 
         public void StopPeriodicChecks()
         {
-            Debug.WriteLine("[UpdateChecker] Stopping periodic checks");
+            Log("Stopping periodic checks", "INFO");
             _updateCheckTimer?.Dispose();
             _updateCheckTimer = null;
             _notificationCount = 0;
@@ -78,14 +110,15 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine($"[UpdateChecker] === Check #{_notificationCount + 1} at {DateTime.Now:HH:mm:ss} ===");
+                Log($"=== Update Check #{_notificationCount + 1} Starting ===", "INFO");
+                Log($"Check time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "INFO");
 
                 bool updateDetected = false;
                 string versionNumber = "unknown";
 
                 if (SIMULATE_UPDATE_AVAILABLE)
                 {
-                    Debug.WriteLine("[UpdateChecker] 🧪 TEST MODE: Simulating available update");
+                    Log("🧪 TEST MODE: Simulating available update", "INFO");
                     updateDetected = true;
                     versionNumber = "99.99.99";
 
@@ -98,29 +131,33 @@ namespace AkademiTrack.Services
                 else
                 {
                     // 🚀 PRODUCTION MODE: Real update check
-                    Debug.WriteLine("[UpdateChecker] PRODUCTION: Checking for real updates...");
+                    Log("🚀 PRODUCTION: Checking for real updates...", "INFO");
                     await _settingsViewModel.CheckForUpdatesAsync();
 
                     // Read the results from ViewModel
                     updateDetected = _settingsViewModel.UpdateAvailable;
                     versionNumber = _settingsViewModel.AvailableVersion ?? "unknown";
 
-                    Debug.WriteLine($"[UpdateChecker] Real check result: Update={updateDetected}, Version={versionNumber}");
+                    Log($"Real check result: Update Available={updateDetected}, Version={versionNumber}", "INFO");
                 }
 
                 // If update is available, notify user reasonably
                 if (updateDetected)
                 {
                     _updateAvailable = true;
+                    Log($"✓ Update detected! Version {versionNumber} is available", "SUCCESS");
 
                     // Only notify once per day to avoid spam
                     var timeSinceLastNotification = DateTime.Now - _lastUpdateNotification;
+                    Log($"Time since last notification: {timeSinceLastNotification.TotalHours:F1} hours", "INFO");
+
                     if (timeSinceLastNotification.TotalHours >= 24 || _notificationCount == 0)
                     {
                         string message = GetReasonableMessage();
 
-                        Debug.WriteLine($"[UpdateChecker] Notifying user about update (notification #{_notificationCount + 1})");
-                        Debug.WriteLine($"[UpdateChecker] Update version: v{versionNumber}");
+                        Log($"→ Notifying user about update (notification #{_notificationCount + 1})", "INFO");
+                        Log($"→ Update version: v{versionNumber}", "INFO");
+                        Log($"→ Message: {message}", "INFO");
 
                         // Show notification on UI thread
                         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -134,20 +171,22 @@ namespace AkademiTrack.Services
 
                         _notificationCount++;
                         _lastUpdateNotification = DateTime.Now;
+                        Log($"✓ Notification sent successfully. Total notifications: {_notificationCount}", "SUCCESS");
                     }
                     else
                     {
-                        Debug.WriteLine($"[UpdateChecker] Update available but not notifying (last notification: {_lastUpdateNotification:HH:mm:ss})");
+                        Log($"⊗ Update available but not notifying yet (last notification: {_lastUpdateNotification:HH:mm:ss})", "INFO");
+                        Log($"  Next notification will be sent after: {_lastUpdateNotification.AddHours(24):yyyy-MM-dd HH:mm:ss}", "INFO");
                     }
                 }
                 else
                 {
-                    Debug.WriteLine("[UpdateChecker] No updates available");
+                    Log("✗ No updates available - software is up to date", "INFO");
 
                     // Reset counter if no update is available
                     if (_updateAvailable)
                     {
-                        Debug.WriteLine("[UpdateChecker] Update was installed! Resetting notification counter.");
+                        Log("🎉 Update was installed! Resetting notification counter.", "SUCCESS");
                         
                         // Notify user that update was successful
                         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -162,13 +201,18 @@ namespace AkademiTrack.Services
                         _notificationCount = 0;
                         _updateAvailable = false;
                         _lastUpdateNotification = DateTime.MinValue;
+                        Log("✓ Notification state reset", "INFO");
                     }
                 }
+
+                Log($"=== Update Check #{_notificationCount + 1} Complete ===", "INFO");
+                Log($"Next check scheduled for: {DateTime.Now.Add(_checkInterval):yyyy-MM-dd HH:mm:ss}", "INFO");
+                Log("", "INFO"); // Empty line for readability
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[UpdateChecker] Error during scheduled check: {ex.Message}");
-                Debug.WriteLine($"[UpdateChecker] Stack trace: {ex.StackTrace}");
+                Log($"❌ ERROR during scheduled check: {ex.Message}", "ERROR");
+                Log($"Stack trace: {ex.StackTrace}", "ERROR");
             }
         }
 
@@ -183,9 +227,10 @@ namespace AkademiTrack.Services
         {
             if (_disposed) return;
 
-            Debug.WriteLine("[UpdateChecker] Disposing...");
+            Log("Disposing UpdateCheckerService...", "INFO");
             StopPeriodicChecks();
             _disposed = true;
+            Log("✓ UpdateCheckerService disposed", "INFO");
         }
     }
 }

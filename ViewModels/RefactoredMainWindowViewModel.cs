@@ -117,6 +117,7 @@ namespace AkademiTrack.ViewModels
 
         // Automation
         public bool IsAutomationRunning => _automationService?.IsRunning ?? false;
+        private Timer? _autoStartCheckTimer;
 
         // Logging
         public ObservableCollection<LogEntry> LogEntries => _loggingService.LogEntries;
@@ -273,6 +274,8 @@ namespace AkademiTrack.ViewModels
 
                     _updateChecker?.StartPeriodicChecks();
                     _loggingService.LogInfo("Update checker ready");
+
+                    await CheckAutoStartAutomationAsync();
 
                     // Reset retry count on success
                     _initializationRetryCount = 0;
@@ -708,6 +711,74 @@ namespace AkademiTrack.ViewModels
             return importantMessages.Any(important => message.StartsWith(important));
         }
 
+        private async Task CheckAutoStartAutomationAsync()
+        {
+            try
+            {
+                _loggingService.LogInfo("🔍 CHECKING AUTO-START AUTOMATION");
+                
+                await _settingsService.LoadSettingsAsync();
+                var autoStartEnabled = _settingsService.AutoStartAutomation;
+                
+                _loggingService.LogInfo($"AutoStartAutomation setting: {autoStartEnabled}");
+                _loggingService.LogInfo($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                _loggingService.LogInfo($"Current day: {DateTime.Now.DayOfWeek}");
+                
+                if (!autoStartEnabled)
+                {
+                    _loggingService.LogInfo("❌ Auto-start is DISABLED in settings");
+                    _loggingService.LogInfo("   Periodic checking will NOT run");
+                    
+                    // Stop timer if it's running
+                    _autoStartCheckTimer?.Dispose();
+                    _autoStartCheckTimer = null;
+                    return;
+                }
+                
+                _loggingService.LogSuccess("✅ Auto-start is ENABLED - checking school hours...");
+                
+                bool isSchoolHours = await _automationService.CheckSchoolHoursAsync();
+                
+                _loggingService.LogInfo($"School hours check result: {isSchoolHours}");
+                
+                if (isSchoolHours && !IsAutomationRunning)
+                {
+                    _loggingService.LogSuccess("✅ Current time is WITHIN school hours");
+                    _loggingService.LogInfo("🚀 Starting automation automatically...");
+                    
+                    await Task.Delay(500);
+                    await StartAutomationAsync();
+                    
+                }
+                else if (isSchoolHours && IsAutomationRunning)
+                {
+                    _loggingService.LogInfo("✅ Within school hours and automation is already running");
+                }
+                else
+                {
+                    _loggingService.LogInfo("❌ Current time is OUTSIDE school hours");
+                    _loggingService.LogInfo("   Automation will not start automatically");
+                }
+                
+                // ✅ START PERIODIC CHECKING (every 30 seconds)
+                if (_autoStartCheckTimer == null)
+                {
+                    _loggingService.LogInfo("⏰ Starting periodic auto-start checker (checks every 30 seconds)");
+                    _autoStartCheckTimer = new Timer(
+                        async _ => await CheckAutoStartAutomationAsync(),
+                        null,
+                        TimeSpan.FromSeconds(30), // First check after 30 seconds
+                        TimeSpan.FromSeconds(30)  // Then every 30 seconds
+                    );
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking auto-start: {ex.Message}");
+                Debug.WriteLine($"[AUTO-START] Error: {ex}");
+            }
+        }
 
 
         private new bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
@@ -730,6 +801,7 @@ namespace AkademiTrack.ViewModels
         public void Dispose()
         {
             _updateChecker?.Dispose();
+            _autoStartCheckTimer?.Dispose();
             _httpClient?.Dispose();
             _authService?.Dispose();
             FeideViewModel?.Dispose();

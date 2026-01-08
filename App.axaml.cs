@@ -304,7 +304,7 @@ Utviklet av:
 - Mathias Hansen (@CyberHansen)
 
 Lisens: MIT
-© 2025 CyberGutta
+© 2026 CyberGutta
 
 github.com/CyberGutta/AkademiTrack";
 
