@@ -1351,6 +1351,10 @@
 					<StackPanel x:Name="AdvancedSection" Spacing="16" IsVisible="False">
 					<TextBlock Text="Avanserte innstillinger" Classes="section-header"/>
 
+
+					<!-- Activity Log Toggle -->
+					
+					<!--
 					<Border Classes="setting-card">
 						<StackPanel Spacing="12">
 							<TextBlock Text="Aktivitetslogg" Classes="setting-title"/>
@@ -1359,6 +1363,20 @@
 							<Button Content="{Binding ShowActivityLog, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Vis logg|Skjul logg'}"
 									Classes="settings-action"
 									Command="{Binding ToggleActivityLogCommand}"/>
+						</StackPanel>
+					</Border> 
+					
+					-->
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
+							<TextBlock Text="Aktivitetslogg" Classes="setting-title"/>
+							<TextBlock Text="Eksporter teknisk aktivitetslogg for feilsøking og diagnostikk."
+									   Classes="setting-description"/>
+							<Button Content="Eksporter logg"
+									Classes="settings-action"
+									Command="{Binding ExportLogsCommand}"
+									Background="#28A745"/>
 						</StackPanel>
 					</Border>
 
