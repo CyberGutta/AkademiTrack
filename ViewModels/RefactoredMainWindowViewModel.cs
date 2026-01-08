@@ -228,10 +228,8 @@ namespace AkademiTrack.ViewModels
                 IsLoading = true;
                 _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
-                // Track app initialization
-                await _analyticsService.TrackEventAsync("app_initialization_started", new { 
-                    retry_count = _initializationRetryCount 
-                });
+                // Track app initialization - removed events tracking
+                Debug.WriteLine("[MainWindow] App initialization started");
 
                 // Initialize authentication service
                 _authService = new AuthenticationService(_notificationService);
@@ -243,11 +241,8 @@ namespace AkademiTrack.ViewModels
                 {
                     _loggingService.LogSuccess("✓ Autentisering fullført!");
                     
-                    // Track successful initialization
-                    await _analyticsService.TrackEventAsync("app_initialization_success", new { 
-                        school_id = authResult.Parameters.SkoleId,
-                        fylke_id = authResult.Parameters.FylkeId 
-                    });
+                    // Track successful initialization - removed events tracking
+                    Debug.WriteLine("[MainWindow] App initialization successful");
                     
                     IsAuthenticated = true;
                     _userParameters = authResult.Parameters;
@@ -287,11 +282,8 @@ namespace AkademiTrack.ViewModels
                 {
                     _initializationRetryCount++;
                     
-                    // Track initialization failure
-                    await _analyticsService.TrackEventAsync("app_initialization_failed", new { 
-                        retry_count = _initializationRetryCount,
-                        error_message = authResult.ErrorMessage 
-                    });
+                    // Track initialization failure - removed events tracking
+                    Debug.WriteLine("[MainWindow] App initialization failed");
                     
                     // Use specific error message if available
                     string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage) 
@@ -301,10 +293,17 @@ namespace AkademiTrack.ViewModels
                     if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
                     {
                         // Only log to error_logs table on final failure (not every retry)
-                        await _analyticsService.LogErrorAsync(
-                            "app_initialization_critical_failure",
-                            $"Failed after {MAX_RETRY_ATTEMPTS} attempts: {errorMessage}"
-                        );
+                        try
+                        {
+                            await _analyticsService.LogErrorAsync(
+                                "app_initialization_critical_failure",
+                                $"Failed after {MAX_RETRY_ATTEMPTS} attempts: {errorMessage}"
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[Analytics] Failed to log initialization failure: {ex.Message}");
+                        }
                         
                         _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
                         _loggingService.LogError($"Feilmelding: {errorMessage}");
@@ -336,11 +335,18 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 // Log critical exception for developers
-                await _analyticsService.LogErrorAsync(
-                    "app_initialization_exception",
-                    ex.Message,
-                    ex
-                );
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "app_initialization_exception",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log initialization exception: {analyticsEx.Message}");
+                }
                 
                 _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
                 await _notificationService.ShowNotificationAsync(
@@ -447,10 +453,14 @@ namespace AkademiTrack.ViewModels
             }
 
             // Track automation start
-            await _analyticsService.TrackEventAsync("automation_started", new { 
-                school_id = _userParameters?.SkoleId,
-                manual_start = true 
-            });
+            try
+            {
+                await _analyticsService.TrackAutomationStartAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Analytics] Failed to track automation start: {ex.Message}");
+            }
 
             // Set credentials in automation service
             if (_automationService is AutomationService automationService)
@@ -467,10 +477,17 @@ namespace AkademiTrack.ViewModels
             if (!result.Success)
             {
                 // Log automation failure for developers
-                await _analyticsService.LogErrorAsync(
-                    "automation_start_failure", 
-                    result.Message ?? "Unknown automation start error"
-                );
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "automation_start_failure", 
+                        result.Message ?? "Unknown automation start error"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log automation start failure: {ex.Message}");
+                }
                 
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering feilet",
@@ -478,11 +495,8 @@ namespace AkademiTrack.ViewModels
                     NotificationLevel.Error
                 );
                 
-                // Track automation start failure
-                await _analyticsService.TrackEventAsync("automation_start_failed", new { 
-                    error = result.Message,
-                    school_id = _userParameters?.SkoleId 
-                });
+                // Track automation start failure - removed events tracking
+                Debug.WriteLine("[MainWindow] Automation start failed");
             }
             
             // Update UI
@@ -494,9 +508,15 @@ namespace AkademiTrack.ViewModels
         private async Task StopAutomationAsync()
         {
             // Track automation stop
-            await _analyticsService.TrackEventAsync("automation_stopped", new { 
-                manual_stop = true 
-            });
+            Debug.WriteLine("[MainWindow] Automation stopped");
+            try
+            {
+                await _analyticsService.TrackAutomationStopAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Analytics] Failed to track automation stop: {ex.Message}");
+            }
 
             var result = await _automationService.StopAsync();
             
@@ -531,8 +551,8 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogInfo("Åpner innstillinger...");
             
-            // Track settings navigation
-            await _analyticsService.TrackEventAsync("navigation_settings");
+            // Track settings navigation - removed events tracking
+            Debug.WriteLine("[MainWindow] Navigating to settings");
 
             // Connect SettingsViewModel to logging service
             SettingsViewModel.ConnectToMainViewModel(this);
@@ -567,8 +587,8 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogInfo("Åpner veiledning...");
             
-            // Track tutorial navigation
-            await _analyticsService.TrackEventAsync("navigation_tutorial");
+            // Track tutorial navigation - removed events tracking
+            Debug.WriteLine("[MainWindow] Navigating to tutorial");
             
             ShowDashboard = false;
             ShowSettings = false;
@@ -588,11 +608,7 @@ namespace AkademiTrack.ViewModels
                 _loggingService.LogSuccess("✓ Data oppdatert!");
                 StatusMessage = "Data oppdatert!";
                 
-                await _notificationService.ShowNotificationAsync(
-                    "Data Oppdatert",
-                    "Dashboard-data er oppdatert med fersk informasjon.",
-                    NotificationLevel.Success
-                );
+                // Removed notification - data refresh should be silent
 
                 // Reset status after 3 seconds
                 await Task.Delay(3000);

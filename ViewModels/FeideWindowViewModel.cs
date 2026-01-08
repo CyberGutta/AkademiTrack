@@ -208,11 +208,8 @@ namespace AkademiTrack.ViewModels
                 {
                     Debug.WriteLine("[FeideWindow] ✓ Credentials test successful!");
                     
-                    // Track successful Feide setup
-                    await _analyticsService.TrackEventAsync("feide_setup_completed", new { 
-                        school_name = SchoolName,
-                        username_length = FeideUsername.Length 
-                    });
+                    // Track successful Feide setup - removed events tracking
+                    Debug.WriteLine("[FeideWindow] Feide setup completed successfully");
                     
                     // Step 3a: Mark setup as complete since credentials work
                     await MarkSetupAsCompleteAsync();
@@ -235,18 +232,21 @@ namespace AkademiTrack.ViewModels
                 {
                     Debug.WriteLine("[FeideWindow] ❌ Credentials test failed!");
                     
-                    // Track failed Feide setup
-                    await _analyticsService.TrackEventAsync("feide_setup_failed", new { 
-                        school_name = SchoolName,
-                        error_type = "authentication_failed",
-                        error_message = testResult.ErrorMessage 
-                    });
+                    // Track failed Feide setup - removed events tracking
+                    Debug.WriteLine("[FeideWindow] Feide setup failed");
                     
                     // Log detailed error for developers
-                    await _analyticsService.LogErrorAsync(
-                        "feide_setup_authentication_failure",
-                        testResult.ErrorMessage ?? "Feide authentication failed"
-                    );
+                    try
+                    {
+                        await _analyticsService.LogErrorAsync(
+                            "feide_setup_authentication_failure",
+                            testResult.ErrorMessage ?? "Feide authentication failed"
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to log Feide setup failure: {ex.Message}");
+                    }
                     
                     // Step 3b: Delete the invalid credentials
                     await DeleteCredentialsAsync();

@@ -296,16 +296,7 @@ namespace AkademiTrack.Services
                     
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
                         $"Syklus #{cycleCount} - Sjekker registreringsvinduer", cycleCount));
-
-                    // Notify user every 10 cycles (5 minutes) that automation is still running
-                    if (cycleCount % 10 == 0)
-                    {
-                        await _notificationService.ShowNotificationAsync(
-                            "Automatisering Aktiv",
-                            $"Overvåker {validStuSessions.Count} STU-økter. Syklus #{cycleCount} fullført.",
-                            NotificationLevel.Info
-                        );
-                    }
+                
 
                     bool allSessionsComplete = true;
                     int openWindows = 0;
