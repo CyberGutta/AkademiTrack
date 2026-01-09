@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using AkademiTrack.Services;
 using Avalonia.Threading;
+using AkademiTrack.Services.Interfaces;
 
 namespace AkademiTrack.ViewModels
 {
@@ -102,7 +103,11 @@ namespace AkademiTrack.ViewModels
         public DashboardViewModel()
         {
             _attendanceService = new AttendanceDataService();
-
+            
+            // Connect logging service for auto-retry functionality
+            var loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
+            _attendanceService.SetLoggingService(loggingService);
+            
             _weeklyDays = InitializeEmptyWeek();
         }
 

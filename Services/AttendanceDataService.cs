@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AkademiTrack.Services.Interfaces;
 
 namespace AkademiTrack.Services
 {
@@ -13,6 +14,13 @@ namespace AkademiTrack.Services
         private readonly HttpClient _httpClient;
         private UserParameters? _userParameters;
         private Dictionary<string, string>? _cookies;
+        
+        private ILoggingService? _loggingService;
+
+        public void SetLoggingService(ILoggingService loggingService)
+        {
+            _loggingService = loggingService;
+        }
 
         public AttendanceDataService()
         {
@@ -26,8 +34,66 @@ namespace AkademiTrack.Services
             _cookies = cookies;
         }
 
+        private async Task<T?> FetchWithRetryAsync<T>(Func<Task<T?>> fetchFunc) where T : class
+        {
+            try
+            {
+                // First attempt with current cookies
+                var result = await fetchFunc();
+                
+                // If fetch failed (likely expired cookies), re-authenticate and retry
+                if (result == null)
+                {
+                    _loggingService?.LogInfo("📡 Data kunne ikke hentes - prøver å oppdatere autentisering...");
+                    
+                    var notificationService = ServiceLocator.Instance.GetService<INotificationService>();
+                    var authService = new AuthenticationService(notificationService);
+                    var authResult = await authService.AuthenticateAsync();
+                    
+                    if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
+                    {
+                        // Update credentials with fresh cookies
+                        var newParams = new UserParameters
+                        {
+                            FylkeId = authResult.Parameters.FylkeId,
+                            PlanPeri = authResult.Parameters.PlanPeri,
+                            SkoleId = authResult.Parameters.SkoleId
+                        };
+                        SetCredentials(newParams, authResult.Cookies);
+                        
+                        _loggingService?.LogSuccess("✓ Autentisering oppdatert - prøver å hente data på nytt...");
+                        
+                        // Retry with fresh cookies
+                        result = await fetchFunc();
+                        
+                        if (result == null)
+                        {
+                            _loggingService?.LogError("❌ Kunne ikke hente data selv etter re-autentisering");
+                        }
+                    }
+                    else
+                    {
+                        _loggingService?.LogError("❌ Re-autentisering feilet");
+                    }
+                }
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"Fetch with retry error: {ex.Message}");
+                return null;
+            }
+        }
+
+
         // Fetch summary statistics (over/undertid, total hours, etc.)
         public async Task<AttendanceSummary?> GetAttendanceSummaryAsync()
+        {
+            return await FetchWithRetryAsync(FetchAttendanceSummaryAsync);
+        }
+
+        private async Task<AttendanceSummary?> FetchAttendanceSummaryAsync()
         {
             try
             {
@@ -68,6 +134,11 @@ namespace AkademiTrack.Services
 
         // Fetch today's schedule with attendance status
         public async Task<TodayScheduleData?> GetTodayScheduleAsync()
+        {
+            return await FetchWithRetryAsync(FetchTodayScheduleAsync);
+        }
+
+        private async Task<TodayScheduleData?> FetchTodayScheduleAsync()
         {
             try
             {
@@ -111,6 +182,11 @@ namespace AkademiTrack.Services
 
         public async Task<MonthlyAttendanceData?> GetMonthlyAttendanceAsync()
         {
+            return await FetchWithRetryAsync(FetchMonthlyAttendanceAsync);
+        }
+
+        private async Task<MonthlyAttendanceData?> FetchMonthlyAttendanceAsync()
+        {
             try
             {
                 if (_userParameters == null || _cookies == null)
@@ -121,7 +197,6 @@ namespace AkademiTrack.Services
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
 
-                // Calculate first and last day of current month
                 var now = DateTime.Now;
                 var firstDayOfMonth = new DateTime(now.Year, now.Month, 1);
                 var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
@@ -131,7 +206,6 @@ namespace AkademiTrack.Services
 
                 Console.WriteLine($"[MONTHLY DEBUG] Date range: {startDate} to {endDate}");
 
-                // Use the VoTimeplan_elev endpoint with date range
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={startDate},endDate={endDate}&onlyData=true&limit=1000&totalResults=true";
 
@@ -161,7 +235,6 @@ namespace AkademiTrack.Services
 
                 Console.WriteLine($"[MONTHLY DEBUG] JSON length: {json.Length}");
 
-                // Need to deserialize with fields: Fag, Fagnavn, Fravaer (from your JSON example)
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -175,7 +248,6 @@ namespace AkademiTrack.Services
 
                 Console.WriteLine($"[MONTHLY DEBUG] Total items received: {scheduleResponse.Items.Count}");
 
-                // Print first few items to see what we're getting
                 if (scheduleResponse.Items.Count > 0)
                 {
                     var firstItem = scheduleResponse.Items[0];
@@ -188,7 +260,6 @@ namespace AkademiTrack.Services
                     }
                 }
 
-                // Count STU sessions - look for "STU" in Fag field or "Studietid" in Fagnavn
                 var stuSessions = scheduleResponse.Items.Where(i =>
                     (i.Fag != null && i.Fag.Contains("STU")) ||
                     (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
@@ -201,7 +272,6 @@ namespace AkademiTrack.Services
                     Console.WriteLine($"[MONTHLY DEBUG] First STU session - Fag: '{stuSessions[0].Fag}', Fagnavn: '{stuSessions[0].Fagnavn}', Fravaer: '{stuSessions[0].Fravaer}'");
                 }
 
-                // Count registered (Fravaer = "M" means "Møtt" = attended)
                 var registeredCount = stuSessions.Count(s => s.Fravaer == "M");
                 var totalCount = stuSessions.Count;
 
@@ -226,8 +296,12 @@ namespace AkademiTrack.Services
             }
         }
         
-        // Fetch THIS WEEK's attendance data
         public async Task<WeeklyAttendanceData?> GetWeeklyAttendanceAsync()
+        {
+            return await FetchWithRetryAsync(FetchWeeklyAttendanceAsync);
+        }
+
+        private async Task<WeeklyAttendanceData?> FetchWeeklyAttendanceAsync()
         {
             try
             {
@@ -236,11 +310,9 @@ namespace AkademiTrack.Services
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 
-                // Calculate Monday-Friday of current week
                 var today = DateTime.Now;
                 var dayOfWeek = (int)today.DayOfWeek;
                 
-                // Adjust for Monday as start of week (Monday = 1, Sunday = 0)
                 var daysUntilMonday = dayOfWeek == 0 ? -6 : -(dayOfWeek - 1);
                 var monday = today.AddDays(daysUntilMonday);
                 var friday = monday.AddDays(4);
@@ -274,7 +346,6 @@ namespace AkademiTrack.Services
                 if (scheduleResponse?.Items == null)
                     return null;
 
-                // Group by day (Monday through Friday)
                 var dailyStats = new List<DailyAttendance>();
                 
                 for (int i = 0; i < 5; i++)
@@ -282,7 +353,6 @@ namespace AkademiTrack.Services
                     var currentDay = monday.AddDays(i);
                     var dayString = currentDay.ToString("yyyyMMdd");
                     
-                    // Get all STU sessions for this day
                     var dayStuSessions = scheduleResponse.Items.Where(item =>
                         item.Dato == dayString &&
                         ((item.Fag != null && item.Fag.Contains("STU")) || 
@@ -302,7 +372,6 @@ namespace AkademiTrack.Services
                     });
                 }
                 
-                // Calculate weekly totals
                 var weeklyRegistered = dailyStats.Sum(d => d.RegisteredSessions);
                 var weeklyTotal = dailyStats.Sum(d => d.TotalSessions);
                 var weeklyPercentage = weeklyTotal > 0 ? (double)weeklyRegistered / weeklyTotal * 100 : 0;

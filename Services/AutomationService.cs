@@ -416,6 +416,48 @@ namespace AkademiTrack.Services
                 if (_userParameters == null || _cookies == null)
                     return null;
 
+                // First attempt with current cookies
+                var scheduleData = await FetchScheduleDataAsync();
+                
+                // If fetch failed (likely expired cookies)
+                if (scheduleData == null)
+                {
+                    _loggingService.LogInfo("📡 Timeplandata kunne ikke hentes - prøver å oppdatere autentisering...");
+                    
+                    var authResult = await RefreshAuthenticationAsync();
+                    if (!authResult.Success)
+                    {
+                        _loggingService.LogError("❌ Re-autentisering feilet");
+                        return null;
+                    }
+                    
+                    _loggingService.LogInfo("✓ Autentisering oppdatert - prøver å hente timeplandata på nytt...");
+                    
+                    // Retry with fresh cookies
+                    scheduleData = await FetchScheduleDataAsync();
+                    
+                    if (scheduleData == null)
+                    {
+                        _loggingService.LogError("❌ Kunne ikke hente timeplandata selv etter re-autentisering");
+                    }
+                }
+                
+                return scheduleData;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error getting schedule data: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<List<ScheduleItem>?> FetchScheduleDataAsync()
+        {
+            try
+            {
+                if (_userParameters == null || _cookies == null)
+                    return null;
+
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId}&onlyData=true&limit=99&offset=0&totalResults=true";
@@ -432,7 +474,10 @@ namespace AkademiTrack.Services
 
                 var response = await _httpClient.SendAsync(request);
                 if (!response.IsSuccessStatusCode)
+                {
+                    _loggingService.LogError($"HTTP error: {response.StatusCode}");
                     return null;
+                }
 
                 var json = await response.Content.ReadAsStringAsync();
                 var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(json, new JsonSerializerOptions
@@ -444,7 +489,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"Error getting schedule data: {ex.Message}");
+                _loggingService.LogError($"Fetch error: {ex.Message}");
                 return null;
             }
         }
