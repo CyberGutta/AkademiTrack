@@ -99,6 +99,10 @@ namespace AkademiTrack
             AkademiTrack.Services.TrayIconManager.Initialize(mainWindow);
             Debug.WriteLine("[App] TrayIconManager initialized");
 
+            AkademiTrack.Services.MacOSDockHandler.Initialize(mainWindow);
+            Debug.WriteLine("[App] MacOSDockHandler initialized");
+
+            // Check if we should start minimized (regardless of showFeideSetup for this check)
             if (startMinimized && !showFeideSetup)
             {
                 Debug.WriteLine("[App] Starting minimized to tray...");
@@ -106,7 +110,6 @@ namespace AkademiTrack
                 mainWindow.Show();
                 await Task.Delay(50);
                 mainWindow.Hide();
-                mainWindow.ShowInTaskbar = false;
                 AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
             }
             else
