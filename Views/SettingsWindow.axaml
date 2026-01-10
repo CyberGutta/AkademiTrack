@@ -625,7 +625,7 @@
                 Command="{Binding BackToDashboardCommand}"
                 Width="45"
                 Height="45"
-                FontSize="24"
+                FontSize="22"
                 ToolTip.Tip="Tilbake til dashboard"
                 Cursor="Hand"/>
 
@@ -636,7 +636,7 @@
                 Command="{Binding ToggleThemeCommand}"
                 Width="45"
                 Height="45"
-                FontSize="24"
+                FontSize="22"
                 ToolTip.Tip="Toggle dark/light mode"
                 Cursor="Hand"/>
     </StackPanel>
