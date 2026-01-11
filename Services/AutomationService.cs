@@ -44,6 +44,8 @@ namespace AkademiTrack.Services
                 return AutomationResult.Failed("Automation is already running");
             }
 
+            string finalStatus = "Ready"; // Track what final status to send
+
             try
             {
                 _isRunning = true;
@@ -54,12 +56,14 @@ namespace AkademiTrack.Services
                 var loadResult = await LoadCredentialsAsync();
                 if (!loadResult.Success)
                 {
+                    finalStatus = "Autentisering feilet";
                     return loadResult;
                 }
 
                 // Check internet connection
                 if (!await CheckInternetConnectionAsync())
                 {
+                    finalStatus = "Ingen internett-tilkobling";
                     return AutomationResult.Failed("No internet connection available");
                 }
 
@@ -72,13 +76,25 @@ namespace AkademiTrack.Services
 
                 _loggingService.LogInfo("Starter automatisering...");
                 await _notificationService.ShowNotificationAsync(
-                    "Automatisering startet", 
-                    "STU tidsregistrering automatisering kjører nå", 
+                    "Automatisering startet",
+                    "STU tidsregistrering automatisering kjører nå",
                     NotificationLevel.Success
                 );
 
                 // Start the monitoring loop
-                await RunMonitoringLoopAsync(combinedToken);
+                var loopResult = await RunMonitoringLoopAsync(combinedToken);
+
+                // Set final status based on loop result
+                if (loopResult.HasValue)
+                {
+                    finalStatus = loopResult.Value switch
+                    {
+                        MonitoringLoopResult.NoSessionsFound => "Ingen STUDIE-økter funnet for i dag",
+                        MonitoringLoopResult.AllSessionsConflict => "Alle STU-økter har konflikter",
+                        MonitoringLoopResult.AllComplete => "Alle STU-økter er håndtert",
+                        _ => "Ready"
+                    };
+                }
 
                 return AutomationResult.Successful("Automation completed successfully");
             }
@@ -86,10 +102,11 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogInfo("Automatisering stoppet av bruker");
                 await _notificationService.ShowNotificationAsync(
-                    "Automatisering stoppet", 
-                    "Overvåking har blitt stoppet", 
+                    "Automatisering stoppet",
+                    "Overvåking har blitt stoppet",
                     NotificationLevel.Info
                 );
+                finalStatus = "Automatisering stoppet";
                 return AutomationResult.Successful("Automation stopped by user");
             }
             catch (Exception ex)
@@ -101,16 +118,25 @@ namespace AkademiTrack.Services
                     NotificationLevel.Error,
                     isHighPriority: true
                 );
+                finalStatus = "Automatisering feilet";
                 return AutomationResult.Failed($"Automation failed: {ex.Message}", ex);
             }
             finally
             {
                 _isRunning = false;
-                _currentStatus = "Ready";
+                _currentStatus = finalStatus; // Use the tracked final status instead of always "Ready"
                 _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
                 StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
             }
+        }
+
+        private enum MonitoringLoopResult
+        {
+            NoSessionsFound,
+            AllSessionsConflict,
+            AllComplete,
+            Cancelled
         }
 
         public async Task<AutomationResult> StopAsync()
@@ -230,7 +256,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task RunMonitoringLoopAsync(CancellationToken cancellationToken)
+        private async Task<MonitoringLoopResult?> RunMonitoringLoopAsync(CancellationToken cancellationToken)
         {
             int cycleCount = 0;
 
@@ -261,10 +287,9 @@ namespace AkademiTrack.Services
                     "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.",
                     NotificationLevel.Info
                 );
-                return;
+                return MonitoringLoopResult.NoSessionsFound;
             }
 
-            // Filter out conflicting sessions
             var validStuSessions = todaysStuSessions
                 .Where(session => !HasConflictingClass(session, _cachedScheduleData))
                 .ToList();
@@ -278,14 +303,13 @@ namespace AkademiTrack.Services
                     "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.",
                     NotificationLevel.Warning
                 );
-                return;
+                return MonitoringLoopResult.AllSessionsConflict;
             }
 
             _loggingService.LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige");
 
             var registeredSessions = new HashSet<string>();
 
-            // Main monitoring loop
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
@@ -293,10 +317,9 @@ namespace AkademiTrack.Services
                     cycleCount++;
                     var currentTime = DateTime.Now.ToString("HH:mm");
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
-                    
+
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
                         $"Syklus #{cycleCount} - Sjekker registreringsvinduer", cycleCount));
-                
 
                     bool allSessionsComplete = true;
                     int openWindows = 0;
@@ -321,7 +344,7 @@ namespace AkademiTrack.Services
                                 openWindows++;
                                 allSessionsComplete = false;
                                 _loggingService.LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuSession.StartKl}-{stuSession.SluttKl}");
-                                
+
                                 try
                                 {
                                     var registrationResult = await RegisterAttendanceAsync(stuSession);
@@ -362,7 +385,7 @@ namespace AkademiTrack.Services
                     {
                         _loggingService.LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
-                        
+
                         if (registeredSessions.Count > 0)
                         {
                             await _notificationService.ShowNotificationAsync(
@@ -379,7 +402,7 @@ namespace AkademiTrack.Services
                                 NotificationLevel.Info
                             );
                         }
-                            break;
+                        return MonitoringLoopResult.AllComplete;
                     }
 
                     _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
@@ -388,13 +411,12 @@ namespace AkademiTrack.Services
                 }
                 catch (OperationCanceledException)
                 {
-                    break;
+                    return MonitoringLoopResult.Cancelled;
                 }
                 catch (Exception ex)
                 {
                     _loggingService.LogError($"Overvåkingsfeil: {ex.Message}");
-                    
-                    // Only notify on monitoring errors every 5 minutes to avoid spam
+
                     if (cycleCount % 10 == 0)
                     {
                         await _notificationService.ShowNotificationAsync(
@@ -403,10 +425,12 @@ namespace AkademiTrack.Services
                             NotificationLevel.Warning
                         );
                     }
-                    
+
                     await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
                 }
             }
+
+            return MonitoringLoopResult.Cancelled;
         }
 
         private async Task<List<ScheduleItem>?> GetFullDayScheduleDataAsync()
