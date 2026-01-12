@@ -529,10 +529,13 @@ namespace AkademiTrack.ViewModels
                 );
             }
             
-            // Update UI
-            OnPropertyChanged(nameof(IsAutomationRunning));
-            ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-            ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+            // Update UI - waits for UI thread
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                OnPropertyChanged(nameof(IsAutomationRunning));
+                ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+            });
         }
 
         private Task BackToDashboardAsync()
@@ -745,12 +748,14 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogInfo("❌ Auto-start is DISABLED in settings");
                     _loggingService.LogInfo("   Periodic checking will NOT run");
                     
-                    // Stop timer if it's running
-                    _autoStartCheckTimer?.Dispose();
-                    _autoStartCheckTimer = null;
+                    // Stop timer if it's running - must be on UI thread
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        _autoStartCheckTimer?.Dispose();
+                        _autoStartCheckTimer = null;
+                    });
                     return;
                 }
-                
                 
                 bool isSchoolHours = await _automationService.CheckSchoolHoursAsync();
                 
@@ -760,9 +765,12 @@ namespace AkademiTrack.ViewModels
                 {
                     _loggingService.LogInfo("🚀 Starting automation automatically...");
                     
-                    await Task.Delay(500);
-                    await StartAutomationAsync();
-                    
+                    // Must start automation on UI thread
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await Task.Delay(500);
+                        await StartAutomationAsync();
+                    });
                 }
                 else if (isSchoolHours && IsAutomationRunning)
                 {
@@ -774,18 +782,30 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogInfo("   Automation will not start automatically");
                 }
                 
-                // START PERIODIC CHECKING (every 30 seconds)
-                if (_autoStartCheckTimer == null)
+                // START PERIODIC CHECKING (every 30 seconds) - must be on UI thread
+                await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    _loggingService.LogInfo("⏰ Starting periodic auto-start checker (checks every 30 seconds)");
-                    _autoStartCheckTimer = new Timer(
-                        async _ => await CheckAutoStartAutomationAsync(),
-                        null,
-                        TimeSpan.FromSeconds(30), // First check after 30 seconds
-                        TimeSpan.FromSeconds(30)  // Then every 30 seconds
-                    );
-                }
-                
+                    if (_autoStartCheckTimer == null)
+                    {
+                        _loggingService.LogInfo("⏰ Starting periodic auto-start checker (checks every 30 seconds)");
+                        _autoStartCheckTimer = new Timer(
+                            async _ => 
+                            {
+                                try
+                                {
+                                    await CheckAutoStartAutomationAsync();
+                                }
+                                catch (Exception ex)
+                                {
+                                    _loggingService.LogError($"Error in auto-start timer: {ex.Message}");
+                                }
+                            },
+                            null,
+                            TimeSpan.FromSeconds(30), // First check after 30 seconds
+                            TimeSpan.FromSeconds(30)  // Then every 30 seconds
+                        );
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -836,7 +856,12 @@ namespace AkademiTrack.ViewModels
                     if (_settingsService.AutoStartAutomation)
                     {
                         _loggingService.LogInfo("Auto-starting automation due to school hours...");
-                        await StartAutomationAsync();
+                        
+                        // waits on UI thread
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            await StartAutomationAsync();
+                        });
                     }
                 }
             }
@@ -845,7 +870,7 @@ namespace AkademiTrack.ViewModels
                 _loggingService.LogError($"Error refreshing auto-start status: {ex.Message}");
             }
         }
-        
+                
         #endregion
     }
 
