@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
 using AkademiTrack.Common;
 using AkademiTrack.Services.Interfaces;
 
@@ -316,7 +317,14 @@ namespace AkademiTrack.Services
 
             _loggingService.LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige");
 
-            var registeredSessions = new HashSet<string>();
+            // Load previously registered sessions from disk
+            var registeredSessions = await GetRegisteredSessionsForTodayAsync();
+            var registeredSessionKeys = new HashSet<string>(registeredSessions.Keys);
+            
+            if (registeredSessionKeys.Count > 0)
+            {
+                _loggingService.LogInfo($"📋 Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag");
+            }
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -338,7 +346,8 @@ namespace AkademiTrack.Services
                     {
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
-                        if (registeredSessions.Contains(sessionKey))
+                        // Check if already registered (from disk)
+                        if (registeredSessionKeys.Contains(sessionKey))
                         {
                             closedWindows++;
                             continue;
@@ -351,6 +360,17 @@ namespace AkademiTrack.Services
                             case RegistrationWindowStatus.Open:
                                 openWindows++;
                                 allSessionsComplete = false;
+                                
+                                // Double-check if registered (in case another instance registered it)
+                                if (await IsSessionRegisteredAsync(sessionKey))
+                                {
+                                    _loggingService.LogInfo($"✓ STU økt {sessionKey} er allerede registrert");
+                                    registeredSessionKeys.Add(sessionKey);
+                                    closedWindows++;
+                                    openWindows--;
+                                    break;
+                                }
+                                
                                 _loggingService.LogInfo($"Registreringsvindu er ÅPENT for STU økt {stuSession.StartKl}-{stuSession.SluttKl}");
 
                                 try
@@ -364,7 +384,10 @@ namespace AkademiTrack.Services
                                             $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}",
                                             NotificationLevel.Success
                                         );
-                                        registeredSessions.Add(sessionKey);
+                                        
+                                        // Mark as registered on disk
+                                        await MarkSessionAsRegisteredAsync(sessionKey);
+                                        registeredSessionKeys.Add(sessionKey);
                                     }
                                 }
                                 catch (Exception regEx)
@@ -389,12 +412,12 @@ namespace AkademiTrack.Services
                         }
                     }
 
-                    if (allSessionsComplete || registeredSessions.Count == validStuSessions.Count)
+                    if (allSessionsComplete || registeredSessionKeys.Count == validStuSessions.Count)
                     {
                         _loggingService.LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
-                        if (registeredSessions.Count > 0)
+                        if (registeredSessionKeys.Count > 0)
                         {
                             await _notificationService.ShowNotificationAsync(
                                 "Alle Studietimer Registrert",
@@ -439,6 +462,84 @@ namespace AkademiTrack.Services
             }
 
             return MonitoringLoopResult.Cancelled;
+        }
+
+        private async Task MarkSessionAsRegisteredAsync(string sessionKey)
+        {
+            try
+            {
+                var filePath = GetRegisteredSessionsFilePath();
+                var registeredSessions = await GetRegisteredSessionsForTodayAsync();
+                
+                if (!registeredSessions.ContainsKey(sessionKey))
+                {
+                    registeredSessions[sessionKey] = DateTime.Now;
+                    
+                    var json = JsonSerializer.Serialize(registeredSessions, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(filePath, json);
+                    
+                    _loggingService.LogDebug($"[SESSION] Marked {sessionKey} as registered");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[SESSION] Error marking session: {ex.Message}");
+            }
+        }
+
+        private async Task<Dictionary<string, DateTime>> GetRegisteredSessionsForTodayAsync()
+        {
+            try
+            {
+                var filePath = GetRegisteredSessionsFilePath();
+                
+                if (!File.Exists(filePath))
+                    return new Dictionary<string, DateTime>();
+
+                var json = await File.ReadAllTextAsync(filePath);
+                var allSessions = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json) 
+                    ?? new Dictionary<string, DateTime>();
+                
+                var today = DateTime.Now.Date;
+                
+                // Filter to only today's sessions
+                var todaySessions = allSessions
+                    .Where(kvp => kvp.Value.Date == today)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                
+                // Auto-cleanup: If we found old sessions, rewrite file with only today's
+                if (allSessions.Count != todaySessions.Count)
+                {
+                    var oldCount = allSessions.Count - todaySessions.Count;
+                    _loggingService.LogInfo($"🧹 Rydder opp {oldCount} gamle registrering(er)");
+                    
+                    var cleanJson = JsonSerializer.Serialize(todaySessions, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(filePath, cleanJson);
+                }
+                
+                return todaySessions;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[SESSION] Error reading sessions: {ex.Message}");
+                return new Dictionary<string, DateTime>();
+            }
+        }
+
+        private async Task<bool> IsSessionRegisteredAsync(string sessionKey)
+        {
+            var sessions = await GetRegisteredSessionsForTodayAsync();
+            return sessions.ContainsKey(sessionKey);
+        }
+
+        private string GetRegisteredSessionsFilePath()
+        {
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "registered_sessions.json");
         }
 
         private async Task<List<ScheduleItem>?> GetFullDayScheduleDataAsync()
