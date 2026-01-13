@@ -168,6 +168,24 @@ namespace AkademiTrack.Services
                 if (!silent)
                     Debug.WriteLine($"=== AUTO-START CHECK at {now:yyyy-MM-dd HH:mm:ss} ===");
 
+                // Check if user manually stopped today - THIS BLOCKS AUTO-START
+                var manualStopStatus = await GetManualStopStatusAsync().ConfigureAwait(false);
+                if (manualStopStatus.HasValue && manualStopStatus.Value.Date == now.Date)
+                {
+                    if (!silent)
+                        Debug.WriteLine($"[AUTO-START] User manually stopped today at {manualStopStatus:HH:mm} - BLOCKING auto-start until next day");
+
+                    var nextDay = await GetNextSchoolDayAsync(now);
+                    var nextStart = await GetSchoolStartTimeAsync(nextDay);
+
+                    string reason = $"Manuelt stoppet kl. {manualStopStatus:HH:mm}. Starter {GetNorwegianDayName(nextDay.DayOfWeek)}";
+                    
+                    // Always notify about manual stop status
+                    bool shouldNotify = ShouldShowNotification(reason);
+
+                    return (false, reason, nextStart, shouldNotify);
+                }
+
                 var completionStatus = await GetCompletionStatusAsync().ConfigureAwait(false);
                 var today = now.Date;
 
@@ -353,6 +371,59 @@ namespace AkademiTrack.Services
             }
         }
 
+        // NEW: Call this when user clicks "Stop automation" during school hours
+        public static async Task MarkManualStopAsync()
+        {
+            try
+            {
+                var now = await GetTrustedCurrentTimeAsync().ConfigureAwait(false);
+                
+                // Check if we're within school hours
+                if (await IsWithinSchoolHoursAsync().ConfigureAwait(false))
+                {
+                    var filePath = GetManualStopFilePath();
+                    var data = new { stoppedAt = now };
+                    var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
+
+                    Debug.WriteLine($"[MANUAL STOP] User stopped automation during school hours at {now:HH:mm}");
+                }
+                else
+                {
+                    Debug.WriteLine($"[MANUAL STOP] Stop clicked outside school hours - not blocking auto-start");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANUAL STOP] Error saving manual stop: {ex.Message}");
+            }
+        }
+
+        private static async Task<DateTime?> GetManualStopStatusAsync()
+        {
+            try
+            {
+                var filePath = GetManualStopFilePath();
+                if (!File.Exists(filePath))
+                    return null;
+
+                var json = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (data.TryGetProperty("stoppedAt", out var stoppedAtElement))
+                {
+                    var stoppedDate = DateTime.Parse(stoppedAtElement.GetString()!);
+                    Debug.WriteLine($"[MANUAL STOP] Found manual stop record: {stoppedDate:yyyy-MM-dd HH:mm}");
+                    return stoppedDate;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANUAL STOP] Error reading manual stop status: {ex.Message}");
+            }
+            return null;
+        }
+
         private static async Task<DateTime?> GetCompletionStatusAsync()
         {
             try
@@ -397,6 +468,14 @@ namespace AkademiTrack.Services
                     Debug.WriteLine("[AUTO-START] Daily completion flag reset");
                 }
 
+                // Also clear manual stop flag
+                var manualStopPath = GetManualStopFilePath();
+                if (File.Exists(manualStopPath))
+                {
+                    File.Delete(manualStopPath);
+                    Debug.WriteLine("[MANUAL STOP] Manual stop flag reset");
+                }
+
                 _hasPerformedInitialCheck = false;
             }
             catch (Exception ex)
@@ -413,6 +492,16 @@ namespace AkademiTrack.Services
             );
             Directory.CreateDirectory(appDataDir);
             return Path.Combine(appDataDir, "last_auto_run.json");
+        }
+
+        private static string GetManualStopFilePath()
+        {
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AkademiTrack"
+            );
+            Directory.CreateDirectory(appDataDir);
+            return Path.Combine(appDataDir, "manual_stop.json");
         }
 
         private static string GetSchoolHoursFilePath()

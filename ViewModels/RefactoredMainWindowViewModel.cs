@@ -507,6 +507,9 @@ namespace AkademiTrack.ViewModels
 
         private async Task StopAutomationAsync()
         {
+            // Mark manual stop FIRST
+            await SchoolTimeChecker.MarkManualStopAsync();
+            
             // Track automation stop
             Debug.WriteLine("[MainWindow] Automation stopped");
             try
@@ -757,13 +760,17 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
                 
-                bool isSchoolHours = await _automationService.CheckSchoolHoursAsync();
+                // Use the proper method that checks manual stops and completion
+                var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: false);
                 
-                _loggingService.LogInfo($"School hours check result: {isSchoolHours}");
+                _loggingService.LogInfo($"Auto-start check result: {reason}");
                 
-                if (isSchoolHours && !IsAutomationRunning)
+                if (shouldStart && !IsAutomationRunning)
                 {
                     _loggingService.LogInfo("🚀 Starting automation automatically...");
+                    
+                    // Mark as started
+                    await SchoolTimeChecker.MarkTodayAsStartedAsync();
                     
                     // Must start automation on UI thread
                     await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -772,14 +779,17 @@ namespace AkademiTrack.ViewModels
                         await StartAutomationAsync();
                     });
                 }
-                else if (isSchoolHours && IsAutomationRunning)
+                else if (IsAutomationRunning)
                 {
-                    _loggingService.LogInfo("✅ Within school hours and automation is already running");
+                    _loggingService.LogInfo("✅ Automation is already running");
                 }
                 else
                 {
-                    _loggingService.LogInfo("❌ Current time is OUTSIDE school hours");
-                    _loggingService.LogInfo("   Automation will not start automatically");
+                    _loggingService.LogInfo($"❌ Not auto-starting: {reason}");
+                    if (nextStartTime.HasValue)
+                    {
+                        _loggingService.LogInfo($"   Next auto-start: {nextStartTime.Value:yyyy-MM-dd HH:mm}");
+                    }
                 }
                 
                 // START PERIODIC CHECKING (every 30 seconds) - must be on UI thread
