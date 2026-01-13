@@ -10,6 +10,7 @@ using System.IO;
 using AkademiTrack.Common;
 using AkademiTrack.Services.Interfaces;
 
+
 namespace AkademiTrack.Services
 {
     public class AutomationService : IAutomationService
@@ -26,6 +27,8 @@ namespace AkademiTrack.Services
 
         public event EventHandler<AutomationStatusChangedEventArgs>? StatusChanged;
         public event EventHandler<AutomationProgressEventArgs>? ProgressUpdated;
+        public event EventHandler<SessionRegisteredEventArgs>? SessionRegistered;
+
 
         public bool IsRunning => _isRunning;
         public string CurrentStatus => _currentStatus;

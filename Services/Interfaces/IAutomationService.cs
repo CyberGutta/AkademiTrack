@@ -8,6 +8,7 @@ namespace AkademiTrack.Services.Interfaces
     {
         event EventHandler<AutomationStatusChangedEventArgs>? StatusChanged;
         event EventHandler<AutomationProgressEventArgs>? ProgressUpdated;
+        event EventHandler<SessionRegisteredEventArgs>? SessionRegistered;
         
         bool IsRunning { get; }
         string CurrentStatus { get; }
@@ -55,6 +56,16 @@ namespace AkademiTrack.Services.Interfaces
             Message = message;
             CycleCount = cycleCount;
             Timestamp = DateTime.Now;
+        }
+    }
+
+    public class SessionRegisteredEventArgs : EventArgs
+    {
+        public string SessionKey { get; }
+        
+        public SessionRegisteredEventArgs(string sessionKey)
+        {
+            SessionKey = sessionKey;
         }
     }
 }
