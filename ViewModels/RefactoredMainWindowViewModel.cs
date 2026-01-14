@@ -384,6 +384,8 @@ namespace AkademiTrack.ViewModels
             // Subscribe to automation events
             _automationService.StatusChanged += OnAutomationStatusChanged;
             _automationService.ProgressUpdated += OnAutomationProgressUpdated;
+            _automationService.SessionRegistered += OnSessionRegistered;
+
         }
 
         private void OnLogEntryAdded(object? sender, LogEntryEventArgs e)
@@ -441,6 +443,24 @@ namespace AkademiTrack.ViewModels
             Dispatcher.UIThread.Post(() =>
             {
                 StatusMessage = e.Message;
+            });
+        }
+
+        private void OnSessionRegistered(object? sender, SessionRegisteredEventArgs e)
+        {
+            _loggingService.LogInfo($"[DASHBOARD] Session {e.SessionTime} registered - updating display from cache");
+            
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    Dashboard.IncrementRegisteredSessionCount();
+                    _loggingService.LogDebug("[DASHBOARD] Display updated from cache after registration");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"[DASHBOARD] Error updating display: {ex.Message}");
+                }
             });
         }
         #endregion
@@ -747,14 +767,8 @@ namespace AkademiTrack.ViewModels
                 SchoolTimeChecker.ResetDailyCompletion();
                 _loggingService.LogInfo("✓ Daily completion flags reset");
                 
-                await Dispatcher.UIThread.InvokeAsync(async () =>
-                {
-                    await _notificationService.ShowNotificationAsync(
-                        "Ny dag!",
-                        $"God morgen! Ny skoledag: {now:dddd, d. MMMM}",
-                        NotificationLevel.Info
-                    );
-                });
+                Dashboard.ClearCache();
+                _loggingService.LogInfo("✓ Dashboard cache cleared for new day");
                 
                 if (_settingsService.AutoStartAutomation)
                 {

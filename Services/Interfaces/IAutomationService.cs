@@ -61,11 +61,7 @@ namespace AkademiTrack.Services.Interfaces
 
     public class SessionRegisteredEventArgs : EventArgs
     {
-        public string SessionKey { get; }
-        
-        public SessionRegisteredEventArgs(string sessionKey)
-        {
-            SessionKey = sessionKey;
-        }
+        public string SessionTime { get; set; } = "";
+        public DateTime RegistrationTime { get; set; }
     }
 }

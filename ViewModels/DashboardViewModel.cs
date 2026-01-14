@@ -13,6 +13,8 @@ namespace AkademiTrack.ViewModels
     public class DashboardViewModel : INotifyPropertyChanged
     {
         private readonly AttendanceDataService _attendanceService;
+        private ILoggingService? _loggingService;
+
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
 
@@ -107,8 +109,8 @@ namespace AkademiTrack.ViewModels
             _attendanceService = new AttendanceDataService();
             
             // Connect logging service for auto-retry functionality
-            var loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
-            _attendanceService.SetLoggingService(loggingService);
+            _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
+            _attendanceService.SetLoggingService(_loggingService);
             
             _weeklyDays = InitializeEmptyWeek();
         }
@@ -249,6 +251,23 @@ namespace AkademiTrack.ViewModels
             catch (Exception)
             {
                 // Log error if needed
+            }
+        }
+
+        public void IncrementRegisteredSessionCount()
+        {
+            if (_cachedTodaySchedule != null && _cacheDate.Date == DateTime.Now.Date)
+            {
+                _cachedTodaySchedule.RegisteredStuSessions++;
+                
+                UpdateTodayDisplay(_cachedTodaySchedule);
+                
+                _loggingService?.LogDebug($"[CACHE] Incremented registered count to {_cachedTodaySchedule.RegisteredStuSessions}");
+            }
+            else
+            {
+                _loggingService?.LogWarning("[CACHE] Cache is stale - triggering full refresh");
+                _ = RefreshDataAsync();
             }
         }
 
@@ -433,6 +452,13 @@ namespace AkademiTrack.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        public void ClearCache()
+        {
+            _cachedTodaySchedule = null;
+            _cacheDate = DateTime.MinValue;
+            _loggingService?.LogDebug("[CACHE] Cache cleared");
+        }
+
         public void Dispose()
         {
             _attendanceService?.Dispose();
@@ -460,4 +486,5 @@ namespace AkademiTrack.ViewModels
             return emptyWeek;
         }
     }
+    
 }

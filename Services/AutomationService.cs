@@ -940,6 +940,12 @@ namespace AkademiTrack.Services
                         return false;
                     }
 
+                    SessionRegistered?.Invoke(this, new SessionRegisteredEventArgs 
+                    { 
+                        SessionTime = $"{stuTime.StartKl}-{stuTime.SluttKl}",
+                        RegistrationTime = DateTime.Now
+                    });
+
                     return true;
                 }
                 else
@@ -986,5 +992,7 @@ namespace AkademiTrack.Services
             Open,
             Closed
         }
+
+        
     }
 }
