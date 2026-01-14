@@ -18,6 +18,7 @@ namespace AkademiTrack.ViewModels
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
 
+
         // Today's STU sessions
         private string _todayDisplay = "0/0";
         private string _todayStatus = "Venter på data...";
@@ -26,6 +27,8 @@ namespace AkademiTrack.ViewModels
         private string _nextClassName = "Ingen time";
         private string _nextClassTime = "--:-- - --:--";
         private string _nextClassRoom = "";
+        private System.Timers.Timer? _nextClassUpdateTimer;
+
 
         // Monthly attendance
         private string _monthlyDisplay = "0/0";
@@ -203,6 +206,28 @@ namespace AkademiTrack.ViewModels
             _attendanceService.SetCredentials(parameters, cookies);
         }
 
+        public bool IsCacheStale()
+        {
+            // Cache is stale if:
+            // 1. No cached data exists
+            // 2. Cache is from a different day (midnight has passed)
+
+            if (_cachedTodaySchedule == null)
+            {
+                _loggingService?.LogDebug("[CACHE] No cached data - cache is stale");
+                return true;
+            }
+
+            if (_cacheDate.Date != DateTime.Now.Date)
+            {
+                _loggingService?.LogDebug($"[CACHE] Cache is from different day ({_cacheDate.Date:yyyy-MM-dd} vs {DateTime.Now.Date:yyyy-MM-dd}) - cache is stale");
+                return true;
+            }
+
+            _loggingService?.LogDebug($"[CACHE] Cache is fresh (from today {_cacheDate:HH:mm:ss})");
+            return false;
+        }
+
         public async Task RefreshDataAsync()
         {
             try
@@ -275,7 +300,116 @@ namespace AkademiTrack.ViewModels
         {
             if (_cachedTodaySchedule != null && _cacheDate.Date == DateTime.Now.Date)
             {
-                UpdateNextClassDisplay(_cachedTodaySchedule);
+                var recalculatedData = RecalculateNextClass(_cachedTodaySchedule);
+                UpdateNextClassDisplay(recalculatedData);
+
+                ScheduleNextClassUpdate(recalculatedData);
+            }
+        }
+
+        private void ScheduleNextClassUpdate(TodayScheduleData data)
+        {
+            try
+            {
+                _nextClassUpdateTimer?.Dispose();
+                _nextClassUpdateTimer = null;
+
+                if (data.NextClass == null)
+                    return;
+
+                var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
+                if (!nextClassStartTime.HasValue)
+                    return;
+
+                var now = DateTime.Now.TimeOfDay;
+                var timeUntilNextClass = nextClassStartTime.Value - now;
+
+                if (timeUntilNextClass.TotalSeconds > 0)
+                {
+                    _nextClassUpdateTimer = new System.Timers.Timer(timeUntilNextClass.TotalMilliseconds);
+                    _nextClassUpdateTimer.Elapsed += (s, e) =>
+                    {
+                        _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Class started - updating to show next class");
+                        UpdateNextClassFromCache();
+                    };
+                    _nextClassUpdateTimer.AutoReset = false;
+                    _nextClassUpdateTimer.Start();
+
+                    _loggingService?.LogDebug($"[NEXT CLASS] Will update in {timeUntilNextClass.TotalMinutes:F1} minutes");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"[NEXT CLASS] Error scheduling update: {ex.Message}");
+            }
+        }
+
+        private TodayScheduleData RecalculateNextClass(TodayScheduleData cachedData)
+        {
+            if (cachedData.AllTodayItems == null || !cachedData.AllTodayItems.Any())
+                return cachedData;
+
+            var now = DateTime.Now.TimeOfDay;
+
+            var currentClasses = cachedData.AllTodayItems
+                .Where(i => !string.IsNullOrEmpty(i.StartKl) && !string.IsNullOrEmpty(i.SluttKl))
+                .Select(i => new
+                {
+                    Item = i,
+                    StartTime = ParseTimeString(i.StartKl),
+                    EndTime = ParseTimeString(i.SluttKl)
+                })
+                .Where(x => x.StartTime.HasValue && x.EndTime.HasValue &&
+                           x.StartTime.Value <= now && x.EndTime.Value >= now)
+                .OrderBy(x => x.StartTime)
+                .ToList();
+
+            Services.ScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
+
+            var upcomingClasses = cachedData.AllTodayItems
+                .Where(i => !string.IsNullOrEmpty(i.StartKl))
+                .Select(i => new
+                {
+                    Item = i,
+                    StartTime = ParseTimeString(i.StartKl)
+                })
+                .Where(x => x.StartTime.HasValue && x.StartTime.Value > now)
+                .OrderBy(x => x.StartTime)
+                .ToList();
+
+            Services.ScheduleItem? nextClass = upcomingClasses.FirstOrDefault()?.Item;
+
+            return new TodayScheduleData
+            {
+                RegisteredStuSessions = cachedData.RegisteredStuSessions,
+                TotalStuSessions = cachedData.TotalStuSessions,
+                NextClass = nextClass,
+                CurrentClass = currentClass,
+                AllTodayItems = cachedData.AllTodayItems
+            };
+        }
+
+        private TimeSpan? ParseTimeString(string? timeStr)
+        {
+            if (string.IsNullOrEmpty(timeStr) || timeStr.Length != 4)
+                return null;
+
+            try
+            {
+                // Parse time in format "HHmm" (e.g., "0815", "1330")
+                if (int.TryParse(timeStr.Substring(0, 2), out int hours) &&
+                    int.TryParse(timeStr.Substring(2, 2), out int minutes))
+                {
+                    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60)
+                    {
+                        return new TimeSpan(hours, minutes, 0);
+                    }
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -312,15 +446,9 @@ namespace AkademiTrack.ViewModels
         {
             Services.ScheduleItem? displayClass = null;
 
-            // Always prioritize showing the NEXT class, not the current one
             if (data.NextClass != null)
             {
                 displayClass = data.NextClass;
-            }
-            else
-            {
-                // Only if there's no next class, show that there are no more classes
-                displayClass = null;
             }
 
             if (displayClass != null)
@@ -461,6 +589,7 @@ namespace AkademiTrack.ViewModels
 
         public void Dispose()
         {
+            _nextClassUpdateTimer?.Dispose();
             _attendanceService?.Dispose();
         }
 

@@ -43,7 +43,11 @@ namespace AkademiTrack.ViewModels
         private Timer? _midnightResetTimer;
         private DateTime _lastDataRefresh = DateTime.MinValue;
         private DateTime _currentDay = DateTime.Now.Date;
-        
+
+        private bool _isRefreshingData = false;
+        private DateTime _lastManualRefresh = DateTime.MinValue;
+        private const int REFRESH_COOLDOWN_SECONDS = 10; // Minimum 10 seconds between refreshes
+
         // Navigation
         private bool _showDashboard = true;
         private bool _showSettings = false;
@@ -268,7 +272,9 @@ namespace AkademiTrack.ViewModels
                     
                     _loggingService.LogInfo("📊 Laster dashboard data...");
                     await Dashboard.RefreshDataAsync();
-                    
+
+                    Dashboard.UpdateNextClassFromCache();
+
                     _loggingService.LogSuccess("✓ Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
 
@@ -277,7 +283,7 @@ namespace AkademiTrack.ViewModels
 
                     await CheckAutoStartAutomationAsync();
 
-                    StartNextClassUpdateTimer();
+                    StartDashboardRefreshTimer();
 
                     // Reset retry count on success
                     _initializationRetryCount = 0;
@@ -365,6 +371,42 @@ namespace AkademiTrack.ViewModels
                 await Task.Delay(3000);
                 await InitializeAsync(); // Retry
             }
+        }
+
+        private void StartDashboardRefreshTimer()
+        {
+            _loggingService.LogInfo("⏰ Starting dashboard auto-refresh timer...");
+
+            // Refresh dashboard every 5 minutes when automation is NOT running
+            _dataRefreshTimer = new Timer(
+                async _ =>
+                {
+                    try
+                    {
+                        // Only auto-refresh if automation is not running
+                        if (!IsAutomationRunning)
+                        {
+                            _loggingService.LogDebug("🔄 Auto-refreshing dashboard data...");
+
+                            await Dispatcher.UIThread.InvokeAsync(async () =>
+                            {
+                                await Dashboard.RefreshDataAsync();
+                            });
+
+                            _loggingService.LogDebug("✓ Dashboard auto-refresh complete");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Dashboard auto-refresh error: {ex.Message}");
+                    }
+                },
+                null,
+                TimeSpan.FromMinutes(5), 
+                TimeSpan.FromMinutes(5)
+            );
+
+            _loggingService.LogInfo("✓ Dashboard auto-refresh timer started (every 5 minutes)");
         }
         #endregion
 
@@ -479,6 +521,33 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
+            // ✅ Only refresh if cache is stale (no data or new day)
+            if (Dashboard.IsCacheStale())
+            {
+                _loggingService.LogInfo("📊 Cache is stale - refreshing dashboard before automation...");
+                StatusMessage = "Oppdaterer data...";
+
+                try
+                {
+                    await Dashboard.RefreshDataAsync();
+                    _lastDataRefresh = DateTime.Now;
+                    _loggingService.LogSuccess("✓ Dashboard data refreshed");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Kunne ikke oppdatere dashboard: {ex.Message}");
+                    await _notificationService.ShowNotificationAsync(
+                        "Advarsel",
+                        "Kunne ikke oppdatere dashboard data. Starter automatisering likevel...",
+                        NotificationLevel.Warning
+                    );
+                }
+            }
+            else
+            {
+                _loggingService.LogInfo("✓ Using cached data (from today - still fresh)");
+            }
+
             // Track automation start
             try
             {
@@ -499,33 +568,33 @@ namespace AkademiTrack.ViewModels
                 }
             }
 
+            StatusMessage = "Starter automatisering...";
             var result = await _automationService.StartAsync();
-            
+
             if (!result.Success)
             {
                 // Log automation failure for developers
                 try
                 {
                     await _analyticsService.LogErrorAsync(
-                        "automation_start_failure", 
+                        "automation_start_failure",
                         result.Message ?? "Unknown automation start error"
                     );
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[Analytics] Failed to log automation start failure: {ex.Message}");
+                    Debug.WriteLine($"[Analytics] Failed to log automation start: {ex.Message}");
                 }
-                
+
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering feilet",
                     result.Message ?? "Nettverk eller autentiseringsfeil ved start av automatisering",
                     NotificationLevel.Error
                 );
-                
-                // Track automation start failure - removed events tracking
+
                 Debug.WriteLine("[MainWindow] Automation start failed");
             }
-            
+
             // Update UI
             OnPropertyChanged(nameof(IsAutomationRunning));
             ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
@@ -711,49 +780,7 @@ namespace AkademiTrack.ViewModels
             await InitializeAsync();
         }
 
-        private void StartNextClassUpdateTimer()
-        {
-            _loggingService.LogInfo("⏰ Starting next class update timer...");
-
-            // Check every 30 seconds to update next class display
-            
-            _nextClassUpdateTimer = new Timer(
-                async _ => 
-                {
-                    try
-                    {
-                        await UpdateNextClassDisplayAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogError($"Error in next class update timer: {ex.Message}");
-                    }
-                },
-                null,
-                TimeSpan.FromSeconds(30), // First check after 30 seconds
-                TimeSpan.FromSeconds(30)  // Then every 30 seconds
-            );
-            
-            // Midnight reset timer - checks for day change every minute
-            _midnightResetTimer = new Timer(
-                async _ => 
-                {
-                    try
-                    {
-                        await CheckMidnightResetAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogError($"Error in midnight reset timer: {ex.Message}");
-                    }
-                },
-                null,
-                TimeSpan.FromMinutes(1), // First check after 1 minute
-                TimeSpan.FromMinutes(1)  // Then every minute
-            );
-            
-            _loggingService.LogInfo("✓ Next class update timer started");
-        }
+        
 
         private async Task CheckMidnightResetAsync()
         {
@@ -779,21 +806,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private async Task UpdateNextClassDisplayAsync()
-        {
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                try
-                {
-                  
-                    Dashboard.UpdateNextClassFromCache();
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.LogDebug($"[NEXT CLASS UPDATE] Error: {ex.Message}");
-                }
-            });
-        }
         #endregion
 
         #region Event Handlers
