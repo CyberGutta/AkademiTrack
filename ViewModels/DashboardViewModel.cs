@@ -13,6 +13,8 @@ namespace AkademiTrack.ViewModels
     public class DashboardViewModel : INotifyPropertyChanged
     {
         private readonly AttendanceDataService _attendanceService;
+        private TodayScheduleData? _cachedTodaySchedule;
+        private DateTime _cacheDate = DateTime.MinValue;
 
         // Today's STU sessions
         private string _todayDisplay = "0/0";
@@ -203,7 +205,6 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                // Fetch attendance summary (over/undertid)
                 var summary = await _attendanceService.GetAttendanceSummaryAsync();
                 if (summary != null)
                 {
@@ -213,10 +214,11 @@ namespace AkademiTrack.ViewModels
                     });
                 }
 
-                // Fetch today's schedule
                 var todayData = await _attendanceService.GetTodayScheduleAsync();
                 if (todayData != null)
                 {
+                    CacheTodaySchedule(todayData);
+                    
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         UpdateTodayDisplay(todayData);
@@ -248,6 +250,20 @@ namespace AkademiTrack.ViewModels
             {
                 // Log error if needed
             }
+        }
+
+        public void UpdateNextClassFromCache()
+        {
+            if (_cachedTodaySchedule != null && _cacheDate.Date == DateTime.Now.Date)
+            {
+                UpdateNextClassDisplay(_cachedTodaySchedule);
+            }
+        }
+
+        private void CacheTodaySchedule(TodayScheduleData data)
+        {
+            _cachedTodaySchedule = data;
+            _cacheDate = DateTime.Now;
         }
 
         private void UpdateTodayDisplay(TodayScheduleData data)

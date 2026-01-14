@@ -38,6 +38,11 @@ namespace AkademiTrack.ViewModels
         private bool _isLoading = true;
         private bool _isAuthenticated = false;
         private string _statusMessage = "Ready";
+        private Timer? _dataRefreshTimer;
+        private Timer? _nextClassUpdateTimer; 
+        private Timer? _midnightResetTimer;
+        private DateTime _lastDataRefresh = DateTime.MinValue;
+        private DateTime _currentDay = DateTime.Now.Date;
         
         // Navigation
         private bool _showDashboard = true;
@@ -271,6 +276,8 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogInfo("Update checker ready");
 
                     await CheckAutoStartAutomationAsync();
+
+                    StartNextClassUpdateTimer();
 
                     // Reset retry count on success
                     _initializationRetryCount = 0;
@@ -683,6 +690,96 @@ namespace AkademiTrack.ViewModels
             // Start initialization again
             await InitializeAsync();
         }
+
+        private void StartNextClassUpdateTimer()
+        {
+            _loggingService.LogInfo("⏰ Starting next class update timer...");
+
+            // Check every 30 seconds to update next class display
+            
+            _nextClassUpdateTimer = new Timer(
+                async _ => 
+                {
+                    try
+                    {
+                        await UpdateNextClassDisplayAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error in next class update timer: {ex.Message}");
+                    }
+                },
+                null,
+                TimeSpan.FromSeconds(30), // First check after 30 seconds
+                TimeSpan.FromSeconds(30)  // Then every 30 seconds
+            );
+            
+            // Midnight reset timer - checks for day change every minute
+            _midnightResetTimer = new Timer(
+                async _ => 
+                {
+                    try
+                    {
+                        await CheckMidnightResetAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error in midnight reset timer: {ex.Message}");
+                    }
+                },
+                null,
+                TimeSpan.FromMinutes(1), // First check after 1 minute
+                TimeSpan.FromMinutes(1)  // Then every minute
+            );
+            
+            _loggingService.LogInfo("✓ Next class update timer started");
+        }
+
+        private async Task CheckMidnightResetAsync()
+        {
+            var now = DateTime.Now.Date;
+            
+            if (now > _currentDay)
+            {
+                _loggingService.LogInfo($"🌅 NEW DAY DETECTED! Changing from {_currentDay:yyyy-MM-dd} to {now:yyyy-MM-dd}");
+                _currentDay = now;
+                
+                SchoolTimeChecker.ResetDailyCompletion();
+                _loggingService.LogInfo("✓ Daily completion flags reset");
+                
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await _notificationService.ShowNotificationAsync(
+                        "Ny dag!",
+                        $"God morgen! Ny skoledag: {now:dddd, d. MMMM}",
+                        NotificationLevel.Info
+                    );
+                });
+                
+                if (_settingsService.AutoStartAutomation)
+                {
+                    _loggingService.LogInfo("🔍 Checking if automation should auto-start for new day...");
+                    await CheckAutoStartAutomationAsync();
+                }
+                
+            }
+        }
+
+        private async Task UpdateNextClassDisplayAsync()
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                try
+                {
+                  
+                    Dashboard.UpdateNextClassFromCache();
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogDebug($"[NEXT CLASS UPDATE] Error: {ex.Message}");
+                }
+            });
+        }
         #endregion
 
         #region Event Handlers
@@ -845,7 +942,9 @@ namespace AkademiTrack.ViewModels
         public void Dispose()
         {
             _updateChecker?.Dispose();
-            _autoStartCheckTimer?.Dispose();
+            _nextClassUpdateTimer?.Dispose();
+            _dataRefreshTimer?.Dispose();
+            _midnightResetTimer?.Dispose();
             _httpClient?.Dispose();
             _authService?.Dispose();
             FeideViewModel?.Dispose();
