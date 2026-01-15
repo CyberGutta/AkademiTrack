@@ -320,48 +320,80 @@ namespace AkademiTrack.ViewModels
                 _nextClassUpdateTimer?.Dispose();
                 _nextClassUpdateTimer = null;
 
-                if (data.NextClass == null)
-                {
-                    _loggingService?.LogDebug("[NEXT CLASS] No next class - timer not scheduled");
-                    return;
-                }
-
-                var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
-                if (!nextClassStartTime.HasValue)
-                {
-                    _loggingService?.LogWarning($"[NEXT CLASS] Cannot parse start time: {data.NextClass.StartKl}");
-                    return;
-                }
-
+                // Find the next event time (either next class start OR current class end)
                 var now = DateTime.Now.TimeOfDay;
-                var timeUntilNextClass = nextClassStartTime.Value - now;
+                TimeSpan? nextEventTime = null;
+                string eventDescription = "";
 
-                if (timeUntilNextClass.TotalSeconds > 0)
+                // Check if current class is ending soon
+                if (data.CurrentClass != null)
                 {
-                    _nextClassUpdateTimer = new System.Timers.Timer(timeUntilNextClass.TotalMilliseconds);
+                    var currentClassEndTime = ParseTimeString(data.CurrentClass.SluttKl);
+                    if (currentClassEndTime.HasValue && currentClassEndTime.Value > now)
+                    {
+                        nextEventTime = currentClassEndTime.Value;
+                        eventDescription = $"current class ends at {FormatTime(data.CurrentClass.SluttKl)}";
+                    }
+                }
+
+                // Check when next class starts
+                if (data.NextClass != null)
+                {
+                    var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
+                    if (nextClassStartTime.HasValue && nextClassStartTime.Value > now)
+                    {
+                        // Use whichever comes first: current class end or next class start
+                        if (!nextEventTime.HasValue || nextClassStartTime.Value < nextEventTime.Value)
+                        {
+                            nextEventTime = nextClassStartTime.Value;
+                            eventDescription = $"next class starts at {FormatTime(data.NextClass.StartKl)}";
+                        }
+                    }
+                }
+
+                // If no upcoming events today, schedule check for midnight (new day)
+                if (!nextEventTime.HasValue)
+                {
+                    var midnight = TimeSpan.FromDays(1); // Tomorrow at 00:00
+                    var timeUntilMidnight = midnight - now;
+                    
+                    _loggingService?.LogDebug($"[NEXT CLASS] No more classes today - will check again at midnight (in {timeUntilMidnight.TotalHours:F1} hours)");
+                    
+                    _nextClassUpdateTimer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Class started at {data.NextClass.StartKl} - updating display");
-                        
-                        Dispatcher.UIThread.Post(() =>
-                        {
-                            UpdateNextClassFromCache(); // This will recalculate AND reschedule
-                        });
+                        _loggingService?.LogInfo("[NEXT CLASS] ⏰ Midnight reached - new day, rechecking schedule");
+                        Dispatcher.UIThread.Post(() => UpdateNextClassFromCache());
                     };
                     _nextClassUpdateTimer.AutoReset = false;
                     _nextClassUpdateTimer.Start();
-
-                    _loggingService?.LogDebug($"[NEXT CLASS] ⏰ Timer set - will update in {timeUntilNextClass.TotalMinutes:F1} minutes (at {nextClassStartTime:hh\\:mm})");
+                    return;
                 }
-                else
+
+                // Schedule timer for the next event
+                var timeUntilEvent = nextEventTime.Value - now;
+
+                if (timeUntilEvent.TotalSeconds <= 0)
                 {
-                    _loggingService?.LogDebug($"[NEXT CLASS] Next class time has passed or is now - recalculating immediately");
-                    
+                    // Event time has passed, recalculate immediately
+                    _loggingService?.LogDebug("[NEXT CLASS] Event time has passed - recalculating immediately");
+                    Dispatcher.UIThread.Post(() => UpdateNextClassFromCache());
+                    return;
+                }
+
+                _nextClassUpdateTimer = new System.Timers.Timer(timeUntilEvent.TotalMilliseconds);
+                _nextClassUpdateTimer.Elapsed += (s, e) =>
+                {
+                    _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Event triggered: {eventDescription}");
                     Dispatcher.UIThread.Post(() =>
                     {
-                        UpdateNextClassFromCache();
+                        UpdateNextClassFromCache(); // Recalculates and reschedules for next event
                     });
-                }
+                };
+                _nextClassUpdateTimer.AutoReset = false;
+                _nextClassUpdateTimer.Start();
+
+                _loggingService?.LogDebug($"[NEXT CLASS] ⏰ Timer set - will update in {timeUntilEvent.TotalMinutes:F1} minutes ({eventDescription})");
             }
             catch (Exception ex)
             {

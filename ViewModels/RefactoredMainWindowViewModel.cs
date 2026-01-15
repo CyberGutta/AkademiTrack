@@ -492,31 +492,31 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogInfo($"[DASHBOARD] Session {e.SessionTime} registered - updating display");
             
-            Dispatcher.UIThread.Post(() =>
+            Dispatcher.UIThread.Post(async () =>
             {
                 try
                 {
+                    // 1. Immediate cache-based updates (fast, no network)
                     Dashboard.IncrementRegisteredSessionCount();
                     _loggingService.LogDebug("[DASHBOARD] ✓ Today's count updated from cache");
                     
                     Dashboard.UpdateNextClassFromCache();
                     _loggingService.LogDebug("[DASHBOARD] ✓ Next class updated from cache");
                     
-                    _ = Task.Run(async () =>
+                    // 2. Full data refresh after short delay (fetches fresh data from server)
+                    await Task.Delay(500); // Give server time to process registration
+                    
+                    try
                     {
-                        await Task.Delay(100);
-                        
-                        try
-                        {
-                            _loggingService.LogDebug("[DASHBOARD] Refreshing weekly/monthly stats...");
-                            await Dashboard.RefreshDataAsync();
-                            _loggingService.LogSuccess("[DASHBOARD] ✓ Weekly/monthly stats refreshed");
-                        }
-                        catch (Exception ex)
-                        {
-                            _loggingService.LogError($"[DASHBOARD] Background refresh failed: {ex.Message}");
-                        }
-                    });
+                        _loggingService.LogDebug("[DASHBOARD] Refreshing all data from server...");
+                        await Dashboard.RefreshDataAsync();
+                        _loggingService.LogSuccess("[DASHBOARD] ✓ All data refreshed (today, weekly, monthly, overtime)");
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"[DASHBOARD] Full refresh failed: {ex.Message}");
+                        // Cache updates already succeeded, so UI is still updated
+                    }
                 }
                 catch (Exception ex)
                 {
