@@ -250,6 +250,8 @@ namespace AkademiTrack.ViewModels
                     {
                         UpdateTodayDisplay(todayData);
                         UpdateNextClassDisplay(todayData);
+                        
+                        ScheduleNextClassUpdate(todayData);
                     });
                 }
 
@@ -299,6 +301,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+
         public void UpdateNextClassFromCache()
         {
             if (_cachedTodaySchedule != null && _cacheDate.Date == DateTime.Now.Date)
@@ -318,11 +321,17 @@ namespace AkademiTrack.ViewModels
                 _nextClassUpdateTimer = null;
 
                 if (data.NextClass == null)
+                {
+                    _loggingService?.LogDebug("[NEXT CLASS] No next class - timer not scheduled");
                     return;
+                }
 
                 var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
                 if (!nextClassStartTime.HasValue)
+                {
+                    _loggingService?.LogWarning($"[NEXT CLASS] Cannot parse start time: {data.NextClass.StartKl}");
                     return;
+                }
 
                 var now = DateTime.Now.TimeOfDay;
                 var timeUntilNextClass = nextClassStartTime.Value - now;
@@ -332,13 +341,26 @@ namespace AkademiTrack.ViewModels
                     _nextClassUpdateTimer = new System.Timers.Timer(timeUntilNextClass.TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Class started - updating to show next class");
-                        UpdateNextClassFromCache();
+                        _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Class started at {data.NextClass.StartKl} - updating display");
+                        
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            UpdateNextClassFromCache(); // This will recalculate AND reschedule
+                        });
                     };
                     _nextClassUpdateTimer.AutoReset = false;
                     _nextClassUpdateTimer.Start();
 
-                    _loggingService?.LogDebug($"[NEXT CLASS] Will update in {timeUntilNextClass.TotalMinutes:F1} minutes");
+                    _loggingService?.LogDebug($"[NEXT CLASS] ⏰ Timer set - will update in {timeUntilNextClass.TotalMinutes:F1} minutes (at {nextClassStartTime:hh\\:mm})");
+                }
+                else
+                {
+                    _loggingService?.LogDebug($"[NEXT CLASS] Next class time has passed or is now - recalculating immediately");
+                    
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        UpdateNextClassFromCache();
+                    });
                 }
             }
             catch (Exception ex)
