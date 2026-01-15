@@ -22,12 +22,23 @@ namespace AkademiTrack.Views
             InitializeComponent();
 
             this.Closing += MainWindow_Closing;
+            this.Activated += MainWindow_Activated;
             this.WindowState = WindowState.Normal;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             
             this.PropertyChanged += MainWindow_PropertyChanged;
 
             _ = LoadSettingsAsync();
+        }
+
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            // Window activated - could be from sleep, minimize, or focus change
+            // Check if we need to refresh stale data
+            if (DataContext is RefactoredMainWindowViewModel viewModel)
+            {
+                _ = viewModel.CheckForStaleDataAsync();
+            }
         }
 
         private void MainWindow_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)

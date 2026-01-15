@@ -284,6 +284,7 @@ namespace AkademiTrack.ViewModels
                     await CheckAutoStartAutomationAsync();
 
                     StartDashboardRefreshTimer();
+                    StartMidnightResetTimer();
 
                     // Reset retry count on success
                     _initializationRetryCount = 0;
@@ -407,6 +408,31 @@ namespace AkademiTrack.ViewModels
             );
 
             _loggingService.LogInfo("✓ Dashboard auto-refresh timer started (every 5 minutes)");
+        }
+
+        private void StartMidnightResetTimer()
+        {
+            _loggingService.LogInfo("⏰ Starting midnight reset timer...");
+
+            // Check for new day every 5 minutes
+            _midnightResetTimer = new Timer(
+                async _ =>
+                {
+                    try
+                    {
+                        await CheckMidnightResetAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Midnight reset check error: {ex.Message}");
+                    }
+                },
+                null,
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromMinutes(5)
+            );
+
+            _loggingService.LogInfo("✓ Midnight reset timer started (checks every 5 minutes)");
         }
         #endregion
 
@@ -1022,6 +1048,28 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 _loggingService.LogError($"Error refreshing auto-start status: {ex.Message}");
+            }
+        }
+
+        public async Task CheckForStaleDataAsync()
+        {
+            try
+            {
+                // Check if cache is from a different day (computer was asleep/closed)
+                if (Dashboard.IsCacheStale())
+                {
+                    _loggingService.LogInfo("🔄 Window activated - cache is stale, refreshing data...");
+                    await Dashboard.RefreshDataAsync();
+                }
+                else
+                {
+                    // Cache is fresh, but still update next class display in case timer missed
+                    Dashboard.UpdateNextClassFromCache();
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking for stale data: {ex.Message}");
             }
         }
                 

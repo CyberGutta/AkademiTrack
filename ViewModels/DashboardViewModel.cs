@@ -304,12 +304,19 @@ namespace AkademiTrack.ViewModels
 
         public void UpdateNextClassFromCache()
         {
+            // Check if cache is from today
             if (_cachedTodaySchedule != null && _cacheDate.Date == DateTime.Now.Date)
             {
                 var recalculatedData = RecalculateNextClass(_cachedTodaySchedule);
                 UpdateNextClassDisplay(recalculatedData);
 
                 ScheduleNextClassUpdate(recalculatedData);
+            }
+            else
+            {
+                // Cache is stale (different day or no cache) - refresh from server
+                _loggingService?.LogWarning($"[CACHE] Cache is stale - triggering full refresh (cache date: {_cacheDate.Date:yyyy-MM-dd}, today: {DateTime.Now.Date:yyyy-MM-dd})");
+                _ = RefreshDataAsync();
             }
         }
 
@@ -351,21 +358,30 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // If no upcoming events today, schedule check for midnight (new day)
+                // If no upcoming events today, schedule check for 5 minutes (cache might be stale)
                 if (!nextEventTime.HasValue)
                 {
-                    var midnight = TimeSpan.FromDays(1); // Tomorrow at 00:00
-                    var timeUntilMidnight = midnight - now;
+                    _loggingService?.LogDebug("[NEXT CLASS] No more classes today - will recheck in 5 minutes (in case of new day)");
                     
-                    _loggingService?.LogDebug($"[NEXT CLASS] No more classes today - will check again at midnight (in {timeUntilMidnight.TotalHours:F1} hours)");
-                    
-                    _nextClassUpdateTimer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
+                    _nextClassUpdateTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo("[NEXT CLASS] ⏰ Midnight reached - new day, rechecking schedule");
-                        Dispatcher.UIThread.Post(() => UpdateNextClassFromCache());
+                        _loggingService?.LogInfo("[NEXT CLASS] ⏰ Periodic check - verifying if new day or schedule updated");
+                        Dispatcher.UIThread.Post(async () =>
+                        {
+                            // Check if it's a new day - if so, refresh data from server
+                            if (_cacheDate.Date != DateTime.Now.Date)
+                            {
+                                _loggingService?.LogInfo("[NEXT CLASS] 🌅 New day detected - refreshing schedule");
+                                await RefreshDataAsync();
+                            }
+                            else
+                            {
+                                UpdateNextClassFromCache();
+                            }
+                        });
                     };
-                    _nextClassUpdateTimer.AutoReset = false;
+                    _nextClassUpdateTimer.AutoReset = true; // Keep checking every 5 minutes
                     _nextClassUpdateTimer.Start();
                     return;
                 }
