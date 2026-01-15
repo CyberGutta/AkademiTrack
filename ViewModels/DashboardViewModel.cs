@@ -285,13 +285,16 @@ namespace AkademiTrack.ViewModels
             {
                 _cachedTodaySchedule.RegisteredStuSessions++;
                 
-                UpdateTodayDisplay(_cachedTodaySchedule);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    UpdateTodayDisplay(_cachedTodaySchedule);
+                });
                 
-                _loggingService?.LogDebug($"[CACHE] Incremented registered count to {_cachedTodaySchedule.RegisteredStuSessions}");
+                _loggingService?.LogDebug($"[CACHE] ✓ Incremented registered count to {_cachedTodaySchedule.RegisteredStuSessions}/{_cachedTodaySchedule.TotalStuSessions}");
             }
             else
             {
-                _loggingService?.LogWarning("[CACHE] Cache is stale - triggering full refresh");
+                _loggingService?.LogWarning("[CACHE] Cache is stale - cannot increment from cache");
                 _ = RefreshDataAsync();
             }
         }

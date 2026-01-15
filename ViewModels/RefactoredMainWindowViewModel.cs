@@ -490,14 +490,33 @@ namespace AkademiTrack.ViewModels
 
         private void OnSessionRegistered(object? sender, SessionRegisteredEventArgs e)
         {
-            _loggingService.LogInfo($"[DASHBOARD] Session {e.SessionTime} registered - updating display from cache");
+            _loggingService.LogInfo($"[DASHBOARD] Session {e.SessionTime} registered - updating display");
             
             Dispatcher.UIThread.Post(() =>
             {
                 try
                 {
                     Dashboard.IncrementRegisteredSessionCount();
-                    _loggingService.LogDebug("[DASHBOARD] Display updated from cache after registration");
+                    _loggingService.LogDebug("[DASHBOARD] ✓ Today's count updated from cache");
+                    
+                    Dashboard.UpdateNextClassFromCache();
+                    _loggingService.LogDebug("[DASHBOARD] ✓ Next class updated from cache");
+                    
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(100);
+                        
+                        try
+                        {
+                            _loggingService.LogDebug("[DASHBOARD] Refreshing weekly/monthly stats...");
+                            await Dashboard.RefreshDataAsync();
+                            _loggingService.LogSuccess("[DASHBOARD] ✓ Weekly/monthly stats refreshed");
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogError($"[DASHBOARD] Background refresh failed: {ex.Message}");
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
