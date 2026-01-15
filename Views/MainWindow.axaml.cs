@@ -98,6 +98,7 @@ namespace AkademiTrack.Views
         {
             try
             {
+                // FIRST: Check if app is shutting down (from menu quit, etc)
                 if (App.IsShuttingDown)
                 {
                     Debug.WriteLine("[MainWindow] App is shutting down - allowing close");
@@ -106,26 +107,24 @@ namespace AkademiTrack.Views
                     return;
                 }
 
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && !_isReallyClosing)
+                // SECOND: Check if this is marked as a real close (from ReallyClose())
+                if (_isReallyClosing)
+                {
+                    Debug.WriteLine("[MainWindow] ReallyClosing flag set - allowing close");
+                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    return;
+                }
+
+                // macOS-specific behavior: hide instead of close when clicking X
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     Debug.WriteLine("[MainWindow] macOS: Hiding window instead of closing");
                     e.Cancel = true;
                     this.Hide(); 
-                    
-                   /*
-                    if (!App.HasShownHideNotification)
-                    {
-                        App.HasShownHideNotification = true;
-                        AkademiTrack.Services.NativeNotificationService.Show(
-                            "AkademiTrack kjører fortsatt",
-                            "Appen er fortsatt aktiv i bakgrunnen. Bruk dock-ikonet eller menylinjen for å åpne den igjen.",
-                            "INFO"
-                        );
-                    }
-                    */
                     return;
                 }
 
+                // Windows/Linux: Check start minimized setting
                 if (_cachedSettings == null)
                 {
                     _cachedSettings = await AkademiTrack.ViewModels.SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
@@ -135,18 +134,6 @@ namespace AkademiTrack.Views
                 {
                     e.Cancel = true;
                     AkademiTrack.Services.TrayIconManager.MinimizeToTray();
-
-                   /*
-                    if (!_hasShownMinimizeNotification)
-                    {
-                        AkademiTrack.Services.NativeNotificationService.Show(
-                            "AkademiTrack kjører fortsatt",
-                            "Programmet kjører i bakgrunnen. Høyreklikk på tray-ikonet og velg 'Avslutt' for å lukke helt.",
-                            "INFO"
-                        );
-                        _hasShownMinimizeNotification = true;
-                    }
-                    */
                     return;
                 }
                 else
@@ -164,6 +151,7 @@ namespace AkademiTrack.Views
 
         public void ReallyClose()
         {
+            Debug.WriteLine("[MainWindow] ReallyClose() called - setting flag and closing");
             _isReallyClosing = true;
             Close();
         }
