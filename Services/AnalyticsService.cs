@@ -273,6 +273,27 @@ namespace AkademiTrack.Services
             }
         }
 
+        public async Task TrackUserDeletedDataAsync() 
+        {
+            try
+            {
+                await TrackActionAsync("deleted");
+                
+                // Stop heartbeat since user is deleting data
+                lock (_timerLock)
+                {
+                    _heartbeatTimer?.Dispose();
+                    _heartbeatTimer = null;
+                }
+                
+                Debug.WriteLine("[Analytics] User deleted data - heartbeat stopped");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Analytics] TrackUserDeletedDataAsync failed: {ex.Message}");
+            }
+        }
+
         private void StartHeartbeatTimer()
         {
             try

@@ -1365,6 +1365,39 @@ Terminal=false
                 IsDeleting = true;
                 Debug.WriteLine("=== DELETING LOCAL DATA ===");
 
+                // Track user deletion in analytics BEFORE deleting any data
+                // This ensures we use the current user_id and session_id
+                try
+                {
+                    Debug.WriteLine("Tracking user deletion in analytics...");
+                    var analyticsService = Services.ServiceLocator.Instance.GetService<AnalyticsService>();
+                    
+                    // Make sure we have a valid session before tracking
+                    var currentUserId = analyticsService.GetPersistentUserId();
+                    var currentSessionId = analyticsService.GetSessionId();
+                    
+                    Debug.WriteLine($"Current User ID: {currentUserId}");
+                    Debug.WriteLine($"Current Session ID: {currentSessionId}");
+                    
+                    if (!string.IsNullOrEmpty(currentSessionId))
+                    {
+                        await analyticsService.TrackUserDeletedDataAsync();
+                        Debug.WriteLine("✓ User deletion tracked in analytics");
+                        
+                        // Give it time to send the request
+                        await Task.Delay(2000);
+                    }
+                    else
+                    {
+                        Debug.WriteLine("⚠️ No active session - cannot track deletion");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠️ Could not track deletion in analytics: {ex.Message}");
+                    Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                }
+
                 // Delete from secure storage first
                 Debug.WriteLine("Deleting credentials from secure storage...");
                 await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
