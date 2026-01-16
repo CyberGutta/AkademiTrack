@@ -332,12 +332,14 @@
 				</Border>
 
 				<!-- Login Button -->
-				<Button Content="{Binding SaveButtonText}"
-						Command="{Binding SaveCommand}"
-						IsEnabled="{Binding CanSave}"
-						Classes="primary"
+				<Button Classes="primary"
 						HorizontalAlignment="Stretch"
-						Margin="0,4,0,0"/>
+						Margin="0,4,0,0"
+						Command="{Binding SaveCommand}"
+						IsEnabled="{Binding CanSave}">
+					<TextBlock Name="LoadingTextBlock" 
+							   Text="{Binding SaveButtonText}"/>
+				</Button>
 
 			</StackPanel>
 		</Border>

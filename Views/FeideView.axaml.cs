@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using System;
+using AkademiTrack.ViewModels;
 
 namespace AkademiTrack.Views
 {
@@ -14,12 +15,40 @@ namespace AkademiTrack.Views
         {
             InitializeComponent();
             this.Loaded += FeideView_Loaded;
+            this.DataContextChanged += FeideView_DataContextChanged;
         }
 
         private void FeideView_Loaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             // Find the loading text block if it exists
             _loadingTextBlock = this.FindControl<TextBlock>("LoadingTextBlock");
+        }
+
+        private void FeideView_DataContextChanged(object? sender, EventArgs e)
+        {
+            // Subscribe to IsLoading changes
+            if (DataContext is FeideWindowViewModel viewModel)
+            {
+                viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
+        }
+
+        private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FeideWindowViewModel.IsLoading))
+            {
+                if (DataContext is FeideWindowViewModel vm)
+                {
+                    if (vm.IsLoading)
+                    {
+                        StartLoadingAnimation();
+                    }
+                    else
+                    {
+                        StopLoadingAnimation();
+                    }
+                }
+            }
         }
 
         public void StartLoadingAnimation()
@@ -69,7 +98,7 @@ namespace AkademiTrack.Views
             _loadingTextBlock.Text = $"Tester innlogging{dots}";
         }
 
-        protected override void OnDetachedFromVisualTree(Avalonia.VisualTree.VisualTreeAttachmentEventArgs e)
+        protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
             StopLoadingAnimation();
