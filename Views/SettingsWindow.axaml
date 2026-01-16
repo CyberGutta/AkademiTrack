@@ -1178,17 +1178,6 @@
 
 					<Border Classes="setting-card">
 						<StackPanel Spacing="12">
-							<TextBlock Text="Programfiler" Classes="setting-title"/>
-							<TextBlock Text="Tilgang til programmappen der cookies og konfigurasjonsfiler lagres."
-									   Classes="setting-description"/>
-							<Button Content="Åpne Programmappe"
-									Classes="settings-action"
-									Command="{Binding OpenProgramFolderCommand}"/>
-						</StackPanel>
-					</Border>
-
-					<Border Classes="setting-card">
-						<StackPanel Spacing="12">
 							<TextBlock Text="Ressursbruk" Classes="setting-title"/>
 							<TextBlock Text="Sanntidsovervåking av CPU- og minnebruk for AkademiTrack."
 									   Classes="setting-description"/>

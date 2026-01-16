@@ -823,7 +823,6 @@ Terminal=false
         public ICommand CloseCommand { get; }
         public ICommand BackToDashboardCommand { get; }
         public ICommand ToggleThemeCommand { get; }
-        public ICommand OpenProgramFolderCommand { get; }
         public ICommand ClearLogsCommand { get; }
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand ToggleActivityLogCommand { get; }
@@ -1113,7 +1112,6 @@ Terminal=false
             CloseCommand = new RelayCommand(CloseWindow);
             BackToDashboardCommand = new RelayCommand(BackToDashboard);  
             ToggleThemeCommand = new RelayCommand(ToggleTheme);
-            OpenProgramFolderCommand = new RelayCommand(OpenProgramFolder);
             ClearLogsCommand = new RelayCommand(ClearLogs);
             ToggleDetailedLogsCommand = new RelayCommand(ToggleDetailedLogs);
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
@@ -2127,17 +2125,6 @@ Terminal=false
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/", UseShellExecute = true }); }
             catch (Exception ex) { Debug.WriteLine($"Error opening webiste: {ex.Message}"); }
-        }
-
-        private void OpenProgramFolder()
-        {
-            try
-            {
-                var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
-                    Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-            }
-            catch (Exception ex) { Debug.WriteLine($"Error: {ex.Message}"); }
         }
 
         private void ClearLogs()
