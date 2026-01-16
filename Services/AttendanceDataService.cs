@@ -61,7 +61,7 @@ namespace AkademiTrack.Services
                         };
                         SetCredentials(newParams, authResult.Cookies);
                         
-                        _loggingService?.LogSuccess("✓ Autentisering oppdatert - prøver å hente data på nytt...");
+                        _loggingService?.LogSuccess("Autentisering oppdatert");
                         
                         // Retry with fresh cookies
                         result = await fetchFunc();

@@ -332,11 +332,27 @@
 				</Border>
 
 				<!-- Login Button -->
-				<Button Classes="primary"
+				<Button Name="LoadingButton"
+						Classes="primary"
 						HorizontalAlignment="Stretch"
 						Margin="0,4,0,0"
 						Command="{Binding SaveCommand}"
 						IsEnabled="{Binding CanSave}">
+					<Button.Styles>
+						<Style Selector="Button.primary[IsEnabled=False] /template/ ContentPresenter">
+							<Setter Property="Background" Value="#C7C7CC"/>
+						</Style>
+						<Style Selector="Button.primary[IsEnabled=False]">
+							<Setter Property="Foreground" Value="#8E8E93"/>
+						</Style>
+						<!-- Blue when loading -->
+						<Style Selector="Button.primary[IsEnabled=False].loading /template/ ContentPresenter">
+							<Setter Property="Background" Value="#5A8FDB"/>
+						</Style>
+						<Style Selector="Button.primary[IsEnabled=False].loading">
+							<Setter Property="Foreground" Value="White"/>
+						</Style>
+					</Button.Styles>
 					<TextBlock Name="LoadingTextBlock" 
 							   Text="{Binding SaveButtonText}"/>
 				</Button>

@@ -39,13 +39,19 @@ namespace AkademiTrack.Views
             {
                 if (DataContext is FeideWindowViewModel vm)
                 {
-                    if (vm.IsLoading)
+                    var button = this.FindControl<Button>("LoadingButton");
+                    if (button != null)
                     {
-                        StartLoadingAnimation();
-                    }
-                    else
-                    {
-                        StopLoadingAnimation();
+                        if (vm.IsLoading)
+                        {
+                            button.Classes.Add("loading");
+                            StartLoadingAnimation();
+                        }
+                        else
+                        {
+                            button.Classes.Remove("loading");
+                            StopLoadingAnimation();
+                        }
                     }
                 }
             }
