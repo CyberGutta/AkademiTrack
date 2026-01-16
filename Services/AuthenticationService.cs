@@ -21,11 +21,24 @@ namespace AkademiTrack.Services
         private string _schoolName = "";
         private Dictionary<string, string>? _cachedCookies;
         private bool _credentialsWereRejected = false; // Track if credentials were explicitly rejected
+        private static DateTime? _lastMissingCredentialsNotification;
+        private static DateTime? _lastInvalidCredentialsNotification;
+        private static readonly TimeSpan NotificationCooldown = TimeSpan.FromMinutes(5);
         private readonly INotificationService? _notificationService;
 
         public AuthenticationService(INotificationService? notificationService = null)
         {
             _notificationService = notificationService;
+        }
+
+        private bool ShouldShowNotification(ref DateTime? lastShown)
+        {
+            if (lastShown == null || DateTime.Now - lastShown.Value > NotificationCooldown)
+            {
+                lastShown = DateTime.Now;
+                return true;
+            }
+            return false;
         }
 
         public async Task<AuthenticationResult> AuthenticateAsync()
@@ -88,15 +101,17 @@ namespace AkademiTrack.Services
                 {
                     Console.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
                     
-                    // Notify user about missing credentials
-                    if (_notificationService != null)
+                    if (ShouldShowNotification(ref _lastMissingCredentialsNotification))
                     {
-                        await _notificationService.ShowNotificationAsync(
-                            "Mangler Innloggingsdata",
-                            "Gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn.",
-                            NotificationLevel.Warning,
-                            isHighPriority: true
-                        );
+                        if (_notificationService != null)
+                        {
+                            await _notificationService.ShowNotificationAsync(
+                                "Mangler Innloggingsdata",
+                                "Gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn.",
+                                NotificationLevel.Warning,
+                                isHighPriority: true
+                            );
+                        }
                     }
                     
                     return new AuthenticationResult 
@@ -105,6 +120,7 @@ namespace AkademiTrack.Services
                         ErrorMessage = "Mangler innloggingsdata. Vennligst gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn." 
                     };
                 }
+
 
                 var loginResult = await PerformBrowserLoginAsync(hasCredentials);
                 
@@ -242,20 +258,21 @@ namespace AkademiTrack.Services
                 {
                     Console.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
                     
-                    // If credentials were explicitly rejected, don't wait for manual login
                     if (_credentialsWereRejected)
                     {
                         Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately (no manual login wait)");
                         
-                        // Notify user about invalid credentials
-                        if (_notificationService != null)
+                        if (ShouldShowNotification(ref _lastInvalidCredentialsNotification))
                         {
-                            await _notificationService.ShowNotificationAsync(
-                                "Innlogging Feilet",
-                                "Feil brukernavn eller passord. Sjekk dine Feide-innloggingsdata.",
-                                NotificationLevel.Error,
-                                isHighPriority: true
-                            );
+                            if (_notificationService != null)
+                            {
+                                await _notificationService.ShowNotificationAsync(
+                                    "Innlogging Feilet",
+                                    "Feil brukernavn eller passord. Sjekk dine Feide-innloggingsdata.",
+                                    NotificationLevel.Error,
+                                    isHighPriority: true
+                                );
+                            }
                         }
                         
                         return new AuthenticationResult 
