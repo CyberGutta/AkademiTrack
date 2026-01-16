@@ -94,6 +94,10 @@ namespace AkademiTrack.Services
             // Initialize analytics service and start session
             var analyticsService = locator.GetService<AnalyticsService>();
             _ = analyticsService.StartSessionAsync();
+            
+            var loggingService = locator.GetService<ILoggingService>();
+            var retentionManager = new LogRetentionManager(loggingService);
+            retentionManager.Start();
         }
 
         /// <summary>

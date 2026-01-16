@@ -547,6 +547,9 @@ Terminal=false
         private TimeSpan _mondayStart = new TimeSpan(9, 0, 0);
         private TimeSpan _mondayEnd = new TimeSpan(15, 15, 0);
 
+        private System.Timers.Timer? _logCleanupTimer;
+        private const int LOG_RETENTION_DAYS = 7;
+
         public bool MondayEnabled
         {
             get => _mondayEnabled;
@@ -1129,8 +1132,8 @@ Terminal=false
             ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
             RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
-
-
+    
+              _ = CleanOldLogsAsync();
 
             _ = LoadSchoolHoursAsync();
 
@@ -1138,6 +1141,45 @@ Terminal=false
 
             Services.ResourceMonitor.Instance.StartMonitoring();
             Debug.WriteLine("✓ Resource monitoring started for Settings window");
+        }
+
+        private async Task CleanOldLogsAsync()
+        {
+            try
+            {
+                var cutoffDate = DateTime.Now.AddDays(-LOG_RETENTION_DAYS);
+                var logsToRemove = _allLogEntries
+                    .Where(log => log.Timestamp < cutoffDate)
+                    .ToList();
+
+                if (logsToRemove.Any())
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        foreach (var log in logsToRemove)
+                        {
+                            _allLogEntries.Remove(log);
+                        }
+                    });
+
+                    Debug.WriteLine($"✓ Cleaned {logsToRemove.Count} old logs (older than {LOG_RETENTION_DAYS} days)");
+                    
+                    // Optionally notify user
+                    /* if (EnableNotifications && logsToRemove.Count > 100)
+                    {
+                        NativeNotificationService.Show(
+                            "Logger ryddet",
+                            $"Fjernet {logsToRemove.Count} gamle loggoppføringer",
+                            "INFO"
+                        );
+                    }
+                    */
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error cleaning old logs: {ex.Message}");
+            }
         }
 
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
@@ -2530,15 +2572,15 @@ Terminal=false
         }
         public void Dispose()
         {
-            // Securely dispose of the password
             _loginPasswordSecure?.Dispose();
             _loginPasswordSecure = null;
-
+            
+            _logCleanupTimer?.Stop();
+            _logCleanupTimer?.Dispose();
+            
             Services.ResourceMonitor.Instance.StopMonitoring();
-
-            Debug.WriteLine("SettingsViewModel disposed - password cleared from memory");
-            Debug.WriteLine("SettingsViewModel disposed - password cleared from memory and monitoring stopped");
-
+            
+            Debug.WriteLine("SettingsViewModel disposed - cleanup timer stopped");
         }
     }  
 }
