@@ -13,18 +13,19 @@ using AkademiTrack.Services.Interfaces;
 
 namespace AkademiTrack.Services
 {
-    public class AuthenticationService
+    public class AuthenticationService : IDisposable
     {
         private IWebDriver? _webDriver;
         private string _loginEmail = "";
         private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
         private Dictionary<string, string>? _cachedCookies;
-        private bool _credentialsWereRejected = false; // Track if credentials were explicitly rejected
+        private bool _credentialsWereRejected = false;
         private static DateTime? _lastMissingCredentialsNotification;
         private static DateTime? _lastInvalidCredentialsNotification;
         private static readonly TimeSpan NotificationCooldown = TimeSpan.FromMinutes(5);
         private readonly INotificationService? _notificationService;
+        private bool _disposed = false;
 
         public AuthenticationService(INotificationService? notificationService = null)
         {
@@ -918,8 +919,42 @@ namespace AkademiTrack.Services
 
         public void Dispose()
         {
-            _loginPasswordSecure?.Dispose();
-            _webDriver?.Dispose();
+            if (_disposed) return;
+            
+            try
+            {
+                _loginPasswordSecure?.Dispose();
+                _loginPasswordSecure = null;
+                
+                if (_webDriver != null)
+                {
+                    try
+                    {
+                        _webDriver.Quit();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error quitting WebDriver: {ex.Message}");
+                    }
+                    
+                    try
+                    {
+                        _webDriver.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error disposing WebDriver: {ex.Message}");
+                    }
+                    
+                    _webDriver = null;
+                }
+                
+                _disposed = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in AuthenticationService.Dispose: {ex.Message}");
+            }
         }
     }
 }

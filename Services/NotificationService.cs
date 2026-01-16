@@ -12,16 +12,16 @@ using Avalonia.Threading;
 
 namespace AkademiTrack.Services
 {
-    public class NotificationService : INotificationService
+    public class NotificationService : INotificationService, IDisposable
     {
         private readonly ObservableCollection<NotificationEntry> _notifications;
         private readonly Queue<NotificationQueueItem> _notificationQueue;
-        private readonly SemaphoreSlim _notificationSemaphore;
+        private readonly SemaphoreSlim _queueSemaphore;
         private readonly HashSet<string> _processedNotificationIds;
         private readonly string _processedNotificationsFile;
-        private readonly object _queueLock = new();
         private bool _isProcessingQueue;
         private int _nextNotificationId = 1;
+        private bool _disposed = false;
 
         public event EventHandler<NotificationEventArgs>? NotificationAdded;
         public event EventHandler<NotificationEventArgs>? NotificationDismissed;
@@ -32,7 +32,7 @@ namespace AkademiTrack.Services
         {
             _notifications = new ObservableCollection<NotificationEntry>();
             _notificationQueue = new Queue<NotificationQueueItem>();
-            _notificationSemaphore = new SemaphoreSlim(1, 1);
+            _queueSemaphore = new SemaphoreSlim(1, 1);
             _processedNotificationIds = new HashSet<string>();
             _processedNotificationsFile = GetProcessedNotificationsFilePath();
             
@@ -53,7 +53,8 @@ namespace AkademiTrack.Services
                 UniqueId = Guid.NewGuid().ToString()
             };
 
-            lock (_queueLock)
+            await _queueSemaphore.WaitAsync();
+            try
             {
                 if (isHighPriority)
                 {
@@ -75,6 +76,10 @@ namespace AkademiTrack.Services
                 {
                     _notificationQueue.Enqueue(queueItem);
                 }
+            }
+            finally
+            {
+                _queueSemaphore.Release();
             }
 
             await ProcessNotificationQueueAsync();
@@ -111,27 +116,36 @@ namespace AkademiTrack.Services
 
         private async Task ProcessNotificationQueueAsync()
         {
-            if (!await _notificationSemaphore.WaitAsync(100))
-                return;
+            // Prevent concurrent processing
+            if (_isProcessingQueue) return;
+
+            await _queueSemaphore.WaitAsync();
+            try
+            {
+                if (_isProcessingQueue) return;
+                _isProcessingQueue = true;
+            }
+            finally
+            {
+                _queueSemaphore.Release();
+            }
 
             try
             {
-                lock (_queueLock)
-                {
-                    if (_isProcessingQueue || _notificationQueue.Count == 0)
-                        return;
-                    _isProcessingQueue = true;
-                }
-
                 while (true)
                 {
                     NotificationQueueItem? item = null;
                     
-                    lock (_queueLock)
+                    await _queueSemaphore.WaitAsync();
+                    try
                     {
                         if (_notificationQueue.Count == 0)
                             break;
                         item = _notificationQueue.Dequeue();
+                    }
+                    finally
+                    {
+                        _queueSemaphore.Release();
                     }
 
                     if (item != null && !_processedNotificationIds.Contains(item.UniqueId))
@@ -146,11 +160,7 @@ namespace AkademiTrack.Services
             }
             finally
             {
-                lock (_queueLock)
-                {
-                    _isProcessingQueue = false;
-                }
-                _notificationSemaphore.Release();
+                _isProcessingQueue = false;
             }
         }
 
@@ -227,6 +237,21 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to save processed notifications: {ex.Message}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            
+            try
+            {
+                _queueSemaphore?.Dispose();
+                _disposed = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error disposing NotificationService: {ex.Message}");
             }
         }
 

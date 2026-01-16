@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using AkademiTrack.Services;
+using AkademiTrack.Services.Utilities;
 using System.Diagnostics;
 using System.Security;
 
@@ -175,33 +176,40 @@ namespace AkademiTrack.ViewModels
 
             try
             {
-                // Validate inputs
-                if (string.IsNullOrWhiteSpace(SchoolName))
+                // Validate inputs with proper validation
+                var schoolValidation = InputValidator.ValidateSchoolName(SchoolName);
+                if (!schoolValidation.isValid)
                 {
-                    ErrorMessage = "Vennligst velg en skole";
+                    ErrorMessage = schoolValidation.errorMessage ?? "Ugyldig skolenavn";
                     return;
                 }
 
-                if (FeideUsername.Length < 3)
+                var usernameValidation = InputValidator.ValidateUsername(FeideUsername);
+                if (!usernameValidation.isValid)
                 {
-                    ErrorMessage = "Feide brukernavn må være minst 3 tegn";
+                    ErrorMessage = usernameValidation.errorMessage ?? "Ugyldig brukernavn";
                     return;
                 }
 
-                if (FeidePassword.Length < 4)
+                var passwordValidation = InputValidator.ValidatePassword(FeidePassword);
+                if (!passwordValidation.isValid)
                 {
-                    ErrorMessage = "Passord må være minst 4 tegn";
+                    ErrorMessage = passwordValidation.errorMessage ?? "Ugyldig passord";
                     return;
                 }
 
-                Debug.WriteLine($"[FeideWindow] Testing credentials for user: {FeideUsername}");
+                // Sanitize inputs
+                var sanitizedUsername = InputValidator.SanitizeInput(FeideUsername);
+                var sanitizedSchoolName = InputValidator.SanitizeInput(SchoolName);
+
+                Debug.WriteLine($"[FeideWindow] Testing credentials for user: {sanitizedUsername}");
                 
                 // Step 1: Save credentials temporarily (without marking setup as complete)
                 await SaveCredentialsTemporarilyAsync();
                 Debug.WriteLine("[FeideWindow] Credentials saved temporarily for testing");
 
                 // Step 2: Test the credentials with AuthenticationService
-                var authService = new AuthenticationService(null);
+                using var authService = new AuthenticationService(null);
                 var testResult = await authService.AuthenticateAsync();
                 
                 if (testResult.Success)

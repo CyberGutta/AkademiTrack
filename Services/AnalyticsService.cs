@@ -8,14 +8,15 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+using AkademiTrack.Services.Configuration;
 
 namespace AkademiTrack.Services
 {
-    public class AnalyticsService
+    public class AnalyticsService : IDisposable
     {
         private static readonly HttpClient _httpClient = new HttpClient();
-        private readonly string _supabaseUrl = "https://zqqxqyxozyydhotfuurc.supabase.co";
-        private readonly string _supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxcXhxeXhvenl5ZGhvdGZ1dXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2NzkyNTcsImV4cCI6MjA4MzI1NTI1N30.AeCL4DFJzggZ68JGCgYai7XDniWIAUMt_5zAkjNe6OA";
+        private readonly string _supabaseUrl;
+        private readonly string _supabaseAnonKey;
         
         private readonly string _persistentUserId;  // Persistent across app restarts
         private string? _currentSessionId;          // Current session UUID from Supabase
@@ -25,9 +26,15 @@ namespace AkademiTrack.Services
         private Timer? _heartbeatTimer;
         private bool _automationActive = false;
         private readonly object _timerLock = new object();
+        private bool _disposed = false;
 
         public AnalyticsService()
         {
+            // Load configuration from secure source
+            var config = AppConfiguration.Instance;
+            _supabaseUrl = config.SupabaseUrl;
+            _supabaseAnonKey = config.SupabaseAnonKey ?? throw new InvalidOperationException("Supabase API key not configured");
+            
             // Get or create persistent anonymous user ID
             _persistentUserId = GetOrCreatePersistentUserId();
             
@@ -39,6 +46,7 @@ namespace AkademiTrack.Services
             }
 
             Debug.WriteLine($"[Analytics] Persistent User ID: {_persistentUserId}");
+            Debug.WriteLine($"[Analytics] Using Supabase URL: {_supabaseUrl}");
         }
 
         public async Task StartSessionAsync()
@@ -497,6 +505,8 @@ namespace AkademiTrack.Services
 
         public void Dispose()
         {
+            if (_disposed) return;
+            
             try
             {
                 lock (_timerLock)
@@ -505,6 +515,7 @@ namespace AkademiTrack.Services
                     _heartbeatTimer = null;
                 }
                 Debug.WriteLine($"[Analytics] Analytics service disposed for user: {_persistentUserId}");
+                _disposed = true;
             }
             catch (Exception ex)
             {

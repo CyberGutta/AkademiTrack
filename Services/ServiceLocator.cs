@@ -6,15 +6,19 @@ using AkademiTrack.Services.Interfaces;
 namespace AkademiTrack.Services
 {
     /// <summary>
-    /// Simple service locator for dependency injection
+    /// Thread-safe service locator for dependency injection
+    /// NOTE: Consider migrating to Microsoft.Extensions.DependencyInjection for better DI support
     /// </summary>
     public class ServiceLocator
     {
-        private static ServiceLocator? _instance;
+        private static readonly Lazy<ServiceLocator> _instance = 
+            new Lazy<ServiceLocator>(() => new ServiceLocator(), System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+        
         private readonly Dictionary<Type, object> _services = new();
         private readonly Dictionary<Type, Func<object>> _factories = new();
+        private readonly object _lock = new object();
 
-        public static ServiceLocator Instance => _instance ??= new ServiceLocator();
+        public static ServiceLocator Instance => _instance.Value;
 
         private ServiceLocator() { }
 
@@ -24,7 +28,10 @@ namespace AkademiTrack.Services
         public void RegisterSingleton<TInterface, TImplementation>(TImplementation instance)
             where TImplementation : class, TInterface
         {
-            _services[typeof(TInterface)] = instance;
+            lock (_lock)
+            {
+                _services[typeof(TInterface)] = instance;
+            }
         }
 
         /// <summary>
@@ -32,31 +39,37 @@ namespace AkademiTrack.Services
         /// </summary>
         public void RegisterFactory<TInterface>(Func<TInterface> factory)
         {
-            _factories[typeof(TInterface)] = () => factory();
+            lock (_lock)
+            {
+                _factories[typeof(TInterface)] = () => factory();
+            }
         }
 
         /// <summary>
-        /// Get a service instance
+        /// Get a service instance (thread-safe)
         /// </summary>
         public T GetService<T>()
         {
             var type = typeof(T);
             
-            // Check for existing singleton
-            if (_services.TryGetValue(type, out var service))
+            lock (_lock)
             {
-                return (T)service;
+                // Check for existing singleton
+                if (_services.TryGetValue(type, out var service))
+                {
+                    return (T)service;
+                }
+                
+                // Check for factory
+                if (_factories.TryGetValue(type, out var factory))
+                {
+                    var instance = factory();
+                    _services[type] = instance; // Cache as singleton
+                    return (T)instance;
+                }
             }
             
-            // Check for factory
-            if (_factories.TryGetValue(type, out var factory))
-            {
-                var instance = factory();
-                _services[type] = instance; // Cache as singleton
-                return (T)instance;
-            }
-            
-            throw new InvalidOperationException($"Service of type {type.Name} is not registered");
+            throw new InvalidOperationException($"Service of type {type.Name} is not registered. Please register it in InitializeServices().");
         }
 
         /// <summary>
@@ -65,7 +78,10 @@ namespace AkademiTrack.Services
         public bool IsRegistered<T>()
         {
             var type = typeof(T);
-            return _services.ContainsKey(type) || _factories.ContainsKey(type);
+            lock (_lock)
+            {
+                return _services.ContainsKey(type) || _factories.ContainsKey(type);
+            }
         }
 
         /// <summary>
@@ -105,8 +121,27 @@ namespace AkademiTrack.Services
         /// </summary>
         public void Clear()
         {
-            _services.Clear();
-            _factories.Clear();
+            lock (_lock)
+            {
+                // Dispose any IDisposable services
+                foreach (var service in _services.Values)
+                {
+                    if (service is IDisposable disposable)
+                    {
+                        try
+                        {
+                            disposable.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error disposing service: {ex.Message}");
+                        }
+                    }
+                }
+                
+                _services.Clear();
+                _factories.Clear();
+            }
         }
     }
 }

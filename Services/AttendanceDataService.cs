@@ -6,14 +6,16 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AkademiTrack.Services.Interfaces;
+using AkademiTrack.Services.Http;
 
 namespace AkademiTrack.Services
 {
-    public class AttendanceDataService
+    public class AttendanceDataService : IDisposable
     {
         private readonly HttpClient _httpClient;
         private UserParameters? _userParameters;
         private Dictionary<string, string>? _cookies;
+        private bool _disposed = false;
         
         private ILoggingService? _loggingService;
 
@@ -24,14 +26,21 @@ namespace AkademiTrack.Services
 
         public AttendanceDataService()
         {
-            _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _httpClient = HttpClientFactory.DefaultClient;
         }
 
         public void SetCredentials(UserParameters parameters, Dictionary<string, string> cookies)
         {
             _userParameters = parameters;
             _cookies = cookies;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            
+            // Note: _httpClient is shared from HttpClientFactory, so we don't dispose it
+            _disposed = true;
         }
 
         private async Task<T?> FetchWithRetryAsync<T>(Func<Task<T?>> fetchFunc) where T : class
@@ -525,11 +534,6 @@ namespace AkademiTrack.Services
                 AllTodayItems = todayItems
             };
         }
-
-        public void Dispose()
-        {
-            _httpClient?.Dispose();
-        }
     }
 
     public class AttendanceSummary
@@ -634,4 +638,4 @@ namespace AkademiTrack.Services
         public int TotalSessions { get; set; }
         public double FillPercentage { get; set; } // 0-100 for the visual fill
     }
-}   
+}

@@ -20,7 +20,7 @@ using Avalonia.Threading;
 
 namespace AkademiTrack.ViewModels
 {
-    public class RefactoredMainWindowViewModel : ViewModelBase, INotifyPropertyChanged
+    public partial class RefactoredMainWindowViewModel : ViewModelBase, INotifyPropertyChanged, IDisposable
     {
         #region Services
         private readonly ILoggingService _loggingService;
@@ -38,6 +38,7 @@ namespace AkademiTrack.ViewModels
         private bool _isLoading = true;
         private bool _isAuthenticated = false;
         private string _statusMessage = "Ready";
+        private bool _disposed = false;
         private Timer? _dataRefreshTimer;
         private Timer? _nextClassUpdateTimer; 
         private Timer? _midnightResetTimer;
@@ -1009,18 +1010,6 @@ namespace AkademiTrack.ViewModels
         }
         #endregion
 
-        #region Disposal
-        public void Dispose()
-        {
-            _updateChecker?.Dispose();
-            _nextClassUpdateTimer?.Dispose();
-            _dataRefreshTimer?.Dispose();
-            _midnightResetTimer?.Dispose();
-            _httpClient?.Dispose();
-            _authService?.Dispose();
-            FeideViewModel?.Dispose();
-        }
-
         public async Task RefreshAutoStartStatusAsync()
         {
             try
@@ -1072,8 +1061,6 @@ namespace AkademiTrack.ViewModels
                 _loggingService.LogError($"Error checking for stale data: {ex.Message}");
             }
         }
-                
-        #endregion
     }
 
     public class AsyncRelayCommand : ICommand
@@ -1111,5 +1098,56 @@ namespace AkademiTrack.ViewModels
         }
 
         public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Dispose implementation for RefactoredMainWindowViewModel
+    public partial class RefactoredMainWindowViewModel
+    {
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            try
+            {
+                // Dispose timers
+                _dataRefreshTimer?.Dispose();
+                _dataRefreshTimer = null;
+
+                _nextClassUpdateTimer?.Dispose();
+                _nextClassUpdateTimer = null;
+
+                _midnightResetTimer?.Dispose();
+                _midnightResetTimer = null;
+
+                _autoStartCheckTimer?.Dispose();
+                _autoStartCheckTimer = null;
+
+                // Dispose update checker
+                _updateChecker?.Dispose();
+                _updateChecker = null;
+
+                // Note: _httpClient is readonly and shared, so we don't dispose or nullify it
+
+                // Dispose services if they implement IDisposable
+                if (_automationService is IDisposable automationDisposable)
+                {
+                    automationDisposable.Dispose();
+                }
+
+                if (_authService is IDisposable authDisposable)
+                {
+                    authDisposable.Dispose();
+                }
+
+                // Dispose FeideViewModel
+                FeideViewModel?.Dispose();
+
+                _disposed = true;
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"Error disposing RefactoredMainWindowViewModel: {ex.Message}");
+            }
+        }
     }
 }

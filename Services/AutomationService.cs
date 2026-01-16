@@ -9,11 +9,12 @@ using System.Threading.Tasks;
 using System.IO;
 using AkademiTrack.Common;
 using AkademiTrack.Services.Interfaces;
-
+using AkademiTrack.Services.Http;
+using AkademiTrack.Services.Configuration;
 
 namespace AkademiTrack.Services
 {
-    public class AutomationService : IAutomationService
+    public class AutomationService : IAutomationService, IDisposable
     {
         private readonly ILoggingService _loggingService;
         private readonly INotificationService _notificationService;
@@ -24,21 +25,24 @@ namespace AkademiTrack.Services
         private UserParameters? _userParameters;
         private Dictionary<string, string>? _cookies;
         private List<ScheduleItem>? _cachedScheduleData;
+        private bool _disposed = false;
+
+        // Constants
+        private const int MONITORING_INTERVAL_MS = 30_000; // 30 seconds
+        private const int REGISTRATION_WINDOW_MINUTES = 15;
 
         public event EventHandler<AutomationStatusChangedEventArgs>? StatusChanged;
         public event EventHandler<AutomationProgressEventArgs>? ProgressUpdated;
         public event EventHandler<SessionRegisteredEventArgs>? SessionRegistered;
-
 
         public bool IsRunning => _isRunning;
         public string CurrentStatus => _currentStatus;
 
         public AutomationService(ILoggingService loggingService, INotificationService notificationService)
         {
-            _loggingService = loggingService;
-            _notificationService = notificationService;
-            _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+            _httpClient = HttpClientFactory.DefaultClient;
         }
 
         public async Task<AutomationResult> StartAsync(CancellationToken cancellationToken = default)
@@ -982,8 +986,22 @@ namespace AkademiTrack.Services
 
         public void Dispose()
         {
-            _cancellationTokenSource?.Dispose();
-            _httpClient?.Dispose();
+            if (_disposed) return;
+            
+            try
+            {
+                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
+                
+                // Note: _httpClient is shared from HttpClientFactory, so we don't dispose it
+                
+                _disposed = true;
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"Error disposing AutomationService: {ex.Message}");
+            }
         }
 
         private enum RegistrationWindowStatus
