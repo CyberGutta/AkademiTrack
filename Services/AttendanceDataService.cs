@@ -204,12 +204,8 @@ namespace AkademiTrack.Services
                 var startDate = firstDayOfMonth.ToString("yyyyMMdd");
                 var endDate = lastDayOfMonth.ToString("yyyyMMdd");
 
-                Console.WriteLine($"[MONTHLY DEBUG] Date range: {startDate} to {endDate}");
-
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={startDate},endDate={endDate}&onlyData=true&limit=1000&totalResults=true";
-
-                Console.WriteLine($"[MONTHLY DEBUG] Request URL: {url}");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -223,63 +219,66 @@ namespace AkademiTrack.Services
 
                 var response = await _httpClient.SendAsync(request);
 
-                Console.WriteLine($"[MONTHLY DEBUG] Response status: {response.StatusCode}");
-
                 if (!response.IsSuccessStatusCode)
-                {
-                    Console.WriteLine($"[MONTHLY DEBUG] Request failed with status {response.StatusCode}");
                     return null;
-                }
 
                 var json = await response.Content.ReadAsStringAsync();
-
-                Console.WriteLine($"[MONTHLY DEBUG] JSON length: {json.Length}");
-
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
                 if (scheduleResponse?.Items == null)
-                {
-                    Console.WriteLine($"[MONTHLY DEBUG] scheduleResponse is null or has no items");
                     return null;
-                }
 
-                Console.WriteLine($"[MONTHLY DEBUG] Total items received: {scheduleResponse.Items.Count}");
-
-                if (scheduleResponse.Items.Count > 0)
+                // Group by date first
+                var itemsByDate = scheduleResponse.Items.GroupBy(i => i.Dato).ToList();
+                
+                var validStuSessions = new List<MonthlyScheduleItem>();
+                
+                foreach (var dayGroup in itemsByDate)
                 {
-                    var firstItem = scheduleResponse.Items[0];
-                    Console.WriteLine($"[MONTHLY DEBUG] Sample item #1 - Fag: '{firstItem.Fag}', Fagnavn: '{firstItem.Fagnavn}', Fravaer: '{firstItem.Fravaer}'");
-
-                    if (scheduleResponse.Items.Count > 1)
+                    var daySessions = dayGroup.ToList();
+                    
+                    // Get STU sessions for this day
+                    var dayStuSessions = daySessions.Where(item =>
+                        (item.Fag != null && item.Fag.Contains("STU")) ||
+                        (item.Fagnavn != null && item.Fagnavn.Contains("Studietid"))
+                    ).ToList();
+                    
+                    // Get regular classes for this day
+                    var regularClasses = daySessions.Where(item =>
+                        item.Fag != null &&
+                        !item.Fag.Contains("STU") &&
+                        item.Fagnavn != null &&
+                        !item.Fagnavn.Contains("Studietid")
+                    ).ToList();
+                    
+                    // Filter STU sessions - remove any that conflict with regular classes
+                    foreach (var stuSession in dayStuSessions)
                     {
-                        var secondItem = scheduleResponse.Items[1];
-                        Console.WriteLine($"[MONTHLY DEBUG] Sample item #2 - Fag: '{secondItem.Fag}', Fagnavn: '{secondItem.Fagnavn}', Fravaer: '{secondItem.Fravaer}'");
+                        bool hasConflict = false;
+                        
+                        foreach (var regularClass in regularClasses)
+                        {
+                            if (DoSessionsOverlap(stuSession, regularClass))
+                            {
+                                hasConflict = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!hasConflict)
+                        {
+                            validStuSessions.Add(stuSession);
+                        }
                     }
                 }
 
-                var stuSessions = scheduleResponse.Items.Where(i =>
-                    (i.Fag != null && i.Fag.Contains("STU")) ||
-                    (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
-                ).ToList();
-
-                Console.WriteLine($"[MONTHLY DEBUG] STU sessions found: {stuSessions.Count}");
-
-                if (stuSessions.Count > 0)
-                {
-                    Console.WriteLine($"[MONTHLY DEBUG] First STU session - Fag: '{stuSessions[0].Fag}', Fagnavn: '{stuSessions[0].Fagnavn}', Fravaer: '{stuSessions[0].Fravaer}'");
-                }
-
-                var registeredCount = stuSessions.Count(s => s.Fravaer == "M");
-                var totalCount = stuSessions.Count;
-
-                Console.WriteLine($"[MONTHLY DEBUG] Registered: {registeredCount}, Total: {totalCount}");
+                var registeredCount = validStuSessions.Count(s => s.Fravaer == "M");
+                var totalCount = validStuSessions.Count;
 
                 double percentage = totalCount > 0 ? (double)registeredCount / totalCount * 100 : 0;
-
-                Console.WriteLine($"[MONTHLY DEBUG] Percentage: {percentage:F1}%");
 
                 return new MonthlyAttendanceData
                 {
@@ -291,8 +290,27 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"[MONTHLY DEBUG] Exception: {ex.Message}");
-                Console.WriteLine($"[MONTHLY DEBUG] Stack trace: {ex.StackTrace}");
                 return null;
+            }
+        }
+
+        private bool DoSessionsOverlap(MonthlyScheduleItem session1, MonthlyScheduleItem session2)
+        {
+            try
+            {
+                if (DateTime.TryParse(session1.Fradato, out var start1) &&
+                    DateTime.TryParse(session1.Tildato, out var end1) &&
+                    DateTime.TryParse(session2.Fradato, out var start2) &&
+                    DateTime.TryParse(session2.Tildato, out var end2))
+                {
+                    return start1 < end2 && start2 < end1;
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
         
@@ -338,6 +356,7 @@ namespace AkademiTrack.Services
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync();
+                
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -353,14 +372,54 @@ namespace AkademiTrack.Services
                     var currentDay = monday.AddDays(i);
                     var dayString = currentDay.ToString("yyyyMMdd");
                     
-                    var dayStuSessions = scheduleResponse.Items.Where(item =>
-                        item.Dato == dayString &&
-                        ((item.Fag != null && item.Fag.Contains("STU")) || 
-                        (item.Fagnavn != null && item.Fagnavn.Contains("Studietid")))
+                    // Get ALL sessions for this day
+                    var allDaySessions = scheduleResponse.Items
+                        .Where(item => item.Dato == dayString)
+                        .ToList();
+                    
+                    // Get STU sessions
+                    var dayStuSessions = allDaySessions.Where(item =>
+                        (item.Fag != null && item.Fag.Contains("STU")) || 
+                        (item.Fagnavn != null && item.Fagnavn.Contains("Studietid"))
                     ).ToList();
                     
-                    var registeredCount = dayStuSessions.Count(s => s.Fravaer == "M");
-                    var totalCount = dayStuSessions.Count;
+                    // Get regular classes (non-STU)
+                    var regularClasses = allDaySessions.Where(item =>
+                        item.Fag != null &&
+                        !item.Fag.Contains("STU") &&
+                        item.Fagnavn != null &&
+                        !item.Fagnavn.Contains("Studietid")
+                    ).ToList();
+                    
+                    // Filter STU sessions - remove any that conflict with regular classes
+                    var validStuSessions = new List<MonthlyScheduleItem>();
+                    
+                    foreach (var stuSession in dayStuSessions)
+                    {
+                        bool hasConflict = false;
+                        
+                        foreach (var regularClass in regularClasses)
+                        {
+                            if (DoSessionsOverlap(stuSession, regularClass))
+                            {
+                                hasConflict = true;
+                                _loggingService?.LogDebug($"[CONFLICT] STU '{stuSession.Fagnavn}' overlaps with '{regularClass.Fagnavn}' on {currentDay.DayOfWeek}");
+                                break;
+                            }
+                        }
+                        
+                        if (!hasConflict)
+                        {
+                            validStuSessions.Add(stuSession);
+                        }
+                    }
+                    
+                    var registeredCount = validStuSessions.Count(s => s.Fravaer == "M");
+                    var totalCount = validStuSessions.Count;
+                    
+                    int conflictCount = dayStuSessions.Count - validStuSessions.Count;
+                    
+                    _loggingService?.LogDebug($"[WEEKLY] {currentDay.DayOfWeek}: {registeredCount}/{totalCount} valid STU ({conflictCount} conflicts filtered out)");
                     
                     dailyStats.Add(new DailyAttendance
                     {
@@ -384,8 +443,9 @@ namespace AkademiTrack.Services
                     WeeklyPercentage = weeklyPercentage
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _loggingService?.LogError($"Weekly attendance error: {ex.Message}");
                 return null;
             }
         }

@@ -583,6 +583,17 @@ namespace AkademiTrack.ViewModels
             int remaining = data.TotalSessions - data.TotalRegistered;
             WeeklyRemaining = remaining > 0 ? $"{remaining} økter gjenstår" : "Alle økter fullført!";
 
+            // DEBUG: Log what we're receiving
+            _loggingService?.LogInfo($"[DASHBOARD WEEKLY UPDATE] Total: {data.TotalSessions}, Registered: {data.TotalRegistered}");
+            
+            if (data.DailyAttendance != null)
+            {
+                foreach (var day in data.DailyAttendance)
+                {
+                    _loggingService?.LogInfo($"[DASHBOARD] {day.DayOfWeek}: {day.RegisteredSessions}/{day.TotalSessions}");
+                }
+            }
+
             WeeklyDays = data.DailyAttendance ?? new List<DailyAttendance>();
         }
 
