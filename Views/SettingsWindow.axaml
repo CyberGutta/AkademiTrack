@@ -740,7 +740,7 @@
 					</StackPanel>
 
 					<!-- Automation Category -->
-					<StackPanel x:Name="AutomationSection" Spacing="12" IsVisible="False">
+<StackPanel x:Name="AutomationSection" Spacing="12" IsVisible="False">
     <TextBlock Text="Automatisering" Classes="section-header" Margin="0,0,0,12"/>
 
     <!-- Auto-start toggle -->
@@ -780,35 +780,35 @@
                Margin="0,8,0,12"/>
 
     <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-			BorderBrush="#007ACC"
-			BorderThickness="1.5"
-			CornerRadius="8"
-			Padding="14"
-			Margin="0,0,0,12">
-		<StackPanel Spacing="7">
-			<StackPanel Orientation="Horizontal" Spacing="8">
-				<materialIcons:MaterialIcon Kind="InformationOutline" 
-										   Width="16" 
-										   Height="16"
-										   Foreground="#007ACC"
-										   VerticalAlignment="Center"/>
-				<TextBlock Text="Tilpass skoletider"
-						   FontWeight="SemiBold"
-						   FontSize="14"
-						   Foreground="#007ACC"
-						   VerticalAlignment="Center"/>
-			</StackPanel>
-			<TextBlock FontSize="13"
-					   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-					   TextWrapping="Wrap"
-					   LineHeight="19"
-					   MaxWidth="750">
-				<Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
-				<LineBreak/>
-				<Run Text="Deaktiver dager når du ikke har skole."/>
-			</TextBlock>
-		</StackPanel>
-	</Border>
+            BorderBrush="#007ACC"
+            BorderThickness="1.5"
+            CornerRadius="8"
+            Padding="14"
+            Margin="0,0,0,12">
+        <StackPanel Spacing="7">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <materialIcons:MaterialIcon Kind="InformationOutline" 
+                                           Width="16" 
+                                           Height="16"
+                                           Foreground="#007ACC"
+                                           VerticalAlignment="Center"/>
+                <TextBlock Text="Tilpass skoletider"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="#007ACC"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock FontSize="13"
+                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                       TextWrapping="Wrap"
+                       LineHeight="19"
+                       MaxWidth="750">
+                <Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
+                <LineBreak/>
+                <Run Text="Deaktiver dager når du ikke har skole."/>
+            </TextBlock>
+        </StackPanel>
+    </Border>
 
     <!-- Days of the week -->
     <StackPanel Spacing="8">
@@ -827,7 +827,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding MondayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding MondayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12" 
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -837,7 +837,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -866,7 +866,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding TuesdayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding TuesdayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -876,7 +876,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -905,7 +905,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding WednesdayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding WednesdayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -915,7 +915,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -944,7 +944,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding ThursdayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding ThursdayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -954,7 +954,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -983,7 +983,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding FridayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding FridayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -993,7 +993,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -1007,7 +1007,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Saturday (typically disabled) -->
+        <!-- Saturday -->
         <Border Classes="setting-card" Margin="0">
             <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="Auto,*,Auto">
@@ -1022,7 +1022,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding SaturdayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SaturdayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -1032,7 +1032,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -1046,7 +1046,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Sunday (typically disabled) -->
+        <!-- Sunday -->
         <Border Classes="setting-card" Margin="0">
             <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="Auto,*,Auto">
@@ -1061,7 +1061,7 @@
                                VerticalAlignment="Center"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
                 </Grid>
-                <Grid ColumnDefinitions="*,Auto,*" IsEnabled="{Binding SundayEnabled}">
+                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SundayEnabled}">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="Start" FontSize="12"
                                    Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
@@ -1071,7 +1071,7 @@
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="—" 
                                VerticalAlignment="Center" 
-                               Margin="16,20,100,0"
+                               Margin="16,20,16,0"
                                FontSize="16"
                                Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
                     <StackPanel Grid.Column="2" Spacing="4">
@@ -1093,7 +1093,7 @@
             Margin="5,12,0,0"
             Background="#6C757D"/>
 
-    <Rectangle Height="130" Fill="Transparent"/>
+    <Rectangle Height="160" Fill="Transparent"/>
 </StackPanel>
 
 					<!-- System Category -->
