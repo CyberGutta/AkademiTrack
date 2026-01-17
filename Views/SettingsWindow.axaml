@@ -744,22 +744,10 @@
 						<TextBlock Text="Automatisering" Classes="section-header" Margin="0,0,0,12"/>
 
 						<!-- Auto-start toggle -->
-						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-								BorderThickness="1"
-								CornerRadius="10"
-								Padding="16"
-								Margin="0,0,0,12">
-							<StackPanel Spacing="10">
-								<TextBlock Text="Start automatisering ved oppstart"
-										   FontSize="15"
-										   FontWeight="SemiBold"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-								<TextBlock FontSize="13"
-										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-										   TextWrapping="Wrap"
-										   LineHeight="19"
-										   MaxWidth="750">
+						<Border Classes="setting-card">
+							<StackPanel Spacing="12">
+								<TextBlock Text="Start automatisering ved oppstart" Classes="setting-title"/>
+								<TextBlock Classes="setting-description">
 									<Run Text="Automatiseringen starter automatisk når programmet åpnes."/>
 									<LineBreak/>
 									<Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
