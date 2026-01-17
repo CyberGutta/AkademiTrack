@@ -740,361 +740,361 @@
 					</StackPanel>
 
 					<!-- Automation Category -->
-<StackPanel x:Name="AutomationSection" Spacing="12" IsVisible="False">
-    <TextBlock Text="Automatisering" Classes="section-header" Margin="0,0,0,12"/>
+					<StackPanel x:Name="AutomationSection" Spacing="12" IsVisible="False">
+						<TextBlock Text="Automatisering" Classes="section-header" Margin="0,0,0,12"/>
 
-    <!-- Auto-start toggle -->
-    <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-            BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-            BorderThickness="1"
-            CornerRadius="10"
-            Padding="16"
-            Margin="0,0,0,12">
-        <StackPanel Spacing="10">
-            <TextBlock Text="Start automatisering ved oppstart"
-                       FontSize="15"
-                       FontWeight="SemiBold"
-                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-            <TextBlock FontSize="13"
-                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-                       TextWrapping="Wrap"
-                       LineHeight="19"
-                       MaxWidth="750">
-                <Run Text="Automatiseringen starter automatisk når programmet åpnes."/>
-                <LineBreak/>
-                <Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
-            </TextBlock>
-            <Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
-                    Classes="toggle-button"
-                    Classes.enabled="{Binding AutoStartAutomation}"
-                    Classes.disabled="{Binding !AutoStartAutomation}"
-                    Command="{Binding ToggleAutoStartAutomationCommand}"/>
-        </StackPanel>
-    </Border>
+						<!-- Auto-start toggle -->
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+								BorderThickness="1"
+								CornerRadius="10"
+								Padding="16"
+								Margin="0,0,0,12">
+							<StackPanel Spacing="10">
+								<TextBlock Text="Start automatisering ved oppstart"
+										   FontSize="15"
+										   FontWeight="SemiBold"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+								<TextBlock FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="19"
+										   MaxWidth="750">
+									<Run Text="Automatiseringen starter automatisk når programmet åpnes."/>
+									<LineBreak/>
+									<Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
+								</TextBlock>
+								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+										Classes="toggle-button"
+										Classes.enabled="{Binding AutoStartAutomation}"
+										Classes.disabled="{Binding !AutoStartAutomation}"
+										Command="{Binding ToggleAutoStartAutomationCommand}"/>
+							</StackPanel>
+						</Border>
 
-    <!-- School Hours Configuration -->
-    <TextBlock Text="Skoletider" 
-               FontSize="18"
-               FontWeight="SemiBold"
-               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
-               Margin="0,8,0,12"/>
+						<!-- School Hours Configuration -->
+						<TextBlock Text="Skoletider" 
+								   FontSize="18"
+								   FontWeight="SemiBold"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+								   Margin="0,8,0,12"/>
 
-    <Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
-            BorderBrush="#007ACC"
-            BorderThickness="1.5"
-            CornerRadius="8"
-            Padding="14"
-            Margin="0,0,0,12">
-        <StackPanel Spacing="7">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <materialIcons:MaterialIcon Kind="InformationOutline" 
-                                           Width="16" 
-                                           Height="16"
-                                           Foreground="#007ACC"
-                                           VerticalAlignment="Center"/>
-                <TextBlock Text="Tilpass skoletider"
-                           FontWeight="SemiBold"
-                           FontSize="14"
-                           Foreground="#007ACC"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-            <TextBlock FontSize="13"
-                       Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-                       TextWrapping="Wrap"
-                       LineHeight="19"
-                       MaxWidth="750">
-                <Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
-                <LineBreak/>
-                <Run Text="Deaktiver dager når du ikke har skole."/>
-            </TextBlock>
-        </StackPanel>
-    </Border>
+						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
+								BorderBrush="#007ACC"
+								BorderThickness="1.5"
+								CornerRadius="8"
+								Padding="14"
+								Margin="0,0,0,12">
+							<StackPanel Spacing="7">
+								<StackPanel Orientation="Horizontal" Spacing="8">
+									<materialIcons:MaterialIcon Kind="InformationOutline" 
+															   Width="16" 
+															   Height="16"
+															   Foreground="#007ACC"
+															   VerticalAlignment="Center"/>
+									<TextBlock Text="Tilpass skoletider"
+											   FontWeight="SemiBold"
+											   FontSize="14"
+											   Foreground="#007ACC"
+											   VerticalAlignment="Center"/>
+								</StackPanel>
+								<TextBlock FontSize="13"
+										   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+										   TextWrapping="Wrap"
+										   LineHeight="19"
+										   MaxWidth="750">
+									<Run Text="Sett når automatiseringen skal starte automatisk og ikke kunne starte automatisk for hver dag."/>
+									<LineBreak/>
+									<Run Text="Deaktiver dager når du ikke har skole."/>
+								</TextBlock>
+							</StackPanel>
+						</Border>
 
-    <!-- Days of the week -->
-    <StackPanel Spacing="8">
-        <!-- Monday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding MondayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Mandag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding MondayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12" 
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding MondayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding MondayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+						<!-- Days of the week -->
+						<StackPanel Spacing="8">
+							<!-- Monday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding MondayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Mandag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding MondayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12" 
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding MondayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding MondayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Tuesday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding TuesdayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Tirsdag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding TuesdayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding TuesdayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding TuesdayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+							<!-- Tuesday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding TuesdayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Tirsdag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding TuesdayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding TuesdayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding TuesdayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Wednesday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding WednesdayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Onsdag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding WednesdayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding WednesdayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding WednesdayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+							<!-- Wednesday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding WednesdayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Onsdag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding WednesdayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding WednesdayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding WednesdayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Thursday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding ThursdayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Torsdag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding ThursdayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding ThursdayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding ThursdayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+							<!-- Thursday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding ThursdayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Torsdag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding ThursdayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding ThursdayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding ThursdayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Friday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding FridayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Fredag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding FridayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding FridayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding FridayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+							<!-- Friday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding FridayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Fredag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding FridayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding FridayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding FridayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Saturday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding SaturdayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Lørdag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SaturdayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding SaturdayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding SaturdayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
+							<!-- Saturday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding SaturdayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Lørdag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SaturdayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding SaturdayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding SaturdayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
 
-        <!-- Sunday -->
-        <Border Classes="setting-card" Margin="0">
-            <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <CheckBox Grid.Column="0" 
-                              IsChecked="{Binding SundayEnabled}"
-                              VerticalAlignment="Center"
-                              Margin="0,0,12,0"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="Søndag" 
-                               FontWeight="SemiBold"
-                               FontSize="14"
-                               VerticalAlignment="Center"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                </Grid>
-                <Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SundayEnabled}">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Start" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding SundayStart}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="—" 
-                               VerticalAlignment="Center" 
-                               Margin="16,20,16,0"
-                               FontSize="16"
-                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Slutt" FontSize="12"
-                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-                        <TimePicker SelectedTime="{Binding SundayEnd}" 
-                                    MinuteIncrement="5"
-                                    ClockIdentifier="24HourClock"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
-    </StackPanel>
+							<!-- Sunday -->
+							<Border Classes="setting-card" Margin="0">
+								<StackPanel Spacing="8">
+									<Grid ColumnDefinitions="Auto,*,Auto">
+										<CheckBox Grid.Column="0" 
+												  IsChecked="{Binding SundayEnabled}"
+												  VerticalAlignment="Center"
+												  Margin="0,0,12,0"/>
+										<TextBlock Grid.Column="1" 
+												   Text="Søndag" 
+												   FontWeight="SemiBold"
+												   FontSize="14"
+												   VerticalAlignment="Center"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+									</Grid>
+									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SundayEnabled}">
+										<StackPanel Grid.Column="0" Spacing="4">
+											<TextBlock Text="Start" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding SundayStart}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+										<TextBlock Grid.Column="1" Text="—" 
+												   VerticalAlignment="Center" 
+												   Margin="16,20,16,0"
+												   FontSize="16"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+										<StackPanel Grid.Column="2" Spacing="4">
+											<TextBlock Text="Slutt" FontSize="12"
+													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+											<TimePicker SelectedTime="{Binding SundayEnd}" 
+														MinuteIncrement="5"
+														ClockIdentifier="24HourClock"/>
+										</StackPanel>
+									</Grid>
+								</StackPanel>
+							</Border>
+						</StackPanel>
 
-    <!-- Reset to defaults button -->
-    <Button Content="Tilbakestill til standard"
-            Classes="settings-action"
-            Command="{Binding ResetSchoolHoursCommand}"
-            Margin="5,12,0,0"
-            Background="#6C757D"/>
+						<!-- Reset to defaults button -->
+						<Button Content="Tilbakestill til standard"
+								Classes="settings-action"
+								Command="{Binding ResetSchoolHoursCommand}"
+								Margin="5,12,0,0"
+								Background="#6C757D"/>
 
-    <Rectangle Height="160" Fill="Transparent"/>
-</StackPanel>
+						<Rectangle Height="160" Fill="Transparent"/>
+					</StackPanel>
 
 					<!-- System Category -->
 					<StackPanel x:Name="SystemSection" Spacing="16" IsVisible="False">
