@@ -85,6 +85,25 @@
 			<Setter Property="Padding" Value="20"/>
 		</Style>
 
+		<!-- Loading Overlay Styles -->
+		<Style Selector="Border.loading-overlay">
+			<Setter Property="Background" Value="#99000000"/>
+			<Setter Property="ZIndex" Value="9999"/>
+		</Style>
+
+		<Style Selector="Border.loading-container">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="CornerRadius" Value="16"/>
+			<Setter Property="Padding" Value="40"/>
+			<Setter Property="BoxShadow" Value="0 8 32 0 #40000000"/>
+		</Style>
+
+		<Style Selector="Ellipse.loading-dot">
+			<Setter Property="Width" Value="12"/>
+			<Setter Property="Height" Value="12"/>
+			<Setter Property="Fill" Value="#5B9BFF"/>
+		</Style>
+
 		<!-- Start Button -->
 		<Style Selector="Button.start-button">
 			<Setter Property="Background" Value="#5B9BFF"/>
@@ -561,6 +580,170 @@
                         Grid.ColumnSpan="999"
                         IsVisible="False"
                         ZIndex="1000"/>
+
+		<!-- Loading Overlay (shown during authentication) -->
+
+<Border Classes="loading-overlay" 
+        Grid.RowSpan="999"
+        Grid.ColumnSpan="999">
+
+    <!-- Only show when loading AND on dashboard (Only visible on MainWindow) -->
+
+    <Border.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsLoading"/>
+            <Binding Path="ShowDashboard"/>
+        </MultiBinding>
+    </Border.IsVisible>
+    <Grid>
+        <Border Classes="loading-container"
+                Width="300"
+                Height="200"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+            <StackPanel Spacing="24" HorizontalAlignment="Center">
+
+                <Grid Width="60" Height="60">
+
+                    <!-- 8 dots in a circle that spin -->
+
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,0,0,0">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.125">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.25">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.375">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.5">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8,0,0,8">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.625">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.75">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                    
+                    <Ellipse Width="8" Height="8" Fill="#5B9BFF" 
+                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,8,0,0">
+                        <Ellipse.Styles>
+                            <Style Selector="Ellipse">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" IterationCount="Infinite" Delay="0:0:0.875">
+                                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="12.5%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.15"/></KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Ellipse.Styles>
+                    </Ellipse>
+                </Grid>
+
+                <!-- Loading Text -->
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <TextBlock Text="Autentiserer..."
+                              FontSize="18"
+                              FontWeight="SemiBold"
+                              Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                              HorizontalAlignment="Center"/>
+                    <TextBlock Text="Vennligst vent mens vi logger inn"
+                              FontSize="13"
+                              Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                              HorizontalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Border>
 	</Grid>
 	
 </Window>
