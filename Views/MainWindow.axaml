@@ -583,7 +583,7 @@
 
 		<!-- Loading Overlay (shown during authentication) -->
 
-<Border Classes="loading-overlay" 
+		<Border Classes="loading-overlay" 
         Grid.RowSpan="999"
         Grid.ColumnSpan="999">
 
@@ -729,13 +729,14 @@
                 </Grid>
 
                 <!-- Loading Text -->
+
                 <StackPanel Spacing="8" HorizontalAlignment="Center">
                     <TextBlock Text="Autentiserer..."
                               FontSize="18"
                               FontWeight="SemiBold"
                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
                               HorizontalAlignment="Center"/>
-                    <TextBlock Text="Vennligst vent mens vi logger inn"
+                    <TextBlock Text="Logger inn på iskole"
                               FontSize="13"
                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
                               HorizontalAlignment="Center"/>
