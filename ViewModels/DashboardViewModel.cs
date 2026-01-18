@@ -602,22 +602,65 @@ namespace AkademiTrack.ViewModels
             // Map short codes to full names
             var subjectMap = new Dictionary<string, string>
             {
+                // Core subjects
                 { "NOR", "Norsk" },
                 { "MAT", "Matematikk" },
                 { "ENG", "Engelsk" },
                 { "NAT", "Naturfag" },
                 { "SAM", "Samfunnsfag" },
                 { "HIS", "Historie" },
+                { "GEO", "Geografi" },
+                { "REL", "Religion og etikk" },
                 { "KRO", "Kroppsøving" },
                 { "MUS", "Musikk" },
                 { "KHV", "Kunst og håndverk" },
                 { "MAH", "Mat og helse" },
-                { "STU", "Studietid" },
+        
+                // Math variants
                 { "2PY", "Matematikk 2P-Y" },
                 { "MR1", "Matematikk R1" },
+                { "MR2", "Matematikk R2" },
+                { "MS1", "Matematikk S1" },
+                { "MS2", "Matematikk S2" },
+                { "M1P", "Matematikk 1P" },
+                { "M2P", "Matematikk 2P" },
+                { "M1T", "Matematikk 1T" },
+                { "M2T", "Matematikk 2T" },
+        
+                // Science variants
+                { "FYS", "Fysikk" },
+                { "FY1", "Fysikk 1" },
+                { "FY2", "Fysikk 2" },
+                { "KJE", "Kjemi" },
+                { "KJ1", "Kjemi 1" },
+                { "KJ2", "Kjemi 2" },
+                { "BIO", "Biologi" },
+                { "BI1", "Biologi 1" },
+                { "BI2", "Biologi 2" },
+        
+                // Languages
+                { "TYS", "Tysk" },
+                { "FRA", "Fransk" },
+                { "SPA", "Spansk" },
+        
+                // IT/Tech
+                { "INF", "Informatikk" },
+                { "IKT", "IKT" },
+                { "PRO", "Programmering" },
+        
+                // Economy/Business
+                { "OKO", "Økonomi" },
+                { "BED", "Bedriftsøkonomi" },
+                { "MAR", "Markedsføring" },
+        
+                // Other
+                { "STU", "Studietid" },
                 { "MOM", "Morgenmøte" },
                 { "FDA", "Fagdag" },
-                { "FDS", "Fagdag Studietid" }
+                { "FDS", "Fagdag Studietid" },
+                { "SOS", "Sosiologi" },
+                { "PSY", "Psykologi" },
+                { "POL", "Politikk" }
             };
 
             if (item.KNavn != null && subjectMap.ContainsKey(item.KNavn))
@@ -625,7 +668,8 @@ namespace AkademiTrack.ViewModels
                 return subjectMap[item.KNavn];
             }
 
-            return item.KNavn ?? "Ukjent fag";
+            // If not in our map
+            return item.KNavn ?? "Ingen time";
         }
 
         private string FormatTime(string time)
