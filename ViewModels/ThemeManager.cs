@@ -57,9 +57,9 @@ namespace AkademiTrack.Services
         }
 
         public string ThemeIcon => _isDarkMode ? "🌙" : "☀️";
-        
-        public MaterialIconKind ThemeIconKind => _isDarkMode 
-            ? MaterialIconKind.WeatherNight 
+
+        public MaterialIconKind ThemeIconKind => _isDarkMode
+            ? MaterialIconKind.WeatherNight
             : MaterialIconKind.WeatherSunny;
 
         public IBrush ThemeIconColor => new SolidColorBrush(_isDarkMode ? Color.Parse("#FFD700") : Color.Parse("#FFA500"));
@@ -87,12 +87,16 @@ namespace AkademiTrack.Services
                 {
                     var json = File.ReadAllText(_settingsFilePath);
                     var settings = JsonSerializer.Deserialize<ThemeSettings>(json);
-                    _isDarkMode = settings?.IsDarkMode ?? false;
+                    _isDarkMode = settings?.IsDarkMode ?? true;
+                }
+                else
+                {
+                    _isDarkMode = true;
                 }
             }
             catch
             {
-                _isDarkMode = false; 
+                _isDarkMode = true;
             }
         }
 
