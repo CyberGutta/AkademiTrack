@@ -333,7 +333,7 @@ namespace AkademiTrack.ViewModels
                 string eventDescription = "";
 
                 // Check if current class is ending soon
-                if (data.CurrentClass != null)
+                if (data.CurrentClass != null && !string.IsNullOrEmpty(data.CurrentClass.SluttKl))
                 {
                     var currentClassEndTime = ParseTimeString(data.CurrentClass.SluttKl);
                     if (currentClassEndTime.HasValue && currentClassEndTime.Value > now)
@@ -344,7 +344,7 @@ namespace AkademiTrack.ViewModels
                 }
 
                 // Check when next class starts
-                if (data.NextClass != null)
+                if (data.NextClass != null && !string.IsNullOrEmpty(data.NextClass.StartKl))
                 {
                     var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
                     if (nextClassStartTime.HasValue && nextClassStartTime.Value > now)
@@ -362,7 +362,7 @@ namespace AkademiTrack.ViewModels
                 if (!nextEventTime.HasValue)
                 {
                     _loggingService?.LogDebug("[NEXT CLASS] No more classes today - will recheck in 5 minutes (in case of new day)");
-                    
+
                     _nextClassUpdateTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
