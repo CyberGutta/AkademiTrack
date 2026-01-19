@@ -1,5 +1,6 @@
 using AkademiTrack.Services.Interfaces;
 using AkademiTrack.ViewModels;
+using Avalonia.Threading;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
@@ -172,26 +173,29 @@ namespace AkademiTrack.Services
 
         private async Task<bool> TestCookiesAsync(Dictionary<string, string> cookies)
         {
-            try
+            return await Task.Run(async () =>
             {
-                using var httpClient = new System.Net.Http.HttpClient();
-                httpClient.Timeout = TimeSpan.FromSeconds(10);
+                try
+                {
+                    using var httpClient = new System.Net.Http.HttpClient();
+                    httpClient.Timeout = TimeSpan.FromSeconds(10);
 
-                var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
-                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
-                url += "?finder=RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312&onlyData=true&limit=1";
+                    var jsessionId = cookies.GetValueOrDefault("JSESSIONID", "");
+                    var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
+                    url += "?finder=RESTFilter;fylkeid=00,planperi=2025-26,skoleid=312&onlyData=true&limit=1";
 
-                var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, url);
-                var cookieString = string.Join("; ", cookies.Select(c => $"{c.Key}={c.Value}"));
-                request.Headers.Add("Cookie", cookieString);
+                    var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, url);
+                    var cookieString = string.Join("; ", cookies.Select(c => $"{c.Key}={c.Value}"));
+                    request.Headers.Add("Cookie", cookieString);
 
-                var response = await httpClient.SendAsync(request);
-                return response.IsSuccessStatusCode;
-            }
-            catch
-            {
-                return false;
-            }
+                    var response = await httpClient.SendAsync(request);
+                    return response.IsSuccessStatusCode;
+                }
+                catch
+                {
+                    return false;
+                }
+            });
         }
 
         private async Task<UserParameters?> ExtractParametersFromCookies(Dictionary<string, string> cookies)
@@ -225,119 +229,128 @@ namespace AkademiTrack.Services
 
         private async Task<AuthenticationResult> PerformBrowserLoginAsync(bool hasCredentials)
         {
-            try
+            // Wrap entire Selenium operation in Task.Run to prevent UI blocking
+            return await Task.Run(async () =>
             {
-                var options = new ChromeOptions();
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-dev-shm-usage");
-                options.AddArgument("--disable-blink-features=AutomationControlled");
-                options.AddExcludedArgument("enable-automation");
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--headless"); // COMMENTED OUT FOR DEBUGGING - no visible browser windows
-                options.AddArgument("--window-size=1920,1080");
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                try
                 {
-                    var chromeDriverService = ChromeDriverService.CreateDefaultService();
-                    chromeDriverService.HideCommandPromptWindow = true;
-                    _webDriver = new ChromeDriver(chromeDriverService, options);
-                }
-                else
-                {
-                    _webDriver = new ChromeDriver(options);
-                }
+                    var options = new ChromeOptions();
+                    options.AddArgument("--no-sandbox");
+                    options.AddArgument("--disable-dev-shm-usage");
+                    options.AddArgument("--disable-blink-features=AutomationControlled");
+                    options.AddExcludedArgument("enable-automation");
+                    options.AddArgument("--disable-gpu");
+                    options.AddArgument("--headless");
+                    options.AddArgument("--window-size=1920,1080");
 
-                _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
-                await Task.Delay(2000);
-
-                bool loginSuccess = false;
-
-                if (hasCredentials)
-                {
-                    try
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        Console.WriteLine("[AUTH] Starting PerformFastAutomaticLoginAsync...");
-                        loginSuccess = await PerformFastAutomaticLoginAsync();
-                        Console.WriteLine($"[AUTH] PerformFastAutomaticLoginAsync returned: {loginSuccess}");
+                        var chromeDriverService = ChromeDriverService.CreateDefaultService();
+                        chromeDriverService.HideCommandPromptWindow = true;
+                        _webDriver = new ChromeDriver(chromeDriverService, options);
                     }
-                    catch (InvalidOperationException ex) when (ex.Message == "INVALID_CREDENTIALS")
+                    else
                     {
-                        Console.WriteLine("[AUTH] ❌ INVALID CREDENTIALS DETECTED - returning failure immediately");
-                        return new AuthenticationResult { Success = false };
+                        _webDriver = new ChromeDriver(options);
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[AUTH] Auto-login failed with exception: {ex.Message}");
-                        loginSuccess = false;
-                    }
-                }
 
-                if (!loginSuccess)
-                {
-                    Console.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
-                    
-                    if (_credentialsWereRejected)
+                    _webDriver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
+                    await Task.Delay(2000);
+
+                    bool loginSuccess = false;
+
+                    if (hasCredentials)
                     {
-                        Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately (no manual login wait)");
-                        
-                        if (ShouldShowNotification(ref _lastInvalidCredentialsNotification))
+                        try
                         {
-                            if (_notificationService != null)
-                            {
-                                await _notificationService.ShowNotificationAsync(
-                                    "Innlogging Feilet",
-                                    "Feil brukernavn eller passord. Sjekk dine Feide-innloggingsdata.",
-                                    NotificationLevel.Error,
-                                    isHighPriority: true
-                                );
-                            }
+                            Console.WriteLine("[AUTH] Starting PerformFastAutomaticLoginAsync...");
+                            loginSuccess = await PerformFastAutomaticLoginAsync();
+                            Console.WriteLine($"[AUTH] PerformFastAutomaticLoginAsync returned: {loginSuccess}");
                         }
-                        
-                        return new AuthenticationResult 
-                        { 
-                            Success = false, 
-                            ErrorMessage = "Feil brukernavn eller passord. Vennligst sjekk dine Feide-innloggingsdata og prøv igjen." 
+                        catch (InvalidOperationException ex) when (ex.Message == "INVALID_CREDENTIALS")
+                        {
+                            Console.WriteLine("[AUTH] ❌ INVALID CREDENTIALS DETECTED - returning failure immediately");
+                            return new AuthenticationResult { Success = false };
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[AUTH] Auto-login failed with exception: {ex.Message}");
+                            loginSuccess = false;
+                        }
+                    }
+
+                    if (!loginSuccess)
+                    {
+                        Console.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
+
+                        if (_credentialsWereRejected)
+                        {
+                            Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately");
+
+                            // Note: Notifications must be shown on UI thread
+                            if (ShouldShowNotification(ref _lastInvalidCredentialsNotification))
+                            {
+                                if (_notificationService != null)
+                                {
+                                    // Schedule notification on UI thread
+                                    _ = Dispatcher.UIThread.InvokeAsync(async () =>
+                                    {
+                                        await _notificationService.ShowNotificationAsync(
+                                            "Innlogging Feilet",
+                                            "Feil brukernavn eller passord. Sjekk dine Feide-innloggingsdata.",
+                                            NotificationLevel.Error,
+                                            isHighPriority: true
+                                        );
+                                    });
+                                }
+                            }
+
+                            return new AuthenticationResult
+                            {
+                                Success = false,
+                                ErrorMessage = "Feil brukernavn eller passord. Vennligst sjekk dine Feide-innloggingsdata og prøv igjen."
+                            };
+                        }
+
+                        Console.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
+                        return new AuthenticationResult
+                        {
+                            Success = false,
+                            ErrorMessage = "Innlogging mislyktes. Sjekk nettverksforbindelse og prøv igjen."
                         };
                     }
-                    
-                    // For automation service, we should NOT wait for manual login - just fail
-                    Console.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
-                    return new AuthenticationResult 
-                    { 
-                        Success = false, 
-                        ErrorMessage = "Innlogging mislyktes. Sjekk nettverksforbindelse og prøv igjen." 
+
+                    var parameters = await QuickParameterCapture();
+                    var cookies = _webDriver.Manage().Cookies.AllCookies;
+                    var cookieDict = cookies.ToDictionary(c => c.Name, c => c.Value);
+
+                    await SecureCredentialStorage.SaveCookiesAsync(
+                        cookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray()
+                    );
+
+                    if (parameters != null)
+                    {
+                        await SaveParametersAsync(parameters);
+                    }
+
+                    return new AuthenticationResult
+                    {
+                        Success = true,
+                        Cookies = cookieDict,
+                        Parameters = parameters
                     };
                 }
-
-                var parameters = await QuickParameterCapture();
-                var cookies = _webDriver.Manage().Cookies.AllCookies;
-                var cookieDict = cookies.ToDictionary(c => c.Name, c => c.Value);
-
-                await SecureCredentialStorage.SaveCookiesAsync(
-                    cookies.Select(c => new Cookie { Name = c.Name, Value = c.Value }).ToArray()
-                );
-
-                if (parameters != null)
+                catch (Exception ex)
                 {
-                    await SaveParametersAsync(parameters);
+                    Console.WriteLine($"[AUTH] Login error: {ex.Message}");
+                    return new AuthenticationResult { Success = false };
                 }
-
-                return new AuthenticationResult
-                {
-                    Success = true,
-                    Cookies = cookieDict,
-                    Parameters = parameters
-                };
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[AUTH] Login error: {ex.Message}");
-                return new AuthenticationResult { Success = false };
-            }
+            });
         }
 
         private async Task<bool> PerformFastAutomaticLoginAsync()
         {
+
             try
             {
                 if (_webDriver == null) return false;
@@ -351,10 +364,10 @@ namespace AkademiTrack.Services
                     {
                         var selectors = new[]
                         {
-                            "//span[contains(@class, 'feide_icon')]/ancestor::button",
-                            "//button[contains(., 'FEIDE')]",
-                            "//button[contains(@class, 'feide')]"
-                        };
+                    "//span[contains(@class, 'feide_icon')]/ancestor::button",
+                    "//button[contains(., 'FEIDE')]",
+                    "//button[contains(@class, 'feide')]"
+                };
 
                         foreach (var selector in selectors)
                         {

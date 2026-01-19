@@ -230,7 +230,7 @@ namespace AkademiTrack.ViewModels
         #region Initialization
         private int _initializationRetryCount = 0;
         private const int MAX_RETRY_ATTEMPTS = 3;
-        
+
         private async Task InitializeAsync()
         {
             try
@@ -238,29 +238,27 @@ namespace AkademiTrack.ViewModels
                 IsLoading = true;
                 _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
-                // Track app initialization - removed events tracking
                 Debug.WriteLine("[MainWindow] App initialization started");
 
                 // Initialize authentication service
                 _authService = new AuthenticationService(_notificationService);
 
-                // Perform authentication
+                // ✅ Authentication now runs on background thread - UI won't freeze
                 var authResult = await _authService.AuthenticateAsync();
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
                 {
                     _loggingService.LogSuccess("✓ Autentisering fullført!");
-                    
-                    // Track successful initialization - removed events tracking
+
                     Debug.WriteLine("[MainWindow] App initialization successful");
-                    
+
                     IsAuthenticated = true;
                     _userParameters = authResult.Parameters;
-                    
+
                     // Update command states after authentication
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-                    
+
                     // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
                     {
@@ -268,10 +266,12 @@ namespace AkademiTrack.ViewModels
                         PlanPeri = authResult.Parameters.PlanPeri,
                         SkoleId = authResult.Parameters.SkoleId
                     };
-                    
+
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
-                    
+
                     _loggingService.LogInfo("📊 Laster dashboard data...");
+
+                    // ✅ Dashboard refresh should also be async
                     await Dashboard.RefreshDataAsync();
 
                     Dashboard.UpdateNextClassFromCache();
@@ -287,27 +287,23 @@ namespace AkademiTrack.ViewModels
                     StartDashboardRefreshTimer();
                     StartMidnightResetTimer();
 
-                    // Reset retry count on success
                     _initializationRetryCount = 0;
-                    
+
                     await Task.Delay(500);
                     IsLoading = false;
                 }
                 else
                 {
                     _initializationRetryCount++;
-                    
-                    // Track initialization failure - removed events tracking
+
                     Debug.WriteLine("[MainWindow] App initialization failed");
-                    
-                    // Use specific error message if available
-                    string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage) 
-                        ? authResult.ErrorMessage 
+
+                    string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage)
+                        ? authResult.ErrorMessage
                         : "Kunne ikke autentisere med iskole.net. Sjekk innloggingsdata i innstillinger.";
-                    
+
                     if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
                     {
-                        // Only log to error_logs table on final failure (not every retry)
                         try
                         {
                             await _analyticsService.LogErrorAsync(
@@ -319,7 +315,7 @@ namespace AkademiTrack.ViewModels
                         {
                             Debug.WriteLine($"[Analytics] Failed to log initialization failure: {ex.Message}");
                         }
-                        
+
                         _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
                         _loggingService.LogError($"Feilmelding: {errorMessage}");
                         await _notificationService.ShowNotificationAsync(
@@ -327,13 +323,12 @@ namespace AkademiTrack.ViewModels
                             $"Etter {MAX_RETRY_ATTEMPTS} forsøk: {errorMessage}",
                             NotificationLevel.Error
                         );
-                        
-                        
+
                         StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
                         IsLoading = false;
-                        return; // Stop retrying
+                        return;
                     }
-                    
+
                     _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
                     _loggingService.LogError($"Feilmelding: {errorMessage}");
                     await _notificationService.ShowNotificationAsync(
@@ -341,15 +336,13 @@ namespace AkademiTrack.ViewModels
                         $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} mislyktes. Prøver igjen...",
                         NotificationLevel.Warning
                     );
-                    
-                    // Exponential backoff: 3s, 6s, 9s
+
                     await Task.Delay(3000 * _initializationRetryCount);
-                    await InitializeAsync(); // Retry with increased delay
+                    await InitializeAsync();
                 }
             }
             catch (Exception ex)
             {
-                // Log critical exception for developers
                 try
                 {
                     await _analyticsService.LogErrorAsync(
@@ -362,16 +355,16 @@ namespace AkademiTrack.ViewModels
                 {
                     Debug.WriteLine($"[Analytics] Failed to log initialization exception: {analyticsEx.Message}");
                 }
-                
+
                 _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
                 await _notificationService.ShowNotificationAsync(
                     "Oppstartsfeil",
                     "En kritisk feil oppstod under oppstart. Prøver igjen...",
                     NotificationLevel.Error
                 );
-                
+
                 await Task.Delay(3000);
-                await InitializeAsync(); // Retry
+                await InitializeAsync();
             }
         }
 
