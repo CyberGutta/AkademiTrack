@@ -41,7 +41,16 @@ namespace AkademiTrack.Services
         {
             lock (_lock)
             {
-                _factories[typeof(TInterface)] = () => factory();
+                _factories[typeof(TInterface)] = () =>
+                {
+                    var instance = factory();
+                    if (instance == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Factory for {typeof(TInterface).Name} returned null");
+                    }
+                    return instance;
+                };
             }
         }
 
