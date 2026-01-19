@@ -798,42 +798,44 @@ namespace AkademiTrack.Services
             {
                 if (_webDriver == null) return null;
 
-                var jsExecutor = (IJavaScriptExecutor)_webDriver;
-
-                var result = jsExecutor.ExecuteScript(@"
-                    try {
-                        var entries = performance.getEntries();
-                        for (var i = 0; i < entries.length; i++) {
-                            var entry = entries[i];
-                            if (entry.name && entry.name.includes('fylkeid=')) {
-                                var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
-                                if (match && match.length >= 4) {
-                                    return {
-                                        fylkeid: match[1],
-                                        planperi: match[2], 
-                                        skoleid: match[3]
-                                    };
-                                }
+                return await Task.Run(() =>
+                {
+                    var jsExecutor = (IJavaScriptExecutor)_webDriver;
+                    var result = jsExecutor.ExecuteScript(@"
+                try {
+                    var entries = performance.getEntries();
+                    for (var i = 0; i < entries.length; i++) {
+                        var entry = entries[i];
+                        if (entry.name && entry.name.includes('fylkeid=')) {
+                            var match = entry.name.match(/fylkeid=([^,&]+)[^,]*,planperi=([^,&]+)[^,]*,skoleid=([^,&]+)/);
+                            if (match && match.length >= 4) {
+                                return {
+                                    fylkeid: match[1],
+                                    planperi: match[2], 
+                                    skoleid: match[3]
+                                };
                             }
                         }
-                        return null;
-                    } catch (e) {
-                        return null;
                     }
-                ");
-
-                if (result is Dictionary<string, object> resultDict &&
-                    resultDict.ContainsKey("fylkeid"))
-                {
-                    return new UserParameters
-                    {
-                        FylkeId = resultDict["fylkeid"]?.ToString(),
-                        PlanPeri = resultDict["planperi"]?.ToString(),
-                        SkoleId = resultDict["skoleid"]?.ToString()
-                    };
+                    return null;
+                } catch (e) {
+                    return null;
                 }
+            ");
 
-                return null;
+                    if (result is Dictionary<string, object> resultDict &&
+                        resultDict.ContainsKey("fylkeid"))
+                    {
+                        return new UserParameters
+                        {
+                            FylkeId = resultDict["fylkeid"]?.ToString(),
+                            PlanPeri = resultDict["planperi"]?.ToString(),
+                            SkoleId = resultDict["skoleid"]?.ToString()
+                        };
+                    }
+
+                    return null;
+                });
             }
             catch
             {
