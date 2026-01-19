@@ -195,9 +195,9 @@ namespace AkademiTrack.ViewModels
             StartAutomationCommand = new AsyncRelayCommand(StartAutomationAsync, () => IsAuthenticated && !IsAutomationRunning);
             StopAutomationCommand = new AsyncRelayCommand(StopAutomationAsync, () => IsAutomationRunning);
             BackToDashboardCommand = new AsyncRelayCommand(BackToDashboardAsync);
-            OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync);
+            OpenSettingsCommand = new AsyncRelayCommand(OpenSettings);
             OpenFeideCommand = new AsyncRelayCommand(OpenFeideAsync);
-            OpenTutorialCommand = new AsyncRelayCommand(OpenTutorialAsync);
+            OpenTutorialCommand = new AsyncRelayCommand(OpenTutorial);
             RefreshDataCommand = new AsyncRelayCommand(RefreshDataAsync);
             ClearLogsCommand = new AsyncRelayCommand(ClearLogsAsync);
             ToggleDetailedLogsCommand = new AsyncRelayCommand(ToggleDetailedLogsAsync);
@@ -695,10 +695,10 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        private async Task OpenSettingsAsync()
+        private Task OpenSettings()
         {
             _loggingService.LogInfo("Åpner innstillinger...");
-            
+
             // Track settings navigation - removed events tracking
             Debug.WriteLine("[MainWindow] Navigating to settings");
 
@@ -713,6 +713,8 @@ namespace AkademiTrack.ViewModels
             // Subscribe to close event
             SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
             SettingsViewModel.CloseRequested += OnSettingsCloseRequested;
+
+            return Task.CompletedTask;
         }
 
         private Task OpenFeideAsync()
@@ -731,17 +733,19 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        private async Task OpenTutorialAsync()
+        private Task OpenTutorial()
         {
             _loggingService.LogInfo("Åpner veiledning...");
-            
+
             // Track tutorial navigation - removed events tracking
             Debug.WriteLine("[MainWindow] Navigating to tutorial");
-            
+
             ShowDashboard = false;
             ShowSettings = false;
             ShowFeide = false;
             ShowTutorial = true;
+
+            return Task.CompletedTask;
         }
 
         private async Task RefreshDataAsync()
