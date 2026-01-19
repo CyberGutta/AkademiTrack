@@ -262,80 +262,84 @@ namespace AkademiTrack.Services
 
         public async Task<HealthCheckResult> CheckSeleniumDriverAsync()
         {
-            var stopwatch = Stopwatch.StartNew();
-            ChromeDriver? driver = null;
-            ChromeDriverService? service = null;
+            return await Task.Run(() =>
+            {
+                var stopwatch = Stopwatch.StartNew();
+                ChromeDriver? driver = null;
+                ChromeDriverService? service = null;
 
-            try
-            {
-                service = ChromeDriverService.CreateDefaultService();
-                service.HideCommandPromptWindow = true;
-
-                var options = new ChromeOptions();
-                options.AddArgument("--headless");
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-dev-shm-usage");
-
-                driver = new ChromeDriver(service, options);
-                driver.Navigate().GoToUrl("about:blank");
-
-                stopwatch.Stop();
-                return new HealthCheckResult
-                {
-                    ComponentName = "Selenium Driver",
-                    Status = HealthStatus.Healthy,
-                    Message = "Fungerer",
-                    ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                    Details = $"ChromeDriver initialisert på {stopwatch.ElapsedMilliseconds}ms"
-                };
-            }
-            catch (DriverServiceNotFoundException)
-            {
-                stopwatch.Stop();
-                return new HealthCheckResult
-                {
-                    ComponentName = "Selenium Driver",
-                    Status = HealthStatus.Error,
-                    Message = "ChromeDriver ikke funnet",
-                    ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                    Details = "ChromeDriver må installeres. Vennligst reinstaller applikasjonen."
-                };
-            }
-            catch (WebDriverException ex)
-            {
-                stopwatch.Stop();
-                return new HealthCheckResult
-                {
-                    ComponentName = "Selenium Driver",
-                    Status = HealthStatus.Error,
-                    Message = "Driver feil",
-                    ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                    Details = ex.Message
-                };
-            }
-            catch (Exception ex)
-            {
-                stopwatch.Stop();
-                return new HealthCheckResult
-                {
-                    ComponentName = "Selenium Driver",
-                    Status = HealthStatus.Error,
-                    Message = "Ukjent feil",
-                    ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                    Details = ex.Message
-                };
-            }
-            finally
-            {
                 try
                 {
-                    driver?.Quit();
-                    driver?.Dispose();
-                    service?.Dispose();
+                    service = ChromeDriverService.CreateDefaultService();
+                    service.HideCommandPromptWindow = true;
+
+                    var options = new ChromeOptions();
+                    options.AddArgument("--headless");
+                    options.AddArgument("--disable-gpu");
+                    options.AddArgument("--no-sandbox");
+                    options.AddArgument("--disable-dev-shm-usage");
+
+                    driver = new ChromeDriver(service, options);
+                    driver.Navigate().GoToUrl("about:blank");
+
+                    stopwatch.Stop();
+
+                    return new HealthCheckResult
+                    {
+                        ComponentName = "Selenium Driver",
+                        Status = HealthStatus.Healthy,
+                        Message = "Fungerer",
+                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                        Details = $"ChromeDriver initialisert på {stopwatch.ElapsedMilliseconds}ms"
+                    };
                 }
-                catch { }
-            }
+                catch (DriverServiceNotFoundException)
+                {
+                    stopwatch.Stop();
+                    return new HealthCheckResult
+                    {
+                        ComponentName = "Selenium Driver",
+                        Status = HealthStatus.Error,
+                        Message = "ChromeDriver ikke funnet",
+                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                        Details = "ChromeDriver må installeres. Vennligst reinstaller applikasjonen."
+                    };
+                }
+                catch (WebDriverException ex)
+                {
+                    stopwatch.Stop();
+                    return new HealthCheckResult
+                    {
+                        ComponentName = "Selenium Driver",
+                        Status = HealthStatus.Error,
+                        Message = "Driver feil",
+                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                        Details = ex.Message
+                    };
+                }
+                catch (Exception ex)
+                {
+                    stopwatch.Stop();
+                    return new HealthCheckResult
+                    {
+                        ComponentName = "Selenium Driver",
+                        Status = HealthStatus.Error,
+                        Message = "Ukjent feil",
+                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                        Details = ex.Message
+                    };
+                }
+                finally
+                {
+                    try
+                    {
+                        driver?.Quit();
+                        driver?.Dispose();
+                        service?.Dispose();
+                    }
+                    catch { /* Ignore cleanup errors */ }
+                }
+            });
         }
 
         public async Task<HealthCheckResult[]> RunFullHealthCheckAsync()
