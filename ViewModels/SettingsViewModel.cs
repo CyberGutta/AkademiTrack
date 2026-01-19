@@ -772,7 +772,7 @@ Terminal=false
         {
             try
             {
-                _ = Dispatcher.UIThread.InvokeAsync(async () =>
+                await Dispatcher.UIThread.InvokeAsync(async () =>
                 {
                     if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
@@ -784,7 +784,7 @@ Terminal=false
                         }
                     }
                 }, Avalonia.Threading.DispatcherPriority.Background);
-                
+
             }
             catch (Exception ex)
             {
@@ -2213,33 +2213,36 @@ Terminal=false
                 }
                 else // custom
                 {
-                    var saveDialog = new Avalonia.Controls.SaveFileDialog
+                    var storageProvider = window.StorageProvider;
+
+                    var fileTypeChoice = new Avalonia.Platform.Storage.FilePickerFileType(fileExtension.ToUpper() + " filer")
                     {
-                        Title = "Lagre logger",
-                        DefaultExtension = fileExtension,
-                        InitialFileName = defaultFileName,
-                        Filters = new List<Avalonia.Controls.FileDialogFilter>
-                {
-                    new Avalonia.Controls.FileDialogFilter
-                    {
-                        Name = fileExtension.ToUpper() + " filer",
-                        Extensions = new List<string> { fileExtension }
-                    },
-                    new Avalonia.Controls.FileDialogFilter
-                    {
-                        Name = "Alle filer",
-                        Extensions = new List<string> { "*" }
-                    }
-                }
+                        Patterns = new[] { $"*.{fileExtension}" }
                     };
 
-                    filePath = await saveDialog.ShowAsync(window);
+                    var allFilesChoice = new Avalonia.Platform.Storage.FilePickerFileType("Alle filer")
+                    {
+                        Patterns = new[] { "*.*" }
+                    };
 
-                    if (string.IsNullOrEmpty(filePath))
+                    var saveOptions = new Avalonia.Platform.Storage.FilePickerSaveOptions
+                    {
+                        Title = "Lagre logger",
+                        SuggestedFileName = defaultFileName,
+                        DefaultExtension = fileExtension,
+                        FileTypeChoices = new[] { fileTypeChoice, allFilesChoice },
+                        ShowOverwritePrompt = true
+                    };
+
+                    var file = await storageProvider.SaveFilePickerAsync(saveOptions);
+
+                    if (file == null)
                     {
                         Debug.WriteLine("Save cancelled by user");
                         return;
                     }
+
+                    filePath = file.Path.LocalPath;
                 }
 
                 // Save file
