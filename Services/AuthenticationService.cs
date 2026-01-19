@@ -1,15 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
-using System.Threading.Tasks;
+using AkademiTrack.Services.Interfaces;
+using AkademiTrack.ViewModels;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security;
-using AkademiTrack.Services.Interfaces;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace AkademiTrack.Services
 {
@@ -25,11 +26,13 @@ namespace AkademiTrack.Services
         private static DateTime? _lastInvalidCredentialsNotification;
         private static readonly TimeSpan NotificationCooldown = TimeSpan.FromMinutes(5);
         private readonly INotificationService? _notificationService;
+        private readonly bool _suppressNotifications;
         private bool _disposed = false;
 
-        public AuthenticationService(INotificationService? notificationService = null)
+        public AuthenticationService(INotificationService? notificationService = null, bool suppressNotifications = false)
         {
             _notificationService = notificationService;
+            _suppressNotifications = suppressNotifications;
         }
 
         private bool ShouldShowNotification(ref DateTime? lastShown)
@@ -101,24 +104,38 @@ namespace AkademiTrack.Services
                 if (!hasCredentials)
                 {
                     Console.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
-                    
-                    if (ShouldShowNotification(ref _lastMissingCredentialsNotification))
+
+                    // Only show notification if initial setup is already complete - feide window
+                    try
                     {
-                        if (_notificationService != null)
+                        var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
+                        if (settings.InitialSetupCompleted && ShouldShowNotification(ref _lastMissingCredentialsNotification))
                         {
-                            await _notificationService.ShowNotificationAsync(
-                                "Mangler Innloggingsdata",
-                                "Gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn.",
-                                NotificationLevel.Warning,
-                                isHighPriority: true
-                            );
+                            if (_notificationService != null)
+                            {
+                                await _notificationService.ShowNotificationAsync(
+                                    "Mangler Innloggingsdata",
+                                    "Gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn.",
+                                    NotificationLevel.Warning,
+                                    isHighPriority: true
+                                );
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("[AUTH] Initial setup not completed - suppressing notification");
                         }
                     }
-                    
-                    return new AuthenticationResult 
-                    { 
-                        Success = false, 
-                        ErrorMessage = "Mangler innloggingsdata. Vennligst gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn." 
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AUTH] Could not check initial setup status: {ex.Message}");
+                        // Don't show notification if we can't determine setup status
+                    }
+
+                    return new AuthenticationResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Mangler innloggingsdata. Vennligst gå til innstillinger og legg inn Feide-brukernavn, passord og skolenavn."
                     };
                 }
 

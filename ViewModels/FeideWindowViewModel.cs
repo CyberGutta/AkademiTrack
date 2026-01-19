@@ -203,15 +203,15 @@ namespace AkademiTrack.ViewModels
                 var sanitizedSchoolName = InputValidator.SanitizeInput(SchoolName);
 
                 Debug.WriteLine($"[FeideWindow] Testing credentials for user: {sanitizedUsername}");
-                
+
                 // Step 1: Save credentials temporarily (without marking setup as complete)
                 await SaveCredentialsTemporarilyAsync();
                 Debug.WriteLine("[FeideWindow] Credentials saved temporarily for testing");
 
-                // Step 2: Test the credentials with AuthenticationService
-                using var authService = new AuthenticationService(null);
+                // Step 2: Test the credentials with AuthenticationService - SUPPRESS NOTIFICATIONS
+                using var authService = new AuthenticationService(null, suppressNotifications: true);
                 var testResult = await authService.AuthenticateAsync();
-                
+
                 if (testResult.Success)
                 {
                     Debug.WriteLine("[FeideWindow] ✓ Credentials test successful!");
