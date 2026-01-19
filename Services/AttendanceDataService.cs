@@ -323,6 +323,31 @@ namespace AkademiTrack.Services
             }
         }
         
+        private bool DoScheduleItemsOverlap(ScheduleItem session1, ScheduleItem session2)
+        {
+            try
+            {
+                // Both sessions must be on the same date
+                if (session1.Dato != session2.Dato)
+                    return false;
+                
+                // Parse time strings (format: "HH:mm")
+                if (TimeSpan.TryParse(session1.StartKl, out var start1) &&
+                    TimeSpan.TryParse(session1.SluttKl, out var end1) &&
+                    TimeSpan.TryParse(session2.StartKl, out var start2) &&
+                    TimeSpan.TryParse(session2.SluttKl, out var end2))
+                {
+                    return start1 < end2 && start2 < end1;
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
         public async Task<WeeklyAttendanceData?> GetWeeklyAttendanceAsync()
         {
             return await FetchWithRetryAsync(FetchWeeklyAttendanceAsync);
@@ -490,8 +515,36 @@ namespace AkademiTrack.Services
 
             // Get STU sessions
             var stuSessions = todayItems.Where(i => i.KNavn == "STU").ToList();
-            var registeredStuCount = stuSessions.Count(s => s.Typefravaer == "M");
-            var totalStuCount = stuSessions.Count;
+            
+            // Get regular classes (non-STU)
+            var regularClasses = todayItems.Where(i => 
+                !string.IsNullOrEmpty(i.KNavn) && 
+                i.KNavn != "STU").ToList();
+            
+            // Filter STU sessions - remove any that conflict with regular classes
+            var validStuSessions = new List<ScheduleItem>();
+            
+            foreach (var stuSession in stuSessions)
+            {
+                bool hasConflict = false;
+                
+                foreach (var regularClass in regularClasses)
+                {
+                    if (DoScheduleItemsOverlap(stuSession, regularClass))
+                    {
+                        hasConflict = true;
+                        break;
+                    }
+                }
+                
+                if (!hasConflict)
+                {
+                    validStuSessions.Add(stuSession);
+                }
+            }
+            
+            var registeredStuCount = validStuSessions.Count(s => s.Typefravaer == "M");
+            var totalStuCount = validStuSessions.Count;
 
             var now = DateTime.Now.TimeOfDay;
 
