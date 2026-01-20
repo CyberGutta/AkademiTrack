@@ -3,8 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
+using PuppeteerSharp;
 
 namespace AkademiTrack.Services
 {
@@ -260,86 +259,53 @@ namespace AkademiTrack.Services
             }
         }
 
-        public async Task<HealthCheckResult> CheckSeleniumDriverAsync()
+        public async Task<HealthCheckResult> CheckBrowserDriverAsync()
         {
-            return await Task.Run(() =>
+            var stopwatch = Stopwatch.StartNew();
+
+            try
             {
-                var stopwatch = Stopwatch.StartNew();
-                ChromeDriver? driver = null;
-                ChromeDriverService? service = null;
-
-                try
+                // Test PuppeteerSharp browser initialization
+                var browserFetcher = new BrowserFetcher();
+                var revisionInfo = await browserFetcher.DownloadAsync();
+                
+                if (revisionInfo != null)
                 {
-                    service = ChromeDriverService.CreateDefaultService();
-                    service.HideCommandPromptWindow = true;
-
-                    var options = new ChromeOptions();
-                    options.AddArgument("--headless");
-                    options.AddArgument("--disable-gpu");
-                    options.AddArgument("--no-sandbox");
-                    options.AddArgument("--disable-dev-shm-usage");
-
-                    driver = new ChromeDriver(service, options);
-                    driver.Navigate().GoToUrl("about:blank");
-
                     stopwatch.Stop();
-
                     return new HealthCheckResult
                     {
-                        ComponentName = "Selenium Driver",
+                        ComponentName = "Browser Driver",
                         Status = HealthStatus.Healthy,
                         Message = "Fungerer",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = $"ChromeDriver initialisert på {stopwatch.ElapsedMilliseconds}ms"
+                        Details = $"PuppeteerSharp browser tilgjengelig på {stopwatch.ElapsedMilliseconds}ms"
                     };
                 }
-                catch (DriverServiceNotFoundException)
+                else
                 {
                     stopwatch.Stop();
                     return new HealthCheckResult
                     {
-                        ComponentName = "Selenium Driver",
+                        ComponentName = "Browser Driver",
                         Status = HealthStatus.Error,
-                        Message = "ChromeDriver ikke funnet",
+                        Message = "Browser ikke tilgjengelig",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = "ChromeDriver må installeres. Vennligst reinstaller applikasjonen."
+                        Details = "PuppeteerSharp browser kunne ikke lastes ned"
                     };
                 }
-                catch (WebDriverException ex)
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                return new HealthCheckResult
                 {
-                    stopwatch.Stop();
-                    return new HealthCheckResult
-                    {
-                        ComponentName = "Selenium Driver",
-                        Status = HealthStatus.Error,
-                        Message = "Driver feil",
-                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = ex.Message
-                    };
-                }
-                catch (Exception ex)
-                {
-                    stopwatch.Stop();
-                    return new HealthCheckResult
-                    {
-                        ComponentName = "Selenium Driver",
-                        Status = HealthStatus.Error,
-                        Message = "Ukjent feil",
-                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = ex.Message
-                    };
-                }
-                finally
-                {
-                    try
-                    {
-                        driver?.Quit();
-                        driver?.Dispose();
-                        service?.Dispose();
-                    }
-                    catch { /* Ignore cleanup errors */ }
-                }
-            });
+                    ComponentName = "Browser Driver",
+                    Status = HealthStatus.Error,
+                    Message = "Browser feil",
+                    ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                    Details = $"Feil: {ex.Message}"
+                };
+            }
         }
 
         public async Task<HealthCheckResult[]> RunFullHealthCheckAsync()
@@ -349,7 +315,7 @@ namespace AkademiTrack.Services
                 CheckInternetConnectivityAsync(),
                 CheckFeideAvailabilityAsync(),
                 CheckISkoleApiAsync(),
-                CheckSeleniumDriverAsync()
+                CheckBrowserDriverAsync()
             };
 
             return await Task.WhenAll(tasks);

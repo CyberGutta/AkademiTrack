@@ -35,6 +35,21 @@ namespace AkademiTrack
             AvaloniaXamlLoader.Load(this);
 
             Services.ServiceLocator.InitializeServices();
+            
+            // Pre-initialize Puppeteer to avoid delays during first authentication
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // Pre-initialize browser if needed
+                    var browserFetcher = new PuppeteerSharp.BrowserFetcher();
+                    await browserFetcher.DownloadAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[App] Puppeteer pre-initialization failed: {ex.Message}");
+                }
+            });
         }
 
         public override void OnFrameworkInitializationCompleted()

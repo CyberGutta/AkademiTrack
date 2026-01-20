@@ -20,6 +20,16 @@ namespace AkademiTrack.Services
         public Dictionary<string, string>? Cookies { get; set; }
         public UserParameters? Parameters { get; set; }
         public string? ErrorMessage { get; set; }
+
+        public static AuthenticationResult CreateSuccess(Dictionary<string, string>? cookies, UserParameters? parameters)
+        {
+            return new AuthenticationResult { Success = true, Cookies = cookies, Parameters = parameters };
+        }
+
+        public static AuthenticationResult CreateFailed(string errorMessage)
+        {
+            return new AuthenticationResult { Success = false, ErrorMessage = errorMessage };
+        }
     }
 
     public class SavedParameterData

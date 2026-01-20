@@ -1457,9 +1457,9 @@ Terminal=false
                         Debug.WriteLine("Deleting cookies from macOS Keychain...");
                         // Delete each credential key individually
                         await KeychainService.DeleteFromKeychain("cookies");
-                        await KeychainService.DeleteFromKeychain("login_email");
-                        await KeychainService.DeleteFromKeychain("login_password");
-                        await KeychainService.DeleteFromKeychain("school_name");
+                        await KeychainService.DeleteFromKeychain("LoginEmail");
+                        await KeychainService.DeleteFromKeychain("LoginPassword");
+                        await KeychainService.DeleteFromKeychain("SchoolName");
                         Debug.WriteLine("✓ Keychain cookies and credentials cleared");
                     }
                     catch (Exception ex)
@@ -2870,9 +2870,9 @@ Terminal=false
                 _enableNotifications = settings.EnableNotifications;
 
 
-                var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")   ?? "";
-                var pass    = await SecureCredentialStorage.GetCredentialAsync("LoginPassword") ?? "";
-                var school  = await SecureCredentialStorage.GetCredentialAsync("SchoolName")   ?? "";
+                var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")     ?? "";
+                var pass    = await SecureCredentialStorage.GetCredentialAsync("LoginPassword")  ?? "";
+                var school  = await SecureCredentialStorage.GetCredentialAsync("SchoolName")     ?? "";
 
                 LoginEmail   = email;
                 
@@ -2926,7 +2926,7 @@ Terminal=false
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
 
                 if (!string.IsNullOrEmpty(_loginEmail))
-                    await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
+                    await SecureCredentialStorage.SaveCredentialAsync("feide_username", _loginEmail);
 
                 // Convert SecureString to plain string temporarily for saving
                 var passwordPlain = SecureStringToString(_loginPasswordSecure);

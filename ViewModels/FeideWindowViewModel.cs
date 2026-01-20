@@ -301,7 +301,7 @@ namespace AkademiTrack.ViewModels
             {
                 Debug.WriteLine("[FeideWindow] Saving credentials temporarily for testing...");
                 
-                // Save credentials to secure storage (but don't mark setup as complete yet)
+                // Save credentials to secure storage with the correct keys that AuthenticationService expects
                 await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", FeideUsername);
                 Debug.WriteLine($"[FeideWindow] ✓ Saved LoginEmail: {FeideUsername}");
                 

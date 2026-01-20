@@ -56,7 +56,7 @@ namespace AkademiTrack.Services
                     _loggingService?.LogInfo("📡 Data kunne ikke hentes - prøver å oppdatere autentisering...");
                     
                     var notificationService = ServiceLocator.Instance.GetService<INotificationService>();
-                    var authService = new AuthenticationService(notificationService);
+                    using var authService = new AuthenticationService(notificationService);
                     var authResult = await authService.AuthenticateAsync();
                     
                     if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
@@ -107,11 +107,22 @@ namespace AkademiTrack.Services
             try
             {
                 if (_userParameters == null || _cookies == null)
+                {
+                    _loggingService?.LogError("❌ [ATTENDANCE] Missing parameters or cookies for summary fetch");
                     return null;
+                }
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                if (string.IsNullOrEmpty(jsessionId))
+                {
+                    _loggingService?.LogError("❌ [ATTENDANCE] Missing JSESSIONID cookie");
+                    return null;
+                }
+
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoFravaer_oppmote_studietid_sum;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId}&onlyData=true&limit=25&offset=0&totalResults=true";
+
+                _loggingService?.LogDebug($"🌐 [ATTENDANCE] Fetching summary from: {url.Replace(jsessionId, "***")}");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -124,19 +135,50 @@ namespace AkademiTrack.Services
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);
+                
+                _loggingService?.LogDebug($"🌐 [ATTENDANCE] Response status: {response.StatusCode}");
+                
                 if (!response.IsSuccessStatusCode)
+                {
+                    _loggingService?.LogError($"❌ [ATTENDANCE] HTTP error {response.StatusCode} when fetching summary");
+                    
+                    // Log the response content to help debug parameter issues
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    if (errorContent.Length < 500)
+                    {
+                        _loggingService?.LogDebug($"🔍 [ATTENDANCE] Error response: {errorContent}");
+                    }
                     return null;
+                }
 
                 var json = await response.Content.ReadAsStringAsync();
+                _loggingService?.LogDebug($"🌐 [ATTENDANCE] Response length: {json.Length} characters");
+                
+                if (json.Length < 50)
+                {
+                    _loggingService?.LogDebug($"🌐 [ATTENDANCE] Short response content: {json}");
+                }
+
                 var summaryResponse = JsonSerializer.Deserialize<AttendanceSummaryResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
+                if (summaryResponse?.Items?.FirstOrDefault() != null)
+                {
+                    _loggingService?.LogSuccess("✅ [ATTENDANCE] Successfully fetched attendance summary");
+                }
+                else
+                {
+                    _loggingService?.LogWarning("⚠️ [ATTENDANCE] Summary response was empty or null");
+                    _loggingService?.LogDebug($"🔍 [ATTENDANCE] Raw response content: {json.Substring(0, Math.Min(300, json.Length))}");
+                }
+
                 return summaryResponse?.Items?.FirstOrDefault();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _loggingService?.LogError($"❌ [ATTENDANCE] Exception in FetchAttendanceSummaryAsync: {ex.Message}");
                 return null;
             }
         }
@@ -152,15 +194,25 @@ namespace AkademiTrack.Services
             try
             {
                 if (_userParameters == null || _cookies == null)
+                {
+                    _loggingService?.LogError("❌ [TODAY] Missing parameters or cookies for today schedule fetch");
                     return null;
+                }
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                if (string.IsNullOrEmpty(jsessionId))
+                {
+                    _loggingService?.LogError("❌ [TODAY] Missing JSESSIONID cookie");
+                    return null;
+                }
                 
                 // Use today's date for the new endpoint
                 var today = DateTime.Now.ToString("yyyyMMdd");
                 
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
                 url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={today},endDate={today}&onlyData=true&limit=1000&totalResults=true";
+
+                _loggingService?.LogDebug($"🌐 [TODAY] Fetching today's schedule from: {url.Replace(jsessionId, "***")}");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -173,22 +225,36 @@ namespace AkademiTrack.Services
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);
+                
+                _loggingService?.LogDebug($"🌐 [TODAY] Response status: {response.StatusCode}");
+                
                 if (!response.IsSuccessStatusCode)
+                {
+                    _loggingService?.LogError($"❌ [TODAY] HTTP error {response.StatusCode} when fetching today's schedule");
                     return null;
+                }
 
                 var json = await response.Content.ReadAsStringAsync();
+                _loggingService?.LogDebug($"🌐 [TODAY] Response length: {json.Length} characters");
+                
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
                 if (scheduleResponse?.Items == null)
+                {
+                    _loggingService?.LogWarning("⚠️ [TODAY] Schedule response was null or had no items");
+                    _loggingService?.LogDebug($"🔍 [TODAY] Raw response content: {json.Substring(0, Math.Min(300, json.Length))}");
                     return null;
+                }
 
+                _loggingService?.LogSuccess($"✅ [TODAY] Successfully fetched {scheduleResponse.Items.Count} schedule items for today");
                 return ProcessTodayScheduleFromMonthlyData(scheduleResponse.Items);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _loggingService?.LogError($"❌ [TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
                 return null;
             }
         }

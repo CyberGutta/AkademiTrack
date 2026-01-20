@@ -229,8 +229,14 @@ namespace AkademiTrack.Services
         {
             try
             {
+                _loggingService.LogDebug("🔍 [AUTOMATION] Loading credentials from storage...");
+                
                 // Load cookies
                 _cookies = await SecureCredentialStorage.LoadCookiesAsync();
+                _loggingService.LogDebug($"🔍 [AUTOMATION] Loaded {_cookies?.Count ?? 0} cookies from storage");
+                
+                // Load user parameters from storage
+                await LoadUserParametersAsync();
                 
                 if (_cookies == null || _cookies.Count == 0)
                 {
@@ -242,12 +248,14 @@ namespace AkademiTrack.Services
                     }
                 }
 
-                // Load user parameters (you might need to implement this)
-                // For now, we'll assume they're loaded during authentication
+                // Check if we have user parameters after loading/authentication
                 if (_userParameters == null || !_userParameters.IsComplete)
                 {
+                    _loggingService.LogError($"❌ [AUTOMATION] User parameters missing or incomplete after loading. Params null: {_userParameters == null}, Complete: {_userParameters?.IsComplete ?? false}");
                     return AutomationResult.Failed("Missing user parameters");
                 }
+                
+                _loggingService.LogSuccess($"✅ [AUTOMATION] Credentials loaded successfully: {_cookies?.Count ?? 0} cookies, user params complete: {_userParameters.IsComplete}");
 
                 return AutomationResult.Successful();
             }
@@ -786,6 +794,18 @@ namespace AkademiTrack.Services
                     }
 
                     _loggingService.LogSuccess($"✓ [FETCH] Successfully parsed {scheduleResponse.Items.Count} schedule items");
+                    
+                    // Log a sample of what we got if there are items
+                    if (scheduleResponse.Items.Count > 0)
+                    {
+                        var firstItem = scheduleResponse.Items[0];
+                        _loggingService.LogDebug($"🔍 [FETCH] Sample item: Fag={firstItem.Fag}, KNavn={firstItem.KNavn}, Dato={firstItem.Dato}");
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug($"🔍 [FETCH] Raw response: {responseContent}");
+                    }
+                    
                     return scheduleResponse.Items;
                 }
                 catch (JsonException jsonEx)
@@ -982,6 +1002,57 @@ namespace AkademiTrack.Services
         {
             _userParameters = userParameters;
             _cookies = cookies;
+        }
+
+        private async Task LoadUserParametersAsync()
+        {
+            try
+            {
+                // First try to load from file (new method)
+                var appSupportDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+                var filePath = Path.Combine(appSupportDir, "user_parameters.json");
+                
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath);
+                    _userParameters = JsonSerializer.Deserialize<UserParameters>(json);
+                    _loggingService.LogDebug($"✓ [AUTOMATION] Loaded user parameters from file: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
+                    return;
+                }
+                
+                // Fallback: try to load from keychain (old method) and migrate to file
+                var keychainJson = await SecureCredentialStorage.GetCredentialAsync("user_parameters");
+                if (!string.IsNullOrEmpty(keychainJson))
+                {
+                    _userParameters = JsonSerializer.Deserialize<UserParameters>(keychainJson);
+                    if (_userParameters != null)
+                    {
+                        _loggingService.LogDebug("🔄 [AUTOMATION] Migrating user parameters from keychain to file...");
+                        
+                        // Save to file
+                        Directory.CreateDirectory(appSupportDir);
+                        var json = JsonSerializer.Serialize(_userParameters, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(filePath, json);
+                        
+                        // Clean up old keychain entry
+                        await SecureCredentialStorage.DeleteCredentialAsync("user_parameters");
+                        _loggingService.LogDebug("✓ [AUTOMATION] Migration complete - old keychain entry removed");
+                        
+                        _loggingService.LogDebug($"✓ [AUTOMATION] Loaded user parameters from storage: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
+                        return;
+                    }
+                }
+                
+                _loggingService.LogDebug("⚠️ [AUTOMATION] No user parameters found in file or keychain");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ [AUTOMATION] Failed to load user parameters: {ex.Message}");
+                _userParameters = null;
+            }
         }
 
         public void Dispose()
