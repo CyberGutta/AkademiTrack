@@ -109,7 +109,6 @@ namespace AkademiTrack.Services
 
                 var responseTime = stopwatch.ElapsedMilliseconds;
 
-                // Feide auth endpoint will redirect or return 400 (bad request) without params
                 // Both mean the server is working
                 if (response.IsSuccessStatusCode ||
                     response.StatusCode == HttpStatusCode.BadRequest ||

@@ -551,7 +551,6 @@ namespace AkademiTrack.Services
         }
     }
 
-    // Cookie class definition
     public class Cookie
     {
         public string? Name { get; set; }

@@ -108,9 +108,7 @@ namespace AkademiTrack.Services
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_settingsFilePath, json);
             }
-            catch
-            {
-            }
+            catch { /* Intentionally empty */ }
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)

@@ -25,7 +25,6 @@ namespace AkademiTrack.ViewModels
 
         public new event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler<FeideSetupCompletedEventArgs>? SetupCompleted;
-        public event EventHandler? CloseRequested; // NEW: Event to close window
 
         protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
         {
@@ -178,23 +177,23 @@ namespace AkademiTrack.ViewModels
             {
                 // Validate inputs with proper validation
                 var schoolValidation = InputValidator.ValidateSchoolName(SchoolName);
-                if (!schoolValidation.isValid)
+                if (!schoolValidation.IsValid)
                 {
-                    ErrorMessage = schoolValidation.errorMessage ?? "Ugyldig skolenavn";
+                    ErrorMessage = schoolValidation.ErrorMessage ?? "Ugyldig skolenavn";
                     return;
                 }
 
                 var usernameValidation = InputValidator.ValidateUsername(FeideUsername);
-                if (!usernameValidation.isValid)
+                if (!usernameValidation.IsValid)
                 {
-                    ErrorMessage = usernameValidation.errorMessage ?? "Ugyldig brukernavn";
+                    ErrorMessage = usernameValidation.ErrorMessage ?? "Ugyldig brukernavn";
                     return;
                 }
 
                 var passwordValidation = InputValidator.ValidatePassword(FeidePassword);
-                if (!passwordValidation.isValid)
+                if (!passwordValidation.IsValid)
                 {
-                    ErrorMessage = passwordValidation.errorMessage ?? "Ugyldig passord";
+                    ErrorMessage = passwordValidation.ErrorMessage ?? "Ugyldig passord";
                     return;
                 }
 
@@ -285,7 +284,7 @@ namespace AkademiTrack.ViewModels
                 {
                     await DeleteCredentialsAsync();
                 }
-                catch { }
+                catch { /* Intentionally empty */ }
                 
                 ErrorMessage = $"Feil ved testing av innloggingsdata: {ex.Message}";
             }

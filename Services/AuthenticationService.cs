@@ -254,7 +254,6 @@ namespace AkademiTrack.Services
                 
                 Debug.WriteLine($"🔍 [PARAMS] Using JSESSIONID: {jsessionId.Substring(0, Math.Min(10, jsessionId.Length))}...");
                 
-                // Use the VoUserData endpoint to get actual user parameters
                 using var httpClient = new System.Net.Http.HttpClient();
                 var userDataUrl = $"https://iskole.net/iskole_elev/rest/v0/VoUserData;jsessionid={jsessionId}";
                 
@@ -320,7 +319,6 @@ namespace AkademiTrack.Services
                 string? skoleId = null;
                 string? planPeri = null;
                 
-                // Check if there's a "result" field with JSON string (as shown in user's example)
                 if (root.TryGetProperty("result", out var resultProp) && resultProp.ValueKind == JsonValueKind.String)
                 {
                     var resultJson = resultProp.GetString();
@@ -330,7 +328,6 @@ namespace AkademiTrack.Services
                     {
                         try
                         {
-                            // The result is a JSON string that needs to be parsed again
                             using var resultDoc = JsonDocument.Parse(resultJson);
                             var resultArray = resultDoc.RootElement;
                             
@@ -379,7 +376,6 @@ namespace AkademiTrack.Services
                     Debug.WriteLine("🔍 [PARAMS] No 'result' field found, checking other structures...");
                 }
                 
-                // Create and return the parameters if we found them
                 if (!string.IsNullOrEmpty(fylkeId) && !string.IsNullOrEmpty(skoleId) && !string.IsNullOrEmpty(planPeri))
                 {
                     Debug.WriteLine($"✅ [PARAMS] Successfully extracted parameters: FylkeId='{fylkeId}', SkoleId='{skoleId}', PlanPeri='{planPeri}'");

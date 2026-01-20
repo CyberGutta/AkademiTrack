@@ -21,7 +21,6 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Execute an async action with comprehensive error handling
         /// </summary>
         public async Task<Result<T>> ExecuteAsync<T>(Func<Task<T>> action, string context)
         {
@@ -40,7 +39,6 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Execute an async action with comprehensive error handling (no return value)
         /// </summary>
         public async Task<Result> ExecuteAsync(Func<Task> action, string context)
         {
@@ -145,7 +143,6 @@ namespace AkademiTrack.Services.Utilities
             
             _loggingService?.LogError(errorMessage);
             
-            // Can't await in sync method, so just fire and forget
             if (_analyticsService != null)
             {
                 _ = Task.Run(async () =>
@@ -158,8 +155,17 @@ namespace AkademiTrack.Services.Utilities
                             ex
                         );
                     }
-                    catch { }
-                });
+                    catch (Exception analyticsEx)
+                    {
+                        Debug.WriteLine($"[ErrorHandler] Analytics logging failed: {analyticsEx.Message}");
+                    }
+                }).ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        Debug.WriteLine($"[ErrorHandler] Analytics task failed: {t.Exception.GetBaseException().Message}");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
             }
             
             return Result<T>.Failed(errorMessage, ex);

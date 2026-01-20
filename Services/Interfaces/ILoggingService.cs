@@ -32,7 +32,6 @@ namespace AkademiTrack.Services.Interfaces
     }
 
 
-
     public class LogEntryEventArgs : EventArgs
     {
         public LogEntry LogEntry { get; }

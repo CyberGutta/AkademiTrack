@@ -17,7 +17,6 @@ namespace AkademiTrack.Services.Utilities
         private bool _disposed = false;
 
         /// <summary>
-        /// Create a new rate limiter
         /// </summary>
         /// <param name="minIntervalMs">Minimum interval between requests in milliseconds</param>
         public RateLimiter(int minIntervalMs = 1000)
@@ -55,7 +54,6 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Wait if necessary to respect the rate limit, then execute the action (no return value)
         /// </summary>
         public async Task ExecuteAsync(Func<Task> action)
         {

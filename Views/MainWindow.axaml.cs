@@ -12,7 +12,6 @@ namespace AkademiTrack.Views
 {
     public partial class MainWindow : Window
     {
-        private bool _hasShownMinimizeNotification = false;
         private bool _isReallyClosing = false;
         private AkademiTrack.ViewModels.AppSettings? _cachedSettings;
         private bool _isBeingRestored = false;
@@ -34,10 +33,15 @@ namespace AkademiTrack.Views
         private void MainWindow_Activated(object? sender, EventArgs e)
         {
             // Window activated - could be from sleep, minimize, or focus change
-            // Check if we need to refresh stale data
-            if (DataContext is RefactoredMainWindowViewModel viewModel)
+            // Check if we need to refresh stale data, but not if we're just being restored from minimize
+            if (DataContext is RefactoredMainWindowViewModel viewModel && !_isBeingRestored)
             {
+                Debug.WriteLine("[FOCUS] Window activated - checking for stale data");
                 _ = viewModel.CheckForStaleDataAsync();
+            }
+            else if (_isBeingRestored)
+            {
+                Debug.WriteLine("[FOCUS] Window activated during restore - skipping stale data check");
             }
         }
 

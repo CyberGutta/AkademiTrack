@@ -22,7 +22,6 @@ namespace AkademiTrack.Views
         {
             InitializeComponent();
 
-            // DON'T create a new ViewModel here!
             // The DataContext will be set by MainWindow.xaml binding
 
             // Just setup UI interactions

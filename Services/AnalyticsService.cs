@@ -31,28 +31,86 @@ namespace AkademiTrack.Services
 
         public AnalyticsService()
         {
-            // Load configuration from secure source
-            var config = AppConfiguration.Instance;
-            _supabaseUrl = config.SupabaseUrl;
-            _supabaseAnonKey = config.SupabaseAnonKey ?? throw new InvalidOperationException("Supabase API key not configured");
-            
-            // Get or create persistent anonymous user ID
-            _persistentUserId = GetOrCreatePersistentUserId();
-            
-            // Configure HTTP client with correct Supabase headers (only if not already configured)
-            if (!_httpClient.DefaultRequestHeaders.Contains("apikey"))
+            try
             {
-                _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseAnonKey);
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_supabaseAnonKey}");
-            }
+                Debug.WriteLine("[Analytics] Starting AnalyticsService initialization...");
+                
+                // Load configuration from secure source
+                var config = AppConfiguration.Instance;
+                _supabaseUrl = config.SupabaseUrl;
+                
+                // Get API key securely - handle missing key gracefully
+                try
+                {
+                    _supabaseAnonKey = config.SupabaseAnonKey;
+                    
+                    if (string.IsNullOrEmpty(_supabaseAnonKey))
+                    {
+                        Debug.WriteLine($"[Analytics] WARNING: No Supabase API key configured - analytics will be disabled");
+                        _supabaseAnonKey = "disabled"; // Marker for disabled state
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[Analytics] ✓ Supabase API key loaded successfully");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Analytics] Configuration error: {ex.Message}");
+                    Debug.WriteLine($"[Analytics] Analytics will be disabled - app will continue normally");
+                    _supabaseAnonKey = "disabled"; // Marker for disabled state
+                }
+                
+                // Get or create persistent anonymous user ID
+                _persistentUserId = GetOrCreatePersistentUserId();
+                
+                // Configure HTTP client only if we have a valid API key
+                if (_supabaseAnonKey != "disabled" && !string.IsNullOrEmpty(_supabaseAnonKey))
+                {
+                    try
+                    {
+                        // Configure HTTP client with correct Supabase headers (only if not already configured)
+                        if (!_httpClient.DefaultRequestHeaders.Contains("apikey"))
+                        {
+                            _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseAnonKey);
+                            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_supabaseAnonKey}");
+                        }
+                        Debug.WriteLine($"[Analytics] HTTP client configured for Supabase");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to configure HTTP client: {ex.Message}");
+                        _supabaseAnonKey = "disabled";
+                    }
+                }
 
-            Debug.WriteLine($"[Analytics] Persistent User ID: {_persistentUserId}");
-            Debug.WriteLine($"[Analytics] Using Supabase URL: {_supabaseUrl}");
+                Debug.WriteLine($"[Analytics] Persistent User ID: {_persistentUserId}");
+                Debug.WriteLine($"[Analytics] Using Supabase URL: {_supabaseUrl}");
+                Debug.WriteLine($"[Analytics] Analytics enabled: {_supabaseAnonKey != "disabled"}");
+                Debug.WriteLine("[Analytics] AnalyticsService initialization completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Analytics] CRITICAL ERROR in AnalyticsService constructor: {ex.Message}");
+                Debug.WriteLine($"[Analytics] Stack trace: {ex.StackTrace}");
+                
+                // Set safe defaults to prevent further crashes
+                _supabaseAnonKey = "disabled";
+                _persistentUserId = Guid.NewGuid().ToString();
+                _supabaseUrl = "https://disabled.supabase.co";
+                
+                Debug.WriteLine("[Analytics] Set safe defaults - analytics disabled");
+            }
         }
 
         public async Task StartSessionAsync()
         {
-            if (_sessionStarted) return;
+            if (_sessionStarted || _supabaseAnonKey == "disabled") 
+            {
+                if (_supabaseAnonKey == "disabled")
+                    Debug.WriteLine($"[Analytics] Session start skipped - analytics disabled");
+                return;
+            }
 
             try
             {
@@ -75,7 +133,6 @@ namespace AkademiTrack.Services
                 }
                 else
                 {
-                    // Create new session
                     Debug.WriteLine($"[Analytics] No existing session found, creating new one");
                     
                     var sessionData = new
@@ -192,6 +249,12 @@ namespace AkademiTrack.Services
 
         public async Task TrackActionAsync(string action)
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] Action tracking skipped - analytics disabled: {action}");
+                return;
+            }
+            
             try
             {
                 if (string.IsNullOrEmpty(_currentSessionId))
@@ -202,7 +265,6 @@ namespace AkademiTrack.Services
 
                 Debug.WriteLine($"[Analytics] Tracking action '{action}' for user: {_persistentUserId}, session: {_currentSessionId}");
                 
-                // Update session with new action
                 var updateData = new
                 {
                     last_action = action,
@@ -244,6 +306,12 @@ namespace AkademiTrack.Services
         // Convenience methods for specific actions
         public async Task TrackAutomationStartAsync() 
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] Automation start tracking skipped - analytics disabled");
+                return;
+            }
+            
             try
             {
                 _automationActive = true;
@@ -258,6 +326,12 @@ namespace AkademiTrack.Services
         
         public async Task TrackAutomationStopAsync() 
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] Automation stop tracking skipped - analytics disabled");
+                return;
+            }
+            
             try
             {
                 _automationActive = false;
@@ -272,6 +346,12 @@ namespace AkademiTrack.Services
         
         public async Task TrackAppClosedAsync() 
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] App closed tracking skipped - analytics disabled");
+                return;
+            }
+            
             try
             {
                 await TrackActionAsync("app_closed");
@@ -284,6 +364,12 @@ namespace AkademiTrack.Services
 
         public async Task TrackUserDeletedDataAsync() 
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] User data deletion tracking skipped - analytics disabled");
+                return;
+            }
+            
             try
             {
                 await TrackActionAsync("deleted");
@@ -305,6 +391,12 @@ namespace AkademiTrack.Services
 
         public async Task TrackAppUninstalledAsync()
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] App uninstall tracking skipped - analytics disabled");
+                return;
+            }
+            
             await TrackEventAsync("app_uninstalled", new Dictionary<string, object>
             {
                 { "uninstall_time", DateTime.Now.ToString("o") },
@@ -314,6 +406,12 @@ namespace AkademiTrack.Services
 
         public async Task TrackEventAsync(string eventName, Dictionary<string, object>? properties = null)
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] Event tracking skipped - analytics disabled: {eventName}");
+                return;
+            }
+            
             try
             {
                 if (string.IsNullOrEmpty(_currentSessionId))
@@ -429,6 +527,12 @@ namespace AkademiTrack.Services
 
         public async Task LogErrorAsync(string errorType, string errorMessage, Exception? exception = null)
         {
+            if (_supabaseAnonKey == "disabled")
+            {
+                Debug.WriteLine($"[Analytics] Error logging skipped - analytics disabled: {errorType}");
+                return;
+            }
+            
             try
             {
                 if (string.IsNullOrEmpty(_currentSessionId))
@@ -505,7 +609,6 @@ namespace AkademiTrack.Services
                     }
                 }
                 
-                // Generate new persistent user ID
                 var newUserId = GenerateAnonymousUserId();
                 File.WriteAllText(userIdFile, newUserId);
                 
@@ -571,17 +674,60 @@ namespace AkademiTrack.Services
             
             try
             {
+                Debug.WriteLine($"[Analytics] Starting disposal for user: {_persistentUserId}");
+                
+                // Stop heartbeat timer first
                 lock (_timerLock)
                 {
-                    _heartbeatTimer?.Dispose();
-                    _heartbeatTimer = null;
+                    try
+                    {
+                        _heartbeatTimer?.Dispose();
+                        _heartbeatTimer = null;
+                        Debug.WriteLine($"[Analytics] Heartbeat timer disposed");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Analytics] Error disposing heartbeat timer: {ex.Message}");
+                    }
                 }
-                Debug.WriteLine($"[Analytics] Analytics service disposed for user: {_persistentUserId}");
+                
+                // Send final analytics event (fire and forget)
+                try
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await TrackAppClosedAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[Analytics] Error sending final event: {ex.Message}");
+                        }
+                    }).ContinueWith(t =>
+                    {
+                        if (t.IsFaulted && t.Exception != null)
+                        {
+                            Debug.WriteLine($"[Analytics] Final event task failed: {t.Exception.GetBaseException().Message}");
+                        }
+                    }, TaskContinuationOptions.OnlyOnFaulted);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Analytics] Error starting final event task: {ex.Message}");
+                }
+                
+                // Clear session data
+                _currentSessionId = null;
+                _sessionStarted = false;
+                _automationActive = false;
+                
                 _disposed = true;
+                Debug.WriteLine($"[Analytics] Analytics service disposed successfully for user: {_persistentUserId}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Analytics] Dispose failed: {ex.Message}");
+                Debug.WriteLine($"[Analytics] Error during disposal: {ex.Message}");
             }
         }
     }

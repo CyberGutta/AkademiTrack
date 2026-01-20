@@ -46,11 +46,18 @@ namespace AkademiTrack.ViewModels
         private DateTime _lastDataRefresh = DateTime.MinValue;
         private DateTime _currentDay = DateTime.Now.Date;
 
-        private bool _isRefreshingData = false;
+        // Thread-safe refresh management
+        private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
+        private volatile bool _isRefreshingData = false;
         private DateTime _lastManualRefresh = DateTime.MinValue;
         private const int REFRESH_COOLDOWN_SECONDS = 10; // Minimum 10 seconds between refreshes
 
-        // Navigation
+        // Thread-safe initialization management
+        private readonly SemaphoreSlim _initializationSemaphore = new(1, 1);
+        private volatile bool _isInitializing = false;
+
+        // Navigation state with thread safety
+        private readonly object _navigationLock = new object();
         private bool _showDashboard = true;
         private bool _showSettings = false;
         private bool _showTutorial = false;
@@ -101,29 +108,77 @@ namespace AkademiTrack.ViewModels
             private set => SetProperty(ref _statusMessage, value);
         }
 
-        // Navigation
+        // Navigation with thread safety
         public bool ShowDashboard
         {
-            get => _showDashboard;
-            set => SetProperty(ref _showDashboard, value);
+            get 
+            { 
+                lock (_navigationLock) 
+                { 
+                    return _showDashboard; 
+                } 
+            }
+            set 
+            { 
+                lock (_navigationLock) 
+                { 
+                    SetProperty(ref _showDashboard, value); 
+                } 
+            }
         }
 
         public bool ShowSettings
         {
-            get => _showSettings;
-            set => SetProperty(ref _showSettings, value);
+            get 
+            { 
+                lock (_navigationLock) 
+                { 
+                    return _showSettings; 
+                } 
+            }
+            set 
+            { 
+                lock (_navigationLock) 
+                { 
+                    SetProperty(ref _showSettings, value); 
+                } 
+            }
         }
 
         public bool ShowTutorial
         {
-            get => _showTutorial;
-            set => SetProperty(ref _showTutorial, value);
+            get 
+            { 
+                lock (_navigationLock) 
+                { 
+                    return _showTutorial; 
+                } 
+            }
+            set 
+            { 
+                lock (_navigationLock) 
+                { 
+                    SetProperty(ref _showTutorial, value); 
+                } 
+            }
         }
 
         public bool ShowFeide
         {
-            get => _showFeide;
-            set => SetProperty(ref _showFeide, value);
+            get 
+            { 
+                lock (_navigationLock) 
+                { 
+                    return _showFeide; 
+                } 
+            }
+            set 
+            { 
+                lock (_navigationLock) 
+                { 
+                    SetProperty(ref _showFeide, value); 
+                } 
+            }
         }
 
         // Automation
@@ -184,7 +239,7 @@ namespace AkademiTrack.ViewModels
             
             // Initialize other services
             _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _httpClient.Timeout = TimeSpan.FromSeconds(Constants.Network.HTTP_TIMEOUT_SECONDS);
             
             // Initialize ViewModels
             SettingsViewModel = new SettingsViewModel();
@@ -230,12 +285,32 @@ namespace AkademiTrack.ViewModels
 
         #region Initialization
         private int _initializationRetryCount = 0;
-        private const int MAX_RETRY_ATTEMPTS = 3;
+        private const int MAX_RETRY_ATTEMPTS = Constants.Network.MAX_RETRY_ATTEMPTS;
 
         private async Task InitializeAsync()
         {
+            // Prevent concurrent initialization
+            if (_isInitializing)
+            {
+                _loggingService.LogDebug("Initialization already in progress, skipping duplicate call");
+                return;
+            }
+
+            if (!await _initializationSemaphore.WaitAsync(100))
+            {
+                _loggingService.LogWarning("Initialization semaphore timeout - another initialization in progress");
+                return;
+            }
+
             try
             {
+                if (_isInitializing)
+                {
+                    _loggingService.LogDebug("Double-check: initialization already in progress");
+                    return;
+                }
+
+                _isInitializing = true;
                 IsLoading = true;
                 _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
@@ -293,83 +368,98 @@ namespace AkademiTrack.ViewModels
 
                     _initializationRetryCount = 0;
 
-                    await Task.Delay(500);
+                    await Task.Delay(Constants.Time.UI_DELAY_MEDIUM_MS);
                     IsLoading = false;
                 }
                 else
                 {
-                    _initializationRetryCount++;
-
-                    Debug.WriteLine("[MainWindow] App initialization failed");
-
-                    string errorMessage = !string.IsNullOrEmpty(authResult.ErrorMessage)
-                        ? authResult.ErrorMessage
-                        : "Kunne ikke autentisere med iskole.net. Sjekk innloggingsdata i innstillinger.";
-
-                    if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
-                    {
-                        try
-                        {
-                            await _analyticsService.LogErrorAsync(
-                                "app_initialization_critical_failure",
-                                $"Failed after {MAX_RETRY_ATTEMPTS} attempts: {errorMessage}"
-                            );
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[Analytics] Failed to log initialization failure: {ex.Message}");
-                        }
-
-                        _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
-                        _loggingService.LogError($"Feilmelding: {errorMessage}");
-                        await _notificationService.ShowNotificationAsync(
-                            "Autentisering mislyktes",
-                            $"Etter {MAX_RETRY_ATTEMPTS} forsøk: {errorMessage}",
-                            NotificationLevel.Error
-                        );
-
-                        StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
-                        IsLoading = false;
-                        return;
-                    }
-
-                    _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
-                    _loggingService.LogError($"Feilmelding: {errorMessage}");
-                    await _notificationService.ShowNotificationAsync(
-                        "Autentisering mislyktes",
-                        $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} mislyktes. Prøver igjen...",
-                        NotificationLevel.Warning
-                    );
-
-                    await Task.Delay(3000 * _initializationRetryCount);
-                    await InitializeAsync();
+                    await HandleInitializationFailure(authResult.ErrorMessage);
                 }
             }
             catch (Exception ex)
             {
+                await HandleInitializationException(ex);
+            }
+            finally
+            {
+                _isInitializing = false;
+                _initializationSemaphore.Release();
+            }
+        }
+
+        private async Task HandleInitializationFailure(string? errorMessage)
+        {
+            _initializationRetryCount++;
+
+            Debug.WriteLine("[MainWindow] App initialization failed");
+
+            string finalErrorMessage = !string.IsNullOrEmpty(errorMessage)
+                ? errorMessage
+                : "Kunne ikke autentisere med iskole.net. Sjekk innloggingsdata i innstillinger.";
+
+            if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
+            {
                 try
                 {
                     await _analyticsService.LogErrorAsync(
-                        "app_initialization_exception",
-                        ex.Message,
-                        ex
+                        "app_initialization_critical_failure",
+                        $"Failed after {MAX_RETRY_ATTEMPTS} attempts: {finalErrorMessage}"
                     );
                 }
-                catch (Exception analyticsEx)
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"[Analytics] Failed to log initialization exception: {analyticsEx.Message}");
+                    Debug.WriteLine($"[Analytics] Failed to log initialization failure: {ex.Message}");
                 }
 
-                _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
+                _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
+                _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
                 await _notificationService.ShowNotificationAsync(
-                    "Oppstartsfeil",
-                    "En kritisk feil oppstod under oppstart. Prøver igjen...",
+                    "Autentisering mislyktes",
+                    $"Etter {MAX_RETRY_ATTEMPTS} forsøk: {finalErrorMessage}",
                     NotificationLevel.Error
                 );
 
-                await Task.Delay(3000);
-                await InitializeAsync();
+                StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
+                IsLoading = false;
+                return;
             }
+
+            _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
+            _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
+            await _notificationService.ShowNotificationAsync(
+                "Autentisering mislyktes",
+                $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} mislyktes. Prøver igjen...",
+                NotificationLevel.Warning
+            );
+
+            await Task.Delay(Constants.Time.UI_DELAY_EXTRA_LONG_MS * _initializationRetryCount);
+            await InitializeAsync();
+        }
+
+        private async Task HandleInitializationException(Exception ex)
+        {
+            try
+            {
+                await _analyticsService.LogErrorAsync(
+                    "app_initialization_exception",
+                    ex.Message,
+                    ex
+                );
+            }
+            catch (Exception analyticsEx)
+            {
+                Debug.WriteLine($"[Analytics] Failed to log initialization exception: {analyticsEx.Message}");
+            }
+
+            _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
+            await _notificationService.ShowNotificationAsync(
+                "Oppstartsfeil",
+                "En kritisk feil oppstod under oppstart. Prøver igjen...",
+                NotificationLevel.Error
+            );
+
+            await Task.Delay(3000);
+            await InitializeAsync();
         }
 
         private void StartDashboardRefreshTimer()
@@ -412,7 +502,6 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogInfo("⏰ Starting midnight reset timer...");
 
-            // Check for new day every 5 minutes
             _midnightResetTimer = new Timer(
                 async _ =>
                 {
@@ -566,7 +655,6 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
-            // ✅ Only refresh if cache is stale (no data or new day)
             if (Dashboard.IsCacheStale())
             {
                 _loggingService.LogInfo("📊 Cache is stale - refreshing dashboard before automation...");
@@ -614,7 +702,6 @@ namespace AkademiTrack.ViewModels
                 // Also reload user parameters in case they were updated by AuthenticationService
                 Services.UserParameters? freshUserParams = null;
                 
-                // First try to load from file (new method)
                 try
                 {
                     var appSupportDir = Path.Combine(
@@ -804,8 +891,35 @@ namespace AkademiTrack.ViewModels
 
         private async Task RefreshDataAsync()
         {
+            // Prevent concurrent refreshes with timeout
+            if (!await _refreshSemaphore.WaitAsync(100))
+            {
+                _loggingService.LogDebug("Data refresh already in progress, skipping duplicate request");
+                return;
+            }
+
             try
             {
+                // Double-check with volatile flag
+                if (_isRefreshingData)
+                {
+                    _loggingService.LogDebug("Double-check: refresh already in progress");
+                    return;
+                }
+
+                // Check cooldown period
+                var timeSinceLastRefresh = DateTime.Now - _lastManualRefresh;
+                if (timeSinceLastRefresh.TotalSeconds < REFRESH_COOLDOWN_SECONDS)
+                {
+                    var remainingCooldown = REFRESH_COOLDOWN_SECONDS - (int)timeSinceLastRefresh.TotalSeconds;
+                    _loggingService.LogInfo($"Refresh cooldown active - wait {remainingCooldown} more seconds");
+                    StatusMessage = $"Vent {remainingCooldown}s før ny oppdatering";
+                    return;
+                }
+
+                _isRefreshingData = true;
+                _lastManualRefresh = DateTime.Now;
+
                 _loggingService.LogInfo("🔄 Oppdaterer data...");
                 StatusMessage = "Oppdaterer...";
 
@@ -814,8 +928,6 @@ namespace AkademiTrack.ViewModels
                 _loggingService.LogSuccess("✓ Data oppdatert!");
                 StatusMessage = "Data oppdatert!";
                 
-                // Removed notification - data refresh should be silent
-
                 // Reset status after 3 seconds
                 await Task.Delay(3000);
                 if (StatusMessage == "Data oppdatert!")
@@ -833,6 +945,11 @@ namespace AkademiTrack.ViewModels
                     "Kunne ikke oppdatere data. Prøv igjen senere.",
                     NotificationLevel.Warning
                 );
+            }
+            finally
+            {
+                _isRefreshingData = false;
+                _refreshSemaphore.Release();
             }
         }
 
@@ -884,7 +1001,6 @@ namespace AkademiTrack.ViewModels
             await InitializeAsync();
         }
 
-        
 
         private async Task CheckMidnightResetAsync()
         {
@@ -1110,7 +1226,6 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    // Cache is fresh, but still update next class display in case timer missed
                     Dashboard.UpdateNextClassFromCache();
                 }
             }
@@ -1179,6 +1294,10 @@ namespace AkademiTrack.ViewModels
 
                 _autoStartCheckTimer?.Dispose();
                 _autoStartCheckTimer = null;
+
+                // Dispose semaphores
+                _refreshSemaphore?.Dispose();
+                _initializationSemaphore?.Dispose();
 
                 // Dispose update checker
                 _updateChecker?.Dispose();

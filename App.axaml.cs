@@ -16,6 +16,8 @@ using Avalonia.Controls;
 using MsBox.Avalonia;
 using MsBox.Avalonia.Enums;
 using AkademiTrack.Services;
+using AkademiTrack.Services.Interfaces;
+using AkademiTrack.Services.DependencyInjection;
 
 namespace AkademiTrack
 {
@@ -32,24 +34,93 @@ namespace AkademiTrack
 
         public override void Initialize()
         {
-            AvaloniaXamlLoader.Load(this);
-
-            Services.ServiceLocator.InitializeServices();
-            
-            // Pre-initialize Puppeteer to avoid delays during first authentication
-            _ = Task.Run(async () =>
+            try
             {
+                // Add global handler for unobserved task exceptions
+                TaskScheduler.UnobservedTaskException += (sender, e) =>
+                {
+                    Debug.WriteLine($"[App] UnobservedTaskException: {e.Exception.GetBaseException().Message}");
+                    Debug.WriteLine($"[App] Stack trace: {e.Exception.GetBaseException().StackTrace}");
+                    
+                    // Mark as observed to prevent app crash
+                    e.SetObserved();
+                    
+                    // Log to our logging system if available
+                    try
+                    {
+                        var loggingService = ServiceContainer.GetOptionalService<ILoggingService>();
+                        loggingService?.LogError($"UnobservedTaskException: {e.Exception.GetBaseException().Message}");
+                    }
+                    catch
+                    {
+                        // Ignore if logging service not available
+                    }
+                };
+                
+                AvaloniaXamlLoader.Load(this);
+                Debug.WriteLine("[App] XAML loaded successfully");
+
+                ServiceContainer.Initialize();
+                Debug.WriteLine("[App] Services initialized successfully");
+                
+                // Initialize global exception handler
                 try
                 {
-                    // Pre-initialize browser if needed
-                    var browserFetcher = new PuppeteerSharp.BrowserFetcher();
-                    await browserFetcher.DownloadAsync();
+                    var loggingService = ServiceContainer.GetService<ILoggingService>();
+                    var notificationService = ServiceContainer.GetService<INotificationService>();
+                    var analyticsService = ServiceContainer.GetService<AnalyticsService>();
+                    
+                    Services.Utilities.GlobalExceptionHandler.Initialize(loggingService, notificationService, analyticsService);
+                    Debug.WriteLine("✓ Global exception handler initialized");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[App] Puppeteer pre-initialization failed: {ex.Message}");
+                    Debug.WriteLine($"❌ Failed to initialize global exception handler: {ex.Message}");
+                    // Continue without global exception handler - not critical
                 }
-            });
+                
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Pre-initialize browser if needed
+                        var browserFetcher = new PuppeteerSharp.BrowserFetcher();
+                        await browserFetcher.DownloadAsync();
+                        Debug.WriteLine("[App] Puppeteer pre-initialization completed");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[App] Puppeteer pre-initialization failed: {ex.Message}");
+                        // Not critical - continue without pre-initialization
+                    }
+                }).ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        Debug.WriteLine($"[App] Puppeteer task failed: {t.Exception.GetBaseException().Message}");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
+                
+                Debug.WriteLine("[App] Initialize() completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] CRITICAL ERROR in Initialize(): {ex.Message}");
+                Debug.WriteLine($"[App] Stack trace: {ex.StackTrace}");
+                
+                // Try to show error to user if possible
+                try
+                {
+                    System.Console.WriteLine($"AkademiTrack initialization failed: {ex.Message}");
+                }
+                catch
+                {
+                    // If even console output fails, we're in serious trouble
+                }
+                
+                // Re-throw to prevent app from starting in broken state
+                throw;
+            }
         }
 
         public override void OnFrameworkInitializationCompleted()
@@ -381,10 +452,25 @@ github.com/CyberGutta/AkademiTrack";
             });
         }
 
-        private void QuitApp(object? sender, EventArgs e)
+        private async void QuitApp(object? sender, EventArgs e)
         {
             Debug.WriteLine("[App] Quit requested from menu");
             _isShuttingDown = true;
+            
+            try
+            {
+                // Cleanup global exception handler
+                Services.Utilities.GlobalExceptionHandler.Cleanup();
+                Debug.WriteLine("[App] Global exception handler cleaned up");
+
+                // Shutdown service container
+                await ServiceContainer.ShutdownAsync();
+                Debug.WriteLine("[App] Service container shut down");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] Error during cleanup: {ex.Message}");
+            }
             
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {

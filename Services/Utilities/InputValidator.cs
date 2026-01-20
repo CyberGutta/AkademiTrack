@@ -1,11 +1,12 @@
 using System;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace AkademiTrack.Services.Utilities
 {
     /// <summary>
-    /// Input validation utilities to prevent injection attacks and invalid data
+    /// Comprehensive input validation utilities with security-focused sanitization
     /// </summary>
     public static class InputValidator
     {
@@ -16,68 +17,124 @@ namespace AkademiTrack.Services.Utilities
         );
 
         private static readonly Regex SafeStringRegex = new Regex(
-            @"^[\w\s@.\-]+$",
+            @"^[\w\s@.\-æøåÆØÅ]+$",
             RegexOptions.Compiled,
             TimeSpan.FromSeconds(1)
         );
 
+        // SQL injection patterns to detect
+        private static readonly string[] SqlInjectionPatterns = 
+        {
+            "union", "select", "insert", "update", "delete", "drop", "create", "alter",
+            "exec", "execute", "sp_", "xp_", "--", "/*", "*/", "@@", "char(", "nchar(",
+            "varchar(", "nvarchar(", "alter(", "begin(", "cast(", "cursor(", "declare(",
+            "end(", "exec(", "fetch(", "kill(", "open(", "sys", "table", "script",
+            "javascript:", "vbscript:", "onload", "onerror", "onclick"
+        };
+
         /// <summary>
-        /// Validate email address
+        /// Validate email address with comprehensive security checks
         /// </summary>
-        public static bool IsValidEmail(string? email)
+        public static ValidationResult ValidateEmail(string? email)
         {
             if (string.IsNullOrWhiteSpace(email))
-                return false;
+                return ValidationResult.Failed("E-post kan ikke være tom");
+
+            email = email.Trim();
+
+            if (email.Length > 254) // RFC 5321 limit
+                return ValidationResult.Failed("E-post er for lang (maks 254 tegn)");
+
+            // Check for dangerous patterns
+            if (ContainsSqlInjection(email) || ContainsScriptInjection(email))
+                return ValidationResult.Failed("E-post inneholder ugyldige tegn");
 
             try
             {
                 // Use MailAddress for robust validation
                 var addr = new MailAddress(email);
-                return addr.Address == email && EmailRegex.IsMatch(email);
+                if (addr.Address != email || !EmailRegex.IsMatch(email))
+                    return ValidationResult.Failed("Ugyldig e-post format");
+
+                return ValidationResult.Success(SanitizeInput(email));
             }
-            catch
+            catch (FormatException)
             {
-                return false;
+                return ValidationResult.Failed("Ugyldig e-post format");
             }
         }
 
         /// <summary>
-        /// Validate password strength
+        /// Validate password with security requirements
         /// </summary>
-        public static (bool isValid, string? errorMessage) ValidatePassword(string? password)
+        public static ValidationResult ValidatePassword(string? password)
         {
             if (string.IsNullOrEmpty(password))
-                return (false, "Passord kan ikke være tomt");
+                return ValidationResult.Failed("Passord kan ikke være tomt");
 
-            if (password.Length < 4)
-                return (false, "Passord må være minst 4 tegn");
+            if (password.Length < 6)
+                return ValidationResult.Failed("Passord må være minst 6 tegn");
 
             if (password.Length > 128)
-                return (false, "Passord kan ikke være lengre enn 128 tegn");
+                return ValidationResult.Failed("Passord kan ikke være lengre enn 128 tegn");
 
-            return (true, null);
+            // Check for null bytes and control characters
+            if (password.Any(c => char.IsControl(c) && c != '\t'))
+                return ValidationResult.Failed("Passord inneholder ugyldige tegn");
+
+            return ValidationResult.Success(password);
         }
 
         /// <summary>
-        /// Validate username
+        /// Validate username with security checks
         /// </summary>
-        public static (bool isValid, string? errorMessage) ValidateUsername(string? username)
+        public static ValidationResult ValidateUsername(string? username)
         {
             if (string.IsNullOrWhiteSpace(username))
-                return (false, "Brukernavn kan ikke være tomt");
+                return ValidationResult.Failed("Brukernavn kan ikke være tomt");
+
+            username = username.Trim();
 
             if (username.Length < 3)
-                return (false, "Brukernavn må være minst 3 tegn");
+                return ValidationResult.Failed("Brukernavn må være minst 3 tegn");
 
             if (username.Length > 100)
-                return (false, "Brukernavn kan ikke være lengre enn 100 tegn");
+                return ValidationResult.Failed("Brukernavn kan ikke være lengre enn 100 tegn");
 
-            return (true, null);
+            if (ContainsSqlInjection(username) || ContainsScriptInjection(username))
+                return ValidationResult.Failed("Brukernavn inneholder ugyldige tegn");
+
+            return ValidationResult.Success(SanitizeInput(username));
         }
 
         /// <summary>
-        /// Sanitize input to prevent injection attacks
-        /// Removes potentially dangerous characters
+        /// Validate school name with comprehensive checks
+        /// </summary>
+        public static ValidationResult ValidateSchoolName(string? schoolName)
+        {
+            if (string.IsNullOrWhiteSpace(schoolName))
+                return ValidationResult.Failed("Skolenavn kan ikke være tomt");
+
+            schoolName = schoolName.Trim();
+
+            if (schoolName.Length < 3)
+                return ValidationResult.Failed("Skolenavn må være minst 3 tegn");
+
+            if (schoolName.Length > 200)
+                return ValidationResult.Failed("Skolenavn kan ikke være lengre enn 200 tegn");
+
+            if (ContainsSqlInjection(schoolName) || ContainsScriptInjection(schoolName))
+                return ValidationResult.Failed("Skolenavn inneholder ugyldige tegn");
+
+            // Allow Norwegian characters in school names
+            if (!Regex.IsMatch(schoolName, @"^[a-zA-ZæøåÆØÅ0-9\s\-\.\(\)]+$"))
+                return ValidationResult.Failed("Skolenavn inneholder ugyldige tegn");
+
+            return ValidationResult.Success(SanitizeInput(schoolName));
+        }
+
+        /// <summary>
+        /// Enhanced input sanitization with security focus
         /// </summary>
         public static string SanitizeInput(string? input)
         {
@@ -86,23 +143,51 @@ namespace AkademiTrack.Services.Utilities
 
             try
             {
-                // Remove control characters
-                input = Regex.Replace(input, @"[\x00-\x1F\x7F]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+                // Remove control characters except tab, newline, carriage return
+                input = Regex.Replace(input, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", 
+                    RegexOptions.None, TimeSpan.FromSeconds(1));
 
                 // Remove potentially dangerous characters for SQL/script injection
-                input = Regex.Replace(input, @"[<>\"";'`]", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+                input = Regex.Replace(input, @"[<>\"";'`\x00]", "", 
+                    RegexOptions.None, TimeSpan.FromSeconds(1));
+
+                // Normalize whitespace
+                input = Regex.Replace(input, @"\s+", " ", 
+                    RegexOptions.None, TimeSpan.FromSeconds(1));
 
                 return input.Trim();
             }
             catch (RegexMatchTimeoutException)
             {
-                // If regex times out, return empty string for safety
                 return string.Empty;
             }
         }
 
         /// <summary>
-        /// Check if string contains only safe characters (alphanumeric, spaces, @, ., -)
+        /// </summary>
+        private static bool ContainsSqlInjection(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return false;
+
+            var lowerInput = input.ToLowerInvariant();
+            return SqlInjectionPatterns.Any(pattern => lowerInput.Contains(pattern));
+        }
+
+        /// <summary>
+        /// </summary>
+        private static bool ContainsScriptInjection(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return false;
+
+            var lowerInput = input.ToLowerInvariant();
+            var scriptPatterns = new[] { "javascript:", "vbscript:", "data:", "onload", "onerror", "onclick", "onmouseover" };
+            
+            return scriptPatterns.Any(pattern => lowerInput.Contains(pattern));
+        }
+
+        /// <summary>
         /// </summary>
         public static bool IsSafeString(string? input)
         {
@@ -111,7 +196,9 @@ namespace AkademiTrack.Services.Utilities
 
             try
             {
-                return SafeStringRegex.IsMatch(input);
+                return SafeStringRegex.IsMatch(input) && 
+                       !ContainsSqlInjection(input) && 
+                       !ContainsScriptInjection(input);
             }
             catch (RegexMatchTimeoutException)
             {
@@ -120,36 +207,46 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Validate school name
+        /// Validate URL with security checks
         /// </summary>
-        public static (bool isValid, string? errorMessage) ValidateSchoolName(string? schoolName)
-        {
-            if (string.IsNullOrWhiteSpace(schoolName))
-                return (false, "Skolenavn kan ikke være tomt");
-
-            if (schoolName.Length < 3)
-                return (false, "Skolenavn må være minst 3 tegn");
-
-            if (schoolName.Length > 200)
-                return (false, "Skolenavn kan ikke være lengre enn 200 tegn");
-
-            return (true, null);
-        }
-
-        /// <summary>
-        /// Validate URL
-        /// </summary>
-        public static bool IsValidUrl(string? url)
+        public static ValidationResult ValidateUrl(string? url)
         {
             if (string.IsNullOrWhiteSpace(url))
-                return false;
+                return ValidationResult.Failed("URL kan ikke være tom");
 
-            return Uri.TryCreate(url, UriKind.Absolute, out var uriResult)
-                && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+            url = url.Trim();
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uriResult))
+                return ValidationResult.Failed("Ugyldig URL format");
+
+            if (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps)
+                return ValidationResult.Failed("URL må bruke HTTP eller HTTPS");
+
+            // Check for suspicious patterns in URL
+            if (ContainsSqlInjection(url) || ContainsScriptInjection(url))
+                return ValidationResult.Failed("URL inneholder ugyldige tegn");
+
+            return ValidationResult.Success(uriResult.ToString());
         }
 
         /// <summary>
-        /// Truncate string to maximum length
+        /// Validate numeric input within range
+        /// </summary>
+        public static ValidationResult ValidateNumeric(string? input, int min = int.MinValue, int max = int.MaxValue)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return ValidationResult.Failed("Numerisk verdi kan ikke være tom");
+
+            if (!int.TryParse(input.Trim(), out var value))
+                return ValidationResult.Failed("Ugyldig numerisk format");
+
+            if (value < min || value > max)
+                return ValidationResult.Failed($"Verdi må være mellom {min} og {max}");
+
+            return ValidationResult.Success(value.ToString());
+        }
+
+        /// <summary>
         /// </summary>
         public static string Truncate(string? input, int maxLength)
         {
@@ -160,6 +257,81 @@ namespace AkademiTrack.Services.Utilities
                 throw new ArgumentOutOfRangeException(nameof(maxLength));
 
             return input.Length <= maxLength ? input : input.Substring(0, maxLength);
+        }
+
+        /// <summary>
+        /// Validate file path for security
+        /// </summary>
+        public static ValidationResult ValidateFilePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return ValidationResult.Failed("Filsti kan ikke være tom");
+
+            path = path.Trim();
+
+            // Check for path traversal attempts
+            if (path.Contains("..") || path.Contains("~") || path.Contains("//"))
+                return ValidationResult.Failed("Ugyldig filsti - path traversal ikke tillatt");
+
+            // Check for invalid path characters
+            var invalidChars = System.IO.Path.GetInvalidPathChars();
+            if (path.Any(c => invalidChars.Contains(c)))
+                return ValidationResult.Failed("Filsti inneholder ugyldige tegn");
+
+            try
+            {
+                var fullPath = System.IO.Path.GetFullPath(path);
+                return ValidationResult.Success(fullPath);
+            }
+            catch (Exception)
+            {
+                return ValidationResult.Failed("Ugyldig filsti format");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Result of input validation with detailed feedback
+    /// </summary>
+    public class ValidationResult
+    {
+        public bool IsValid { get; private set; }
+        public string? Value { get; private set; }
+        public string? ErrorMessage { get; private set; }
+
+        private ValidationResult(bool isValid, string? value, string? errorMessage)
+        {
+            IsValid = isValid;
+            Value = value;
+            ErrorMessage = errorMessage;
+        }
+
+        public static ValidationResult Success(string value)
+        {
+            return new ValidationResult(true, value, null);
+        }
+
+        public static ValidationResult Failed(string errorMessage)
+        {
+            return new ValidationResult(false, null, errorMessage);
+        }
+
+        /// <summary>
+        /// Throws an exception if validation failed
+        /// </summary>
+        public void ThrowIfInvalid()
+        {
+            if (!IsValid)
+                throw new ArgumentException(ErrorMessage ?? "Validation failed");
+        }
+
+        /// <summary>
+        /// Gets the value or throws if invalid
+        /// </summary>
+        public string GetValueOrThrow()
+        {
+            ThrowIfInvalid();
+            return Value ?? string.Empty;
         }
     }
 }

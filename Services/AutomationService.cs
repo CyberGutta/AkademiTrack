@@ -27,9 +27,13 @@ namespace AkademiTrack.Services
         private List<ScheduleItem>? _cachedScheduleData;
         private bool _disposed = false;
 
+        // Resource tracking for proper disposal
+        private readonly List<IDisposable> _disposables = new();
+        private readonly object _disposalLock = new object();
+
         // Constants
         private const int MONITORING_INTERVAL_MS = 30_000; // 30 seconds
-        private const int REGISTRATION_WINDOW_MINUTES = 15;
+        private const int REGISTRATION_WINDOW_MINUTES = Constants.Time.REGISTRATION_WINDOW_MINUTES;
 
         public event EventHandler<AutomationStatusChangedEventArgs>? StatusChanged;
         public event EventHandler<AutomationProgressEventArgs>? ProgressUpdated;
@@ -43,6 +47,35 @@ namespace AkademiTrack.Services
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _httpClient = HttpClientFactory.DefaultClient;
+            
+            // Track the HttpClient for monitoring (but don't dispose it as it's shared)
+            _loggingService.LogDebug("[AutomationService] Initialized with shared HttpClient");
+        }
+
+        /// <summary>
+        /// Adds a disposable resource to be tracked and disposed when service is disposed
+        /// </summary>
+        private void TrackDisposable(IDisposable disposable)
+        {
+            lock (_disposalLock)
+            {
+                if (!_disposed)
+                {
+                    _disposables.Add(disposable);
+                }
+                else
+                {
+                    // If already disposed, dispose immediately
+                    try
+                    {
+                        disposable?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService?.LogError($"Error disposing tracked resource: {ex.Message}");
+                    }
+                }
+            }
         }
 
         public async Task<AutomationResult> StartAsync(CancellationToken cancellationToken = default)
@@ -53,6 +86,7 @@ namespace AkademiTrack.Services
             }
 
             string finalStatus = "Ready"; // Track what final status to send
+            CancellationTokenSource? localCancellationSource = null;
 
             try
             {
@@ -78,7 +112,11 @@ namespace AkademiTrack.Services
                 // Mark today as started to prevent duplicate auto-starts
                 await SchoolTimeChecker.MarkTodayAsStartedAsync();
 
-                _cancellationTokenSource = new CancellationTokenSource();
+                // Create and track cancellation token source
+                localCancellationSource = new CancellationTokenSource();
+                TrackDisposable(localCancellationSource);
+                _cancellationTokenSource = localCancellationSource;
+                
                 var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken, _cancellationTokenSource.Token).Token;
 
@@ -133,8 +171,18 @@ namespace AkademiTrack.Services
             {
                 _isRunning = false;
                 _currentStatus = finalStatus; // Use the tracked final status instead of always "Ready"
-                _cancellationTokenSource?.Dispose();
+                
+                // Clean up cancellation token source
+                if (localCancellationSource != null)
+                {
+                    lock (_disposalLock)
+                    {
+                        _disposables.Remove(localCancellationSource);
+                    }
+                    localCancellationSource.Dispose();
+                }
                 _cancellationTokenSource = null;
+                
                 StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
             }
         }
@@ -270,7 +318,7 @@ namespace AkademiTrack.Services
             try
             {
                 _loggingService.LogDebug("Checking internet connectivity...");
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.Time.SHORT_TIMEOUT_SECONDS));
                 var response = await _httpClient.GetAsync("https://www.google.com", cts.Token);
                 return response.IsSuccessStatusCode;
             }
@@ -453,7 +501,7 @@ namespace AkademiTrack.Services
 
                     _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
 
-                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Constants.Time.RETRY_DELAY_SECONDS), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -472,7 +520,7 @@ namespace AkademiTrack.Services
                         );
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Constants.Time.RETRY_DELAY_SECONDS), cancellationToken);
                 }
             }
 
@@ -559,7 +607,7 @@ namespace AkademiTrack.Services
 
         private async Task<List<ScheduleItem>?> GetFullDayScheduleDataAsync()
         {
-            const int MAX_RETRIES = 3;
+            const int MAX_RETRIES = Constants.Network.MAX_RETRY_ATTEMPTS;
             int retryCount = 0;
             
             while (retryCount < MAX_RETRIES)
@@ -1008,7 +1056,6 @@ namespace AkademiTrack.Services
         {
             try
             {
-                // First try to load from file (new method)
                 var appSupportDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
@@ -1061,13 +1108,51 @@ namespace AkademiTrack.Services
             
             try
             {
+                _loggingService?.LogDebug("[AutomationService] Starting disposal...");
+                
+                // Cancel any running operations
                 _cancellationTokenSource?.Cancel();
-                _cancellationTokenSource?.Dispose();
-                _cancellationTokenSource = null;
+                
+                // Dispose all tracked resources
+                lock (_disposalLock)
+                {
+                    _disposed = true;
+                    
+                    foreach (var disposable in _disposables)
+                    {
+                        try
+                        {
+                            disposable?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService?.LogError($"Error disposing resource: {ex.Message}");
+                        }
+                    }
+                    _disposables.Clear();
+                }
+                
+                // Dispose cancellation token source
+                try
+                {
+                    _cancellationTokenSource?.Dispose();
+                    _cancellationTokenSource = null;
+                }
+                catch (Exception ex)
+                {
+                    _loggingService?.LogError($"Error disposing cancellation token source: {ex.Message}");
+                }
+                
+                // Clear references to help GC
+                _userParameters = null;
+                _cookies?.Clear();
+                _cookies = null;
+                _cachedScheduleData?.Clear();
+                _cachedScheduleData = null;
                 
                 // Note: _httpClient is shared from HttpClientFactory, so we don't dispose it
                 
-                _disposed = true;
+                _loggingService?.LogDebug("[AutomationService] Disposal completed successfully");
             }
             catch (Exception ex)
             {

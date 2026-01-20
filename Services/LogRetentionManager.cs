@@ -89,7 +89,6 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error in log retention cleanup: {ex.Message}");
-                // Don't log to service here to avoid potential infinite loop
             }
         }
 

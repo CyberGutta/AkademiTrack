@@ -211,7 +211,6 @@ using Microsoft.Win32;
                     });
                     unloadProcess?.WaitForExit();
 
-                    // Load the new one
                     var loadProcess = Process.Start(new ProcessStartInfo
                     {
                         FileName = "launchctl",
@@ -547,7 +546,6 @@ Terminal=false
         private TimeSpan _mondayStart = new TimeSpan(9, 0, 0);
         private TimeSpan _mondayEnd = new TimeSpan(15, 15, 0);
 
-        private System.Timers.Timer? _logCleanupTimer;
         private const int LOG_RETENTION_DAYS = 7;
 
         public bool MondayEnabled
@@ -844,9 +842,6 @@ Terminal=false
         public ICommand RunDiagnosticsCommand { get; }
 
         public ICommand UninstallCompletelyCommand { get; }
-
-
-
 
 
         public string UpdateStatus
@@ -1187,7 +1182,6 @@ Terminal=false
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
 
 
-
         public void ConnectToMainViewModel(RefactoredMainWindowViewModel mainViewModel)
         {
             if (mainViewModel?.LogEntries != null)
@@ -1499,7 +1493,7 @@ Terminal=false
                             if (Directory.Exists(dir))
                                 Directory.Delete(dir, true);
                         }
-                        catch { }
+                        catch { /* Intentionally empty */ }
                     }
 
                     try
@@ -1507,7 +1501,7 @@ Terminal=false
                         if (Directory.Exists(appDataDir))
                             Directory.Delete(appDataDir, true);
                     }
-                    catch { }
+                    catch { /* Intentionally empty */ }
                 }
 
                 Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
@@ -1625,11 +1619,11 @@ Terminal=false
                     foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
                     {
                         try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-                        catch { }
+                        catch { /* Intentionally empty */ }
                     }
 
                     try { if (Directory.Exists(appDataDir)) Directory.Delete(appDataDir, true); }
-                    catch { }
+                    catch { /* Intentionally empty */ }
                 }
 
                 Debug.WriteLine("=== ACCOUNT COMPLETELY DELETED ===");
@@ -1779,7 +1773,7 @@ Terminal=false
                             if (Directory.Exists(dir))
                                 Directory.Delete(dir, true);
                         }
-                        catch { }
+                        catch { /* Intentionally empty */ }
                     }
 
                     try
@@ -1788,7 +1782,7 @@ Terminal=false
                             Directory.Delete(appDataDir, true);
                         Debug.WriteLine("✓ AppData directory deleted");
                     }
-                    catch { }
+                    catch { /* Intentionally empty */ }
                 }
 
                 // 6. Create uninstall script to delete the app itself
@@ -1871,7 +1865,6 @@ Terminal=false
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    // On Windows, return the .exe path
                     if (exePath.EndsWith(".dll"))
                     {
                         var appDir = Path.GetDirectoryName(exePath);
@@ -1882,7 +1875,6 @@ Terminal=false
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    // On Linux, return the executable path
                     return exePath;
                 }
 
@@ -2899,7 +2891,23 @@ Terminal=false
                 });
 
                 RefreshDisplayedLogs();
-                _ = Task.Run(() => AutoStartManager.SetAutoStart(_startWithSystem));
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        AutoStartManager.SetAutoStart(_startWithSystem);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[SettingsViewModel] AutoStart setup failed: {ex.Message}");
+                    }
+                }).ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        Debug.WriteLine($"[SettingsViewModel] AutoStart task failed: {t.Exception.GetBaseException().Message}");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
             }
             catch (Exception ex)
             {
@@ -2928,7 +2936,6 @@ Terminal=false
                 if (!string.IsNullOrEmpty(_loginEmail))
                     await SecureCredentialStorage.SaveCredentialAsync("feide_username", _loginEmail);
 
-                // Convert SecureString to plain string temporarily for saving
                 var passwordPlain = SecureStringToString(_loginPasswordSecure);
                 try
                 {
@@ -2994,9 +3001,6 @@ Terminal=false
         {
             _loginPasswordSecure?.Dispose();
             _loginPasswordSecure = null;
-            
-            _logCleanupTimer?.Stop();
-            _logCleanupTimer?.Dispose();
             
             Services.ResourceMonitor.Instance.StopMonitoring();
             

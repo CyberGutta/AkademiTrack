@@ -11,7 +11,6 @@ namespace AkademiTrack.Services.Utilities
     public static class RetryPolicy
     {
         /// <summary>
-        /// Execute an async action with retry logic and exponential backoff
         /// </summary>
         /// <typeparam name="T">Return type</typeparam>
         /// <param name="action">Action to execute</param>
@@ -61,7 +60,6 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Execute an async action with retry logic (no return value)
         /// </summary>
         public static async Task ExecuteAsync(
             Func<Task> action,

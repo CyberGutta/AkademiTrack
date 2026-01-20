@@ -36,13 +36,26 @@ namespace AkademiTrack.Services
             // Send welcome notification
             _ = Task.Run(async () =>
             {
-                await Task.Delay(2000); // Wait 2 seconds after startup
-                await _notificationService.ShowNotificationAsync(
-                    "AkademiTrack Startet",
-                    "Alle systemer er klare. Automatisering vil starte når du er innenfor skoletid.",
-                    NotificationLevel.Success
-                );
-            });
+                try
+                {
+                    await Task.Delay(2000); // Wait 2 seconds after startup
+                    await _notificationService.ShowNotificationAsync(
+                        "AkademiTrack Startet",
+                        "Alle systemer er klare. Automatisering vil starte når du er innenfor skoletid.",
+                        NotificationLevel.Success
+                    );
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[EnhancedNotificationManager] Welcome notification failed: {ex.Message}");
+                }
+            }).ContinueWith(t =>
+            {
+                if (t.IsFaulted && t.Exception != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[EnhancedNotificationManager] Welcome notification task failed: {t.Exception.GetBaseException().Message}");
+                }
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>

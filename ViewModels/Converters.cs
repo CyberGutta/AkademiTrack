@@ -5,14 +5,12 @@ using Avalonia.Data.Converters;
 
 namespace AkademiTrack.ViewModels
 {
-    // Converter for percentage string to width (e.g., "80%" -> 0.8 * container width)
     public class PercentageToWidthConverter : IMultiValueConverter
     {
         public object Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
         {
             if (values.Count < 2) return 0.0;
             
-            // values[0] = percentage string (e.g., "80%")
             // values[1] = container width
             
             if (values[0] is string percentStr && values[1] is double containerWidth)

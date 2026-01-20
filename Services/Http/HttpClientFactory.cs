@@ -50,7 +50,6 @@ namespace AkademiTrack.Services.Http
         }
 
         /// <summary>
-        /// Create a new HttpClient with custom configuration
         /// Use sparingly - prefer DefaultClient or LongTimeoutClient
         /// </summary>
         public static HttpClient CreateClient(TimeSpan? timeout = null)

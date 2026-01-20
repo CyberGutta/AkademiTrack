@@ -26,10 +26,6 @@ namespace AkademiTrack.Services
         private bool _updateAvailable = false;
         private DateTime _lastUpdateNotification = DateTime.MinValue;
 
-        // 🧪 FOR TESTING: Set to true to simulate an available update
-        // 🚀 FOR PRODUCTION: Set to false for real update checks
-        private const bool SIMULATE_UPDATE_AVAILABLE = false;
-
         // More reasonable notification messages
         private readonly string[] _notificationMessages = new[]
         {
@@ -79,7 +75,7 @@ namespace AkademiTrack.Services
 
             Log("🚀 STARTING UPDATE CHECKER SERVICE", "INFO");
             Log($"Check interval: {_checkInterval.TotalMinutes:F1} minutes", "INFO");
-            Log($"Test mode: {(SIMULATE_UPDATE_AVAILABLE ? "ON" : "OFF")}", "INFO");
+            Log("Test mode: OFF (Production)", "INFO");
             Log($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "INFO");
             Log($"Next check at: {DateTime.Now.Add(_checkInterval):yyyy-MM-dd HH:mm:ss}", "INFO");
 
@@ -116,30 +112,15 @@ namespace AkademiTrack.Services
                 bool updateDetected = false;
                 string versionNumber = "unknown";
 
-                if (SIMULATE_UPDATE_AVAILABLE)
-                {
-                    Log("🧪 TEST MODE: Simulating available update", "INFO");
-                    updateDetected = true;
-                    versionNumber = "99.99.99";
+                // 🚀 PRODUCTION MODE: Real update check
+                Log("🚀 Checking for real updates...", "INFO");
+                await _settingsViewModel.CheckForUpdatesAsync();
 
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        _settingsViewModel.UpdateAvailable = true;
-                        _settingsViewModel.AvailableVersion = versionNumber;
-                    });
-                }
-                else
-                {
-                    // 🚀 PRODUCTION MODE: Real update check
-                    Log("🚀 PRODUCTION: Checking for real updates...", "INFO");
-                    await _settingsViewModel.CheckForUpdatesAsync();
+                // Read the results from ViewModel
+                updateDetected = _settingsViewModel.UpdateAvailable;
+                versionNumber = _settingsViewModel.AvailableVersion ?? "unknown";
 
-                    // Read the results from ViewModel
-                    updateDetected = _settingsViewModel.UpdateAvailable;
-                    versionNumber = _settingsViewModel.AvailableVersion ?? "unknown";
-
-                    Log($"Real check result: Update Available={updateDetected}, Version={versionNumber}", "INFO");
-                }
+                Log($"Real check result: Update Available={updateDetected}, Version={versionNumber}", "INFO");
 
                 // If update is available, notify user reasonably
                 if (updateDetected)
@@ -147,7 +128,6 @@ namespace AkademiTrack.Services
                     _updateAvailable = true;
                     Log($"✓ Update detected! Version {versionNumber} is available", "SUCCESS");
 
-                    // Only notify once per day to avoid spam
                     var timeSinceLastNotification = DateTime.Now - _lastUpdateNotification;
                     Log($"Time since last notification: {timeSinceLastNotification.TotalHours:F1} hours", "INFO");
 

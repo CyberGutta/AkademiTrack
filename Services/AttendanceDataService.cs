@@ -13,6 +13,7 @@ namespace AkademiTrack.Services
     public class AttendanceDataService : IDisposable
     {
         private readonly HttpClient _httpClient;
+        private readonly ICacheService? _cacheService;
         private UserParameters? _userParameters;
         private Dictionary<string, string>? _cookies;
         private bool _disposed = false;
@@ -24,15 +25,39 @@ namespace AkademiTrack.Services
             _loggingService = loggingService;
         }
 
-        public AttendanceDataService()
+        public AttendanceDataService(ICacheService? cacheService = null)
         {
             _httpClient = HttpClientFactory.DefaultClient;
+            _cacheService = cacheService;
         }
 
         public void SetCredentials(UserParameters parameters, Dictionary<string, string> cookies)
         {
             _userParameters = parameters;
             _cookies = cookies;
+            
+            // Invalidate cache when credentials change
+            if (_cacheService != null)
+            {
+                _cacheService.RemoveByPattern("attendance_");
+                _cacheService.RemoveByPattern("today_schedule_");
+                _cacheService.RemoveByPattern("monthly_attendance_");
+                _cacheService.RemoveByPattern("weekly_attendance_");
+            }
+        }
+
+        /// <summary>
+        /// Invalidate all cached attendance data
+        /// </summary>
+        public void InvalidateCache()
+        {
+            if (_cacheService != null)
+            {
+                _cacheService.RemoveByPattern("attendance_");
+                _cacheService.RemoveByPattern("today_schedule_");
+                _cacheService.RemoveByPattern("monthly_attendance_");
+                _cacheService.RemoveByPattern("weekly_attendance_");
+            }
         }
 
         public void Dispose()
@@ -99,6 +124,17 @@ namespace AkademiTrack.Services
         // Fetch summary statistics (over/undertid, total hours, etc.)
         public async Task<AttendanceSummary?> GetAttendanceSummaryAsync()
         {
+            if (_cacheService != null && _userParameters != null)
+            {
+                var cacheKey = $"attendance_summary_{_userParameters.FylkeId}_{_userParameters.SkoleId}_{DateTime.Today:yyyyMMdd}";
+                
+                return await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    () => FetchWithRetryAsync(FetchAttendanceSummaryAsync),
+                    TimeSpan.FromMinutes(10) // Cache for 10 minutes
+                );
+            }
+            
             return await FetchWithRetryAsync(FetchAttendanceSummaryAsync);
         }
 
@@ -183,9 +219,19 @@ namespace AkademiTrack.Services
             }
         }
 
-        // Fetch today's schedule with attendance status using the new endpoint with full subject names
         public async Task<TodayScheduleData?> GetTodayScheduleAsync()
         {
+            if (_cacheService != null && _userParameters != null)
+            {
+                var cacheKey = $"today_schedule_{_userParameters.FylkeId}_{_userParameters.SkoleId}_{DateTime.Today:yyyyMMdd}";
+                
+                return await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    () => FetchWithRetryAsync(FetchTodayScheduleAsync),
+                    TimeSpan.FromMinutes(5) // Cache for 5 minutes (schedule changes more frequently)
+                );
+            }
+            
             return await FetchWithRetryAsync(FetchTodayScheduleAsync);
         }
 
@@ -206,7 +252,6 @@ namespace AkademiTrack.Services
                     return null;
                 }
                 
-                // Use today's date for the new endpoint
                 var today = DateTime.Now.ToString("yyyyMMdd");
                 
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
@@ -261,6 +306,17 @@ namespace AkademiTrack.Services
 
         public async Task<MonthlyAttendanceData?> GetMonthlyAttendanceAsync()
         {
+            if (_cacheService != null && _userParameters != null)
+            {
+                var cacheKey = $"monthly_attendance_{_userParameters.FylkeId}_{_userParameters.SkoleId}_{DateTime.Today:yyyyMM}";
+                
+                return await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    () => FetchWithRetryAsync(FetchMonthlyAttendanceAsync),
+                    TimeSpan.FromMinutes(15) // Cache for 15 minutes (monthly data changes less frequently)
+                );
+            }
+            
             return await FetchWithRetryAsync(FetchMonthlyAttendanceAsync);
         }
 
@@ -420,6 +476,18 @@ namespace AkademiTrack.Services
         
         public async Task<WeeklyAttendanceData?> GetWeeklyAttendanceAsync()
         {
+            if (_cacheService != null && _userParameters != null)
+            {
+                var weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + 1); // Monday of current week
+                var cacheKey = $"weekly_attendance_{_userParameters.FylkeId}_{_userParameters.SkoleId}_{weekStart:yyyyMMdd}";
+                
+                return await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    () => FetchWithRetryAsync(FetchWeeklyAttendanceAsync),
+                    TimeSpan.FromMinutes(10) // Cache for 10 minutes
+                );
+            }
+            
             return await FetchWithRetryAsync(FetchWeeklyAttendanceAsync);
         }
 
@@ -624,7 +692,6 @@ namespace AkademiTrack.Services
 
             var now = DateTime.Now.TimeOfDay;
 
-            // Get current class (if ongoing) - include ALL subjects
             var currentClasses = todayItems
                 .Where(i => !string.IsNullOrEmpty(i.Fradato) && !string.IsNullOrEmpty(i.Tildato))
                 .Select(i => new
@@ -640,7 +707,6 @@ namespace AkademiTrack.Services
 
             MonthlyScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
 
-            // Get next class - include ALL subjects (STU and regular classes)
             var upcomingClasses = todayItems
                 .Where(i => !string.IsNullOrEmpty(i.Fradato))
                 .Select(i => new
@@ -688,7 +754,6 @@ namespace AkademiTrack.Services
             if (monthlyItem == null)
                 return null;
 
-            // Extract clean subject name by removing class prefix (e.g., "PB3A NAT" -> "NAT")
             string cleanSubjectCode = ExtractSubjectCode(monthlyItem.Fag);
             string displayName = GetCleanSubjectName(monthlyItem.Fagnavn);
 
@@ -712,7 +777,6 @@ namespace AkademiTrack.Services
             if (string.IsNullOrEmpty(fag))
                 return "";
 
-            // Remove class prefix (e.g., "PB3A NAT" -> "NAT", "PB3A STU" -> "STU")
             var parts = fag.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 2)
             {

@@ -37,7 +37,6 @@ namespace AkademiTrack.Services.Utilities
         public bool IsOpen => State == CircuitState.Open;
 
         /// <summary>
-        /// Create a new circuit breaker
         /// </summary>
         /// <param name="failureThreshold">Number of failures before opening circuit</param>
         /// <param name="resetTimeoutSeconds">Seconds to wait before attempting to close circuit</param>
@@ -85,7 +84,7 @@ namespace AkademiTrack.Services.Utilities
                 RecordSuccess();
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 RecordFailure();
                 throw;
@@ -93,7 +92,6 @@ namespace AkademiTrack.Services.Utilities
         }
 
         /// <summary>
-        /// Execute an action through the circuit breaker (no return value)
         /// </summary>
         public async Task ExecuteAsync(Func<Task> action)
         {

@@ -384,12 +384,10 @@ namespace AkademiTrack.ViewModels
                 _nextClassUpdateTimer?.Dispose();
                 _nextClassUpdateTimer = null;
 
-                // Find the next event time (either next class start OR current class end)
                 var now = DateTime.Now.TimeOfDay;
                 TimeSpan? nextEventTime = null;
                 string eventDescription = "";
 
-                // Check if current class is ending soon
                 if (data.CurrentClass != null && !string.IsNullOrEmpty(data.CurrentClass.SluttKl))
                 {
                     var currentClassEndTime = ParseTimeString(data.CurrentClass.SluttKl);
@@ -400,13 +398,11 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // Check when next class starts
                 if (data.NextClass != null && !string.IsNullOrEmpty(data.NextClass.StartKl))
                 {
                     var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
                     if (nextClassStartTime.HasValue && nextClassStartTime.Value > now)
                     {
-                        // Use whichever comes first: current class end or next class start
                         if (!nextEventTime.HasValue || nextClassStartTime.Value < nextEventTime.Value)
                         {
                             nextEventTime = nextClassStartTime.Value;
@@ -426,7 +422,6 @@ namespace AkademiTrack.ViewModels
                         _loggingService?.LogInfo("[NEXT CLASS] ⏰ Periodic check - verifying if new day or schedule updated");
                         Dispatcher.UIThread.Post(async () =>
                         {
-                            // Check if it's a new day - if so, refresh data from server
                             if (_cacheDate.Date != DateTime.Now.Date)
                             {
                                 _loggingService?.LogInfo("[NEXT CLASS] 🌅 New day detected - refreshing schedule");
@@ -731,7 +726,6 @@ namespace AkademiTrack.ViewModels
                 return subjectMap[item.KNavn];
             }
 
-            // If not in our map, return the KNavn or fallback
             return item.KNavn ?? "Ingen time";
         }
 

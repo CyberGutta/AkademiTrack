@@ -106,8 +106,21 @@ namespace AkademiTrack.Services
                 {
                     _ = Task.Run(async () =>
                     {
-                        await process.WaitForExitAsync();
-                    });
+                        try
+                        {
+                            await process.WaitForExitAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ Process wait failed: {ex.Message}");
+                        }
+                    }).ContinueWith(t =>
+                    {
+                        if (t.IsFaulted && t.Exception != null)
+                        {
+                            Console.WriteLine($"❌ Process wait task failed: {t.Exception.GetBaseException().Message}");
+                        }
+                    }, TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
             catch (Exception ex)
