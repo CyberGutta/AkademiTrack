@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -299,6 +300,67 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Analytics] TrackUserDeletedDataAsync failed: {ex.Message}");
+            }
+        }
+
+        public async Task TrackAppUninstalledAsync()
+        {
+            await TrackEventAsync("app_uninstalled", new Dictionary<string, object>
+            {
+                { "uninstall_time", DateTime.Now.ToString("o") },
+                { "app_version", GetAppVersion() }
+            });
+        }
+
+        public async Task TrackEventAsync(string eventName, Dictionary<string, object>? properties = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_currentSessionId))
+                {
+                    Debug.WriteLine($"[Analytics] No session ID available for event tracking. Session started: {_sessionStarted}");
+                    return;
+                }
+
+                Debug.WriteLine($"[Analytics] Tracking event '{eventName}' for user: {_persistentUserId}, session: {_currentSessionId}");
+                
+                var eventData = new
+                {
+                    session_id = _currentSessionId,
+                    user_id = _persistentUserId,
+                    event_name = eventName,
+                    properties = properties != null ? JsonSerializer.Serialize(properties) : null,
+                    app_version = GetAppVersion(),
+                    platform = GetPlatform(),
+                    created_at = DateTime.UtcNow
+                };
+
+                var json = JsonSerializer.Serialize(eventData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var url = $"{_supabaseUrl}/rest/v1/events";
+                
+                Debug.WriteLine($"[Analytics] Tracking event '{eventName}': {json}");
+                Debug.WriteLine($"[Analytics] POST URL: {url}");
+
+                var response = await _httpClient.PostAsync(url, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                
+                Debug.WriteLine($"[Analytics] Event tracking response: {response.StatusCode}");
+                Debug.WriteLine($"[Analytics] Response content: {responseContent}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"[Analytics] ✓ Event '{eventName}' tracked successfully");
+                }
+                else
+                {
+                    Debug.WriteLine($"[Analytics] Event tracking failed: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Analytics] Event tracking error: {ex.Message}");
+                Debug.WriteLine($"[Analytics] Stack trace: {ex.StackTrace}");
             }
         }
 

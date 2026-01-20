@@ -843,6 +843,9 @@ Terminal=false
         public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
 
+        public ICommand UninstallCompletelyCommand { get; }
+
+
 
 
 
@@ -1124,6 +1127,7 @@ Terminal=false
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
+            UninstallCompletelyCommand = new RelayCommand(async () => await UninstallCompletelyAsync());
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
@@ -1645,6 +1649,432 @@ Terminal=false
                 IsDeleting = false;
             }
         }
+
+        private async Task UninstallCompletelyAsync()
+        {
+            if (IsDeleting) return;
+
+            try
+            {
+                var result = await ShowConfirmationDialog(
+                    "⚠️ AVINSTALLER AKADEMITRACK FULLSTENDIG",
+                    "ADVARSEL: Dette vil:\n\n" +
+                    "• Slette ALL data (innstillinger, cookies, logger)\n" +
+                    "• Slette ALL brukerinformasjon permanent\n" +
+                    "• Fjerne applikasjonen fra datamaskinen\n" +
+                    "• Fjerne autostart-oppsettet\n\n" +
+                    "Dette kan IKKE angres!\n\n" +
+                    "Er du helt sikker?",
+                    true
+                );
+
+                if (!result) return;
+
+                var doubleCheck = await ShowConfirmationDialog(
+                    "Siste bekreftelse",
+                    "Dette er din absolutt siste sjanse!\n\n" +
+                    "Applikasjonen vil bli fullstendig fjernet.\n\n" +
+                    "Trykk Ja for å avinstallere permanent,\n" +
+                    "eller Avbryt for å beholde applikasjonen.",
+                    true
+                );
+
+                if (!doubleCheck) return;
+
+                IsDeleting = true;
+                Debug.WriteLine("=== UNINSTALLING AKADEMITRACK COMPLETELY ===");
+
+                // 1. Track uninstall in analytics (before deleting data)
+                try
+                {
+                    Debug.WriteLine("Tracking app uninstall in analytics...");
+                    var analyticsService = Services.ServiceLocator.Instance.GetService<AnalyticsService>();
+                    
+                    var currentUserId = analyticsService.GetPersistentUserId();
+                    var currentSessionId = analyticsService.GetSessionId();
+                    
+                    Debug.WriteLine($"Current User ID: {currentUserId}");
+                    Debug.WriteLine($"Current Session ID: {currentSessionId}");
+                    
+                    if (!string.IsNullOrEmpty(currentSessionId))
+                    {
+                        await analyticsService.TrackAppUninstalledAsync();
+                        Debug.WriteLine("✓ App uninstall tracked in analytics");
+                        
+                        // Give it time to send the request
+                        await Task.Delay(2000);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠️ Could not track uninstall in analytics: {ex.Message}");
+                }
+
+                // 2. Remove from auto-start
+                try
+                {
+                    Debug.WriteLine("Removing from auto-start...");
+                    AutoStartManager.SetAutoStart(false);
+                    Debug.WriteLine("✓ Auto-start removed");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"⚠️ Could not remove auto-start: {ex.Message}");
+                }
+
+                // 3. Delete from secure storage
+                Debug.WriteLine("Deleting credentials from secure storage...");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
+                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
+                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
+                Debug.WriteLine("✓ Secure storage cleared");
+
+                // 4. Delete cookies from macOS Keychain (if on macOS)
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    try
+                    {
+                        Debug.WriteLine("Deleting cookies from macOS Keychain...");
+                        await KeychainService.DeleteFromKeychain("cookies");
+                        await KeychainService.DeleteFromKeychain("login_email");
+                        await KeychainService.DeleteFromKeychain("login_password");
+                        await KeychainService.DeleteFromKeychain("school_name");
+                        Debug.WriteLine("✓ Keychain cleared");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
+                    }
+                }
+
+                // 5. Delete all local data files
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "AkademiTrack"
+                );
+
+                if (Directory.Exists(appDataDir))
+                {
+                    Debug.WriteLine($"Deleting AppData directory: {appDataDir}");
+                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
+                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
+
+                    foreach (var file in allFiles)
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
+                        }
+                    }
+
+                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                    {
+                        try
+                        {
+                            if (Directory.Exists(dir))
+                                Directory.Delete(dir, true);
+                        }
+                        catch { }
+                    }
+
+                    try
+                    {
+                        if (Directory.Exists(appDataDir))
+                            Directory.Delete(appDataDir, true);
+                        Debug.WriteLine("✓ AppData directory deleted");
+                    }
+                    catch { }
+                }
+
+                // 6. Create uninstall script to delete the app itself
+                var appPath = GetApplicationBundlePath();
+                Debug.WriteLine($"Application path: {appPath}");
+
+                if (string.IsNullOrEmpty(appPath))
+                {
+                    Debug.WriteLine("⚠️ Could not determine app path - cannot delete app bundle");
+                    await ShowInfoDialog(
+                        "Data slettet",
+                        "All data er slettet, men applikasjonen må slettes manuelt.\n\n" +
+                        "Dra AkademiTrack.app til papirkurven for å fullføre avinstallasjonen."
+                    );
+                    
+                    if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    {
+                        desktop.Shutdown(0);
+                    }
+                    return;
+                }
+
+                // Create platform-specific uninstall script
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    await UninstallOnMacOSAsync(appPath);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    await UninstallOnWindowsAsync(appPath);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    await UninstallOnLinuxAsync(appPath);
+                }
+
+                Debug.WriteLine("=== UNINSTALL SCRIPT EXECUTED ===");
+
+                // Close the app - script will delete it after we exit
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
+                {
+                    desktopLifetime.Shutdown(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"=== UNINSTALL FAILED ===");
+                Debug.WriteLine($"Error: {ex.Message}");
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                await ShowErrorDialog(
+                    "Avinstallasjon feilet",
+                    $"Kunne ikke fullføre avinstallasjonen:\n\n{ex.Message}\n\n" +
+                    "Vennligst slett applikasjonen manuelt fra Applications-mappen."
+                );
+            }
+            finally
+            {
+                IsDeleting = false;
+            }
+        }
+
+        private string GetApplicationBundlePath()
+        {
+            try
+            {
+                var exePath = Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
+                Debug.WriteLine($"Executable path: {exePath}");
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    // On macOS, find the .app bundle
+                    if (exePath.Contains(".app/Contents/MacOS"))
+                    {
+                        var appIndex = exePath.IndexOf(".app/Contents/MacOS");
+                        var appBundlePath = exePath.Substring(0, appIndex + 4); // Include ".app"
+                        Debug.WriteLine($"macOS app bundle: {appBundlePath}");
+                        return appBundlePath;
+                    }
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    // On Windows, return the .exe path
+                    if (exePath.EndsWith(".dll"))
+                    {
+                        var appDir = Path.GetDirectoryName(exePath);
+                        var appName = Path.GetFileNameWithoutExtension(exePath);
+                        exePath = Path.Combine(appDir!, appName + ".exe");
+                    }
+                    return exePath;
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    // On Linux, return the executable path
+                    return exePath;
+                }
+
+                return exePath;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting app path: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        private async Task UninstallOnMacOSAsync(string appBundlePath)
+        {
+            try
+            {
+                Debug.WriteLine("=== CREATING MACOS UNINSTALL SCRIPT ===");
+                
+                var tempDir = Path.GetTempPath();
+                var scriptPath = Path.Combine(tempDir, "akademitrack_uninstall.sh");
+
+                var scriptContent = $@"#!/bin/bash
+        # AkademiTrack Uninstall Script
+        # This script will run after the app closes and delete the app bundle
+
+        # Wait for app to close (max 10 seconds)
+        echo ""Waiting for AkademiTrack to close...""
+        for i in {{1..20}}; do
+            if ! pgrep -f ""AkademiTrack"" > /dev/null; then
+                echo ""App closed successfully""
+                break
+            fi
+            sleep 0.5
+        done
+
+        # Delete the app bundle
+        echo ""Deleting app bundle: {appBundlePath}""
+        rm -rf ""{appBundlePath}""
+
+        # Delete this script
+        echo ""Cleaning up uninstall script...""
+        rm -f ""$0""
+
+        echo ""✓ AkademiTrack has been completely uninstalled""
+        echo ""Press any key to close this window...""
+        read -n 1
+        ";
+
+                await File.WriteAllTextAsync(scriptPath, scriptContent);
+                
+                // Make script executable
+                var chmodProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                chmodProcess?.WaitForExit();
+
+                Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
+
+                // Execute the script in Terminal so user can see it's working
+                var terminalProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "open",
+                    Arguments = $"-a Terminal.app \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+
+                Debug.WriteLine("✓ Uninstall script launched in Terminal");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error creating macOS uninstall script: {ex.Message}");
+                throw;
+            }
+        }
+
+        private async Task UninstallOnWindowsAsync(string exePath)
+        {
+            try
+            {
+                Debug.WriteLine("=== CREATING WINDOWS UNINSTALL SCRIPT ===");
+                
+                var tempDir = Path.GetTempPath();
+                var scriptPath = Path.Combine(tempDir, "akademitrack_uninstall.bat");
+
+                // Get the app directory (everything in the installation folder)
+                var appDir = Path.GetDirectoryName(exePath);
+
+                var scriptContent = $@"@echo off
+        REM AkademiTrack Uninstall Script
+        echo Waiting for AkademiTrack to close...
+
+        REM Wait for app to close (max 10 seconds)
+        timeout /t 3 /nobreak >nul
+
+        REM Delete the entire application directory
+        echo Deleting application files...
+        rd /s /q ""{appDir}""
+
+        REM Delete this script
+        del ""%~f0""
+
+        echo.
+        echo AkademiTrack has been completely uninstalled.
+        pause
+        ";
+
+                await File.WriteAllTextAsync(scriptPath, scriptContent);
+                
+                Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
+
+                // Execute the batch file
+                var batchProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = scriptPath,
+                    UseShellExecute = true,
+                    CreateNoWindow = false
+                });
+
+                Debug.WriteLine("✓ Uninstall script launched");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error creating Windows uninstall script: {ex.Message}");
+                throw;
+            }
+        }
+
+        private async Task UninstallOnLinuxAsync(string appPath)
+        {
+            try
+            {
+                Debug.WriteLine("=== CREATING LINUX UNINSTALL SCRIPT ===");
+                
+                var tempDir = Path.GetTempPath();
+                var scriptPath = Path.Combine(tempDir, "akademitrack_uninstall.sh");
+
+                var appDir = Path.GetDirectoryName(appPath);
+
+                var scriptContent = $@"#!/bin/bash
+        # AkademiTrack Uninstall Script
+
+        echo ""Waiting for AkademiTrack to close...""
+        sleep 3
+
+        # Delete the application directory
+        echo ""Deleting application files...""
+        rm -rf ""{appDir}""
+
+        # Delete this script
+        rm -f ""$0""
+
+        echo ""✓ AkademiTrack has been completely uninstalled""
+        read -p ""Press Enter to close...""
+        ";
+
+                await File.WriteAllTextAsync(scriptPath, scriptContent);
+                
+                // Make script executable
+                var chmodProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+                chmodProcess?.WaitForExit();
+
+                Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
+
+                // Execute in terminal
+                var terminalProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "xterm",
+                    Arguments = $"-e \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = false
+                });
+
+                Debug.WriteLine("✓ Uninstall script launched");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error creating Linux uninstall script: {ex.Message}");
+                throw;
+            }
+        }
+
 
         private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
         {
