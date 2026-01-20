@@ -17,6 +17,7 @@ namespace AkademiTrack.ViewModels
 
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
+        private bool _isRefreshing = false; // Concurrency guard
 
 
         // Today's STU sessions
@@ -230,8 +231,16 @@ namespace AkademiTrack.ViewModels
 
         public async Task RefreshDataAsync()
         {
+            // Prevent concurrent refreshes
+            if (_isRefreshing)
+            {
+                _loggingService?.LogDebug("[DASHBOARD] Refresh already in progress - skipping duplicate call");
+                return;
+            }
+
             try
             {
+                _isRefreshing = true;
                 _loggingService?.LogDebug("[DASHBOARD] Starting data refresh...");
 
                 // Add timeout to each service call
@@ -335,6 +344,10 @@ namespace AkademiTrack.ViewModels
                 
                 // Re-throw so the caller knows it failed
                 throw;
+            }
+            finally
+            {
+                _isRefreshing = false;
             }
         }
 

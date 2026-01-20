@@ -142,7 +142,7 @@ namespace AkademiTrack.Services
                 // Launch browser
                 browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
-                    Headless = true,
+                    Headless = true, // Hide Chrome window
                     Args = new[] { 
                         "--no-sandbox", 
                         "--disable-setuid-sandbox",
@@ -150,12 +150,41 @@ namespace AkademiTrack.Services
                         "--disable-gpu",
                         "--no-first-run",
                         "--no-default-browser-check",
-                        "--disable-default-apps"
+                        "--disable-default-apps",
+                        "--disable-web-security", // Disable CSS loading for speed
+                        "--disable-features=VizDisplayCompositor",
+                        "--blink-settings=imagesEnabled=false" // Disable images for faster loading
                     }
                 });
 
                 page = await browser.NewPageAsync();
                 await page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 });
+
+                // Block CSS and other resources for faster loading
+                await page.SetRequestInterceptionAsync(true);
+                page.Request += async (sender, e) =>
+                {
+                    try
+                    {
+                        var request = e.Request;
+                        // Block CSS, fonts, and images to speed up loading
+                        if (request.ResourceType == ResourceType.StyleSheet || 
+                            request.ResourceType == ResourceType.Font ||
+                            request.ResourceType == ResourceType.Image)
+                        {
+                            await request.AbortAsync();
+                        }
+                        else
+                        {
+                            await request.ContinueAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Silently handle request interception errors to prevent notifications
+                        Debug.WriteLine($"Request interception error (ignored): {ex.Message}");
+                    }
+                };
 
                 Debug.WriteLine("🌐 [PUPPETEER] Navigating to login page...");
                 await page.GoToAsync("https://iskole.net/elev/?ojr=login");

@@ -70,6 +70,14 @@ namespace AkademiTrack.Services.Utilities
                 // Mark as observed to prevent app termination
                 e.SetObserved();
 
+                // Ignore specific non-critical exceptions from browser automation
+                if (e.Exception.Message.Contains("Response body is unavailable for redirect responses") ||
+                    e.Exception.InnerException?.Message.Contains("Response body is unavailable for redirect responses") == true)
+                {
+                    Debug.WriteLine("[GlobalExceptionHandler] Ignoring browser automation redirect exception (non-critical)");
+                    return;
+                }
+
                 HandleException(e.Exception, "UnobservedTaskException", false);
             }
             catch (Exception handlerEx)
