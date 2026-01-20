@@ -141,7 +141,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        // Fetch today's schedule with attendance status
+        // Fetch today's schedule with attendance status using the new endpoint with full subject names
         public async Task<TodayScheduleData?> GetTodayScheduleAsync()
         {
             return await FetchWithRetryAsync(FetchTodayScheduleAsync);
@@ -155,8 +155,12 @@ namespace AkademiTrack.Services
                     return null;
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
-                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
-                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId}&onlyData=true&limit=99&totalResults=true";
+                
+                // Use today's date for the new endpoint
+                var today = DateTime.Now.ToString("yyyyMMdd");
+                
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={today},endDate={today}&onlyData=true&limit=1000&totalResults=true";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -173,7 +177,7 @@ namespace AkademiTrack.Services
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync();
-                var scheduleResponse = JsonSerializer.Deserialize<ScheduleResponse>(json, new JsonSerializerOptions
+                var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
@@ -181,7 +185,7 @@ namespace AkademiTrack.Services
                 if (scheduleResponse?.Items == null)
                     return null;
 
-                return ProcessTodaySchedule(scheduleResponse.Items);
+                return ProcessTodayScheduleFromMonthlyData(scheduleResponse.Items);
             }
             catch (Exception)
             {
@@ -508,21 +512,27 @@ namespace AkademiTrack.Services
             }
         }
 
-        private TodayScheduleData ProcessTodaySchedule(List<ScheduleItem> items)
+        private TodayScheduleData ProcessTodayScheduleFromMonthlyData(List<MonthlyScheduleItem> items)
         {
             var today = DateTime.Now.ToString("yyyyMMdd");
             var todayItems = items.Where(i => i.Dato == today).ToList();
 
             // Get STU sessions
-            var stuSessions = todayItems.Where(i => i.KNavn == "STU").ToList();
+            var stuSessions = todayItems.Where(i => 
+                (i.Fag != null && i.Fag.Contains("STU")) ||
+                (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
+            ).ToList();
             
             // Get regular classes (non-STU)
             var regularClasses = todayItems.Where(i => 
-                !string.IsNullOrEmpty(i.KNavn) && 
-                i.KNavn != "STU").ToList();
+                i.Fag != null &&
+                !i.Fag.Contains("STU") &&
+                i.Fagnavn != null &&
+                !i.Fagnavn.Contains("Studietid")
+            ).ToList();
             
             // Filter STU sessions - remove any that conflict with regular classes
-            var validStuSessions = new List<ScheduleItem>();
+            var validStuSessions = new List<MonthlyScheduleItem>();
             
             foreach (var stuSession in stuSessions)
             {
@@ -530,7 +540,7 @@ namespace AkademiTrack.Services
                 
                 foreach (var regularClass in regularClasses)
                 {
-                    if (DoScheduleItemsOverlap(stuSession, regularClass))
+                    if (DoSessionsOverlap(stuSession, regularClass))
                     {
                         hasConflict = true;
                         break;
@@ -543,49 +553,152 @@ namespace AkademiTrack.Services
                 }
             }
             
-            var registeredStuCount = validStuSessions.Count(s => s.Typefravaer == "M");
+            var registeredStuCount = validStuSessions.Count(s => s.Fravaer == "M");
             var totalStuCount = validStuSessions.Count;
 
             var now = DateTime.Now.TimeOfDay;
 
             // Get current class (if ongoing) - include ALL subjects
             var currentClasses = todayItems
-                .Where(i => !string.IsNullOrEmpty(i.StartKl) && !string.IsNullOrEmpty(i.SluttKl))
+                .Where(i => !string.IsNullOrEmpty(i.Fradato) && !string.IsNullOrEmpty(i.Tildato))
                 .Select(i => new
                 {
                     Item = i,
-                    StartTime = ParseTimeString(i.StartKl),
-                    EndTime = ParseTimeString(i.SluttKl)
+                    StartTime = ParseDateTimeToTimeSpan(i.Fradato),
+                    EndTime = ParseDateTimeToTimeSpan(i.Tildato)
                 })
                 .Where(x => x.StartTime.HasValue && x.EndTime.HasValue &&
                            x.StartTime.Value <= now && x.EndTime.Value >= now)
                 .OrderBy(x => x.StartTime)
                 .ToList();
 
-            ScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
+            MonthlyScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
 
             // Get next class - include ALL subjects (STU and regular classes)
             var upcomingClasses = todayItems
-                .Where(i => !string.IsNullOrEmpty(i.StartKl))
+                .Where(i => !string.IsNullOrEmpty(i.Fradato))
                 .Select(i => new
                 {
                     Item = i,
-                    StartTime = ParseTimeString(i.StartKl)
+                    StartTime = ParseDateTimeToTimeSpan(i.Fradato)
                 })
                 .Where(x => x.StartTime.HasValue && x.StartTime.Value > now)
                 .OrderBy(x => x.StartTime)
                 .ToList();
 
-            ScheduleItem? nextClass = upcomingClasses.FirstOrDefault()?.Item;
+            MonthlyScheduleItem? nextClass = upcomingClasses.FirstOrDefault()?.Item;
 
             return new TodayScheduleData
             {
                 RegisteredStuSessions = registeredStuCount,
                 TotalStuSessions = totalStuCount,
-                NextClass = nextClass,
-                CurrentClass = currentClass,
-                AllTodayItems = todayItems
+                NextClass = ConvertToScheduleItem(nextClass),
+                CurrentClass = ConvertToScheduleItem(currentClass),
+                AllTodayItems = todayItems.Select(ConvertToScheduleItem).Where(item => item != null).ToList()!
             };
+        }
+
+        private TimeSpan? ParseDateTimeToTimeSpan(string? dateTimeStr)
+        {
+            if (string.IsNullOrEmpty(dateTimeStr))
+                return null;
+
+            try
+            {
+                if (DateTime.TryParse(dateTimeStr, out var dateTime))
+                {
+                    return dateTime.TimeOfDay;
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private ScheduleItem? ConvertToScheduleItem(MonthlyScheduleItem? monthlyItem)
+        {
+            if (monthlyItem == null)
+                return null;
+
+            // Extract clean subject name by removing class prefix (e.g., "PB3A NAT" -> "NAT")
+            string cleanSubjectCode = ExtractSubjectCode(monthlyItem.Fag);
+            string displayName = GetCleanSubjectName(monthlyItem.Fagnavn);
+
+            return new ScheduleItem
+            {
+                Id = int.TryParse(monthlyItem.Id, out var id) ? id : 0,
+                Fag = monthlyItem.Fag,
+                Dato = monthlyItem.Dato,
+                Timenr = monthlyItem.Timenr,
+                StartKl = FormatTimeFromDateTime(monthlyItem.Fradato),
+                SluttKl = FormatTimeFromDateTime(monthlyItem.Tildato),
+                KNavn = cleanSubjectCode,
+                DisplayName = displayName, // Store the clean full name
+                Typefravaer = monthlyItem.Fravaer == "M" ? "M" : null,
+                UndervisningPaagaar = 1
+            };
+        }
+
+        private string ExtractSubjectCode(string? fag)
+        {
+            if (string.IsNullOrEmpty(fag))
+                return "";
+
+            // Remove class prefix (e.g., "PB3A NAT" -> "NAT", "PB3A STU" -> "STU")
+            var parts = fag.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                return parts[1]; // Return the subject code part
+            }
+            
+            return fag; // Return as-is if no space found
+        }
+
+        private string GetCleanSubjectName(string? fagnavn)
+        {
+            if (string.IsNullOrEmpty(fagnavn))
+                return "";
+
+            // Remove any prefix before the actual subject name
+            // Examples: "NAT1018 Naturfag" -> "Naturfag", "Studietid" -> "Studietid"
+            
+            // Check if it contains a course code pattern (letters followed by numbers)
+            var parts = fagnavn.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            
+            if (parts.Length >= 2)
+            {
+                var firstPart = parts[0];
+                // If first part looks like a course code (contains both letters and numbers)
+                if (firstPart.Any(char.IsLetter) && firstPart.Any(char.IsDigit))
+                {
+                    // Return everything after the first part
+                    return string.Join(" ", parts.Skip(1));
+                }
+            }
+            
+            // Return as-is if no course code pattern found
+            return fagnavn;
+        }
+
+        private string FormatTimeFromDateTime(string? dateTimeStr)
+        {
+            if (string.IsNullOrEmpty(dateTimeStr))
+                return "";
+
+            try
+            {
+                if (DateTime.TryParse(dateTimeStr, out var dateTime))
+                {
+                    return dateTime.ToString("HHmm");
+                }
+                return "";
+            }
+            catch
+            {
+                return "";
+            }
         }
     }
 
@@ -613,6 +726,7 @@ namespace AkademiTrack.Services
         public string? KlTrinn { get; set; }
         public string? KlId { get; set; }
         public string? KNavn { get; set; }
+        public string? DisplayName { get; set; } // Full subject name from Fagnavn
         public string? GruppeNr { get; set; }
         public string? Dato { get; set; }
         public int Timenr { get; set; }

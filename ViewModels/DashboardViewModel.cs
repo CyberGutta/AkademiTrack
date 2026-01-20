@@ -599,7 +599,13 @@ namespace AkademiTrack.ViewModels
 
         private string GetSubjectDisplayName(Services.ScheduleItem item)
         {
-            // Map short codes to full names
+            // Use the DisplayName from the API if available (contains the full subject name)
+            if (!string.IsNullOrEmpty(item.DisplayName))
+            {
+                return item.DisplayName;
+            }
+
+            // Fallback to manual mapping if DisplayName is not available (for backward compatibility)
             var subjectMap = new Dictionary<string, string>
             {
                 // Core subjects
@@ -668,7 +674,7 @@ namespace AkademiTrack.ViewModels
                 return subjectMap[item.KNavn];
             }
 
-            // If not in our map
+            // If not in our map, return the KNavn or fallback
             return item.KNavn ?? "Ingen time";
         }
 
