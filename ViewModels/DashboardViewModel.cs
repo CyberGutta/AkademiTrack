@@ -232,52 +232,109 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                var summary = await _attendanceService.GetAttendanceSummaryAsync();
-                if (summary != null)
+                _loggingService?.LogDebug("[DASHBOARD] Starting data refresh...");
+
+                // Add timeout to each service call
+                var summaryTask = _attendanceService.GetAttendanceSummaryAsync();
+                var summaryTimeout = Task.Delay(TimeSpan.FromSeconds(15));
+                var summaryCompleted = await Task.WhenAny(summaryTask, summaryTimeout);
+                
+                if (summaryCompleted == summaryTask)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    var summary = await summaryTask;
+                    if (summary != null)
                     {
-                        UpdateOvertimeDisplay(summary);
-                    });
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            UpdateOvertimeDisplay(summary);
+                        });
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Overtime data loaded");
+                    }
+                }
+                else
+                {
+                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Overtime data fetch timed out after 15 seconds");
                 }
 
-                var todayData = await _attendanceService.GetTodayScheduleAsync();
-                if (todayData != null)
+                // Today's schedule with timeout
+                var todayTask = _attendanceService.GetTodayScheduleAsync();
+                var todayTimeout = Task.Delay(TimeSpan.FromSeconds(15));
+                var todayCompleted = await Task.WhenAny(todayTask, todayTimeout);
+                
+                if (todayCompleted == todayTask)
                 {
-                    CacheTodaySchedule(todayData);
-                    
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    var todayData = await todayTask;
+                    if (todayData != null)
                     {
-                        UpdateTodayDisplay(todayData);
-                        UpdateNextClassDisplay(todayData);
+                        CacheTodaySchedule(todayData);
                         
-                        ScheduleNextClassUpdate(todayData);
-                    });
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            UpdateTodayDisplay(todayData);
+                            UpdateNextClassDisplay(todayData);
+                            ScheduleNextClassUpdate(todayData);
+                        });
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Today's schedule loaded");
+                    }
+                }
+                else
+                {
+                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Today's schedule fetch timed out after 15 seconds");
                 }
 
-                // Fetch monthly attendance
-                var monthlyData = await _attendanceService.GetMonthlyAttendanceAsync();
-                if (monthlyData != null)
+                // Monthly attendance with timeout
+                var monthlyTask = _attendanceService.GetMonthlyAttendanceAsync();
+                var monthlyTimeout = Task.Delay(TimeSpan.FromSeconds(15));
+                var monthlyCompleted = await Task.WhenAny(monthlyTask, monthlyTimeout);
+                
+                if (monthlyCompleted == monthlyTask)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    var monthlyData = await monthlyTask;
+                    if (monthlyData != null)
                     {
-                        UpdateMonthlyDisplay(monthlyData);
-                    });
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            UpdateMonthlyDisplay(monthlyData);
+                        });
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Monthly data loaded");
+                    }
+                }
+                else
+                {
+                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Monthly data fetch timed out after 15 seconds");
                 }
 
-                // Fetch weekly attendance
-                var weeklyData = await _attendanceService.GetWeeklyAttendanceAsync();
-                if (weeklyData != null)
+                // Weekly attendance with timeout
+                var weeklyTask = _attendanceService.GetWeeklyAttendanceAsync();
+                var weeklyTimeout = Task.Delay(TimeSpan.FromSeconds(15));
+                var weeklyCompleted = await Task.WhenAny(weeklyTask, weeklyTimeout);
+                
+                if (weeklyCompleted == weeklyTask)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    var weeklyData = await weeklyTask;
+                    if (weeklyData != null)
                     {
-                        UpdateWeeklyDisplay(weeklyData);
-                    });
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            UpdateWeeklyDisplay(weeklyData);
+                        });
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Weekly data loaded");
+                    }
                 }
+                else
+                {
+                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Weekly data fetch timed out after 15 seconds");
+                }
+
+                _loggingService?.LogSuccess("[DASHBOARD] ✓ Data refresh complete!");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Log error if needed
+                _loggingService?.LogError($"[DASHBOARD] Error refreshing data: {ex.Message}");
+                _loggingService?.LogDebug($"[DASHBOARD] Stack trace: {ex.StackTrace}");
+                
+                // Re-throw so the caller knows it failed
+                throw;
             }
         }
 

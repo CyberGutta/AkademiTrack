@@ -67,7 +67,6 @@ namespace AkademiTrack.Services
                 }
                 _schoolName = await SecureCredentialStorage.GetCredentialAsync("SchoolName") ?? "";
 
-                // Try loading existing cookies ONCE and cache them
                 if (_cachedCookies == null)
                 {
                     _cachedCookies = await SecureCredentialStorage.LoadCookiesAsync();
@@ -75,12 +74,15 @@ namespace AkademiTrack.Services
                 
                 if (_cachedCookies != null)
                 {
+                    Debug.WriteLine("[AUTH] Found cached cookies, testing validity...");
                     if (await TestCookiesAsync(_cachedCookies))
                     {
+                        Debug.WriteLine("[AUTH] ✓ Cached cookies are valid!");
                         var parameters = await ExtractParametersFromCookies(_cachedCookies);
                         
                         if (parameters != null && parameters.IsComplete)
                         {
+                            Debug.WriteLine("[AUTH] ✓ Parameters are complete - returning success without browser login");
                             return new AuthenticationResult
                             {
                                 Success = true,
@@ -88,9 +90,14 @@ namespace AkademiTrack.Services
                                 Parameters = parameters
                             };
                         }
+                        else
+                        {
+                            Debug.WriteLine("[AUTH] ⚠️ Parameters missing or incomplete - will need browser login");
+                        }
                     }
                     else
                     {
+                        Debug.WriteLine("[AUTH] ❌ Cached cookies are invalid - will need fresh login");
                         _cachedCookies = null;
                     }
                 }
@@ -100,13 +107,12 @@ namespace AkademiTrack.Services
                                     _loginPasswordSecure != null && _loginPasswordSecure.Length > 0 &&
                                     !string.IsNullOrEmpty(_schoolName);
 
-                Console.WriteLine($"[AUTH] Credential check - Email: {(!string.IsNullOrEmpty(_loginEmail) ? "✓" : "✗")}, Password: {(_loginPasswordSecure != null && _loginPasswordSecure.Length > 0 ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(_schoolName) ? "✓" : "✗")}");
+                Debug.WriteLine($"[AUTH] Credential check - Email: {(!string.IsNullOrEmpty(_loginEmail) ? "✓" : "✗")}, Password: {(_loginPasswordSecure != null && _loginPasswordSecure.Length > 0 ? "✓" : "✗")}, School: {(!string.IsNullOrEmpty(_schoolName) ? "✓" : "✗")}");
 
                 if (!hasCredentials)
                 {
-                    Console.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
+                    Debug.WriteLine("[AUTH] ❌ Missing credentials - cannot proceed with authentication");
 
-                    // Only show notification if initial setup is already complete - feide window
                     try
                     {
                         var settings = await SafeSettingsLoader.LoadSettingsWithAutoRepairAsync();
@@ -124,12 +130,12 @@ namespace AkademiTrack.Services
                         }
                         else
                         {
-                            Console.WriteLine("[AUTH] Initial setup not completed - suppressing notification");
+                            Debug.WriteLine("[AUTH] Initial setup not completed - suppressing notification");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[AUTH] Could not check initial setup status: {ex.Message}");
+                        Debug.WriteLine($"[AUTH] Could not check initial setup status: {ex.Message}");
                         // Don't show notification if we can't determine setup status
                     }
 
@@ -158,7 +164,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AUTH] Authentication error: {ex.Message}");
+                Debug.WriteLine($"[AUTH] Authentication error: {ex.Message}");
                 return new AuthenticationResult 
                 { 
                     Success = false, 
@@ -263,29 +269,29 @@ namespace AkademiTrack.Services
                     {
                         try
                         {
-                            Console.WriteLine("[AUTH] Starting PerformFastAutomaticLoginAsync...");
+                            Debug.WriteLine("[AUTH] Starting PerformFastAutomaticLoginAsync...");
                             loginSuccess = await PerformFastAutomaticLoginAsync();
-                            Console.WriteLine($"[AUTH] PerformFastAutomaticLoginAsync returned: {loginSuccess}");
+                            Debug.WriteLine($"[AUTH] PerformFastAutomaticLoginAsync returned: {loginSuccess}");
                         }
                         catch (InvalidOperationException ex) when (ex.Message == "INVALID_CREDENTIALS")
                         {
-                            Console.WriteLine("[AUTH] ❌ INVALID CREDENTIALS DETECTED - returning failure immediately");
+                            Debug.WriteLine("[AUTH] ❌ INVALID CREDENTIALS DETECTED - returning failure immediately");
                             return new AuthenticationResult { Success = false };
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[AUTH] Auto-login failed with exception: {ex.Message}");
+                            Debug.WriteLine($"[AUTH] Auto-login failed with exception: {ex.Message}");
                             loginSuccess = false;
                         }
                     }
 
                     if (!loginSuccess)
                     {
-                        Console.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
+                        Debug.WriteLine($"[AUTH] Login was not successful. _credentialsWereRejected = {_credentialsWereRejected}");
 
                         if (_credentialsWereRejected)
                         {
-                            Console.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately");
+                            Debug.WriteLine("[AUTH] ❌ CREDENTIALS WERE REJECTED - returning failure immediately");
 
                             // Note: Notifications must be shown on UI thread
                             if (ShouldShowNotification(ref _lastInvalidCredentialsNotification))
@@ -312,7 +318,7 @@ namespace AkademiTrack.Services
                             };
                         }
 
-                        Console.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
+                        Debug.WriteLine("[AUTH] ❌ Auto-login failed and no manual login allowed - returning failure");
                         return new AuthenticationResult
                         {
                             Success = false,
@@ -342,7 +348,7 @@ namespace AkademiTrack.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[AUTH] Login error: {ex.Message}");
+                    Debug.WriteLine($"[AUTH] Login error: {ex.Message}");
                     return new AuthenticationResult { Success = false };
                 }
             });
@@ -398,9 +404,9 @@ namespace AkademiTrack.Services
                 }
 
                 // Fill login form
-                Console.WriteLine("[AUTH] Calling HandleFastFeideLoginFormAsync...");
+                Debug.WriteLine("[AUTH] Calling HandleFastFeideLoginFormAsync...");
                 var loginResult = await HandleFastFeideLoginFormAsync();
-                Console.WriteLine($"[AUTH] HandleFastFeideLoginFormAsync returned: {loginResult}");
+                Debug.WriteLine($"[AUTH] HandleFastFeideLoginFormAsync returned: {loginResult}");
                 return loginResult;
             }
             catch
@@ -587,8 +593,8 @@ namespace AkademiTrack.Services
                 await Task.Delay(500);
                 passwordField.SendKeys(Keys.Enter);
                 
-                Console.WriteLine("[AUTH] ========== LOGIN FORM SUBMITTED ==========");
-                Console.WriteLine("[AUTH] Waiting for Feide response...");
+                Debug.WriteLine("[AUTH] ========== LOGIN FORM SUBMITTED ==========");
+                Debug.WriteLine("[AUTH] Waiting for Feide response...");
                 
                 // Wait a bit for the page to process the login
                 await Task.Delay(2000);
@@ -598,14 +604,14 @@ namespace AkademiTrack.Services
                     await Task.Delay(1000);
                     var currentUrl = _webDriver.Url;
                     
-                    Console.WriteLine($"[AUTH] Checking login status... attempt {i + 1}/25");
-                    Console.WriteLine($"[AUTH] Current URL: {currentUrl}");
+                    Debug.WriteLine($"[AUTH] Checking login status... attempt {i + 1}/25");
+                    Debug.WriteLine($"[AUTH] Current URL: {currentUrl}");
                     
                     // Check for success first
                     if (currentUrl.Contains("isFeideinnlogget=true") || 
                         currentUrl.Contains("ojr=timeplan"))
                     {
-                        Console.WriteLine("[AUTH] ✓ SUCCESS: Login successful - found success URL");
+                        Debug.WriteLine("[AUTH] ✓ SUCCESS: Login successful - found success URL");
                         return true;
                     }
                     
@@ -615,40 +621,39 @@ namespace AkademiTrack.Services
                         try
                         {
                             var pageSource = _webDriver.PageSource;
-                            Console.WriteLine("[AUTH] ========== PAGE SOURCE DUMP (after 5 seconds) ==========");
-                            Console.WriteLine($"[AUTH] Page title: {_webDriver.Title}");
-                            Console.WriteLine($"[AUTH] Current URL: {currentUrl}");
+                            Debug.WriteLine("[AUTH] ========== PAGE SOURCE DUMP (after 5 seconds) ==========");
+                            Debug.WriteLine($"[AUTH] Page title: {_webDriver.Title}");
+                            Debug.WriteLine($"[AUTH] Current URL: {currentUrl}");
                             
-                            // Look for any error-related content
                             if (pageSource.Contains("Innlogging feilet"))
                             {
-                                Console.WriteLine("[AUTH] ❌ FOUND 'Innlogging feilet' in page source!");
+                                Debug.WriteLine("[AUTH] ❌ FOUND 'Innlogging feilet' in page source!");
                                 var startIndex = Math.Max(0, pageSource.IndexOf("Innlogging feilet") - 200);
                                 var endIndex = Math.Min(pageSource.Length, pageSource.IndexOf("Innlogging feilet") + 200);
                                 var context = pageSource.Substring(startIndex, endIndex - startIndex);
-                                Console.WriteLine($"[AUTH] Context around error: {context}");
+                                Debug.WriteLine($"[AUTH] Context around error: {context}");
                             }
                             else
                             {
-                                Console.WriteLine("[AUTH] No 'Innlogging feilet' found in page source");
+                                Debug.WriteLine("[AUTH] No 'Innlogging feilet' found in page source");
                             }
                             
                             // Check for dialog elements
                             if (pageSource.Contains("dialog"))
                             {
-                                Console.WriteLine("[AUTH] Found 'dialog' in page source");
+                                Debug.WriteLine("[AUTH] Found 'dialog' in page source");
                             }
                             
                             if (pageSource.Contains("error"))
                             {
-                                Console.WriteLine("[AUTH] Found 'error' in page source");
+                                Debug.WriteLine("[AUTH] Found 'error' in page source");
                             }
                             
-                            Console.WriteLine("[AUTH] ========== END PAGE SOURCE DUMP ==========");
+                            Debug.WriteLine("[AUTH] ========== END PAGE SOURCE DUMP ==========");
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[AUTH] Error dumping page source: {ex.Message}");
+                            Debug.WriteLine($"[AUTH] Error dumping page source: {ex.Message}");
                         }
                     }
                     
@@ -660,8 +665,8 @@ namespace AkademiTrack.Services
                         var pageSource = _webDriver.PageSource;
                         if (pageSource.Contains("Innlogging feilet"))
                         {
-                            Console.WriteLine("[AUTH] ❌ CONFIRMED: Found 'Innlogging feilet' in page source - INVALID CREDENTIALS!");
-                            Console.WriteLine("[AUTH] ❌ RETURNING FALSE FROM HandleFastFeideLoginFormAsync");
+                            Debug.WriteLine("[AUTH] ❌ CONFIRMED: Found 'Innlogging feilet' in page source - INVALID CREDENTIALS!");
+                            Debug.WriteLine("[AUTH] ❌ RETURNING FALSE FROM HandleFastFeideLoginFormAsync");
                             _credentialsWereRejected = true;
                             return false;
                         }
@@ -684,20 +689,20 @@ namespace AkademiTrack.Services
                                 var errorElements = _webDriver.FindElements(By.CssSelector(selector));
                                 if (errorElements.Count > 0)
                                 {
-                                    Console.WriteLine($"[AUTH] Found {errorElements.Count} potential error element(s) using selector: {selector}");
+                                    Debug.WriteLine($"[AUTH] Found {errorElements.Count} potential error element(s) using selector: {selector}");
                                     
                                     foreach (var errorElement in errorElements)
                                     {
                                         if (errorElement.Displayed)
                                         {
                                             var elementText = errorElement.Text;
-                                            Console.WriteLine($"[AUTH] Error element text: '{elementText}'");
+                                            Debug.WriteLine($"[AUTH] Error element text: '{elementText}'");
                                             
                                             if (elementText.Contains("Innlogging feilet") || 
                                                 elementText.Contains("feil brukernavn eller passord") ||
                                                 elementText.Contains("Dette kan skyldes feil brukernavn"))
                                             {
-                                                Console.WriteLine("[AUTH] ❌ CONFIRMED: Error text detected - INVALID CREDENTIALS!");
+                                                Debug.WriteLine("[AUTH] ❌ CONFIRMED: Error text detected - INVALID CREDENTIALS!");
                                                 _credentialsWereRejected = true;
                                                 return false;
                                             }
@@ -707,13 +712,13 @@ namespace AkademiTrack.Services
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"[AUTH] Selector '{selector}' failed: {ex.Message}");
+                                Debug.WriteLine($"[AUTH] Selector '{selector}' failed: {ex.Message}");
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[AUTH] Error checking for error dialog: {ex.Message}");
+                        Debug.WriteLine($"[AUTH] Error checking for error dialog: {ex.Message}");
                     }
                     
                     // Also check for any element containing "Innlogging feilet" text (fallback)
@@ -722,14 +727,14 @@ namespace AkademiTrack.Services
                         var errorElements = _webDriver.FindElements(By.XPath("//*[contains(text(), 'Innlogging feilet')]"));
                         if (errorElements.Count > 0)
                         {
-                            Console.WriteLine($"[AUTH] Found {errorElements.Count} element(s) with 'Innlogging feilet' text");
+                            Debug.WriteLine($"[AUTH] Found {errorElements.Count} element(s) with 'Innlogging feilet' text");
                             
                             foreach (var element in errorElements)
                             {
                                 if (element.Displayed)
                                 {
-                                    Console.WriteLine($"[AUTH] ❌ CONFIRMED: Found visible 'Innlogging feilet' text - INVALID CREDENTIALS!");
-                                    Console.WriteLine($"[AUTH] Element tag: {element.TagName}, text: '{element.Text}'");
+                                    Debug.WriteLine($"[AUTH] ❌ CONFIRMED: Found visible 'Innlogging feilet' text - INVALID CREDENTIALS!");
+                                    Debug.WriteLine($"[AUTH] Element tag: {element.TagName}, text: '{element.Text}'");
                                     _credentialsWereRejected = true;
                                     return false;
                                 }
@@ -738,7 +743,7 @@ namespace AkademiTrack.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[AUTH] Error checking for 'Innlogging feilet' text: {ex.Message}");
+                        Debug.WriteLine($"[AUTH] Error checking for 'Innlogging feilet' text: {ex.Message}");
                     }
                     
                     // Check for h2 with "Innlogging feilet" (specific to the error structure)
@@ -747,13 +752,13 @@ namespace AkademiTrack.Services
                         var h2Elements = _webDriver.FindElements(By.XPath("//h2[contains(text(), 'Innlogging feilet')]"));
                         if (h2Elements.Count > 0)
                         {
-                            Console.WriteLine($"[AUTH] Found {h2Elements.Count} h2 element(s) with 'Innlogging feilet'");
+                            Debug.WriteLine($"[AUTH] Found {h2Elements.Count} h2 element(s) with 'Innlogging feilet'");
                             
                             foreach (var h2 in h2Elements)
                             {
                                 if (h2.Displayed)
                                 {
-                                    Console.WriteLine($"[AUTH] ❌ CONFIRMED: Found h2 with 'Innlogging feilet' - INVALID CREDENTIALS!");
+                                    Debug.WriteLine($"[AUTH] ❌ CONFIRMED: Found h2 with 'Innlogging feilet' - INVALID CREDENTIALS!");
                                     _credentialsWereRejected = true;
                                     return false;
                                 }
@@ -762,13 +767,13 @@ namespace AkademiTrack.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[AUTH] Error checking for h2 'Innlogging feilet': {ex.Message}");
+                        Debug.WriteLine($"[AUTH] Error checking for h2 'Innlogging feilet': {ex.Message}");
                     }
                     
-                    Console.WriteLine($"[AUTH] No success or error detected yet, continuing to wait...");
+                    Debug.WriteLine($"[AUTH] No success or error detected yet, continuing to wait...");
                 }
 
-                Console.WriteLine("[AUTH] ❌ LOGIN TIMEOUT - no success or error detected after 25 attempts");
+                Debug.WriteLine("[AUTH] ❌ LOGIN TIMEOUT - no success or error detected after 25 attempts");
                 return false;
             }
             catch

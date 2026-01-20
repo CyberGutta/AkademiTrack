@@ -235,29 +235,40 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                Debug.WriteLine("========== INITIALIZE ASYNC START ==========");
                 IsLoading = true;
+                Debug.WriteLine("[INIT] IsLoading set to TRUE");
+                
                 _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
                 Debug.WriteLine("[MainWindow] App initialization started");
 
                 // Initialize authentication service
+                Debug.WriteLine("[INIT] Creating AuthenticationService...");
                 _authService = new AuthenticationService(_notificationService);
+                Debug.WriteLine("[INIT] ✓ AuthenticationService created");
 
-                // ✅ Authentication now runs on background thread - UI won't freeze
+                Debug.WriteLine("[INIT] Calling AuthenticateAsync()...");
                 var authResult = await _authService.AuthenticateAsync();
+                Debug.WriteLine($"[INIT] ✓ AuthenticateAsync() returned - Success: {authResult.Success}");
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
                 {
+                    Debug.WriteLine("[INIT] Auth SUCCESS - processing...");
                     _loggingService.LogSuccess("✓ Autentisering fullført!");
 
                     Debug.WriteLine("[MainWindow] App initialization successful");
 
                     IsAuthenticated = true;
+                    Debug.WriteLine("[INIT] IsAuthenticated set to TRUE");
+                    
                     _userParameters = authResult.Parameters;
+                    Debug.WriteLine("[INIT] User parameters stored");
 
                     // Update command states after authentication
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                    Debug.WriteLine("[INIT] Commands updated");
 
                     // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
@@ -266,34 +277,78 @@ namespace AkademiTrack.ViewModels
                         PlanPeri = authResult.Parameters.PlanPeri,
                         SkoleId = authResult.Parameters.SkoleId
                     };
+                    Debug.WriteLine("[INIT] Created servicesUserParams");
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
+                    Debug.WriteLine("[INIT] ✓ Dashboard credentials set");
 
                     _loggingService.LogInfo("📊 Laster dashboard data...");
+                    Debug.WriteLine("[INIT] About to call Dashboard.RefreshDataAsync()...");
 
-                    // ✅ Dashboard refresh should also be async
-                    await Dashboard.RefreshDataAsync();
+                    try
+                    {
+                        Debug.WriteLine("[INIT] Creating refresh task with 30s timeout...");
+                        
+                        // Add 30 second timeout to dashboard refresh
+                        var refreshTask = Dashboard.RefreshDataAsync();
+                        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+                        
+                        Debug.WriteLine("[INIT] Waiting for Task.WhenAny...");
+                        var completedTask = await Task.WhenAny(refreshTask, timeoutTask);
+                        Debug.WriteLine($"[INIT] Task.WhenAny completed - was timeout: {completedTask == timeoutTask}");
+                        
+                        if (completedTask == timeoutTask)
+                        {
+                            Debug.WriteLine("[INIT] ⏱️ TIMEOUT! Dashboard refresh took >30 seconds");
+                            _loggingService.LogError("⚠️ Dashboard refresh timed out after 30 seconds");
+                            _loggingService.LogInfo("Continuing with cached/empty data...");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[INIT] Dashboard refresh completed - awaiting result...");
+                            // Ensure any exceptions from refreshTask are observed
+                            await refreshTask;
+                            Debug.WriteLine("[INIT] ✓ Dashboard refresh completed successfully");
+                            
+                            Dashboard.UpdateNextClassFromCache();
+                            Debug.WriteLine("[INIT] ✓ Next class updated from cache");
+                            
+                            _loggingService.LogSuccess("✓ Dashboard data lastet!");
+                        }
+                    }
+                    catch (Exception dashboardEx)
+                    {
+                        Debug.WriteLine($"[INIT] ❌ Dashboard refresh EXCEPTION: {dashboardEx.Message}");
+                        _loggingService.LogError($"⚠️ Dashboard refresh failed: {dashboardEx.Message}");
+                        _loggingService.LogInfo("Continuing with cached/empty data...");
+                        // Don't throw - continue initialization even if dashboard fails
+                    }
 
-                    Dashboard.UpdateNextClassFromCache();
+                    Debug.WriteLine("[INIT] Dashboard section complete - continuing initialization...");
 
                     _loggingService.LogSuccess("✓ Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
+                    Debug.WriteLine("[INIT] Status message set");
 
                     _updateChecker?.StartPeriodicChecks();
                     _loggingService.LogInfo("Update checker ready");
+                    Debug.WriteLine("[INIT] Update checker started");
 
+                    Debug.WriteLine("[INIT] Calling CheckAutoStartAutomationAsync()...");
                     await CheckAutoStartAutomationAsync();
+                    Debug.WriteLine("[INIT] ✓ CheckAutoStartAutomationAsync() complete");
 
+                    Debug.WriteLine("[INIT] Starting timers...");
                     StartDashboardRefreshTimer();
                     StartMidnightResetTimer();
+                    Debug.WriteLine("[INIT] ✓ Timers started");
 
                     _initializationRetryCount = 0;
-
-                    await Task.Delay(500);
-                    IsLoading = false;
+                    Debug.WriteLine("[INIT] Retry count reset to 0");
                 }
                 else
                 {
+                    Debug.WriteLine("[INIT] Auth FAILED - entering retry logic...");
                     _initializationRetryCount++;
 
                     Debug.WriteLine("[MainWindow] App initialization failed");
@@ -304,6 +359,8 @@ namespace AkademiTrack.ViewModels
 
                     if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
                     {
+                        Debug.WriteLine($"[INIT] Max retries ({MAX_RETRY_ATTEMPTS}) reached - giving up");
+                        
                         try
                         {
                             await _analyticsService.LogErrorAsync(
@@ -325,10 +382,12 @@ namespace AkademiTrack.ViewModels
                         );
 
                         StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
-                        IsLoading = false;
+                        Debug.WriteLine("[INIT] Exiting without retry");
                         return;
                     }
 
+                    Debug.WriteLine($"[INIT] Retry {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} - waiting {3 * _initializationRetryCount}s...");
+                    
                     _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
                     _loggingService.LogError($"Feilmelding: {errorMessage}");
                     await _notificationService.ShowNotificationAsync(
@@ -338,11 +397,15 @@ namespace AkademiTrack.ViewModels
                     );
 
                     await Task.Delay(3000 * _initializationRetryCount);
+                    Debug.WriteLine("[INIT] Recursively calling InitializeAsync() again...");
                     await InitializeAsync();
                 }
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[INIT] ❌ EXCEPTION in InitializeAsync: {ex.Message}");
+                Debug.WriteLine($"[INIT] Stack trace: {ex.StackTrace}");
+                
                 try
                 {
                     await _analyticsService.LogErrorAsync(
@@ -364,7 +427,18 @@ namespace AkademiTrack.ViewModels
                 );
 
                 await Task.Delay(3000);
+                Debug.WriteLine("[INIT] Recursively calling InitializeAsync() after exception...");
                 await InitializeAsync();
+            }
+            finally
+            {
+                Debug.WriteLine("[INIT] ========== FINALLY BLOCK ==========");
+                // ✅ ALWAYS set loading to false, even if something fails
+                await Task.Delay(500);
+                Debug.WriteLine("[INIT] Setting IsLoading to FALSE...");
+                IsLoading = false;
+                Debug.WriteLine("[INIT] ✓ IsLoading set to FALSE");
+                Debug.WriteLine("========== INITIALIZE ASYNC END ==========");
             }
         }
 
@@ -917,8 +991,7 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogInfo("❌ Auto-start is DISABLED in settings");
                     _loggingService.LogInfo("   Periodic checking will NOT run");
                     
-                    // Stop timer if it's running - must be on UI thread
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    Dispatcher.UIThread.Post(() =>
                     {
                         _autoStartCheckTimer?.Dispose();
                         _autoStartCheckTimer = null;
@@ -926,7 +999,6 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
                 
-                // Use the proper method that checks manual stops and completion
                 var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: false);
                 
                 _loggingService.LogInfo($"Auto-start check result: {reason}");
@@ -935,11 +1007,9 @@ namespace AkademiTrack.ViewModels
                 {
                     _loggingService.LogInfo("🚀 Starting automation automatically...");
                     
-                    // Mark as started
                     await SchoolTimeChecker.MarkTodayAsStartedAsync();
                     
-                    // Must start automation on UI thread
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    Dispatcher.UIThread.Post(async () =>
                     {
                         await Task.Delay(500);
                         await StartAutomationAsync();
@@ -958,8 +1028,7 @@ namespace AkademiTrack.ViewModels
                     }
                 }
                 
-                // START PERIODIC CHECKING (every 30 seconds) - must be on UI thread
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                Dispatcher.UIThread.Post(() =>
                 {
                     if (_autoStartCheckTimer == null)
                     {
