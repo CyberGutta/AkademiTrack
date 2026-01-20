@@ -33,7 +33,7 @@ namespace AkademiTrack.ViewModels
 
         #region Private Fields
         private readonly HttpClient _httpClient;
-        private AkademiTrack.Services.AuthenticationService? _authService;
+        private AuthenticationService? _authService;
         private UserParameters? _userParameters;
         private UpdateCheckerService? _updateChecker;
         private bool _isLoading = true;
@@ -242,7 +242,7 @@ namespace AkademiTrack.ViewModels
                 Debug.WriteLine("[MainWindow] App initialization started");
 
                 // Initialize authentication service
-                _authService = new AkademiTrack.Services.AuthenticationService(_notificationService, false);
+                _authService = new AuthenticationService(_notificationService, false);
 
                 // ✅ Authentication now runs on background thread - UI won't freeze
                 var authResult = await _authService.AuthenticateAsync();
