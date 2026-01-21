@@ -27,6 +27,7 @@
 		<vm:PercentageToWidthConverter x:Key="PercentageToWidthConverter"/>
 		<vm:PercentageToHeightConverter x:Key="PercentageToHeightConverter"/>
 		<vm:DayOfWeekConverter x:Key="DayOfWeekConverter"/>
+		<vm:TextLengthToFontSizeConverter x:Key="TextLengthToFontSizeConverter"/>
 	</Window.Resources>
 
 	<Window.Styles>
@@ -409,9 +410,11 @@
 									<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
 								</Grid>
 								<TextBlock Text="{Binding Dashboard.NextClassName}"
-										FontSize="24"
+										FontSize="{Binding Dashboard.NextClassName, Converter={StaticResource TextLengthToFontSizeConverter}}"
 										FontWeight="Bold"
-										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+										TextWrapping="Wrap"
+										MaxLines="2"/>
 								<TextBlock Text="{Binding Dashboard.NextClassTime}"
 										FontSize="16"
 										Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"

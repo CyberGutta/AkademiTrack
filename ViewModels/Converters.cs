@@ -83,4 +83,36 @@ namespace AkademiTrack.ViewModels
             throw new NotImplementedException();
         }
     }
+
+    // Converter for dynamic font sizing based on text length
+    public class TextLengthToFontSizeConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is string text && !string.IsNullOrEmpty(text))
+            {
+                int length = text.Length;
+                
+                // Dynamic font sizing based on text length
+                // Base font size is 24, reduce as text gets longer
+                if (length <= 10)
+                    return 24.0; // Short text - full size
+                else if (length <= 15)
+                    return 22.0; // Medium text - slightly smaller
+                else if (length <= 20)
+                    return 20.0; // Long text - smaller
+                else if (length <= 25)
+                    return 18.0; // Very long text - much smaller
+                else
+                    return 16.0; // Extremely long text - smallest readable size
+            }
+            
+            return 24.0; // Default size
+        }
+        
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

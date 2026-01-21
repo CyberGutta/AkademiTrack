@@ -252,12 +252,37 @@ namespace AkademiTrack.Services
                     return null;
                 }
                 
+                // Fetch both APIs
+                var dailyData = await FetchDailyScheduleAsync();
+                var monthlyData = await FetchMonthlyScheduleAsync();
+                
+                if (dailyData == null || monthlyData == null)
+                {
+                    _loggingService?.LogError("❌ [TODAY] Failed to fetch both daily and monthly data");
+                    return null;
+                }
+
+                _loggingService?.LogSuccess($"✅ [TODAY] Fetched {dailyData.Count} daily items and {monthlyData.Count} monthly items");
+                return ProcessCombinedScheduleData(dailyData, monthlyData);
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"❌ [TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<List<DailyScheduleItem>?> FetchDailyScheduleAsync()
+        {
+            try
+            {
+                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 var today = DateTime.Now.ToString("yyyyMMdd");
                 
-                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
-                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={today},endDate={today}&onlyData=true&limit=1000&totalResults=true";
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_dato;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},dato={today}&onlyData=true";
 
-                _loggingService?.LogDebug($"🌐 [TODAY] Fetching today's schedule from: {url.Replace(jsessionId, "***")}");
+                _loggingService?.LogDebug($"🌐 [DAILY] Fetching daily schedule from: {url.Replace(jsessionId, "***")}");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -270,38 +295,200 @@ namespace AkademiTrack.Services
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);
-                
-                _loggingService?.LogDebug($"🌐 [TODAY] Response status: {response.StatusCode}");
-                
-                if (!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode) 
                 {
-                    _loggingService?.LogError($"❌ [TODAY] HTTP error {response.StatusCode} when fetching today's schedule");
+                    _loggingService?.LogError($"❌ [DAILY] HTTP error {response.StatusCode}");
                     return null;
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
-                _loggingService?.LogDebug($"🌐 [TODAY] Response length: {json.Length} characters");
+                _loggingService?.LogDebug($"🌐 [DAILY] Response length: {json.Length} characters");
                 
+                var dailyResponse = JsonSerializer.Deserialize<SimpleDailyScheduleResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (dailyResponse?.Items == null)
+                {
+                    _loggingService?.LogWarning("⚠️ [DAILY] Daily response was null or had no items");
+                    return null;
+                }
+
+                _loggingService?.LogSuccess($"✅ [DAILY] Successfully fetched {dailyResponse.Items.Count} daily items");
+                return dailyResponse.Items;
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"❌ [DAILY] Exception: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<List<MonthlyScheduleItem>?> FetchMonthlyScheduleAsync()
+        {
+            try
+            {
+                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                var today = DateTime.Now.ToString("yyyyMMdd");
+                var tomorrow = DateTime.Now.AddDays(1).ToString("yyyyMMdd");
+                
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={today},endDate={tomorrow}&onlyData=true&limit=1000&totalResults=true";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Accept-Language", "no-NB");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+
+                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                request.Headers.Add("Cookie", cookieString);
+
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return null;
+
+                var json = await response.Content.ReadAsStringAsync();
                 var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
-                if (scheduleResponse?.Items == null)
-                {
-                    _loggingService?.LogWarning("⚠️ [TODAY] Schedule response was null or had no items");
-                    _loggingService?.LogDebug($"🔍 [TODAY] Raw response content: {json.Substring(0, Math.Min(300, json.Length))}");
-                    return null;
-                }
-
-                _loggingService?.LogSuccess($"✅ [TODAY] Successfully fetched {scheduleResponse.Items.Count} schedule items for today");
-                return ProcessTodayScheduleFromMonthlyData(scheduleResponse.Items);
+                return scheduleResponse?.Items;
             }
             catch (Exception ex)
             {
-                _loggingService?.LogError($"❌ [TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
+                _loggingService?.LogError($"❌ [MONTHLY] Exception: {ex.Message}");
                 return null;
             }
+        }
+
+        private TodayScheduleData ProcessCombinedScheduleData(List<DailyScheduleItem> dailyItems, List<MonthlyScheduleItem> monthlyItems)
+        {
+            var today = DateTime.Now.Date;
+            var now = DateTime.Now;
+
+            // Filter daily items (all are for today since we fetch by date)
+            var validDailyItems = dailyItems
+                .Where(item => !string.IsNullOrEmpty(item.StartKl) &&
+                              !string.IsNullOrEmpty(item.SluttKl))
+                .ToList();
+
+            // Count STU sessions for today
+            var todayStuSessions = validDailyItems
+                .Where(item => item.Fag != null && item.Fag.Contains("STU"))
+                .ToList();
+            
+            // For STU counting, we need to check monthly data for registration status
+            var registeredStuCount = 0;
+            var totalStuCount = todayStuSessions.Count;
+
+            foreach (var stuSession in todayStuSessions)
+            {
+                var matchingMonthly = monthlyItems.FirstOrDefault(m => m.Timenr == stuSession.Timenr);
+                if (matchingMonthly?.Fravaer == "M")
+                {
+                    registeredStuCount++;
+                }
+            }
+
+            // Find next class (not STU, after current time)
+            var nextDailyItem = validDailyItems
+                .Where(item => !item.Fag?.Contains("STU") == true && IsUpcomingClassSimple(item, now))
+                .OrderBy(item => item.StartKl)
+                .FirstOrDefault();
+
+            ScheduleItem? nextClass = null;
+            if (nextDailyItem != null)
+            {
+                // Find matching monthly item for subject name
+                var matchingMonthlyItem = monthlyItems.FirstOrDefault(m => m.Timenr == nextDailyItem.Timenr);
+                nextClass = CombineScheduleItemSimple(nextDailyItem, matchingMonthlyItem);
+            }
+
+            // Find current class
+            var currentDailyItem = validDailyItems
+                .Where(item => IsCurrentClassSimple(item, now))
+                .FirstOrDefault();
+
+            ScheduleItem? currentClass = null;
+            if (currentDailyItem != null)
+            {
+                var matchingMonthlyItem = monthlyItems.FirstOrDefault(m => m.Timenr == currentDailyItem.Timenr);
+                currentClass = CombineScheduleItemSimple(currentDailyItem, matchingMonthlyItem);
+            }
+
+            return new TodayScheduleData
+            {
+                RegisteredStuSessions = registeredStuCount,
+                TotalStuSessions = totalStuCount,
+                NextClass = nextClass,
+                CurrentClass = currentClass,
+                AllTodayItems = new List<ScheduleItem>() // Not needed for next class display
+            };
+        }
+
+        private ScheduleItem CombineScheduleItemSimple(DailyScheduleItem dailyItem, MonthlyScheduleItem? monthlyItem)
+        {
+            string displayName = "";
+            string roomNumber = "";
+
+            if (monthlyItem != null)
+            {
+                // Use subject name from monthly API
+                displayName = GetCleanSubjectName(monthlyItem.Fagnavn);
+                roomNumber = monthlyItem.Romnr?.Trim() ?? "";
+            }
+            else
+            {
+                // Fallback to daily item subject
+                displayName = dailyItem.Fag ?? "";
+            }
+
+            var today = DateTime.Now.ToString("yyyyMMdd");
+
+            return new ScheduleItem
+            {
+                Id = dailyItem.Id,
+                Fag = dailyItem.Fag,
+                Dato = today,
+                Timenr = dailyItem.Timenr,
+                StartKl = dailyItem.StartKl,  // Use time from daily API
+                SluttKl = dailyItem.SluttKl,  // Use time from daily API
+                KNavn = ExtractSubjectCode(dailyItem.Fag),
+                DisplayName = displayName,    // Use name from monthly API
+                Romnr = roomNumber,          // Use room from monthly API
+                Typefravaer = monthlyItem?.Fravaer == "M" ? "M" : null,
+                UndervisningPaagaar = 1
+            };
+        }
+
+        private bool IsCurrentClassSimple(DailyScheduleItem item, DateTime now)
+        {
+            if (!TimeSpan.TryParse($"{item.StartKl?.PadLeft(4, '0').Insert(2, ":")}", out var startTime) ||
+                !TimeSpan.TryParse($"{item.SluttKl?.PadLeft(4, '0').Insert(2, ":")}", out var endTime))
+            {
+                return false;
+            }
+
+            var today = DateTime.Now.Date;
+            var classStart = today.Add(startTime);
+            var classEnd = today.Add(endTime);
+
+            return now >= classStart && now <= classEnd;
+        }
+
+        private bool IsUpcomingClassSimple(DailyScheduleItem item, DateTime now)
+        {
+            if (!TimeSpan.TryParse($"{item.StartKl?.PadLeft(4, '0').Insert(2, ":")}", out var startTime))
+            {
+                return false;
+            }
+
+            var today = DateTime.Now.Date;
+            var classStart = today.Add(startTime);
+            return classStart > now;
         }
 
         public async Task<MonthlyAttendanceData?> GetMonthlyAttendanceAsync()
@@ -651,13 +838,13 @@ namespace AkademiTrack.Services
             var today = DateTime.Now.ToString("yyyyMMdd");
             var todayItems = items.Where(i => i.Dato == today).ToList();
 
-            // Get STU sessions
+            // Get STU sessions for today only
             var stuSessions = todayItems.Where(i => 
                 (i.Fag != null && i.Fag.Contains("STU")) ||
                 (i.Fagnavn != null && i.Fagnavn.Contains("Studietid"))
             ).ToList();
             
-            // Get regular classes (non-STU)
+            // Get regular classes for today only (non-STU)
             var regularClasses = todayItems.Where(i => 
                 i.Fag != null &&
                 !i.Fag.Contains("STU") &&
@@ -690,15 +877,16 @@ namespace AkademiTrack.Services
             var registeredStuCount = validStuSessions.Count(s => s.Fravaer == "M");
             var totalStuCount = validStuSessions.Count;
 
-            var now = DateTime.Now.TimeOfDay;
+            var now = DateTime.Now;
 
+            // Find current class from today's items only
             var currentClasses = todayItems
                 .Where(i => !string.IsNullOrEmpty(i.Fradato) && !string.IsNullOrEmpty(i.Tildato))
                 .Select(i => new
                 {
                     Item = i,
-                    StartTime = ParseDateTimeToTimeSpan(i.Fradato),
-                    EndTime = ParseDateTimeToTimeSpan(i.Tildato)
+                    StartTime = ParseDateTime(i.Fradato),
+                    EndTime = ParseDateTime(i.Tildato)
                 })
                 .Where(x => x.StartTime.HasValue && x.EndTime.HasValue &&
                            x.StartTime.Value <= now && x.EndTime.Value >= now)
@@ -707,12 +895,15 @@ namespace AkademiTrack.Services
 
             MonthlyScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
 
-            var upcomingClasses = todayItems
-                .Where(i => !string.IsNullOrEmpty(i.Fradato))
+            // Find next class from ALL items (today and tomorrow), excluding STU sessions
+            var upcomingClasses = items
+                .Where(i => !string.IsNullOrEmpty(i.Fradato) && 
+                           i.Fagnavn != null && 
+                           !i.Fagnavn.Contains("Studietid")) // Exclude STU sessions from next class display
                 .Select(i => new
                 {
                     Item = i,
-                    StartTime = ParseDateTimeToTimeSpan(i.Fradato)
+                    StartTime = ParseDateTime(i.Fradato)
                 })
                 .Where(x => x.StartTime.HasValue && x.StartTime.Value > now)
                 .OrderBy(x => x.StartTime)
@@ -730,7 +921,7 @@ namespace AkademiTrack.Services
             };
         }
 
-        private TimeSpan? ParseDateTimeToTimeSpan(string? dateTimeStr)
+        private DateTime? ParseDateTime(string? dateTimeStr)
         {
             if (string.IsNullOrEmpty(dateTimeStr))
                 return null;
@@ -739,7 +930,7 @@ namespace AkademiTrack.Services
             {
                 if (DateTime.TryParse(dateTimeStr, out var dateTime))
                 {
-                    return dateTime.TimeOfDay;
+                    return dateTime;
                 }
                 return null;
             }
@@ -767,6 +958,7 @@ namespace AkademiTrack.Services
                 SluttKl = FormatTimeFromDateTime(monthlyItem.Tildato),
                 KNavn = cleanSubjectCode,
                 DisplayName = displayName, // Store the clean full name
+                Romnr = monthlyItem.Romnr?.Trim(), // Add room information
                 Typefravaer = monthlyItem.Fravaer == "M" ? "M" : null,
                 UndervisningPaagaar = 1
             };
@@ -804,7 +996,18 @@ namespace AkademiTrack.Services
                 if (firstPart.Any(char.IsLetter) && firstPart.Any(char.IsDigit))
                 {
                     // Return everything after the first part
-                    return string.Join(" ", parts.Skip(1));
+                    var cleanName = string.Join(" ", parts.Skip(1));
+                    
+                    // Simple shortening for very long names
+                    if (cleanName.Length > 25)
+                    {
+                        cleanName = cleanName.Replace("hovedmål, skriftlig", "skriftlig");
+                        cleanName = cleanName.Replace("hovedmål, muntlig", "muntlig");
+                        cleanName = cleanName.Replace("sidemål, skriftlig", "nynorsk skriftlig");
+                        cleanName = cleanName.Replace("sidemål, muntlig", "nynorsk muntlig");
+                    }
+                    
+                    return cleanName;
                 }
             }
             
@@ -862,6 +1065,7 @@ namespace AkademiTrack.Services
         public int Timenr { get; set; }
         public string? StartKl { get; set; }
         public string? SluttKl { get; set; }
+        public string? Romnr { get; set; } // Room number
         public int UndervisningPaagaar { get; set; }
         public string? Typefravaer { get; set; }  // "M" means registered
         public int ElevForerTilstedevaerelse { get; set; }
@@ -934,5 +1138,24 @@ namespace AkademiTrack.Services
         public int RegisteredSessions { get; set; }
         public int TotalSessions { get; set; }
         public double FillPercentage { get; set; } // 0-100 for the visual fill
+    }
+
+    // Daily API models for better time accuracy
+    public class DailyScheduleItem
+    {
+        public int Id { get; set; }
+        public int Timenr { get; set; }
+        public string? Fag { get; set; }      // "PB3A STU", "PB3A NOR", etc.
+        public string? StartKl { get; set; }  // "0815" format
+        public string? SluttKl { get; set; }  // "0900" format
+    }
+
+    public class SimpleDailyScheduleResponse
+    {
+        public List<DailyScheduleItem>? Items { get; set; }
+        public int Count { get; set; }
+        public bool HasMore { get; set; }
+        public int Limit { get; set; }
+        public int Offset { get; set; }
     }
 }

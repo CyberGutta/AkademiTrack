@@ -29,6 +29,7 @@ namespace AkademiTrack.ViewModels
         private string _nextClassTime = "--:-- - --:--";
         private string _nextClassRoom = "";
         private System.Timers.Timer? _nextClassUpdateTimer;
+        private DateTime _lastSystemTime = DateTime.Now; // For sleep detection
 
 
         // Monthly attendance
@@ -117,6 +118,9 @@ namespace AkademiTrack.ViewModels
             _attendanceService.SetLoggingService(_loggingService);
             
             _weeklyDays = InitializeEmptyWeek();
+            
+            // Set up wake-from-sleep detection
+            SetupSleepDetection();
         }
 
         // Today's STU Sessions
@@ -401,6 +405,7 @@ namespace AkademiTrack.ViewModels
                 TimeSpan? nextEventTime = null;
                 string eventDescription = "";
 
+                // Check for current class ending
                 if (data.CurrentClass != null && !string.IsNullOrEmpty(data.CurrentClass.SluttKl))
                 {
                     var currentClassEndTime = ParseTimeString(data.CurrentClass.SluttKl);
@@ -411,6 +416,7 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
+                // Check for next class starting
                 if (data.NextClass != null && !string.IsNullOrEmpty(data.NextClass.StartKl))
                 {
                     var nextClassStartTime = ParseTimeString(data.NextClass.StartKl);
@@ -424,29 +430,24 @@ namespace AkademiTrack.ViewModels
                     }
                 }
 
-                // If no upcoming events today, schedule check for 5 minutes (cache might be stale)
+                // If no upcoming events today, schedule check for midnight (new day)
                 if (!nextEventTime.HasValue)
                 {
-                    _loggingService?.LogDebug("[NEXT CLASS] No more classes today - will recheck in 5 minutes (in case of new day)");
+                    var midnight = TimeSpan.FromDays(1); // Tomorrow at 00:00
+                    var timeUntilMidnight = midnight - now;
+                    
+                    _loggingService?.LogDebug($"[NEXT CLASS] No more classes today - will check at midnight in {timeUntilMidnight.TotalHours:F1} hours");
 
-                    _nextClassUpdateTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
+                    _nextClassUpdateTimer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo("[NEXT CLASS] ⏰ Periodic check - verifying if new day or schedule updated");
+                        _loggingService?.LogInfo("[NEXT CLASS] 🌅 Midnight reached - refreshing for new day");
                         Dispatcher.UIThread.Post(async () =>
                         {
-                            if (_cacheDate.Date != DateTime.Now.Date)
-                            {
-                                _loggingService?.LogInfo("[NEXT CLASS] 🌅 New day detected - refreshing schedule");
-                                await RefreshDataAsync();
-                            }
-                            else
-                            {
-                                UpdateNextClassFromCache();
-                            }
+                            await RefreshDataAsync();
                         });
                     };
-                    _nextClassUpdateTimer.AutoReset = true; // Keep checking every 5 minutes
+                    _nextClassUpdateTimer.AutoReset = false;
                     _nextClassUpdateTimer.Start();
                     return;
                 }
@@ -482,20 +483,56 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private void SetupSleepDetection()
+        {
+            try
+            {
+                // Set up a timer to check for system sleep/wake every 30 seconds
+                var sleepDetectionTimer = new System.Timers.Timer(30000); // 30 seconds
+                sleepDetectionTimer.Elapsed += (s, e) =>
+                {
+                    var currentTime = DateTime.Now;
+                    var timeDifference = currentTime - _lastSystemTime;
+                    
+                    // If more than 2 minutes have passed since last check, assume system was sleeping
+                    if (timeDifference.TotalMinutes > 2)
+                    {
+                        _loggingService?.LogInfo($"[SLEEP DETECTION] 💤 System wake detected - time gap: {timeDifference.TotalMinutes:F1} minutes");
+                        
+                        Dispatcher.UIThread.Post(async () =>
+                        {
+                            _loggingService?.LogInfo("[SLEEP DETECTION] 🔄 Refreshing data after wake from sleep");
+                            await RefreshDataAsync();
+                        });
+                    }
+                    
+                    _lastSystemTime = currentTime;
+                };
+                sleepDetectionTimer.AutoReset = true;
+                sleepDetectionTimer.Start();
+                
+                _loggingService?.LogDebug("[SLEEP DETECTION] ✅ Sleep detection timer started");
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"[SLEEP DETECTION] Error setting up sleep detection: {ex.Message}");
+            }
+        }
+
         private TodayScheduleData RecalculateNextClass(TodayScheduleData cachedData)
         {
             if (cachedData.AllTodayItems == null || !cachedData.AllTodayItems.Any())
                 return cachedData;
 
-            var now = DateTime.Now.TimeOfDay;
+            var now = DateTime.Now;
 
             var currentClasses = cachedData.AllTodayItems
                 .Where(i => !string.IsNullOrEmpty(i.StartKl) && !string.IsNullOrEmpty(i.SluttKl))
                 .Select(i => new
                 {
                     Item = i,
-                    StartTime = ParseTimeString(i.StartKl),
-                    EndTime = ParseTimeString(i.SluttKl)
+                    StartTime = ParseTimeToDateTime(i.StartKl, i.Dato),
+                    EndTime = ParseTimeToDateTime(i.SluttKl, i.Dato)
                 })
                 .Where(x => x.StartTime.HasValue && x.EndTime.HasValue &&
                            x.StartTime.Value <= now && x.EndTime.Value >= now)
@@ -504,18 +541,10 @@ namespace AkademiTrack.ViewModels
 
             Services.ScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
 
-            var upcomingClasses = cachedData.AllTodayItems
-                .Where(i => !string.IsNullOrEmpty(i.StartKl))
-                .Select(i => new
-                {
-                    Item = i,
-                    StartTime = ParseTimeString(i.StartKl)
-                })
-                .Where(x => x.StartTime.HasValue && x.StartTime.Value > now)
-                .OrderBy(x => x.StartTime)
-                .ToList();
-
-            Services.ScheduleItem? nextClass = upcomingClasses.FirstOrDefault()?.Item;
+            // For next class, we need to check if we have data beyond today
+            // Since RecalculateNextClass works with cached data, it might not have tomorrow's data
+            // The next class calculation should be done in the main data fetch
+            Services.ScheduleItem? nextClass = cachedData.NextClass; // Keep the existing next class from the original fetch
 
             return new TodayScheduleData
             {
@@ -527,22 +556,56 @@ namespace AkademiTrack.ViewModels
             };
         }
 
-        private TimeSpan? ParseTimeString(string? timeStr)
+        private DateTime? ParseTimeToDateTime(string? timeStr, string? dateStr)
         {
-            if (string.IsNullOrEmpty(timeStr) || timeStr.Length != 4)
+            if (string.IsNullOrEmpty(timeStr) || string.IsNullOrEmpty(dateStr))
                 return null;
 
             try
             {
-                // Parse time in format "HHmm" (e.g., "0815", "1330")
-                if (int.TryParse(timeStr.Substring(0, 2), out int hours) &&
-                    int.TryParse(timeStr.Substring(2, 2), out int minutes))
+                // Parse date from "yyyyMMdd" format
+                if (DateTime.TryParseExact(dateStr, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date))
                 {
-                    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60)
+                    var timeSpan = ParseTimeString(timeStr);
+                    if (timeSpan.HasValue)
                     {
-                        return new TimeSpan(hours, minutes, 0);
+                        return date.Add(timeSpan.Value);
                     }
                 }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private TimeSpan? ParseTimeString(string? timeStr)
+        {
+            if (string.IsNullOrEmpty(timeStr))
+                return null;
+
+            try
+            {
+                // Handle both old format "HHmm" and new format "HH:mm"
+                if (timeStr.Length == 4 && timeStr.All(char.IsDigit))
+                {
+                    // Parse time in format "HHmm" (e.g., "0815", "1330")
+                    if (int.TryParse(timeStr.Substring(0, 2), out int hours) &&
+                        int.TryParse(timeStr.Substring(2, 2), out int minutes))
+                    {
+                        if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60)
+                        {
+                            return new TimeSpan(hours, minutes, 0);
+                        }
+                    }
+                }
+                else if (TimeSpan.TryParse(timeStr, out var timeSpan))
+                {
+                    // Handle "HH:mm" format
+                    return timeSpan;
+                }
+                
                 return null;
             }
             catch
@@ -597,14 +660,26 @@ namespace AkademiTrack.ViewModels
                 {
                     string startTime = FormatTime(displayClass.StartKl);
                     string endTime = FormatTime(displayClass.SluttKl);
-                    NextClassTime = $"{startTime} - {endTime}";
+                    
+                    // Check if the class is tomorrow
+                    var today = DateTime.Now.ToString("yyyyMMdd");
+                    if (displayClass.Dato != today)
+                    {
+                        // Class is tomorrow, add day indicator
+                        NextClassTime = $"I morgen {startTime} - {endTime}";
+                    }
+                    else
+                    {
+                        NextClassTime = $"{startTime} - {endTime}";
+                    }
                 }
                 else
                 {
                     NextClassTime = "--:-- - --:--";
                 }
 
-                NextClassRoom = "";
+                // Show room information if available
+                NextClassRoom = !string.IsNullOrEmpty(displayClass.Romnr) ? $"Rom {displayClass.Romnr.Trim()}" : "";
             }
             else
             {
@@ -744,10 +819,23 @@ namespace AkademiTrack.ViewModels
 
         private string FormatTime(string time)
         {
-            if (string.IsNullOrEmpty(time) || time.Length != 4)
+            if (string.IsNullOrEmpty(time))
                 return time;
 
-            return $"{time.Substring(0, 2)}:{time.Substring(2, 2)}";
+            // Handle old format "HHmm" (e.g., "0815")
+            if (time.Length == 4 && time.All(char.IsDigit))
+            {
+                return $"{time.Substring(0, 2)}:{time.Substring(2, 2)}";
+            }
+            
+            // Handle new format "HH:mm" (already formatted)
+            if (time.Contains(':'))
+            {
+                return time;
+            }
+            
+            // Fallback - return as-is
+            return time;
         }
 
         private void UpdateOvertimeDisplay(AttendanceSummary summary)
