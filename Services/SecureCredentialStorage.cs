@@ -549,6 +549,176 @@ namespace AkademiTrack.Services
                 Debug.WriteLine($"Failed to delete cookies: {ex.Message}");
             }
         }
+
+        public static async Task ClearAllDataAsync()
+        {
+            try
+            {
+                Debug.WriteLine("🗑️ Starting complete AkademiTrack data cleanup...");
+
+                var credentialKeys = new[]
+                {
+                    "LoginEmail",
+                    "LoginPassword", 
+                    "SchoolName",
+                    "cookies",
+                    "user_parameters",      
+                    "supabase_api_key",
+                    "feide_username"        
+                };
+
+                int deletedCount = 0;
+                int totalKeys = credentialKeys.Length;
+
+                // Delete each credential
+                foreach (var key in credentialKeys)
+                {
+                    try
+                    {
+                        bool deleted = await DeleteCredentialAsync(key);
+                        if (deleted)
+                        {
+                            deletedCount++;
+                            Debug.WriteLine($"✓ Deleted credential: {key}");
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"⚠️ Credential not found or already deleted: {key}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"❌ Failed to delete credential '{key}': {ex.Message}");
+                    }
+                }
+
+                // Platform-specific cleanup
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    await ClearWindowsRegistryDataAsync();
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    await ClearMacOSKeychainDataAsync();
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    await ClearLinuxSecretServiceDataAsync();
+                }
+
+                Debug.WriteLine($"✅ Secure storage cleanup complete: {deletedCount}/{totalKeys} credentials processed");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Error during complete data cleanup: {ex.Message}");
+            }
+        }
+
+        private static async Task ClearWindowsRegistryDataAsync()
+        {
+            try
+            {
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    return;
+
+                Debug.WriteLine("🗑️ Clearing Windows registry data...");
+
+                using var regKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AkademiTrack", true);
+                if (regKey != null)
+                {
+                    // Delete the entire AkademiTrack registry key
+                    Registry.CurrentUser.DeleteSubKeyTree(@"SOFTWARE\AkademiTrack", false);
+                    Debug.WriteLine("✓ Windows registry data cleared");
+                }
+                else
+                {
+                    Debug.WriteLine("⚠️ No Windows registry data found");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Failed to clear Windows registry data: {ex.Message}");
+            }
+        }
+
+        private static async Task ClearMacOSKeychainDataAsync()
+        {
+            try
+            {
+                Debug.WriteLine("🗑️ Clearing macOS Keychain data...");
+
+                // Use security command to delete all AkademiTrack entries
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "/usr/bin/security",
+                        Arguments = $"delete-generic-password -s \"{ServiceName}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                await process.WaitForExitAsync();
+
+                // Note: This command will fail if no entries exist, which is expected
+                Debug.WriteLine("✓ macOS Keychain cleanup attempted");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Failed to clear macOS Keychain data: {ex.Message}");
+            }
+        }
+
+        private static async Task ClearLinuxSecretServiceDataAsync()
+        {
+            try
+            {
+                Debug.WriteLine("🗑️ Clearing Linux Secret Service data...");
+
+                if (File.Exists("/usr/bin/secret-tool"))
+                {
+                    // Clear all AkademiTrack entries from secret service
+                    var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "secret-tool",
+                            Arguments = $"clear service {ServiceName}",
+                            UseShellExecute = false,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    process.Start();
+                    await process.WaitForExitAsync();
+                    Debug.WriteLine("✓ Linux Secret Service cleanup attempted");
+                }
+
+                // Also delete fallback file
+                if (File.Exists(FallbackPath))
+                {
+                    File.Delete(FallbackPath);
+                    Debug.WriteLine("✓ Linux fallback credentials file deleted");
+                }
+
+                // Delete the entire .akademitrack directory if it exists
+                var fallbackDir = Path.GetDirectoryName(FallbackPath);
+                if (!string.IsNullOrEmpty(fallbackDir) && Directory.Exists(fallbackDir))
+                {
+                    Directory.Delete(fallbackDir, true);
+                    Debug.WriteLine("✓ Linux .akademitrack directory deleted");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Failed to clear Linux Secret Service data: {ex.Message}");
+            }
+        }
     }
 
     public class Cookie
