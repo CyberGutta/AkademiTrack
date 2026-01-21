@@ -262,7 +262,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Overtime data fetch timed out after 15 seconds");
+                    _loggingService?.LogWarning("[DASHBOARD] Overtime data fetch timed out after 15 seconds");
                 }
 
                 // Today's schedule with timeout
@@ -283,12 +283,12 @@ namespace AkademiTrack.ViewModels
                             UpdateNextClassDisplay(todayData);
                             ScheduleNextClassUpdate(todayData);
                         });
-                        _loggingService?.LogDebug("[DASHBOARD] ✓ Today's schedule loaded");
+                        _loggingService?.LogDebug("[DASHBOARD] Today's schedule loaded");
                     }
                 }
                 else
                 {
-                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Today's schedule fetch timed out after 15 seconds");
+                    _loggingService?.LogWarning("[DASHBOARD] Today's schedule fetch timed out after 15 seconds");
                 }
 
                 // Monthly attendance with timeout
@@ -310,7 +310,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Monthly data fetch timed out after 15 seconds");
+                    _loggingService?.LogWarning("[DASHBOARD] Monthly data fetch timed out after 15 seconds");
                 }
 
                 // Weekly attendance with timeout
@@ -332,7 +332,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    _loggingService?.LogWarning("[DASHBOARD] ⚠️ Weekly data fetch timed out after 15 seconds");
+                    _loggingService?.LogWarning("[DASHBOARD] Weekly data fetch timed out after 15 seconds");
                 }
 
                 _loggingService?.LogSuccess("[DASHBOARD] ✓ Data refresh complete!");
@@ -432,12 +432,12 @@ namespace AkademiTrack.ViewModels
                     _nextClassUpdateTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo("[NEXT CLASS] ⏰ Periodic check - verifying if new day or schedule updated");
+                        _loggingService?.LogInfo("[NEXT CLASS] Periodic check - verifying if new day or schedule updated");
                         Dispatcher.UIThread.Post(async () =>
                         {
                             if (_cacheDate.Date != DateTime.Now.Date)
                             {
-                                _loggingService?.LogInfo("[NEXT CLASS] 🌅 New day detected - refreshing schedule");
+                                _loggingService?.LogInfo("[NEXT CLASS] New day detected - refreshing schedule");
                                 await RefreshDataAsync();
                             }
                             else
@@ -465,7 +465,7 @@ namespace AkademiTrack.ViewModels
                 _nextClassUpdateTimer = new System.Timers.Timer(timeUntilEvent.TotalMilliseconds);
                 _nextClassUpdateTimer.Elapsed += (s, e) =>
                 {
-                    _loggingService?.LogInfo($"[NEXT CLASS] ⏰ Event triggered: {eventDescription}");
+                    _loggingService?.LogInfo($"[NEXT CLASS] Event triggered: {eventDescription}");
                     Dispatcher.UIThread.Post(() =>
                     {
                         UpdateNextClassFromCache(); // Recalculates and reschedules for next event
@@ -474,7 +474,7 @@ namespace AkademiTrack.ViewModels
                 _nextClassUpdateTimer.AutoReset = false;
                 _nextClassUpdateTimer.Start();
 
-                _loggingService?.LogDebug($"[NEXT CLASS] ⏰ Timer set - will update in {timeUntilEvent.TotalMinutes:F1} minutes ({eventDescription})");
+                _loggingService?.LogDebug($"[NEXT CLASS] Timer set - will update in {timeUntilEvent.TotalMinutes:F1} minutes ({eventDescription})");
             }
             catch (Exception ex)
             {

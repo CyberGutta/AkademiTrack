@@ -366,7 +366,7 @@ namespace AkademiTrack.ViewModels
                         // Continue initialization even if dashboard fails
                     }
 
-                    _loggingService.LogSuccess("✓ Applikasjon er klar!");
+                    _loggingService.LogSuccess("Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
 
                     // Start services with error handling
@@ -434,7 +434,7 @@ namespace AkademiTrack.ViewModels
                     Debug.WriteLine($"[Analytics] Failed to log initialization failure: {ex.Message}");
                 }
 
-                _loggingService.LogError($"❌ Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
+                _loggingService.LogError($"Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
                 _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
                 await _notificationService.ShowNotificationAsync(
                     "Autentisering mislyktes",
@@ -447,7 +447,7 @@ namespace AkademiTrack.ViewModels
                 return;
             }
 
-            _loggingService.LogError($"❌ Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
+            _loggingService.LogError($"Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
             _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
             await _notificationService.ShowNotificationAsync(
                 "Autentisering mislyktes",
@@ -481,7 +481,7 @@ namespace AkademiTrack.ViewModels
             // Check if we've exceeded max retries
             if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
             {
-                _loggingService.LogError($"❌ Oppstart mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper");
+                _loggingService.LogError($"Oppstart mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper");
                 await _notificationService.ShowNotificationAsync(
                     "Oppstartsfeil",
                     $"Kritisk feil etter {MAX_RETRY_ATTEMPTS} forsøk. Sjekk innstillinger eller nettverk.",
@@ -523,7 +523,7 @@ namespace AkademiTrack.ViewModels
                                 await Dashboard.RefreshDataAsync();
                             });
 
-                            _loggingService.LogDebug("✓ Dashboard auto-refresh complete");
+                            _loggingService.LogDebug("Dashboard auto-refresh complete");
                         }
                     }
                     catch (Exception ex)
@@ -536,12 +536,12 @@ namespace AkademiTrack.ViewModels
                 TimeSpan.FromMinutes(5)
             );
 
-            _loggingService.LogInfo("✓ Dashboard auto-refresh timer started (every 5 minutes)");
+            _loggingService.LogInfo("Dashboard auto-refresh timer started (every 5 minutes)");
         }
 
         private void StartMidnightResetTimer()
         {
-            _loggingService.LogInfo("⏰ Starting midnight reset timer...");
+            _loggingService.LogInfo("Starting midnight reset timer...");
 
             _midnightResetTimer = new Timer(
                 async _ =>
@@ -560,7 +560,7 @@ namespace AkademiTrack.ViewModels
                 TimeSpan.FromMinutes(5)
             );
 
-            _loggingService.LogInfo("✓ Midnight reset timer started (checks every 5 minutes)");
+            _loggingService.LogInfo("Midnight reset timer started (checks every 5 minutes)");
         }
         #endregion
 
@@ -652,10 +652,10 @@ namespace AkademiTrack.ViewModels
                 {
                     // 1. Immediate cache-based updates (fast, no network)
                     Dashboard.IncrementRegisteredSessionCount();
-                    _loggingService.LogDebug("[DASHBOARD] ✓ Today's count updated from cache");
+                    _loggingService.LogDebug("[DASHBOARD] Today's count updated from cache");
                     
                     Dashboard.UpdateNextClassFromCache();
-                    _loggingService.LogDebug("[DASHBOARD] ✓ Next class updated from cache");
+                    _loggingService.LogDebug("[DASHBOARD] Next class updated from cache");
                     
                     // 2. Full data refresh after short delay (fetches fresh data from server)
                     await Task.Delay(500); // Give server time to process registration
@@ -664,7 +664,7 @@ namespace AkademiTrack.ViewModels
                     {
                         _loggingService.LogDebug("[DASHBOARD] Refreshing all data from server...");
                         await Dashboard.RefreshDataAsync();
-                        _loggingService.LogSuccess("[DASHBOARD] ✓ All data refreshed (today, weekly, monthly, overtime)");
+                        _loggingService.LogSuccess("[DASHBOARD] All data refreshed (today, weekly, monthly, overtime)");
                     }
                     catch (Exception ex)
                     {
@@ -683,7 +683,7 @@ namespace AkademiTrack.ViewModels
         #region Command Implementations
         private async Task StartAutomationAsync()
         {
-            _loggingService.LogDebug($"🔍 [START] Checking authentication state: IsAuthenticated={IsAuthenticated}, _userParameters null={_userParameters == null}, complete={_userParameters?.IsComplete ?? false}");
+            _loggingService.LogDebug($"[START] Checking authentication state: IsAuthenticated={IsAuthenticated}, _userParameters null={_userParameters == null}, complete={_userParameters?.IsComplete ?? false}");
             
             // Clear manual stop flag when user manually starts automation
             await SchoolTimeChecker.ClearManualStopAsync();
@@ -691,7 +691,7 @@ namespace AkademiTrack.ViewModels
             
             if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
             {
-                _loggingService.LogError($"❌ [START] Ikke autentisert - kan ikke starte automatisering. IsAuth={IsAuthenticated}, Params={_userParameters != null}, Complete={_userParameters?.IsComplete ?? false}");
+                _loggingService.LogError($"[START] Ikke autentisert - kan ikke starte automatisering. IsAuth={IsAuthenticated}, Params={_userParameters != null}, Complete={_userParameters?.IsComplete ?? false}");
                 await _notificationService.ShowNotificationAsync(
                     "Autentiseringsfeil",
                     "Du må være innlogget for å starte automatisering",
@@ -702,14 +702,14 @@ namespace AkademiTrack.ViewModels
 
             if (Dashboard.IsCacheStale())
             {
-                _loggingService.LogInfo("📊 Cache is stale - refreshing dashboard before automation...");
+                _loggingService.LogInfo("Cache is stale - refreshing dashboard before automation...");
                 StatusMessage = "Oppdaterer data...";
 
                 try
                 {
                     await Dashboard.RefreshDataAsync();
                     _lastDataRefresh = DateTime.Now;
-                    _loggingService.LogSuccess("✓ Dashboard data refreshed");
+                    _loggingService.LogSuccess("Dashboard data refreshed");
                 }
                 catch (Exception ex)
                 {
@@ -723,7 +723,7 @@ namespace AkademiTrack.ViewModels
             }
             else
             {
-                _loggingService.LogInfo("✓ Using cached data (from today - still fresh)");
+                _loggingService.LogInfo("Using cached data (from today - still fresh)");
             }
 
             // Track automation start
@@ -774,7 +774,7 @@ namespace AkademiTrack.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    _loggingService.LogError($"❌ [MAIN] Failed to load user parameters: {ex.Message}");
+                    _loggingService.LogError($"[MAIN] Failed to load user parameters: {ex.Message}");
                 }
                 
                 if (freshUserParams == null)
@@ -792,11 +792,11 @@ namespace AkademiTrack.ViewModels
                     // Also update Dashboard with fresh credentials
                     Dashboard.SetCredentials(paramsToUse, cookies);
                     
-                    _loggingService.LogSuccess($"✅ [MAIN] Set credentials in automation service and dashboard: {cookies.Count} cookies, params complete: {paramsToUse.IsComplete}");
+                    _loggingService.LogSuccess($"[MAIN] Set credentials in automation service and dashboard: {cookies.Count} cookies, params complete: {paramsToUse.IsComplete}");
                 }
                 else
                 {
-                    _loggingService.LogError($"❌ [MAIN] Missing credentials for automation: cookies={cookies?.Count ?? 0}, params={paramsToUse != null}");
+                    _loggingService.LogError($"[MAIN] Missing credentials for automation: cookies={cookies?.Count ?? 0}, params={paramsToUse != null}");
                 }
             }
 
@@ -965,12 +965,12 @@ namespace AkademiTrack.ViewModels
                 _isRefreshingData = true;
                 _lastManualRefresh = DateTime.Now;
 
-                _loggingService.LogInfo("🔄 Oppdaterer data...");
+                _loggingService.LogInfo("Oppdaterer data...");
                 StatusMessage = "Oppdaterer...";
 
                 await Dashboard.RefreshDataAsync();
                 
-                _loggingService.LogSuccess("✓ Data oppdatert!");
+                _loggingService.LogSuccess("Data oppdatert!");
                 StatusMessage = "Data oppdatert!";
                 
                 // Reset status after 3 seconds
@@ -1028,7 +1028,7 @@ namespace AkademiTrack.ViewModels
 
         private async Task RetryAuthenticationAsync()
         {
-            _loggingService.LogInfo("🔄 Manuell retry av autentisering startet...");
+            _loggingService.LogInfo("Manuell retry av autentisering startet...");
             
             // Reset retry count for manual retry
             _initializationRetryCount = 0;
@@ -1053,18 +1053,18 @@ namespace AkademiTrack.ViewModels
             
             if (now > _currentDay)
             {
-                _loggingService.LogInfo($"🌅 NEW DAY DETECTED! Changing from {_currentDay:yyyy-MM-dd} to {now:yyyy-MM-dd}");
+                _loggingService.LogInfo($"NEW DAY DETECTED! Changing from {_currentDay:yyyy-MM-dd} to {now:yyyy-MM-dd}");
                 _currentDay = now;
                 
                 SchoolTimeChecker.ResetDailyCompletion();
-                _loggingService.LogInfo("✓ Daily completion flags reset");
+                _loggingService.LogInfo("Daily completion flags reset");
                 
                 Dashboard.ClearCache();
-                _loggingService.LogInfo("✓ Dashboard cache cleared for new day");
+                _loggingService.LogInfo("Dashboard cache cleared for new day");
                 
                 if (_settingsService.AutoStartAutomation)
                 {
-                    _loggingService.LogInfo("🔍 Checking if automation should auto-start for new day...");
+                    _loggingService.LogInfo("Checking if automation should auto-start for new day...");
                     await CheckAutoStartAutomationAsync();
                 }
                 
@@ -1083,7 +1083,7 @@ namespace AkademiTrack.ViewModels
         {
             if (e.Success)
             {
-                _loggingService.LogSuccess($"✓ Feide-oppsett fullført for {e.UserEmail}");
+                _loggingService.LogSuccess($"Feide-oppsett fullført for {e.UserEmail}");
                 
                 // Reset retry count
                 _initializationRetryCount = 0;
@@ -1091,7 +1091,7 @@ namespace AkademiTrack.ViewModels
             }
             else
             {
-                _loggingService.LogError("❌ Feide-oppsett mislyktes");
+                _loggingService.LogError("Feide-oppsett mislyktes");
             }
         }
         #endregion
@@ -1125,7 +1125,7 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                _loggingService.LogInfo("🔍 CHECKING AUTO-START AUTOMATION");
+                _loggingService.LogInfo("CHECKING AUTO-START AUTOMATION");
                 
                 await _settingsService.LoadSettingsAsync();
                 var autoStartEnabled = _settingsService.AutoStartAutomation;
@@ -1136,7 +1136,7 @@ namespace AkademiTrack.ViewModels
                 
                 if (!autoStartEnabled)
                 {
-                    _loggingService.LogInfo("❌ Auto-start is DISABLED in settings");
+                    _loggingService.LogInfo("Auto-start is DISABLED in settings");
                     _loggingService.LogInfo("   Periodic checking will NOT run");
                     
                     // Stop timer if it's running - must be on UI thread
@@ -1151,7 +1151,7 @@ namespace AkademiTrack.ViewModels
                 // If auto-start is enabled and app is restarting, clear manual stop flag
                 // This handles the case where app crashed while user had manually started automation
                 await SchoolTimeChecker.ClearManualStopAsync();
-                _loggingService.LogInfo("✓ Manual stop flag cleared on app restart (auto-start enabled)");
+                _loggingService.LogInfo("Manual stop flag cleared on app restart (auto-start enabled)");
                 
                 // Use the proper method that checks manual stops and completion
                 var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: false);
@@ -1160,7 +1160,7 @@ namespace AkademiTrack.ViewModels
                 
                 if (shouldStart && !IsAutomationRunning)
                 {
-                    _loggingService.LogInfo("🚀 Starting automation automatically...");
+                    _loggingService.LogInfo("Starting automation automatically...");
                     
                     // Mark as started
                     await SchoolTimeChecker.MarkTodayAsStartedAsync();
@@ -1174,11 +1174,11 @@ namespace AkademiTrack.ViewModels
                 }
                 else if (IsAutomationRunning)
                 {
-                    _loggingService.LogInfo("✅ Automation is already running");
+                    _loggingService.LogInfo("Automation is already running");
                 }
                 else
                 {
-                    _loggingService.LogInfo($"❌ Not auto-starting: {reason}");
+                    _loggingService.LogInfo($"Not auto-starting: {reason}");
                     if (nextStartTime.HasValue)
                     {
                         _loggingService.LogInfo($"   Next auto-start: {nextStartTime.Value:yyyy-MM-dd HH:mm}");
@@ -1190,7 +1190,7 @@ namespace AkademiTrack.ViewModels
                 {
                     if (_autoStartCheckTimer == null)
                     {
-                        _loggingService.LogInfo("⏰ Starting periodic auto-start checker (checks every 30 seconds)");
+                        _loggingService.LogInfo("Starting periodic auto-start checker (checks every 30 seconds)");
                         _autoStartCheckTimer = new Timer(
                             async _ => 
                             {
@@ -1271,7 +1271,7 @@ namespace AkademiTrack.ViewModels
                 // Check if cache is from a different day (computer was asleep/closed)
                 if (Dashboard.IsCacheStale())
                 {
-                    _loggingService.LogInfo("🔄 Window activated - cache is stale, refreshing data...");
+                    _loggingService.LogInfo("Window activated - cache is stale, refreshing data...");
                     await Dashboard.RefreshDataAsync();
                 }
                 else
