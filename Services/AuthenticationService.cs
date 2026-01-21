@@ -142,7 +142,7 @@ namespace AkademiTrack.Services
                 // Launch browser
                 browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
-                    Headless = false, // Hide Chrome window
+                    Headless = true, // Hide Chrome window
                     Args = new[] { 
                         "--no-sandbox", 
                         "--disable-setuid-sandbox",
