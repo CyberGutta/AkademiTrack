@@ -233,7 +233,7 @@ namespace AkademiTrack.Services
                     }
                 }
                 
-                return AuthenticationResult.CreateFailed("Login failed");
+                return AuthenticationResult.CreateFailed("Login feilet - kanskje feil passord eller brukernavn");
             }
             catch (Exception ex)
             {

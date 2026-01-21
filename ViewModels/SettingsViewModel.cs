@@ -1847,30 +1847,21 @@ Terminal=false
                 var scriptPath = Path.Combine(tempDir, "akademitrack_uninstall.sh");
 
                 var scriptContent = $@"#!/bin/bash
-        # AkademiTrack Uninstall Script
-        # This script will run after the app closes and delete the app bundle
+        # AkademiTrack Uninstall Script - Silent Background Execution
 
         # Wait for app to close (max 10 seconds)
-        echo ""Waiting for AkademiTrack to close...""
         for i in {{1..20}}; do
             if ! pgrep -f ""AkademiTrack"" > /dev/null; then
-                echo ""App closed successfully""
                 break
             fi
             sleep 0.5
         done
 
         # Delete the app bundle
-        echo ""Deleting app bundle: {appBundlePath}""
-        rm -rf ""{appBundlePath}""
+        rm -rf ""{appBundlePath}"" 2>/dev/null
 
         # Delete this script
-        echo ""Cleaning up uninstall script...""
-        rm -f ""$0""
-
-        echo ""✓ AkademiTrack has been completely uninstalled""
-        echo ""Press any key to close this window...""
-        read -n 1
+        rm -f ""$0"" 2>/dev/null
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
@@ -1887,13 +1878,15 @@ Terminal=false
 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute the script in Terminal so user can see it's working
-                var terminalProcess = Process.Start(new ProcessStartInfo
+                // Run the script silently in the background - no terminal window needed
+                var backgroundProcess = Process.Start(new ProcessStartInfo
                 {
-                    FileName = "open",
-                    Arguments = $"-a Terminal.app \"{scriptPath}\"",
+                    FileName = "/bin/bash",
+                    Arguments = $"\"{scriptPath}\"",
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched in Terminal");
@@ -1918,34 +1911,29 @@ Terminal=false
                 var appDir = Path.GetDirectoryName(exePath);
 
                 var scriptContent = $@"@echo off
-        REM AkademiTrack Uninstall Script
-        echo Waiting for AkademiTrack to close...
+        REM AkademiTrack Uninstall Script - Silent Background Execution
 
-        REM Wait for app to close (max 10 seconds)
-        timeout /t 3 /nobreak >nul
+        REM Wait for app to close
+        timeout /t 3 /nobreak >nul 2>nul
 
         REM Delete the entire application directory
-        echo Deleting application files...
-        rd /s /q ""{appDir}""
+        rd /s /q ""{appDir}"" >nul 2>nul
 
         REM Delete this script
-        del ""%~f0""
-
-        echo.
-        echo AkademiTrack has been completely uninstalled.
-        pause
+        del ""%~f0"" >nul 2>nul
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
                 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute the batch file
+                // Execute the batch file silently
                 var batchProcess = Process.Start(new ProcessStartInfo
                 {
                     FileName = scriptPath,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched");
@@ -1969,20 +1957,16 @@ Terminal=false
                 var appDir = Path.GetDirectoryName(appPath);
 
                 var scriptContent = $@"#!/bin/bash
-        # AkademiTrack Uninstall Script
+        # AkademiTrack Uninstall Script - Silent Background Execution
 
-        echo ""Waiting for AkademiTrack to close...""
+        # Wait for app to close
         sleep 3
 
         # Delete the application directory
-        echo ""Deleting application files...""
-        rm -rf ""{appDir}""
+        rm -rf ""{appDir}"" 2>/dev/null
 
         # Delete this script
-        rm -f ""$0""
-
-        echo ""✓ AkademiTrack has been completely uninstalled""
-        read -p ""Press Enter to close...""
+        rm -f ""$0"" 2>/dev/null
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
@@ -1999,13 +1983,15 @@ Terminal=false
 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute in terminal
+                // Execute silently in background
                 var terminalProcess = Process.Start(new ProcessStartInfo
                 {
-                    FileName = "xterm",
-                    Arguments = $"-e \"{scriptPath}\"",
+                    FileName = "/bin/bash",
+                    Arguments = $"\"{scriptPath}\"",
                     UseShellExecute = false,
-                    CreateNoWindow = false
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched");
