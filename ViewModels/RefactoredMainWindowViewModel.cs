@@ -338,6 +338,9 @@ namespace AkademiTrack.ViewModels
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
 
+                    IsLoading = false;
+                    _loggingService.LogSuccess("✓ Autentisering fullført - UI er klar!");
+
                     // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
                     {
@@ -350,26 +353,40 @@ namespace AkademiTrack.ViewModels
 
                     _loggingService.LogInfo("📊 Laster dashboard data...");
 
-                    // ✅ Dashboard refresh should also be async
-                    await Dashboard.RefreshDataAsync();
-
-                    Dashboard.UpdateNextClassFromCache();
+                    // Dashboard refresh with error handling
+                    try
+                    {
+                        await Dashboard.RefreshDataAsync();
+                        Dashboard.UpdateNextClassFromCache();
+                        _loggingService.LogSuccess("✓ Dashboard data lastet!");
+                    }
+                    catch (Exception dashboardEx)
+                    {
+                        _loggingService.LogError($"Dashboard refresh failed: {dashboardEx.Message}");
+                        // Continue initialization even if dashboard fails
+                    }
 
                     _loggingService.LogSuccess("✓ Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
 
-                    _updateChecker?.StartPeriodicChecks();
-                    _loggingService.LogInfo("Update checker ready");
+                    // Start services with error handling
+                    try
+                    {
+                        _updateChecker?.StartPeriodicChecks();
+                        _loggingService.LogInfo("Update checker ready");
 
-                    await CheckAutoStartAutomationAsync();
+                        await CheckAutoStartAutomationAsync();
 
-                    StartDashboardRefreshTimer();
-                    StartMidnightResetTimer();
+                        StartDashboardRefreshTimer();
+                        StartMidnightResetTimer();
+                    }
+                    catch (Exception serviceEx)
+                    {
+                        _loggingService.LogError($"Service startup failed: {serviceEx.Message}");
+                        // Continue initialization even if services fail
+                    }
 
                     _initializationRetryCount = 0;
-
-                    await Task.Delay(Constants.Time.UI_DELAY_MEDIUM_MS);
-                    IsLoading = false;
                 }
                 else
                 {
@@ -384,6 +401,12 @@ namespace AkademiTrack.ViewModels
             {
                 _isInitializing = false;
                 _initializationSemaphore.Release();
+                
+                // Safety check: ensure loading is cleared if initialization completely failed
+                if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
+                {
+                    IsLoading = false;
+                }
             }
         }
 
@@ -438,6 +461,8 @@ namespace AkademiTrack.ViewModels
 
         private async Task HandleInitializationException(Exception ex)
         {
+            _initializationRetryCount++;
+
             try
             {
                 await _analyticsService.LogErrorAsync(
@@ -452,13 +477,29 @@ namespace AkademiTrack.ViewModels
             }
 
             _loggingService.LogError($"Kritisk feil under oppstart: {ex.Message}");
+            
+            // Check if we've exceeded max retries
+            if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
+            {
+                _loggingService.LogError($"❌ Oppstart mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper");
+                await _notificationService.ShowNotificationAsync(
+                    "Oppstartsfeil",
+                    $"Kritisk feil etter {MAX_RETRY_ATTEMPTS} forsøk. Sjekk innstillinger eller nettverk.",
+                    NotificationLevel.Error
+                );
+                
+                StatusMessage = "Oppstart mislyktes - sjekk innstillinger eller nettverk";
+                IsLoading = false;
+                return;
+            }
+
             await _notificationService.ShowNotificationAsync(
                 "Oppstartsfeil",
-                "En kritisk feil oppstod under oppstart. Prøver igjen...",
+                $"En kritisk feil oppstod under oppstart. Prøver igjen... (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS})",
                 NotificationLevel.Error
             );
 
-            await Task.Delay(3000);
+            await Task.Delay(3000 * _initializationRetryCount);
             await InitializeAsync();
         }
 

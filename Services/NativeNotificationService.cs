@@ -101,9 +101,10 @@ namespace AkademiTrack.Services
                 startInfo.ArgumentList.Add(title);
                 startInfo.ArgumentList.Add(message);
 
-                using var process = Process.Start(startInfo);
+                var process = Process.Start(startInfo);
                 if (process != null)
                 {
+                    // Don't use 'using' here since we need the process to stay alive for the background task
                     _ = Task.Run(async () =>
                     {
                         try
@@ -113,6 +114,11 @@ namespace AkademiTrack.Services
                         catch (Exception ex)
                         {
                             Console.WriteLine($"❌ Process wait failed: {ex.Message}");
+                        }
+                        finally
+                        {
+                            // Dispose the process after waiting is complete
+                            process?.Dispose();
                         }
                     }).ContinueWith(t =>
                     {
@@ -180,10 +186,17 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
                         CreateNoWindow = true
                     };
 
-                    using var process = Process.Start(startInfo);
+                    var process = Process.Start(startInfo);
                     if (process != null)
                     {
-                        await process.WaitForExitAsync();
+                        try
+                        {
+                            await process.WaitForExitAsync();
+                        }
+                        finally
+                        {
+                            process.Dispose();
+                        }
                     }
                 }
                 catch (Exception psEx)
@@ -207,11 +220,18 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
                     CreateNoWindow = true
                 };
 
-                using var process = Process.Start(startInfo);
+                var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    await process.WaitForExitAsync();
-                    Console.WriteLine($"✓ Linux notification shown: {title}");
+                    try
+                    {
+                        await process.WaitForExitAsync();
+                        Console.WriteLine($"✓ Linux notification shown: {title}");
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
                 }
             }
             catch (Exception ex)

@@ -205,13 +205,33 @@ namespace AkademiTrack
                 
                 if (!showFeideSetup)
                 {
-                    Debug.WriteLine("[App] Not in Feide setup mode - will show notification overlay");
+                    Debug.WriteLine("[App] Not in Feide setup mode - will show notification overlay after loading completes");
                     
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        Debug.WriteLine("DISPATCHER POST FIRED");
+                        Debug.WriteLine("DISPATCHER POST FIRED - waiting for loading to complete");
                         
-                        await Task.Delay(1000);
+                        // Wait for initial loading to complete
+                        var maxWaitTime = TimeSpan.FromSeconds(30); // Maximum wait time
+                        var startTime = DateTime.Now;
+                        
+                        while (mainWindowViewModel.IsLoading && (DateTime.Now - startTime) < maxWaitTime)
+                        {
+                            Debug.WriteLine($"[App] Still loading... waiting 1 second");
+                            await Task.Delay(1000);
+                        }
+                        
+                        if (mainWindowViewModel.IsLoading)
+                        {
+                            Debug.WriteLine("[App] ⚠️ Loading took too long, showing notification dialog anyway");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[App] ✅ Loading complete! Now showing notification dialog");
+                        }
+                        
+                        // Additional delay for better UX - let user see the loaded app first
+                        await Task.Delay(2000);
                         
                         try
                         {
