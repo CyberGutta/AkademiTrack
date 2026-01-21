@@ -47,7 +47,7 @@ namespace AkademiTrack.Services
                 _cachedCookies = await SecureCredentialStorage.LoadCookiesAsync();
                 if (_cachedCookies != null && await TestCookiesAsync())
                 {
-                    Debug.WriteLine("✅ [AUTH] Existing cookies are valid!");
+                    Debug.WriteLine("[AUTH] Existing cookies are valid!");
                     var parameters = await LoadUserParametersFromFileAsync();
                     if (parameters != null && parameters.IsComplete)
                     {
@@ -290,7 +290,7 @@ namespace AkademiTrack.Services
                     }
                 }
                 
-                return AuthenticationResult.CreateFailed("Login failed");
+                return AuthenticationResult.CreateFailed("Login feilet - kanskje feil passord eller brukernavn");
             }
             catch (Exception ex)
             {
@@ -375,7 +375,7 @@ namespace AkademiTrack.Services
                 
                 if (parameters != null && parameters.IsComplete)
                 {
-                    Debug.WriteLine($"✅ [PARAMS] Successfully extracted from VoUserData: FylkeId='{parameters.FylkeId}', SkoleId='{parameters.SkoleId}', PlanPeri='{parameters.PlanPeri}'");
+                    Debug.WriteLine($"[PARAMS] Successfully extracted from VoUserData: FylkeId='{parameters.FylkeId}', SkoleId='{parameters.SkoleId}', PlanPeri='{parameters.PlanPeri}'");
                     return parameters;
                 }
                 
@@ -464,7 +464,7 @@ namespace AkademiTrack.Services
                 
                 if (!string.IsNullOrEmpty(fylkeId) && !string.IsNullOrEmpty(skoleId) && !string.IsNullOrEmpty(planPeri))
                 {
-                    Debug.WriteLine($"✅ [PARAMS] Successfully extracted parameters: FylkeId='{fylkeId}', SkoleId='{skoleId}', PlanPeri='{planPeri}'");
+                    Debug.WriteLine($"[PARAMS] Successfully extracted parameters: FylkeId='{fylkeId}', SkoleId='{skoleId}', PlanPeri='{planPeri}'");
                     return new UserParameters
                     {
                         FylkeId = fylkeId,

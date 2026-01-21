@@ -303,7 +303,7 @@ namespace AkademiTrack.Services
                     return AutomationResult.Failed("Missing user parameters");
                 }
                 
-                _loggingService.LogSuccess($"✅ [AUTOMATION] Credentials loaded successfully: {_cookies?.Count ?? 0} cookies, user params complete: {_userParameters.IsComplete}");
+                _loggingService.LogSuccess($"[AUTOMATION] Credentials loaded successfully: {_cookies?.Count ?? 0} cookies, user params complete: {_userParameters.IsComplete}");
 
                 return AutomationResult.Successful();
             }

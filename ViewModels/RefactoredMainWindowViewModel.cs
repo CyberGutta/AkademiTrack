@@ -312,14 +312,14 @@ namespace AkademiTrack.ViewModels
 
                 _isInitializing = true;
                 IsLoading = true;
-                _loggingService.LogInfo($"🚀 Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
+                _loggingService.LogInfo($"Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
                 Debug.WriteLine("[MainWindow] App initialization started");
 
                 // Initialize authentication service
                 _authService = new AuthenticationService(_notificationService, false);
 
-                // ✅ Authentication now runs on background thread - UI won't freeze
+                // Authentication now runs on background thread - UI won't freeze
                 var authResult = await _authService.AuthenticateAsync();
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
@@ -351,7 +351,7 @@ namespace AkademiTrack.ViewModels
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
 
-                    _loggingService.LogInfo("📊 Laster dashboard data...");
+                    _loggingService.LogInfo("Laster dashboard data...");
 
                     // Dashboard refresh with error handling
                     try
@@ -505,7 +505,7 @@ namespace AkademiTrack.ViewModels
 
         private void StartDashboardRefreshTimer()
         {
-            _loggingService.LogInfo("⏰ Starting dashboard auto-refresh timer...");
+            _loggingService.LogInfo("Starting dashboard auto-refresh timer...");
 
             // Refresh dashboard every 5 minutes when automation is NOT running
             _dataRefreshTimer = new Timer(
@@ -687,7 +687,7 @@ namespace AkademiTrack.ViewModels
             
             // Clear manual stop flag when user manually starts automation
             await SchoolTimeChecker.ClearManualStopAsync();
-            _loggingService.LogInfo("✓ Manual stop flag cleared - user manually started automation");
+            _loggingService.LogInfo("Manual stop flag cleared - user manually started automation");
             
             if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
             {

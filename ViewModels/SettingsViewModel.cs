@@ -833,6 +833,7 @@ Terminal=false
         public ICommand DownloadAndInstallUpdateCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
         public ICommand DeleteAccountCompletelyCommand { get; }
+        public ICommand ClearSecureStorageCommand { get; }
         public ICommand ExportDataAsJsonCommand { get; }
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
@@ -1122,6 +1123,7 @@ Terminal=false
             DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
+            ClearSecureStorageCommand = new RelayCommand(async () => await ClearSecureStorageAsync());
             UninstallCompletelyCommand = new RelayCommand(async () => await UninstallCompletelyAsync());
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
@@ -1436,31 +1438,9 @@ Terminal=false
                     Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
 
-                // Delete from secure storage first
-                Debug.WriteLine("Deleting credentials from secure storage...");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
-                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
-                Debug.WriteLine("✓ Secure storage cleared");
-
-                // Delete cookies from macOS Keychain (if on macOS)
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    try
-                    {
-                        Debug.WriteLine("Deleting cookies from macOS Keychain...");
-                        // Delete each credential key individually
-                        await KeychainService.DeleteFromKeychain("cookies");
-                        await KeychainService.DeleteFromKeychain("LoginEmail");
-                        await KeychainService.DeleteFromKeychain("LoginPassword");
-                        await KeychainService.DeleteFromKeychain("SchoolName");
-                        Debug.WriteLine("✓ Keychain cookies and credentials cleared");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
-                    }
-                }
+                Debug.WriteLine("Performing comprehensive secure storage cleanup...");
+                await SecureCredentialStorage.ClearAllDataAsync();
+                Debug.WriteLine("✓ Complete secure storage cleanup finished");
 
                 // Then delete local files
                 var appDataDir = Path.Combine(
@@ -1470,38 +1450,15 @@ Terminal=false
 
                 if (Directory.Exists(appDataDir))
                 {
-                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
-
-                    foreach (var file in allFiles)
-                    {
-                        try
-                        {
-                            File.Delete(file);
-                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
-                        }
-                    }
-
-                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
-                    {
-                        try
-                        {
-                            if (Directory.Exists(dir))
-                                Directory.Delete(dir, true);
-                        }
-                        catch { /* Intentionally empty */ }
-                    }
-
                     try
                     {
-                        if (Directory.Exists(appDataDir))
-                            Directory.Delete(appDataDir, true);
+                        Directory.Delete(appDataDir, true);
+                        Debug.WriteLine("✓ AkademiTrack directory deleted");
                     }
-                    catch { /* Intentionally empty */ }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete directory: {ex.Message}");
+                    }
                 }
 
                 Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
@@ -1568,6 +1525,50 @@ Terminal=false
             }
         }
 
+        private async Task ClearSecureStorageAsync()
+        {
+            if (IsDeleting) return;
+
+            try
+            {
+                var result = await ShowConfirmationDialog(
+                    "Rens sikker lagring",
+                    "Dette vil fjerne ALL AkademiTrack-data fra:\n\n" +
+                    "• macOS Keychain\n" +
+                    "• Windows Credential Manager\n" +
+                    "• Linux Secret Service\n" +
+                    "• Alle backup-filer\n\n" +
+                    "Dette inkluderer innloggingsdata, cookies og tokens.\n\n" +
+                    "Er du sikker?",
+                    false
+                );
+
+                if (!result) return;
+
+                IsDeleting = true;
+                Debug.WriteLine("=== CLEARING SECURE STORAGE ===");
+
+                await SecureCredentialStorage.ClearAllDataAsync();
+
+                Debug.WriteLine("✓ Secure storage cleanup complete");
+
+                await ShowInfoDialog(
+                    "Sikker lagring renset",
+                    "All AkademiTrack-data er fjernet fra sikker lagring.\n\n" +
+                    "Du må logge inn på nytt neste gang du starter appen."
+                );
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error clearing secure storage: {ex.Message}");
+                await ShowErrorDialog("Feil", $"Kunne ikke rense sikker lagring: {ex.Message}");
+            }
+            finally
+            {
+                IsDeleting = false;
+            }
+        }
+
         private async Task DeleteAccountCompletelyAsync()
         {
             if (IsDeleting) return;
@@ -1599,6 +1600,9 @@ Terminal=false
                 IsDeleting = true;
                 Debug.WriteLine("=== DELETING ACCOUNT COMPLETELY ===");
 
+                Debug.WriteLine("Performing comprehensive secure storage cleanup...");
+                await SecureCredentialStorage.ClearAllDataAsync();
+                Debug.WriteLine("✓ Complete secure storage cleanup finished");
 
                 var appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -1607,23 +1611,15 @@ Terminal=false
 
                 if (Directory.Exists(appDataDir))
                 {
-                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
-
-                    foreach (var file in allFiles)
+                    try
                     {
-                        try { File.Delete(file); Debug.WriteLine($"✓ Deleted: {Path.GetFileName(file)}"); }
-                        catch (Exception ex) { Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}"); }
+                        Directory.Delete(appDataDir, true);
+                        Debug.WriteLine("✓ AkademiTrack directory deleted");
                     }
-
-                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
+                    catch (Exception ex)
                     {
-                        try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-                        catch { /* Intentionally empty */ }
+                        Debug.WriteLine($"⚠️ Could not delete directory: {ex.Message}");
                     }
-
-                    try { if (Directory.Exists(appDataDir)) Directory.Delete(appDataDir, true); }
-                    catch { /* Intentionally empty */ }
                 }
 
                 Debug.WriteLine("=== ACCOUNT COMPLETELY DELETED ===");
@@ -1716,32 +1712,11 @@ Terminal=false
                     Debug.WriteLine($"⚠️ Could not remove auto-start: {ex.Message}");
                 }
 
-                // 3. Delete from secure storage
-                Debug.WriteLine("Deleting credentials from secure storage...");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginEmail");
-                await SecureCredentialStorage.DeleteCredentialAsync("LoginPassword");
-                await SecureCredentialStorage.DeleteCredentialAsync("SchoolName");
-                Debug.WriteLine("✓ Secure storage cleared");
+                Debug.WriteLine("Performing comprehensive secure storage cleanup...");
+                await SecureCredentialStorage.ClearAllDataAsync();
+                Debug.WriteLine("✓ Complete secure storage cleanup finished");
 
-                // 4. Delete cookies from macOS Keychain (if on macOS)
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    try
-                    {
-                        Debug.WriteLine("Deleting cookies from macOS Keychain...");
-                        await KeychainService.DeleteFromKeychain("cookies");
-                        await KeychainService.DeleteFromKeychain("login_email");
-                        await KeychainService.DeleteFromKeychain("login_password");
-                        await KeychainService.DeleteFromKeychain("school_name");
-                        Debug.WriteLine("✓ Keychain cleared");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"⚠️ Could not delete from Keychain: {ex.Message}");
-                    }
-                }
-
-                // 5. Delete all local data files
+                // 4. Delete all local data files
                 var appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "AkademiTrack"
@@ -1749,40 +1724,15 @@ Terminal=false
 
                 if (Directory.Exists(appDataDir))
                 {
-                    Debug.WriteLine($"Deleting AppData directory: {appDataDir}");
-                    var allFiles = Directory.GetFiles(appDataDir, "*.*", SearchOption.AllDirectories);
-                    var allDirectories = Directory.GetDirectories(appDataDir, "*", SearchOption.AllDirectories);
-
-                    foreach (var file in allFiles)
-                    {
-                        try
-                        {
-                            File.Delete(file);
-                            Debug.WriteLine($"✓ Deleted file: {Path.GetFileName(file)}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
-                        }
-                    }
-
-                    foreach (var dir in allDirectories.OrderByDescending(d => d.Length))
-                    {
-                        try
-                        {
-                            if (Directory.Exists(dir))
-                                Directory.Delete(dir, true);
-                        }
-                        catch { /* Intentionally empty */ }
-                    }
-
                     try
                     {
-                        if (Directory.Exists(appDataDir))
-                            Directory.Delete(appDataDir, true);
-                        Debug.WriteLine("✓ AppData directory deleted");
+                        Directory.Delete(appDataDir, true);
+                        Debug.WriteLine("✓ AkademiTrack directory deleted");
                     }
-                    catch { /* Intentionally empty */ }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"⚠️ Could not delete directory: {ex.Message}");
+                    }
                 }
 
                 // 6. Create uninstall script to delete the app itself
@@ -1897,30 +1847,21 @@ Terminal=false
                 var scriptPath = Path.Combine(tempDir, "akademitrack_uninstall.sh");
 
                 var scriptContent = $@"#!/bin/bash
-        # AkademiTrack Uninstall Script
-        # This script will run after the app closes and delete the app bundle
+        # AkademiTrack Uninstall Script - Silent Background Execution
 
         # Wait for app to close (max 10 seconds)
-        echo ""Waiting for AkademiTrack to close...""
         for i in {{1..20}}; do
             if ! pgrep -f ""AkademiTrack"" > /dev/null; then
-                echo ""App closed successfully""
                 break
             fi
             sleep 0.5
         done
 
         # Delete the app bundle
-        echo ""Deleting app bundle: {appBundlePath}""
-        rm -rf ""{appBundlePath}""
+        rm -rf ""{appBundlePath}"" 2>/dev/null
 
         # Delete this script
-        echo ""Cleaning up uninstall script...""
-        rm -f ""$0""
-
-        echo ""✓ AkademiTrack has been completely uninstalled""
-        echo ""Press any key to close this window...""
-        read -n 1
+        rm -f ""$0"" 2>/dev/null
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
@@ -1937,13 +1878,15 @@ Terminal=false
 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute the script in Terminal so user can see it's working
-                var terminalProcess = Process.Start(new ProcessStartInfo
+                // Run the script silently in the background - no terminal window needed
+                var backgroundProcess = Process.Start(new ProcessStartInfo
                 {
-                    FileName = "open",
-                    Arguments = $"-a Terminal.app \"{scriptPath}\"",
+                    FileName = "/bin/bash",
+                    Arguments = $"\"{scriptPath}\"",
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched in Terminal");
@@ -1968,34 +1911,29 @@ Terminal=false
                 var appDir = Path.GetDirectoryName(exePath);
 
                 var scriptContent = $@"@echo off
-        REM AkademiTrack Uninstall Script
-        echo Waiting for AkademiTrack to close...
+        REM AkademiTrack Uninstall Script - Silent Background Execution
 
-        REM Wait for app to close (max 10 seconds)
-        timeout /t 3 /nobreak >nul
+        REM Wait for app to close
+        timeout /t 3 /nobreak >nul 2>nul
 
         REM Delete the entire application directory
-        echo Deleting application files...
-        rd /s /q ""{appDir}""
+        rd /s /q ""{appDir}"" >nul 2>nul
 
         REM Delete this script
-        del ""%~f0""
-
-        echo.
-        echo AkademiTrack has been completely uninstalled.
-        pause
+        del ""%~f0"" >nul 2>nul
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
                 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute the batch file
+                // Execute the batch file silently
                 var batchProcess = Process.Start(new ProcessStartInfo
                 {
                     FileName = scriptPath,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched");
@@ -2019,20 +1957,16 @@ Terminal=false
                 var appDir = Path.GetDirectoryName(appPath);
 
                 var scriptContent = $@"#!/bin/bash
-        # AkademiTrack Uninstall Script
+        # AkademiTrack Uninstall Script - Silent Background Execution
 
-        echo ""Waiting for AkademiTrack to close...""
+        # Wait for app to close
         sleep 3
 
         # Delete the application directory
-        echo ""Deleting application files...""
-        rm -rf ""{appDir}""
+        rm -rf ""{appDir}"" 2>/dev/null
 
         # Delete this script
-        rm -f ""$0""
-
-        echo ""✓ AkademiTrack has been completely uninstalled""
-        read -p ""Press Enter to close...""
+        rm -f ""$0"" 2>/dev/null
         ";
 
                 await File.WriteAllTextAsync(scriptPath, scriptContent);
@@ -2049,13 +1983,15 @@ Terminal=false
 
                 Debug.WriteLine($"✓ Uninstall script created: {scriptPath}");
 
-                // Execute in terminal
+                // Execute silently in background
                 var terminalProcess = Process.Start(new ProcessStartInfo
                 {
-                    FileName = "xterm",
-                    Arguments = $"-e \"{scriptPath}\"",
+                    FileName = "/bin/bash",
+                    Arguments = $"\"{scriptPath}\"",
                     UseShellExecute = false,
-                    CreateNoWindow = false
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 });
 
                 Debug.WriteLine("✓ Uninstall script launched");

@@ -202,7 +202,7 @@ namespace AkademiTrack.Services
 
                 if (summaryResponse?.Items?.FirstOrDefault() != null)
                 {
-                    _loggingService?.LogSuccess("✅ [ATTENDANCE] Successfully fetched attendance summary");
+                    _loggingService?.LogSuccess("[ATTENDANCE] Successfully fetched attendance summary");
                 }
                 else
                 {
@@ -262,7 +262,7 @@ namespace AkademiTrack.Services
                     return null;
                 }
 
-                _loggingService?.LogSuccess($"✅ [TODAY] Fetched {dailyData.Count} daily items and {monthlyData.Count} monthly items");
+                _loggingService?.LogSuccess($"[TODAY] Fetched {dailyData.Count} daily items and {monthlyData.Count} monthly items");
                 return ProcessCombinedScheduleData(dailyData, monthlyData);
             }
             catch (Exception ex)
@@ -315,7 +315,7 @@ namespace AkademiTrack.Services
                     return null;
                 }
 
-                _loggingService?.LogSuccess($"✅ [DAILY] Successfully fetched {dailyResponse.Items.Count} daily items");
+                _loggingService?.LogSuccess($"[DAILY] Successfully fetched {dailyResponse.Items.Count} daily items");
                 return dailyResponse.Items;
             }
             catch (Exception ex)
