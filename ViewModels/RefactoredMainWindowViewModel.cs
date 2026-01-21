@@ -685,6 +685,10 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogDebug($"🔍 [START] Checking authentication state: IsAuthenticated={IsAuthenticated}, _userParameters null={_userParameters == null}, complete={_userParameters?.IsComplete ?? false}");
             
+            // Clear manual stop flag when user manually starts automation
+            await SchoolTimeChecker.ClearManualStopAsync();
+            _loggingService.LogInfo("✓ Manual stop flag cleared - user manually started automation");
+            
             if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
             {
                 _loggingService.LogError($"❌ [START] Ikke autentisert - kan ikke starte automatisering. IsAuth={IsAuthenticated}, Params={_userParameters != null}, Complete={_userParameters?.IsComplete ?? false}");
@@ -1143,6 +1147,11 @@ namespace AkademiTrack.ViewModels
                     });
                     return;
                 }
+
+                // If auto-start is enabled and app is restarting, clear manual stop flag
+                // This handles the case where app crashed while user had manually started automation
+                await SchoolTimeChecker.ClearManualStopAsync();
+                _loggingService.LogInfo("✓ Manual stop flag cleared on app restart (auto-start enabled)");
                 
                 // Use the proper method that checks manual stops and completion
                 var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: false);

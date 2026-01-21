@@ -399,6 +399,24 @@ namespace AkademiTrack.Services
             }
         }
 
+        // NEW: Clear manual stop flag when user manually starts automation again
+        public static async Task ClearManualStopAsync()
+        {
+            try
+            {
+                var filePath = GetManualStopFilePath();
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    Debug.WriteLine("[MANUAL STOP] Manual stop flag cleared - user manually started automation");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANUAL STOP] Error clearing manual stop flag: {ex.Message}");
+            }
+        }
+
         private static async Task<DateTime?> GetManualStopStatusAsync()
         {
             try
