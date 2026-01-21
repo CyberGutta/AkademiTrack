@@ -142,7 +142,7 @@ namespace AkademiTrack.Services
                 // Launch browser
                 browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
-                    Headless = true, // Hide Chrome window
+                    Headless = false, // Hide Chrome window
                     Args = new[] { 
                         "--no-sandbox", 
                         "--disable-setuid-sandbox",
@@ -196,15 +196,72 @@ namespace AkademiTrack.Services
                 await page.ClickAsync("button:has(span.feide_icon)");
                 await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
 
-                // Handle organization selection
-                Debug.WriteLine("🏫 [PUPPETEER] Selecting organization...");
-                await page.WaitForSelectorAsync("#org_selector_filter", new WaitForSelectorOptions { Timeout = 10000 });
-                await page.TypeAsync("#org_selector_filter", _schoolName);
-                await Task.Delay(1000);
-
-                await page.WaitForSelectorAsync("li.orglist_item.match", new WaitForSelectorOptions { Timeout = 5000 });
-                await page.ClickAsync("li.orglist_item.match");
-                await page.ClickAsync("#selectorg_button");
+                // Handle organization selection - directly click on school from list without using search
+                Debug.WriteLine("🏫 [PUPPETEER] Selecting organization directly from list...");
+                
+                // Wait for the organization list to be present in DOM
+                await page.WaitForSelectorAsync("#orglist", new WaitForSelectorOptions { Timeout = 10000 });
+                
+                // Find and click the school by matching org_name attribute (case-insensitive)
+                var schoolNameLower = _schoolName.ToLowerInvariant();
+                Debug.WriteLine($"🔍 [PUPPETEER] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
+                
+                // Use a more specific selector to find all school items
+                var schoolSelector = "li.orglist_item[org_name]";
+                await page.WaitForSelectorAsync(schoolSelector, new WaitForSelectorOptions { Timeout = 5000 });
+                
+                // Get all school elements and find the matching one
+                var schoolElements = await page.QuerySelectorAllAsync(schoolSelector);
+                bool schoolFound = false;
+                
+                Debug.WriteLine($"🔍 [PUPPETEER] Found {schoolElements.Length} schools in the list");
+                
+                foreach (var element in schoolElements)
+                {
+                    var orgName = await page.EvaluateFunctionAsync<string>("el => el.getAttribute('org_name')", element);
+                    Debug.WriteLine($"🔍 [PUPPETEER] Checking school: '{orgName}'");
+                    
+                    if (!string.IsNullOrEmpty(orgName) && orgName.ToLowerInvariant().Contains(schoolNameLower))
+                    {
+                        Debug.WriteLine($"✅ [PUPPETEER] Found matching school: '{orgName}' - clicking it");
+                        await element.ClickAsync();
+                        schoolFound = true;
+                        break;
+                    }
+                }
+                
+                if (!schoolFound)
+                {
+                    Debug.WriteLine($"❌ [PUPPETEER] School '{_schoolName}' not found in list, trying alternative approach");
+                    
+                    // Try to find by text content instead of attribute
+                    var schoolByText = await page.QuerySelectorAsync($"li.orglist_item:has(.orglist_name:contains('{_schoolName}'))");
+                    if (schoolByText != null)
+                    {
+                        Debug.WriteLine($"✅ [PUPPETEER] Found school by text content - clicking it");
+                        await schoolByText.ClickAsync();
+                        schoolFound = true;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"❌ [PUPPETEER] School not found by any method, falling back to search");
+                        // Last resort: use search method
+                        await page.ClickAsync("#org_selector_filter");
+                        await page.TypeAsync("#org_selector_filter", _schoolName);
+                        await Task.Delay(1000);
+                        await page.WaitForSelectorAsync("li.orglist_item.match", new WaitForSelectorOptions { Timeout = 5000 });
+                        await page.ClickAsync("li.orglist_item.match");
+                        schoolFound = true;
+                    }
+                }
+                
+                if (schoolFound)
+                {
+                    // Small delay to ensure school selection is registered
+                    await Task.Delay(500);
+                    Debug.WriteLine("➡️ [PUPPETEER] Clicking Continue button to proceed with selected school");
+                    await page.ClickAsync("#selectorg_button");
+                }
                 await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
 
                 // Fill login form
