@@ -189,7 +189,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        public string ClassToggleLabel => _showCurrentClass ? "Neste" : "Nå";
+        public string ClassToggleLabel => _showCurrentClass ? "Nå" : "Neste";
 
         public void ToggleClassView()
         {

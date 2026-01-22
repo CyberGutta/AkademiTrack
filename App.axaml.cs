@@ -39,11 +39,17 @@ namespace AkademiTrack
                 // Add global handler for unobserved task exceptions
                 TaskScheduler.UnobservedTaskException += (sender, e) =>
                 {
-                    Debug.WriteLine($"[App] UnobservedTaskException: {e.Exception.GetBaseException().Message}");
-                    Debug.WriteLine($"[App] Stack trace: {e.Exception.GetBaseException().StackTrace}");
-                    
                     // Mark as observed to prevent app crash
                     e.SetObserved();
+                    
+                    // Ignore specific non-critical exceptions from browser automation
+                    if (e.Exception.GetBaseException().Message.Contains("Response body is unavailable for redirect responses"))
+                    {
+                        return;
+                    }
+                    
+                    Debug.WriteLine($"[App] UnobservedTaskException: {e.Exception.GetBaseException().Message}");
+                    Debug.WriteLine($"[App] Stack trace: {e.Exception.GetBaseException().StackTrace}");
                     
                     // Log to our logging system if available
                     try

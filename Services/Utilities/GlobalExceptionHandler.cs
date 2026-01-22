@@ -64,9 +64,6 @@ namespace AkademiTrack.Services.Utilities
         {
             try
             {
-                Debug.WriteLine($"[GlobalExceptionHandler] Unobserved task exception caught");
-                Debug.WriteLine($"[GlobalExceptionHandler] Exception: {e.Exception.Message}");
-
                 // Mark as observed to prevent app termination
                 e.SetObserved();
 
@@ -74,9 +71,11 @@ namespace AkademiTrack.Services.Utilities
                 if (e.Exception.Message.Contains("Response body is unavailable for redirect responses") ||
                     e.Exception.InnerException?.Message.Contains("Response body is unavailable for redirect responses") == true)
                 {
-                    Debug.WriteLine("[GlobalExceptionHandler] Ignoring browser automation redirect exception (non-critical)");
                     return;
                 }
+
+                Debug.WriteLine($"[GlobalExceptionHandler] Unobserved task exception caught");
+                Debug.WriteLine($"[GlobalExceptionHandler] Exception: {e.Exception.Message}");
 
                 HandleException(e.Exception, "UnobservedTaskException", false);
             }
