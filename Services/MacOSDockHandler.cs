@@ -47,7 +47,7 @@ namespace AkademiTrack.Services
             
             try
             {
-                Debug.WriteLine("[MacOSDockHandler] Setting up dock handlers...");
+                Debug.WriteLine("[MacOSDockHandler] Setting up dock handlers");
                 
                 var nsApp = objc_msgSend(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
                 Debug.WriteLine($"[MacOSDockHandler] NSApplication: {nsApp}");
@@ -128,7 +128,7 @@ namespace AkademiTrack.Services
                 {
                     if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
-                        Debug.WriteLine("[MacOSDockHandler] Initiating app shutdown...");
+                        Debug.WriteLine("[MacOSDockHandler] Initiating app shutdown");
                         
                         if (Avalonia.Application.Current is App app)
                         {

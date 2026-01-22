@@ -159,8 +159,8 @@ namespace AkademiTrack.ViewModels
                                !string.IsNullOrWhiteSpace(FeideUsername) &&
                                !string.IsNullOrWhiteSpace(FeidePassword);
 
-        public string SaveButtonText => IsRestarting ? "Starter appen på nytt..." : 
-                                       IsLoading ? "Tester innlogging..." : 
+        public string SaveButtonText => IsRestarting ? "Starter appen på nytt" : 
+                                       IsLoading ? "Tester innlogging" : 
                                        "Lagre og fortsett";
 
         public ICommand SaveCommand { get; }

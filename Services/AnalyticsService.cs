@@ -33,7 +33,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("[Analytics] Starting AnalyticsService initialization...");
+                Debug.WriteLine("[Analytics] Starting AnalyticsService initialization");
                 
                 // Load configuration from secure source
                 var config = AppConfiguration.Instance;
@@ -51,7 +51,7 @@ namespace AkademiTrack.Services
                     }
                     else
                     {
-                        Debug.WriteLine($"[Analytics] ✓ Supabase API key loaded successfully");
+                        Debug.WriteLine($"[Analytics] Supabase API key loaded successfully");
                     }
                 }
                 catch (Exception ex)
@@ -126,7 +126,7 @@ namespace AkademiTrack.Services
                     _currentSessionId = existingSessionId;
                     await TrackActionAsync("app_opened");
                     _sessionStarted = true;
-                    Debug.WriteLine($"[Analytics] ✓ Existing session updated for user: {_persistentUserId}");
+                    Debug.WriteLine($"[Analytics] Existing session updated for user: {_persistentUserId}");
                     
                     // Start heartbeat timer for existing session too
                     StartHeartbeatTimer();
@@ -176,7 +176,7 @@ namespace AkademiTrack.Services
                                     sessionResponse[0].TryGetProperty("id", out var idElement))
                                 {
                                     _currentSessionId = idElement.GetString();
-                                    Debug.WriteLine($"[Analytics] ✓ New session created with ID: {_currentSessionId}");
+                                    Debug.WriteLine($"[Analytics] New session created with ID: {_currentSessionId}");
                                 }
                                 else
                                 {
@@ -191,7 +191,7 @@ namespace AkademiTrack.Services
                         }
                         
                         _sessionStarted = true;
-                        Debug.WriteLine($"[Analytics] ✓ New session started successfully for user: {_persistentUserId}");
+                        Debug.WriteLine($"[Analytics] New session started successfully for user: {_persistentUserId}");
                     }
                     else
                     {
@@ -289,7 +289,7 @@ namespace AkademiTrack.Services
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine($"[Analytics] ✓ Action '{action}' tracked successfully");
+                    Debug.WriteLine($"[Analytics] Action '{action}' tracked successfully");
                 }
                 else
                 {
@@ -448,7 +448,7 @@ namespace AkademiTrack.Services
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine($"[Analytics] ✓ Event '{eventName}' tracked successfully");
+                    Debug.WriteLine($"[Analytics] Event '{eventName}' tracked successfully");
                 }
                 else
                 {
@@ -572,7 +572,7 @@ namespace AkademiTrack.Services
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine($"[Analytics] ✓ Error logged: {errorType}");
+                    Debug.WriteLine($"[Analytics] Error logged: {errorType}");
                 }
                 else
                 {

@@ -79,7 +79,7 @@ namespace AkademiTrack.Services
                     CreateNoWindow = true
                 };
 
-                Console.WriteLine("[PermissionChecker] Running check: flags = 16...");
+                Console.WriteLine("[PermissionChecker] Running check: flags = 16");
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
@@ -90,7 +90,7 @@ namespace AkademiTrack.Services
 
                     if (output == "enabled")
                     {
-                        Console.WriteLine("[PermissionChecker] ✓ Found enabled notification settings (flags = 16)");
+                        Console.WriteLine("[PermissionChecker] Found enabled notification settings (flags = 16)");
                         await MarkDialogDismissedAsync();
                         return true;
                     }
@@ -167,7 +167,7 @@ namespace AkademiTrack.Services
                 
                 Console.WriteLine($"[PermissionChecker] Writing state: {json}");
                 await File.WriteAllTextAsync(NotificationStatePath, json);
-                Console.WriteLine("[PermissionChecker] ✓ Marked dialog as permanently dismissed");
+                Console.WriteLine("[PermissionChecker] Marked dialog as permanently dismissed");
             }
             catch (Exception ex)
             {
@@ -205,7 +205,7 @@ namespace AkademiTrack.Services
             
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                Console.WriteLine("[PermissionChecker] ❌ Not macOS, skipping dialog");
+                Console.WriteLine("[PermissionChecker] Not macOS, skipping dialog");
                 return false;
             }
 
@@ -216,7 +216,7 @@ namespace AkademiTrack.Services
                 
                 if (hasDismissed)
                 {
-                    Console.WriteLine("[PermissionChecker] ❌ User permanently dismissed dialog");
+                    Console.WriteLine("[PermissionChecker] User permanently dismissed dialog");
                     return false;
                 }
 
@@ -225,7 +225,7 @@ namespace AkademiTrack.Services
                 
                 if (isEnabled)
                 {
-                    Console.WriteLine("[PermissionChecker] ❌ Notifications already enabled in system");
+                    Console.WriteLine("[PermissionChecker] Notifications already enabled in system");
                     return false;
                 }
 
@@ -234,7 +234,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] ❌ Error: {ex.Message}");
+                Console.WriteLine($"[PermissionChecker] Error: {ex.Message}");
                 return false;
             }
         }
@@ -251,7 +251,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                Console.WriteLine("[PermissionChecker] Sending test notification...");
+                Console.WriteLine("[PermissionChecker] Sending test notification");
                 
                 await NativeNotificationService.ShowAsync(
                     "Varsler Aktivert",
@@ -259,7 +259,7 @@ namespace AkademiTrack.Services
                     "SUCCESS"
                 );
                 
-                Console.WriteLine("[PermissionChecker] ✓ Test notification sent");
+                Console.WriteLine("[PermissionChecker] Test notification sent");
             }
             catch (Exception ex)
             {

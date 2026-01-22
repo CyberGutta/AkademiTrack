@@ -554,7 +554,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🗑️ Starting complete AkademiTrack data cleanup...");
+                Debug.WriteLine("Starting complete AkademiTrack data cleanup");
 
                 var credentialKeys = new[]
                 {
@@ -621,7 +621,7 @@ namespace AkademiTrack.Services
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     return;
 
-                Debug.WriteLine("🗑️ Clearing Windows registry data...");
+                Debug.WriteLine("Clearing Windows registry data");
 
                 using var regKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\AkademiTrack", true);
                 if (regKey != null)
@@ -645,7 +645,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🗑️ Clearing macOS Keychain data...");
+                Debug.WriteLine("Clearing macOS Keychain data");
 
                 // Use security command to delete all AkademiTrack entries
                 var process = new Process
@@ -677,7 +677,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🗑️ Clearing Linux Secret Service data...");
+                Debug.WriteLine("Clearing Linux Secret Service data");
 
                 if (File.Exists("/usr/bin/secret-tool"))
                 {

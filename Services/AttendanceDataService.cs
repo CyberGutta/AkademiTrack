@@ -78,7 +78,7 @@ namespace AkademiTrack.Services
                 // If fetch failed (likely expired cookies), re-authenticate and retry
                 if (result == null)
                 {
-                    _loggingService?.LogInfo("📡 Data kunne ikke hentes - prøver å oppdatere autentisering...");
+                    _loggingService?.LogInfo("Data kunne ikke hentes - prøver å oppdatere autentisering");
                     
                     var notificationService = ServiceLocator.Instance.GetService<INotificationService>();
                     using var authService = new AuthenticationService(notificationService);
@@ -172,11 +172,11 @@ namespace AkademiTrack.Services
 
                 var response = await _httpClient.SendAsync(request);
                 
-                _loggingService?.LogDebug($"🌐 [ATTENDANCE] Response status: {response.StatusCode}");
+                _loggingService?.LogDebug($"[ATTENDANCE] Response status: {response.StatusCode}");
                 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _loggingService?.LogError($"❌ [ATTENDANCE] HTTP error {response.StatusCode} when fetching summary");
+                    _loggingService?.LogError($"[ATTENDANCE] HTTP error {response.StatusCode} when fetching summary");
                     
                     // Log the response content to help debug parameter issues
                     var errorContent = await response.Content.ReadAsStringAsync();
@@ -297,7 +297,7 @@ namespace AkademiTrack.Services
                 var response = await _httpClient.SendAsync(request);
                 if (!response.IsSuccessStatusCode) 
                 {
-                    _loggingService?.LogError($"❌ [DAILY] HTTP error {response.StatusCode}");
+                    _loggingService?.LogError($"[DAILY] HTTP error {response.StatusCode}");
                     return null;
                 }
 

@@ -22,7 +22,7 @@ namespace AkademiTrack.ViewModels
 
         // Today's STU sessions
         private string _todayDisplay = "0/0";
-        private string _todayStatus = "Venter på data...";
+        private string _todayStatus = "Venter på data";
 
         // Next class
         private string _nextClassName = "Ingen time";
@@ -282,7 +282,7 @@ namespace AkademiTrack.ViewModels
                         {
                             UpdateOvertimeDisplay(summary);
                         });
-                        _loggingService?.LogDebug("[DASHBOARD] ✓ Overtime data loaded");
+                        _loggingService?.LogDebug("[DASHBOARD] Overtime data loaded");
                     }
                 }
                 else
@@ -330,7 +330,7 @@ namespace AkademiTrack.ViewModels
                         {
                             UpdateMonthlyDisplay(monthlyData);
                         });
-                        _loggingService?.LogDebug("[DASHBOARD] ✓ Monthly data loaded");
+                        _loggingService?.LogDebug("[DASHBOARD] Monthly data loaded");
                     }
                 }
                 else
@@ -352,7 +352,7 @@ namespace AkademiTrack.ViewModels
                         {
                             UpdateWeeklyDisplay(weeklyData);
                         });
-                        _loggingService?.LogDebug("[DASHBOARD] ✓ Weekly data loaded");
+                        _loggingService?.LogDebug("[DASHBOARD] Weekly data loaded");
                     }
                 }
                 else
@@ -360,7 +360,7 @@ namespace AkademiTrack.ViewModels
                     _loggingService?.LogWarning("[DASHBOARD] Weekly data fetch timed out after 15 seconds");
                 }
 
-                _loggingService?.LogSuccess("[DASHBOARD] ✓ Data refresh complete!");
+                _loggingService?.LogSuccess("[DASHBOARD] Data refresh complete");
             }
             catch (Exception ex)
             {
@@ -387,7 +387,7 @@ namespace AkademiTrack.ViewModels
                     UpdateTodayDisplay(_cachedTodaySchedule);
                 });
                 
-                _loggingService?.LogDebug($"[CACHE] ✓ Incremented registered count to {_cachedTodaySchedule.RegisteredStuSessions}/{_cachedTodaySchedule.TotalStuSessions}");
+                _loggingService?.LogDebug($"[CACHE] Incremented registered count to {_cachedTodaySchedule.RegisteredStuSessions}/{_cachedTodaySchedule.TotalStuSessions}");
             }
             else
             {
@@ -462,7 +462,7 @@ namespace AkademiTrack.ViewModels
                     _nextClassUpdateTimer = new System.Timers.Timer(timeUntilMidnight.TotalMilliseconds);
                     _nextClassUpdateTimer.Elapsed += (s, e) =>
                     {
-                        _loggingService?.LogInfo("[NEXT CLASS] 🌅 Midnight reached - refreshing for new day");
+                        _loggingService?.LogInfo("[NEXT CLASS] Midnight reached - refreshing for new day");
                         Dispatcher.UIThread.Post(async () =>
                         {
                             await RefreshDataAsync();
@@ -522,7 +522,7 @@ namespace AkademiTrack.ViewModels
                         
                         Dispatcher.UIThread.Post(async () =>
                         {
-                            _loggingService?.LogInfo("[SLEEP DETECTION] 🔄 Refreshing data after wake from sleep");
+                            _loggingService?.LogInfo("[SLEEP DETECTION] Refreshing data after wake from sleep");
                             await RefreshDataAsync();
                         });
                     }
@@ -647,7 +647,7 @@ namespace AkademiTrack.ViewModels
 
             if (data.RegisteredStuSessions == data.TotalStuSessions && data.TotalStuSessions > 0)
             {
-                TodayStatus = "✓ Alle registrert";
+                TodayStatus = "Alle registrert";
             }
             else if (data.RegisteredStuSessions == 0 && data.TotalStuSessions > 0)
             {
@@ -763,7 +763,7 @@ namespace AkademiTrack.ViewModels
             WeeklyDisplay = $"{data.TotalRegistered} av {data.TotalSessions} økter registrert";
 
             int remaining = data.TotalSessions - data.TotalRegistered;
-            WeeklyRemaining = remaining > 0 ? $"{remaining} økter gjenstår" : "Alle økter fullført!";
+            WeeklyRemaining = remaining > 0 ? $"{remaining} økter gjenstår" : "Alle økter fullført";
 
             // DEBUG: Log what we're receiving
             _loggingService?.LogInfo($"[DASHBOARD WEEKLY UPDATE] Total: {data.TotalSessions}, Registered: {data.TotalRegistered}");
@@ -890,12 +890,12 @@ namespace AkademiTrack.ViewModels
 
             if (saldo > 0)
             {
-                OvertimeStatus = "Du er over målet! ✓";
+                OvertimeStatus = "Du er over målet";
                 OvertimeColor = "green";
             }
             else if (saldo < 0)
             {
-                OvertimeStatus = "Du er under grensen!";
+                OvertimeStatus = "Du er under grensen";
                 OvertimeColor = "orange";
             }
             else

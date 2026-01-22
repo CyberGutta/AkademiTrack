@@ -85,7 +85,7 @@ namespace AkademiTrack.Services
 
                 if (!File.Exists(helperPath))
                 {
-                    Console.WriteLine("❌ AkademiTrackHelper not found");
+                    Console.WriteLine("AkademiTrackHelper not found");
                     return;
                 }
 
@@ -113,7 +113,7 @@ namespace AkademiTrack.Services
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"❌ Process wait failed: {ex.Message}");
+                            Console.WriteLine($"Process wait failed: {ex.Message}");
                         }
                         finally
                         {
@@ -124,14 +124,14 @@ namespace AkademiTrack.Services
                     {
                         if (t.IsFaulted && t.Exception != null)
                         {
-                            Console.WriteLine($"❌ Process wait task failed: {t.Exception.GetBaseException().Message}");
+                            Console.WriteLine($"Process wait task failed: {t.Exception.GetBaseException().Message}");
                         }
                     }, TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Failed to launch AkademiTrackHelper: {ex.Message}");
+                Console.WriteLine($"Failed to launch AkademiTrackHelper: {ex.Message}");
             }
         }
 
@@ -141,7 +141,7 @@ namespace AkademiTrack.Services
             {
                 OsNotifications.Notifications.ShowNotification(title, message);
                 await Task.Delay(1000);
-                Console.WriteLine($"✓ Windows notification shown: {title}");
+                Console.WriteLine($"Windows notification shown: {title}");
             }
             catch (Exception ex)
             {
@@ -226,7 +226,7 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
                     try
                     {
                         await process.WaitForExitAsync();
-                        Console.WriteLine($"✓ Linux notification shown: {title}");
+                        Console.WriteLine($"Linux notification shown: {title}");
                     }
                     finally
                     {

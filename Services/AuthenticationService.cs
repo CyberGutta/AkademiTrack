@@ -34,7 +34,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🚀 [AUTH] Starting authentication...");
+                Debug.WriteLine("[AUTH] Starting authentication");
                 
                 // Load credentials (same as before)
                 var credentialsResult = await LoadCredentialsAsync();
@@ -56,12 +56,12 @@ namespace AkademiTrack.Services
                 }
 
                 // Need fresh login with PuppeteerSharp
-                Debug.WriteLine("🔄 [AUTH] Performing fresh login with PuppeteerSharp...");
+                Debug.WriteLine("[AUTH] Performing fresh login with PuppeteerSharp");
                 return await PerformPuppeteerLoginAsync();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [AUTH] Authentication error: {ex.Message}");
+                Debug.WriteLine($"[AUTH] Authentication error: {ex.Message}");
                 return AuthenticationResult.CreateFailed($"Authentication error: {ex.Message}");
             }
         }
@@ -93,7 +93,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [LOAD] Failed to load credentials: {ex.Message}");
+                Debug.WriteLine($"[LOAD] Failed to load credentials: {ex.Message}");
                 return AuthenticationResult.CreateFailed($"Failed to load credentials: {ex.Message}");
             }
         }
@@ -122,7 +122,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [TEST] Cookie test failed: {ex.Message}");
+                Debug.WriteLine($"[TEST] Cookie test failed: {ex.Message}");
                 return false;
             }
         }
@@ -134,7 +134,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                Debug.WriteLine("🚀 [PUPPETEER] Starting browser...");
+                Debug.WriteLine("[PUPPETEER] Starting browser");
                 
                 // Download Chromium if needed
                 await new BrowserFetcher().DownloadAsync();
@@ -186,25 +186,25 @@ namespace AkademiTrack.Services
                     }
                 };
 
-                Debug.WriteLine("🌐 [PUPPETEER] Navigating to login page...");
+                Debug.WriteLine("[PUPPETEER] Navigating to login page");
                 await page.GoToAsync("https://iskole.net/elev/?ojr=login");
                 await Task.Delay(2000);
 
                 // Click FEIDE button
-                Debug.WriteLine("🔘 [PUPPETEER] Clicking FEIDE button...");
+                Debug.WriteLine("[PUPPETEER] Clicking FEIDE button");
                 await page.WaitForSelectorAsync("button:has(span.feide_icon)", new WaitForSelectorOptions { Timeout = 10000 });
                 await page.ClickAsync("button:has(span.feide_icon)");
                 await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
 
                 // Handle organization selection - directly click on school from list without using search
-                Debug.WriteLine("🏫 [PUPPETEER] Selecting organization directly from list...");
+                Debug.WriteLine("[PUPPETEER] Selecting organization directly from list");
                 
                 // Wait for the organization list to be present in DOM
                 await page.WaitForSelectorAsync("#orglist", new WaitForSelectorOptions { Timeout = 10000 });
                 
                 // Find and click the school by matching org_name attribute (case-insensitive)
                 var schoolNameLower = _schoolName.ToLowerInvariant();
-                Debug.WriteLine($"🔍 [PUPPETEER] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
+                Debug.WriteLine($"[PUPPETEER] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
                 
                 // Use a more specific selector to find all school items
                 var schoolSelector = "li.orglist_item[org_name]";
@@ -214,12 +214,12 @@ namespace AkademiTrack.Services
                 var schoolElements = await page.QuerySelectorAllAsync(schoolSelector);
                 bool schoolFound = false;
                 
-                Debug.WriteLine($"🔍 [PUPPETEER] Found {schoolElements.Length} schools in the list");
+                Debug.WriteLine($"[PUPPETEER] Found {schoolElements.Length} schools in the list");
                 
                 foreach (var element in schoolElements)
                 {
                     var orgName = await page.EvaluateFunctionAsync<string>("el => el.getAttribute('org_name')", element);
-                    Debug.WriteLine($"🔍 [PUPPETEER] Checking school: '{orgName}'");
+                    Debug.WriteLine($"[PUPPETEER] Checking school: '{orgName}'");
                     
                     if (!string.IsNullOrEmpty(orgName) && orgName.ToLowerInvariant().Contains(schoolNameLower))
                     {
@@ -232,7 +232,7 @@ namespace AkademiTrack.Services
                 
                 if (!schoolFound)
                 {
-                    Debug.WriteLine($"❌ [PUPPETEER] School '{_schoolName}' not found in list, trying alternative approach");
+                    Debug.WriteLine($"[PUPPETEER] School '{_schoolName}' not found in list, trying alternative approach");
                     
                     // Try to find by text content instead of attribute
                     var schoolByText = await page.QuerySelectorAsync($"li.orglist_item:has(.orglist_name:contains('{_schoolName}'))");
@@ -244,7 +244,7 @@ namespace AkademiTrack.Services
                     }
                     else
                     {
-                        Debug.WriteLine($"❌ [PUPPETEER] School not found by any method, falling back to search");
+                        Debug.WriteLine($"[PUPPETEER] School not found by any method, falling back to search");
                         // Last resort: use search method
                         await page.ClickAsync("#org_selector_filter");
                         await page.TypeAsync("#org_selector_filter", _schoolName);
@@ -265,7 +265,7 @@ namespace AkademiTrack.Services
                 await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
 
                 // Fill login form
-                Debug.WriteLine("🔐 [PUPPETEER] Filling login form...");
+                Debug.WriteLine("[PUPPETEER] Filling login form");
                 await page.WaitForSelectorAsync("#username", new WaitForSelectorOptions { Timeout = 10000 });
                 await page.TypeAsync("#username", _loginEmail);
                 await page.TypeAsync("#password", SecureStringToString(_loginPasswordSecure));
@@ -277,7 +277,7 @@ namespace AkademiTrack.Services
                 var currentUrl = page.Url;
                 if (currentUrl.Contains("isFeideinnlogget=true"))
                 {
-                    Debug.WriteLine("🎉 [PUPPETEER] Login successful!");
+                    Debug.WriteLine("[PUPPETEER] Login successful");
                     
                     // Extract cookies and parameters
                     var cookies = await ExtractCookiesAsync(page);
@@ -294,7 +294,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [PUPPETEER] Error: {ex.Message}");
+                Debug.WriteLine($"[PUPPETEER] Error: {ex.Message}");
                 return AuthenticationResult.CreateFailed($"Browser login error: {ex.Message}");
             }
             finally
@@ -324,7 +324,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🔍 [PARAMS] Starting parameter extraction from VoUserData API...");
+                Debug.WriteLine("[PARAMS] Starting parameter extraction from VoUserData API");
                 
                 // Get cookies from the page first
                 var cookies = await page.GetCookiesAsync();
@@ -334,16 +334,16 @@ namespace AkademiTrack.Services
                 var jsessionId = cookieDict.GetValueOrDefault("JSESSIONID", "");
                 if (string.IsNullOrEmpty(jsessionId))
                 {
-                    Debug.WriteLine("❌ [PARAMS] No JSESSIONID found");
+                    Debug.WriteLine("[PARAMS] No JSESSIONID found");
                     return await FallbackParameterExtraction(page);
                 }
                 
-                Debug.WriteLine($"🔍 [PARAMS] Using JSESSIONID: {jsessionId.Substring(0, Math.Min(10, jsessionId.Length))}...");
+                Debug.WriteLine($"[PARAMS] Using JSESSIONID: {jsessionId.Substring(0, Math.Min(10, jsessionId.Length))}");
                 
                 using var httpClient = new System.Net.Http.HttpClient();
                 var userDataUrl = $"https://iskole.net/iskole_elev/rest/v0/VoUserData;jsessionid={jsessionId}";
                 
-                Debug.WriteLine($"🔍 [PARAMS] Fetching user data from: {userDataUrl.Replace(jsessionId, "***")}");
+                Debug.WriteLine($"[PARAMS] Fetching user data from: {userDataUrl.Replace(jsessionId, "***")}");
                 
                 var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, userDataUrl);
                 request.Headers.Add("Host", "iskole.net");
@@ -359,14 +359,14 @@ namespace AkademiTrack.Services
                 var response = await httpClient.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
                 
-                Debug.WriteLine($"🔍 [PARAMS] VoUserData response status: {response.StatusCode}");
-                Debug.WriteLine($"🔍 [PARAMS] VoUserData response length: {content.Length} characters");
-                Debug.WriteLine($"🔍 [PARAMS] VoUserData FULL response: {content}");
+                Debug.WriteLine($"[PARAMS] VoUserData response status: {response.StatusCode}");
+                Debug.WriteLine($"[PARAMS] VoUserData response length: {content.Length} characters");
+                Debug.WriteLine($"[PARAMS] VoUserData FULL response: {content}");
                 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine($"❌ [PARAMS] VoUserData API failed: {response.StatusCode}");
-                    Debug.WriteLine($"❌ [PARAMS] Response content: {content}");
+                    Debug.WriteLine($"[PARAMS] VoUserData API failed: {response.StatusCode}");
+                    Debug.WriteLine($"[PARAMS] Response content: {content}");
                     return await FallbackParameterExtraction(page);
                 }
                 
@@ -379,13 +379,13 @@ namespace AkademiTrack.Services
                     return parameters;
                 }
                 
-                Debug.WriteLine("⚠️ [PARAMS] VoUserData didn't provide complete parameters, trying fallback...");
+                Debug.WriteLine("[PARAMS] VoUserData didn't provide complete parameters, trying fallback");
                 return await FallbackParameterExtraction(page);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [PARAMS] VoUserData extraction failed: {ex.Message}");
-                Debug.WriteLine($"❌ [PARAMS] Stack trace: {ex.StackTrace}");
+                Debug.WriteLine($"[PARAMS] VoUserData extraction failed: {ex.Message}");
+                Debug.WriteLine($"[PARAMS] Stack trace: {ex.StackTrace}");
                 return await FallbackParameterExtraction(page);
             }
         }
@@ -394,8 +394,8 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine($"🔍 [PARAMS] Parsing VoUserData JSON structure...");
-                Debug.WriteLine($"🔍 [PARAMS] Raw JSON content: {jsonContent}");
+                Debug.WriteLine($"[PARAMS] Parsing VoUserData JSON structure");
+                Debug.WriteLine($"[PARAMS] Raw JSON content: {jsonContent}");
                 
                 using var document = JsonDocument.Parse(jsonContent);
                 var root = document.RootElement;
@@ -408,7 +408,7 @@ namespace AkademiTrack.Services
                 if (root.TryGetProperty("result", out var resultProp) && resultProp.ValueKind == JsonValueKind.String)
                 {
                     var resultJson = resultProp.GetString();
-                    Debug.WriteLine($"🔍 [PARAMS] Found result field with JSON string: {resultJson}");
+                    Debug.WriteLine($"[PARAMS] Found result field with JSON string: {resultJson}");
                     
                     if (!string.IsNullOrEmpty(resultJson))
                     {
@@ -417,49 +417,49 @@ namespace AkademiTrack.Services
                             using var resultDoc = JsonDocument.Parse(resultJson);
                             var resultArray = resultDoc.RootElement;
                             
-                            Debug.WriteLine($"🔍 [PARAMS] Parsed result JSON, type: {resultArray.ValueKind}");
+                            Debug.WriteLine($"[PARAMS] Parsed result JSON, type: {resultArray.ValueKind}");
                             
                             if (resultArray.ValueKind == JsonValueKind.Array && resultArray.GetArrayLength() > 0)
                             {
                                 var firstItem = resultArray[0];
-                                Debug.WriteLine($"🔍 [PARAMS] First item in array: {firstItem}");
+                                Debug.WriteLine($"[PARAMS] First item in array: {firstItem}");
                                 
                                 // Extract the correct field names from the actual response
                                 if (firstItem.TryGetProperty("fylkeid", out var fylkeIdProp))
                                 {
                                     fylkeId = fylkeIdProp.GetString();
-                                    Debug.WriteLine($"🔍 [PARAMS] Found fylkeid: '{fylkeId}'");
+                                    Debug.WriteLine($"[PARAMS] Found fylkeid: '{fylkeId}'");
                                 }
                                     
                                 if (firstItem.TryGetProperty("skoleid", out var skoleIdProp))
                                 {
                                     skoleId = skoleIdProp.GetString();
-                                    Debug.WriteLine($"🔍 [PARAMS] Found skoleid: '{skoleId}'");
+                                    Debug.WriteLine($"[PARAMS] Found skoleid: '{skoleId}'");
                                 }
                                     
                                 if (firstItem.TryGetProperty("planperi", out var planPeriProp))
                                 {
                                     planPeri = planPeriProp.GetString();
-                                    Debug.WriteLine($"🔍 [PARAMS] Found planperi: '{planPeri}'");
+                                    Debug.WriteLine($"[PARAMS] Found planperi: '{planPeri}'");
                                 }
                                     
-                                Debug.WriteLine($"🔍 [PARAMS] Extracted from result JSON: fylkeid='{fylkeId}', skoleid='{skoleId}', planperi='{planPeri}'");
+                                Debug.WriteLine($"[PARAMS] Extracted from result JSON: fylkeid='{fylkeId}', skoleid='{skoleId}', planperi='{planPeri}'");
                             }
                             else
                             {
-                                Debug.WriteLine($"❌ [PARAMS] Result array is empty or not an array");
+                                Debug.WriteLine($"[PARAMS] Result array is empty or not an array");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"❌ [PARAMS] Failed to parse result JSON: {ex.Message}");
-                            Debug.WriteLine($"❌ [PARAMS] Result JSON content: {resultJson}");
+                            Debug.WriteLine($"[PARAMS] Failed to parse result JSON: {ex.Message}");
+                            Debug.WriteLine($"[PARAMS] Result JSON content: {resultJson}");
                         }
                     }
                 }
                 else
                 {
-                    Debug.WriteLine("🔍 [PARAMS] No 'result' field found, checking other structures...");
+                    Debug.WriteLine("[PARAMS] No 'result' field found, checking other structures");
                 }
                 
                 if (!string.IsNullOrEmpty(fylkeId) && !string.IsNullOrEmpty(skoleId) && !string.IsNullOrEmpty(planPeri))
@@ -473,13 +473,13 @@ namespace AkademiTrack.Services
                     };
                 }
                 
-                Debug.WriteLine("❌ [PARAMS] Could not extract all required parameters from VoUserData response");
+                Debug.WriteLine("[PARAMS] Could not extract all required parameters from VoUserData response");
                 return null;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [PARAMS] JSON parsing failed: {ex.Message}");
-                Debug.WriteLine($"❌ [PARAMS] Stack trace: {ex.StackTrace}");
+                Debug.WriteLine($"[PARAMS] JSON parsing failed: {ex.Message}");
+                Debug.WriteLine($"[PARAMS] Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -488,9 +488,9 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("🔍 [PARAMS] Starting fallback parameter extraction...");
+                Debug.WriteLine("[PARAMS] Starting fallback parameter extraction");
                 
-                Debug.WriteLine("⚠️ [PARAMS] All extraction methods failed, using CORRECT hardcoded parameters");
+                Debug.WriteLine("[PARAMS] All extraction methods failed, using CORRECT hardcoded parameters");
                 return new UserParameters 
                 { 
                     FylkeId = "00", 
@@ -500,7 +500,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [PARAMS] Fallback extraction failed: {ex.Message}");
+                Debug.WriteLine($"[PARAMS] Fallback extraction failed: {ex.Message}");
                 return new UserParameters { FylkeId = "00", SkoleId = "312", PlanPeri = "2025-26" };
             }
         }
@@ -509,20 +509,20 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine($"💾 [SAVE] Saving {cookies.Count} cookies and parameters...");
-                Debug.WriteLine($"💾 [SAVE] Parameters: FylkeId='{parameters.FylkeId}', SkoleId='{parameters.SkoleId}', PlanPeri='{parameters.PlanPeri}', IsComplete={parameters.IsComplete}");
+                Debug.WriteLine($"[SAVE] Saving {cookies.Count} cookies and parameters");
+                Debug.WriteLine($"[SAVE] Parameters: FylkeId='{parameters.FylkeId}', SkoleId='{parameters.SkoleId}', PlanPeri='{parameters.PlanPeri}', IsComplete={parameters.IsComplete}");
                 
                 var cookieArray = cookies.Select(c => new Cookie { Name = c.Key, Value = c.Value }).ToArray();
                 await SecureCredentialStorage.SaveCookiesAsync(cookieArray);
-                Debug.WriteLine("💾 [SAVE] ✓ Cookies saved successfully");
+                Debug.WriteLine("[SAVE] Cookies saved successfully");
                 
                 // Save user parameters to Application Support directory as plain text file
                 await SaveUserParametersToFileAsync(parameters);
-                Debug.WriteLine($"💾 [SAVE] ✓ Parameters saved to file successfully");
+                Debug.WriteLine($"[SAVE] Parameters saved to file successfully");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [SAVE] Failed to save session data: {ex.Message}");
+                Debug.WriteLine($"[SAVE] Failed to save session data: {ex.Message}");
             }
         }
         
@@ -533,7 +533,7 @@ namespace AkademiTrack.Services
                 // DON'T save if these are the wrong default parameters
                 if (parameters.FylkeId == "06" && parameters.SkoleId == "0602" && parameters.PlanPeri == "2024-2025")
                 {
-                    Debug.WriteLine("❌ [SAVE] NOT saving wrong default parameters - keeping existing file");
+                    Debug.WriteLine("[SAVE] NOT saving wrong default parameters - keeping existing file");
                     return;
                 }
                 
@@ -547,11 +547,11 @@ namespace AkademiTrack.Services
                 var json = JsonSerializer.Serialize(parameters, new JsonSerializerOptions { WriteIndented = true });
                 
                 await File.WriteAllTextAsync(filePath, json);
-                Debug.WriteLine($"💾 [SAVE] User parameters saved to: {filePath}");
+                Debug.WriteLine($"[SAVE] User parameters saved to: {filePath}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [SAVE] Failed to save user parameters: {ex.Message}");
+                Debug.WriteLine($"[SAVE] Failed to save user parameters: {ex.Message}");
             }
         }
         
@@ -579,7 +579,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ [LOAD] Failed to load user parameters from file: {ex.Message}");
+                Debug.WriteLine($"[LOAD] Failed to load user parameters from file: {ex.Message}");
                 return null;
             }
         }

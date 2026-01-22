@@ -17,7 +17,7 @@ namespace AkademiTrack.Services
         private readonly ILoggingService _loggingService;
         private Timer? _updateCheckTimer;
 
-        // 🚀 FOR PRODUCTION: Set to 10 minutes for reasonable update checks
+        // FOR PRODUCTION: Set to 10 minutes for reasonable update checks
         // 🧪 FOR TESTING: Set to 30 seconds to see notifications quickly
         private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(10);
 
@@ -69,18 +69,18 @@ namespace AkademiTrack.Services
         {
             if (_updateCheckTimer != null)
             {
-                Log("⚠️ Already running - timer already exists", "INFO");
+                Log("Already running - timer already exists", "INFO");
                 return;
             }
 
-            Log("🚀 STARTING UPDATE CHECKER SERVICE", "INFO");
+            Log("STARTING UPDATE CHECKER SERVICE", "INFO");
             Log($"Check interval: {_checkInterval.TotalMinutes:F1} minutes", "INFO");
             Log("Test mode: OFF (Production)", "INFO");
             Log($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "INFO");
             Log($"Next check at: {DateTime.Now.Add(_checkInterval):yyyy-MM-dd HH:mm:ss}", "INFO");
 
             // Run first check immediately
-            Log("Running initial update check...", "INFO");
+            Log("Running initial update check", "INFO");
             _ = CheckForUpdatesAsync();
 
             // Set up periodic checks
@@ -113,7 +113,7 @@ namespace AkademiTrack.Services
                 string versionNumber = "unknown";
 
                 // 🚀 PRODUCTION MODE: Real update check
-                Log("🚀 Checking for real updates...", "INFO");
+                Log("Checking for real updates", "INFO");
                 await _settingsViewModel.CheckForUpdatesAsync();
 
                 // Read the results from ViewModel
@@ -126,7 +126,7 @@ namespace AkademiTrack.Services
                 if (updateDetected)
                 {
                     _updateAvailable = true;
-                    Log($"✓ Update detected! Version {versionNumber} is available", "SUCCESS");
+                    Log($"Update detected! Version {versionNumber} is available", "SUCCESS");
 
                     var timeSinceLastNotification = DateTime.Now - _lastUpdateNotification;
                     Log($"Time since last notification: {timeSinceLastNotification.TotalHours:F1} hours", "INFO");
@@ -151,7 +151,7 @@ namespace AkademiTrack.Services
 
                         _notificationCount++;
                         _lastUpdateNotification = DateTime.Now;
-                        Log($"✓ Notification sent successfully. Total notifications: {_notificationCount}", "SUCCESS");
+                        Log($"Notification sent successfully. Total notifications: {_notificationCount}", "SUCCESS");
                     }
                     else
                     {
@@ -166,7 +166,7 @@ namespace AkademiTrack.Services
                     // Reset counter if no update is available
                     if (_updateAvailable)
                     {
-                        Log("🎉 Update was installed! Resetting notification counter.", "SUCCESS");
+                        Log("Update was installed! Resetting notification counter.", "SUCCESS");
                         
                         // Notify user that update was successful
                         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -181,7 +181,7 @@ namespace AkademiTrack.Services
                         _notificationCount = 0;
                         _updateAvailable = false;
                         _lastUpdateNotification = DateTime.MinValue;
-                        Log("✓ Notification state reset", "INFO");
+                        Log("Notification state reset", "INFO");
                     }
                 }
 
@@ -191,7 +191,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Log($"❌ ERROR during scheduled check: {ex.Message}", "ERROR");
+                Log($"ERROR during scheduled check: {ex.Message}", "ERROR");
                 Log($"Stack trace: {ex.StackTrace}", "ERROR");
             }
         }
@@ -207,10 +207,10 @@ namespace AkademiTrack.Services
         {
             if (_disposed) return;
 
-            Log("Disposing UpdateCheckerService...", "INFO");
+            Log("Disposing UpdateCheckerService", "INFO");
             StopPeriodicChecks();
             _disposed = true;
-            Log("✓ UpdateCheckerService disposed", "INFO");
+            Log("UpdateCheckerService disposed", "INFO");
         }
     }
 }

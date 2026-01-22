@@ -311,7 +311,7 @@ namespace AkademiTrack.ViewModels
 
                 _isInitializing = true;
                 IsLoading = true;
-                _loggingService.LogInfo($"Starter AkademiTrack... (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
+                _loggingService.LogInfo($"Starter AkademiTrack (Forsøk {_initializationRetryCount + 1}/{MAX_RETRY_ATTEMPTS})");
 
                 Debug.WriteLine("[MainWindow] App initialization started");
 
@@ -323,7 +323,7 @@ namespace AkademiTrack.ViewModels
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
                 {
-                    _loggingService.LogSuccess("✓ Autentisering fullført!");
+                    _loggingService.LogSuccess("Autentisering fullført");
                     _loggingService.LogDebug($"🔍 [INIT] Auth result: Cookies={authResult.Cookies.Count}, Params complete={authResult.Parameters.IsComplete}");
 
                     Debug.WriteLine("[MainWindow] App initialization successful");
@@ -338,7 +338,7 @@ namespace AkademiTrack.ViewModels
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
 
                     IsLoading = false;
-                    _loggingService.LogSuccess("✓ Autentisering fullført - UI er klar!");
+                    _loggingService.LogSuccess("Autentisering fullført - UI er klar");
 
                     // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
@@ -350,7 +350,7 @@ namespace AkademiTrack.ViewModels
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
 
-                    _loggingService.LogInfo("Laster dashboard data...");
+                    _loggingService.LogInfo("Laster dashboard data");
 
                     // Dashboard refresh with error handling
                     try
@@ -746,7 +746,7 @@ namespace AkademiTrack.ViewModels
             if (Dashboard.IsCacheStale())
             {
                 _loggingService.LogInfo("Cache is stale - refreshing dashboard before automation...");
-                StatusMessage = "Oppdaterer data...";
+                StatusMessage = "Oppdaterer data";
 
                 try
                 {
@@ -843,7 +843,7 @@ namespace AkademiTrack.ViewModels
                 }
             }
 
-            StatusMessage = "Starter automatisering...";
+            StatusMessage = "Starter automatisering";
             var result = await _automationService.StartAsync();
 
             if (!result.Success)
@@ -1037,8 +1037,8 @@ namespace AkademiTrack.ViewModels
                 _isRefreshingData = true;
                 _lastManualRefresh = DateTime.Now;
 
-                _loggingService.LogInfo("Oppdaterer data...");
-                StatusMessage = "Oppdaterer...";
+                _loggingService.LogInfo("Oppdaterer data");
+                StatusMessage = "Oppdaterer";
 
                 await Dashboard.RefreshDataAsync();
                 
@@ -1164,12 +1164,12 @@ namespace AkademiTrack.ViewModels
             var importantMessages = new[]
             {
                 "Applikasjon er klar",
-                "Starter automatisering...",
+                "Starter automatisering",
                 "Automatisering stoppet",
                 "Automatisering fullført",
                 "Innlogging fullført",
                 "Autentisering og parametere fullført",
-                "Registreringsvindu er ÅPENT",
+                "Registreringsvindu er åpent",
                 "Forsøker å registrere oppmøte",
                 "Alle STU-økter er håndtert",
                 "Syklus #"

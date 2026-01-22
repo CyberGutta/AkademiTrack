@@ -147,7 +147,7 @@ namespace AkademiTrack.Services
             _lastCpuCheck = DateTime.UtcNow;
             _lastTotalProcessorTime = _currentProcess.TotalProcessorTime;
             _updateTimer = new Timer(UpdateMetrics, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
-            Debug.WriteLine("✓ Resource monitoring started");
+            Debug.WriteLine("Resource monitoring started");
         }
 
         public void StopMonitoring()
@@ -157,7 +157,7 @@ namespace AkademiTrack.Services
             IsMonitoring = false;
             _updateTimer?.Dispose();
             _updateTimer = null;
-            Debug.WriteLine("✓ Resource monitoring stopped");
+            Debug.WriteLine("Resource monitoring stopped");
         }
 
         private void UpdateMetrics(object? state)

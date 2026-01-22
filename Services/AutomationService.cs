@@ -91,7 +91,7 @@ namespace AkademiTrack.Services
             try
             {
                 _isRunning = true;
-                _currentStatus = "Starting automation...";
+                _currentStatus = "Starting automation";
                 StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(true, _currentStatus));
 
                 // Load credentials and parameters
@@ -120,7 +120,7 @@ namespace AkademiTrack.Services
                 var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken, _cancellationTokenSource.Token).Token;
 
-                _loggingService.LogInfo("Starter automatisering...");
+                _loggingService.LogInfo("Starter automatisering");
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering startet",
                     "STU tidsregistrering automatisering kjører nå",
@@ -205,7 +205,7 @@ namespace AkademiTrack.Services
             try
             {
                 _cancellationTokenSource?.Cancel();
-                _loggingService.LogInfo("Stopp forespurt - stopper automatisering...");
+                _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering stoppet", 
                     "Automatisering har blitt stoppet av bruker", 
@@ -223,7 +223,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                _loggingService.LogInfo("🔐 Starting re-authentication...");
+                _loggingService.LogInfo("Starting re-authentication");
                 
                 var authService = new AuthenticationService(_notificationService);
                 var authResult = await authService.AuthenticateAsync();
@@ -237,24 +237,24 @@ namespace AkademiTrack.Services
                     if (authResult.Parameters != null && authResult.Parameters.IsComplete)
                     {
                         _userParameters = authResult.Parameters;
-                        _loggingService.LogSuccess($"✓ Authentication complete! Got {authResult.Cookies.Count} cookies and user parameters");
+                        _loggingService.LogSuccess($"Authentication complete! Got {authResult.Cookies.Count} cookies and user parameters");
                     }
                     else
                     {
-                        _loggingService.LogSuccess($"✓ Authentication complete! Got {authResult.Cookies.Count} cookies");
+                        _loggingService.LogSuccess($"Authentication complete! Got {authResult.Cookies.Count} cookies");
                     }
 
                     return AutomationResult.Successful("Authentication refreshed successfully");
                 }
                 else
                 {
-                    _loggingService.LogError("❌ Authentication returned no cookies or failed");
+                    _loggingService.LogError("Authentication returned no cookies or failed");
                     return AutomationResult.Failed("Authentication failed - no cookies received");
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"❌ Authentication exception: {ex.Message}");
+                _loggingService.LogError($"Authentication exception: {ex.Message}");
                 return AutomationResult.Failed($"Authentication refresh failed: {ex.Message}", ex);
             }
         }
@@ -277,18 +277,18 @@ namespace AkademiTrack.Services
         {
             try
             {
-                _loggingService.LogDebug("🔍 [AUTOMATION] Loading credentials from storage...");
+                _loggingService.LogDebug("[AUTOMATION] Loading credentials from storage");
                 
                 // Load cookies
                 _cookies = await SecureCredentialStorage.LoadCookiesAsync();
-                _loggingService.LogDebug($"🔍 [AUTOMATION] Loaded {_cookies?.Count ?? 0} cookies from storage");
+                _loggingService.LogDebug($"[AUTOMATION] Loaded {_cookies?.Count ?? 0} cookies from storage");
                 
                 // Load user parameters from storage
                 await LoadUserParametersAsync();
                 
                 if (_cookies == null || _cookies.Count == 0)
                 {
-                    _loggingService.LogInfo("Ingen cookies funnet - autentiserer på nytt...");
+                    _loggingService.LogInfo("Ingen cookies funnet - autentiserer på nytt");
                     var authResult = await RefreshAuthenticationAsync();
                     if (!authResult.Success)
                     {
@@ -299,7 +299,7 @@ namespace AkademiTrack.Services
                 // Check if we have user parameters after loading/authentication
                 if (_userParameters == null || !_userParameters.IsComplete)
                 {
-                    _loggingService.LogError($"❌ [AUTOMATION] User parameters missing or incomplete after loading. Params null: {_userParameters == null}, Complete: {_userParameters?.IsComplete ?? false}");
+                    _loggingService.LogError($"[AUTOMATION] User parameters missing or incomplete after loading. Params null: {_userParameters == null}, Complete: {_userParameters?.IsComplete ?? false}");
                     return AutomationResult.Failed("Missing user parameters");
                 }
                 
@@ -317,7 +317,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                _loggingService.LogDebug("Checking internet connectivity...");
+                _loggingService.LogDebug("Checking internet connectivity");
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.Time.SHORT_TIMEOUT_SECONDS));
                 var response = await _httpClient.GetAsync("https://www.google.com", cts.Token);
                 return response.IsSuccessStatusCode;
@@ -332,7 +332,7 @@ namespace AkademiTrack.Services
         {
             int cycleCount = 0;
 
-            _loggingService.LogInfo("Henter timeplandata for hele dagen...");
+            _loggingService.LogInfo("Henter timeplandata for hele dagen");
             _cachedScheduleData = await GetFullDayScheduleDataAsync();
 
             if (_cachedScheduleData == null)
@@ -427,7 +427,7 @@ namespace AkademiTrack.Services
                                 // Double-check if registered (in case another instance registered it)
                                 if (await IsSessionRegisteredAsync(sessionKey))
                                 {
-                                    _loggingService.LogInfo($"✓ STU økt {sessionKey} er allerede registrert");
+                                    _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert");
                                     registeredSessionKeys.Add(sessionKey);
                                     closedWindows++;
                                     openWindows--;
@@ -515,7 +515,7 @@ namespace AkademiTrack.Services
                     {
                         await _notificationService.ShowNotificationAsync(
                             "Overvåkingsfeil",
-                            $"Feil under overvåking: {ex.Message}. Prøver igjen...",
+                            $"Feil under overvåking: {ex.Message}. Prøver igjen",
                             NotificationLevel.Warning
                         );
                     }
@@ -617,12 +617,12 @@ namespace AkademiTrack.Services
                     // Check and fix user parameters
                     if (_userParameters == null || !_userParameters.IsComplete)
                     {
-                        _loggingService.LogWarning("⚠️ User parameters missing or incomplete - attempting re-authentication");
+                        _loggingService.LogWarning("User parameters missing or incomplete - attempting re-authentication");
                         var authResult = await RefreshAuthenticationAsync();
                         
                         if (!authResult.Success)
                         {
-                            _loggingService.LogError($"❌ Re-authentication failed (attempt {retryCount + 1}/{MAX_RETRIES})");
+                            _loggingService.LogError($"Re-authentication failed (attempt {retryCount + 1}/{MAX_RETRIES})");
                             retryCount++;
                             if (retryCount < MAX_RETRIES)
                             {
@@ -632,18 +632,18 @@ namespace AkademiTrack.Services
                             return null;
                         }
                         
-                        _loggingService.LogSuccess("✓ Re-authentication successful - parameters restored");
+                        _loggingService.LogSuccess("Re-authentication successful - parameters restored");
                     }
 
                     // Check and fix cookies
                     if (_cookies == null || _cookies.Count == 0)
                     {
-                        _loggingService.LogWarning("⚠️ Cookies are missing - attempting re-authentication");
+                        _loggingService.LogWarning("Cookies are missing - attempting re-authentication");
                         var authResult = await RefreshAuthenticationAsync();
                         
                         if (!authResult.Success)
                         {
-                            _loggingService.LogError($"❌ Re-authentication failed (attempt {retryCount + 1}/{MAX_RETRIES})");
+                            _loggingService.LogError($"Re-authentication failed (attempt {retryCount + 1}/{MAX_RETRIES})");
                             retryCount++;
                             if (retryCount < MAX_RETRIES)
                             {
@@ -653,7 +653,7 @@ namespace AkademiTrack.Services
                             return null;
                         }
                         
-                        _loggingService.LogSuccess("✓ Re-authentication successful - cookies restored");
+                        _loggingService.LogSuccess("Re-authentication successful - cookies restored");
                     }
 
                     // Log attempt
@@ -665,71 +665,71 @@ namespace AkademiTrack.Services
                     // Success!
                     if (scheduleData != null && scheduleData.Count > 0)
                     {
-                        _loggingService.LogSuccess($"✓ Successfully fetched {scheduleData.Count} schedule items");
+                        _loggingService.LogSuccess($"Successfully fetched {scheduleData.Count} schedule items");
                         return scheduleData;
                     }
 
                     // Empty schedule (might be normal if no classes today)
                     if (scheduleData != null && scheduleData.Count == 0)
                     {
-                        _loggingService.LogWarning("⚠️ Schedule fetch returned 0 items - this might be normal if no classes today");
+                        _loggingService.LogWarning("Schedule fetch returned 0 items - this might be normal if no classes today");
                         return scheduleData;
                     }
 
                     // If fetch returned null, cookies are likely expired - re-authenticate
-                    _loggingService.LogWarning($"⚠️ Schedule fetch failed - cookies likely expired (attempt {retryCount + 1}/{MAX_RETRIES})");
-                    _loggingService.LogInfo("🔐 Attempting to refresh authentication...");
+                    _loggingService.LogWarning($"Schedule fetch failed - cookies likely expired (attempt {retryCount + 1}/{MAX_RETRIES})");
+                    _loggingService.LogInfo("Attempting to refresh authentication");
                     
                     var reAuthResult = await RefreshAuthenticationAsync();
                     if (!reAuthResult.Success)
                     {
-                        _loggingService.LogError("❌ Re-authentication failed");
+                        _loggingService.LogError("Re-authentication failed");
                         retryCount++;
                         
                         if (retryCount < MAX_RETRIES)
                         {
-                            _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}...");
+                            _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}");
                             await Task.Delay(3000);
                         }
                         continue;
                     }
                     
-                    _loggingService.LogSuccess("✓ Re-authentication successful - retrying schedule fetch");
+                    _loggingService.LogSuccess("Re-authentication successful - retrying schedule fetch");
                     
                     // Retry with fresh cookies (don't increment retry count since we just re-authed)
                     scheduleData = await FetchScheduleDataAsync();
                     
                     if (scheduleData != null)
                     {
-                        _loggingService.LogSuccess($"✓ Successfully fetched {scheduleData.Count} schedule items after re-auth");
+                        _loggingService.LogSuccess($"Successfully fetched {scheduleData.Count} schedule items after re-auth");
                         return scheduleData;
                     }
 
                     // Still failed after re-auth
-                    _loggingService.LogError("❌ Schedule fetch still failed even after re-authentication");
+                    _loggingService.LogError("Schedule fetch still failed even after re-authentication");
                     retryCount++;
                     
                     if (retryCount < MAX_RETRIES)
                     {
-                        _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}...");
+                        _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}");
                         await Task.Delay(3000);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _loggingService.LogError($"❌ Exception while fetching schedule data: {ex.Message}");
+                    _loggingService.LogError($"Exception while fetching schedule data: {ex.Message}");
                     _loggingService.LogDebug($"Stack trace: {ex.StackTrace}");
                     retryCount++;
                     
                     if (retryCount < MAX_RETRIES)
                     {
-                        _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}...");
+                        _loggingService.LogInfo($"Waiting 3 seconds before retry {retryCount + 1}");
                         await Task.Delay(3000);
                     }
                 }
             }
             
-            _loggingService.LogError($"❌ Failed to fetch schedule data after {MAX_RETRIES} attempts");
+            _loggingService.LogError($"Failed to fetch schedule data after {MAX_RETRIES} attempts");
             await _notificationService.ShowNotificationAsync(
                 "Kunne ikke hente timeplan",
                 "Automatiseringen kunne ikke hente timeplandata etter flere forsøk. Sjekk nettverkstilkobling og prøv igjen.",
@@ -745,20 +745,20 @@ namespace AkademiTrack.Services
             {
                 if (_userParameters == null)
                 {
-                    _loggingService.LogError("❌ [FETCH] User parameters are null");
+                    _loggingService.LogError("[FETCH] User parameters are null");
                     return null;
                 }
 
                 if (!_userParameters.IsComplete)
                 {
-                    _loggingService.LogError("❌ [FETCH] User parameters are incomplete");
+                    _loggingService.LogError("[FETCH] User parameters are incomplete");
                     _loggingService.LogDebug($"FylkeId: {_userParameters.FylkeId}, PlanPeri: {_userParameters.PlanPeri}, SkoleId: {_userParameters.SkoleId}");
                     return null;
                 }
 
                 if (_cookies == null || _cookies.Count == 0)
                 {
-                    _loggingService.LogError("❌ [FETCH] Cookies are missing or empty");
+                    _loggingService.LogError("[FETCH] Cookies are missing or empty");
                     return null;
                 }
 
@@ -766,7 +766,7 @@ namespace AkademiTrack.Services
                 
                 if (string.IsNullOrEmpty(jsessionId))
                 {
-                    _loggingService.LogError("❌ [FETCH] JSESSIONID cookie is missing or empty");
+                    _loggingService.LogError("[FETCH] JSESSIONID cookie is missing or empty");
                     _loggingService.LogDebug($"Available cookies: {string.Join(", ", _cookies.Keys)}");
                     return null;
                 }
@@ -803,11 +803,11 @@ namespace AkademiTrack.Services
                     if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
                         response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                     {
-                        _loggingService.LogWarning($"⚠️ [FETCH] Authentication error ({response.StatusCode}) - cookies likely expired");
+                        _loggingService.LogWarning($"[FETCH] Authentication error ({response.StatusCode}) - cookies likely expired");
                         return null; // Signal to parent to re-authenticate
                     }
                     
-                    _loggingService.LogError($"❌ [FETCH] HTTP error {response.StatusCode}");
+                    _loggingService.LogError($"[FETCH] HTTP error {response.StatusCode}");
                     _loggingService.LogDebug($"Response content: {responseContent.Substring(0, Math.Min(500, responseContent.Length))}");
                     return null;
                 }
@@ -815,7 +815,7 @@ namespace AkademiTrack.Services
                 if (responseContent.Contains("JSESSIONID") && responseContent.Contains("expired") ||
                     responseContent.Contains("login") && responseContent.Contains("required"))
                 {
-                    _loggingService.LogWarning("⚠️ [FETCH] Response indicates session expired");
+                    _loggingService.LogWarning("[FETCH] Response indicates session expired");
                     return null; 
                 }
 
@@ -829,54 +829,54 @@ namespace AkademiTrack.Services
 
                     if (scheduleResponse == null)
                     {
-                        _loggingService.LogError("❌ [FETCH] Failed to deserialize response - got null");
+                        _loggingService.LogError("[FETCH] Failed to deserialize response - got null");
                         _loggingService.LogDebug($"Response preview: {responseContent.Substring(0, Math.Min(200, responseContent.Length))}");
                         return null;
                     }
 
                     if (scheduleResponse.Items == null)
                     {
-                        _loggingService.LogWarning("⚠️ [FETCH] Response deserialized but Items is null");
+                        _loggingService.LogWarning("[FETCH] Response deserialized but Items is null");
                         _loggingService.LogDebug($"Response preview: {responseContent.Substring(0, Math.Min(200, responseContent.Length))}");
                         return new List<ScheduleItem>();
                     }
 
-                    _loggingService.LogSuccess($"✓ [FETCH] Successfully parsed {scheduleResponse.Items.Count} schedule items");
+                    _loggingService.LogSuccess($"[FETCH] Successfully parsed {scheduleResponse.Items.Count} schedule items");
                     
                     // Log a sample of what we got if there are items
                     if (scheduleResponse.Items.Count > 0)
                     {
                         var firstItem = scheduleResponse.Items[0];
-                        _loggingService.LogDebug($"🔍 [FETCH] Sample item: Fag={firstItem.Fag}, KNavn={firstItem.KNavn}, Dato={firstItem.Dato}");
+                        _loggingService.LogDebug($"[FETCH] Sample item: Fag={firstItem.Fag}, KNavn={firstItem.KNavn}, Dato={firstItem.Dato}");
                     }
                     else
                     {
-                        _loggingService.LogDebug($"🔍 [FETCH] Raw response: {responseContent}");
+                        _loggingService.LogDebug($"[FETCH] Raw response: {responseContent}");
                     }
                     
                     return scheduleResponse.Items;
                 }
                 catch (JsonException jsonEx)
                 {
-                    _loggingService.LogError($"❌ [FETCH] JSON deserialization error: {jsonEx.Message}");
+                    _loggingService.LogError($"[FETCH] JSON deserialization error: {jsonEx.Message}");
                     _loggingService.LogDebug($"Response content: {responseContent.Substring(0, Math.Min(500, responseContent.Length))}");
                     return null;
                 }
             }
             catch (HttpRequestException httpEx)
             {
-                _loggingService.LogError($"❌ [FETCH] Network error: {httpEx.Message}");
+                _loggingService.LogError($"[FETCH] Network error: {httpEx.Message}");
                 _loggingService.LogDebug($"Stack trace: {httpEx.StackTrace}");
                 return null;
             }
             catch (TaskCanceledException timeoutEx)
             {
-                _loggingService.LogError($"❌ [FETCH] Request timeout: {timeoutEx.Message}");
+                _loggingService.LogError($"[FETCH] Request timeout: {timeoutEx.Message}");
                 return null;
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"❌ [FETCH] Unexpected exception: {ex.Message}");
+                _loggingService.LogError($"[FETCH] Unexpected exception: {ex.Message}");
                 _loggingService.LogDebug($"Exception type: {ex.GetType().Name}");
                 _loggingService.LogDebug($"Stack trace: {ex.StackTrace}");
                 return null;
@@ -1066,7 +1066,7 @@ namespace AkademiTrack.Services
                 {
                     var json = await File.ReadAllTextAsync(filePath);
                     _userParameters = JsonSerializer.Deserialize<UserParameters>(json);
-                    _loggingService.LogDebug($"✓ [AUTOMATION] Loaded user parameters from file: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
+                    _loggingService.LogDebug($"[AUTOMATION] Loaded user parameters from file: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
                     return;
                 }
                 
@@ -1077,7 +1077,7 @@ namespace AkademiTrack.Services
                     _userParameters = JsonSerializer.Deserialize<UserParameters>(keychainJson);
                     if (_userParameters != null)
                     {
-                        _loggingService.LogDebug("🔄 [AUTOMATION] Migrating user parameters from keychain to file...");
+                        _loggingService.LogDebug("[AUTOMATION] Migrating user parameters from keychain to file");
                         
                         // Save to file
                         Directory.CreateDirectory(appSupportDir);
@@ -1086,18 +1086,18 @@ namespace AkademiTrack.Services
                         
                         // Clean up old keychain entry
                         await SecureCredentialStorage.DeleteCredentialAsync("user_parameters");
-                        _loggingService.LogDebug("✓ [AUTOMATION] Migration complete - old keychain entry removed");
+                        _loggingService.LogDebug("[AUTOMATION] Migration complete - old keychain entry removed");
                         
-                        _loggingService.LogDebug($"✓ [AUTOMATION] Loaded user parameters from storage: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
+                        _loggingService.LogDebug($"[AUTOMATION] Loaded user parameters from storage: FylkeId={_userParameters?.FylkeId}, SkoleId={_userParameters?.SkoleId}, PlanPeri={_userParameters?.PlanPeri}");
                         return;
                     }
                 }
                 
-                _loggingService.LogDebug("⚠️ [AUTOMATION] No user parameters found in file or keychain");
+                _loggingService.LogDebug("[AUTOMATION] No user parameters found in file or keychain");
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"❌ [AUTOMATION] Failed to load user parameters: {ex.Message}");
+                _loggingService.LogError($"[AUTOMATION] Failed to load user parameters: {ex.Message}");
                 _userParameters = null;
             }
         }
@@ -1108,7 +1108,7 @@ namespace AkademiTrack.Services
             
             try
             {
-                _loggingService?.LogDebug("[AutomationService] Starting disposal...");
+                _loggingService?.LogDebug("[AutomationService] Starting disposal");
                 
                 // Cancel any running operations
                 _cancellationTokenSource?.Cancel();

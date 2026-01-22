@@ -1352,7 +1352,7 @@ Terminal=false
                 Debug.WriteLine($"✓ Export completed: {filePath}");
 
                 var openFolder = await ShowConfirmationDialog(
-                    "Lokal eksport fullført! ✓",
+                    "Lokal eksport fullført",
                     $"Din LOKALE data er eksportert til:\n\n{filePath}\n\n" +
                     "Vil du åpne mappen der filen er lagret?",
                     false
@@ -1662,7 +1662,7 @@ Terminal=false
             try
             {
                 var result = await ShowConfirmationDialog(
-                    "⚠️ AVINSTALLER AKADEMITRACK FULLSTENDIG",
+                    "AVINSTALLER AKADEMITRACK FULLSTENDIG",
                     "ADVARSEL: Dette vil:\n\n" +
                     "• Slette ALL data (innstillinger, cookies, logger)\n" +
                     "• Slette ALL brukerinformasjon permanent\n" +
@@ -2376,13 +2376,13 @@ Terminal=false
                 LogInfo($"Version: {updateInfo.TargetFullRelease.Version}");
                 LogInfo($"Package: {updateInfo.TargetFullRelease.FileName}");
                 LogInfo($"Size: {updateInfo.TargetFullRelease.Size / 1024 / 1024} MB");
-                UpdateStatus = "Laster ned oppdatering...";
+                UpdateStatus = "Laster ned oppdatering";
 
                 await mgr.DownloadUpdatesAsync(updateInfo, progress =>
                 {
                     Dispatcher.UIThread.Post(() =>
                     {
-                        UpdateStatus = $"Laster ned... {progress}%";
+                        UpdateStatus = $"Laster ned {progress}%";
                         if (progress % 10 == 0) // Log every 10%
                             LogInfo($"Download progress: {progress}%");
                     });

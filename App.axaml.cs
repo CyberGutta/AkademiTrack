@@ -71,11 +71,11 @@ namespace AkademiTrack
                     var analyticsService = ServiceContainer.GetService<AnalyticsService>();
                     
                     Services.Utilities.GlobalExceptionHandler.Initialize(loggingService, notificationService, analyticsService);
-                    Debug.WriteLine("✓ Global exception handler initialized");
+                    Debug.WriteLine("Global exception handler initialized");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"❌ Failed to initialize global exception handler: {ex.Message}");
+                    Debug.WriteLine($"Failed to initialize global exception handler: {ex.Message}");
                     // Continue without global exception handler - not critical
                 }
                 
@@ -162,7 +162,7 @@ namespace AkademiTrack
                     if (e.Success)
                     {
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
-                        Debug.WriteLine("[App] Restarting application to load all services with new credentials...");
+                        Debug.WriteLine("[App] Restarting application to load all services with new credentials");
 
                         await Task.Delay(1000);
 
@@ -191,7 +191,7 @@ namespace AkademiTrack
             // Check if we should start minimized (regardless of showFeideSetup for this check)
             if (startMinimized && !showFeideSetup)
             {
-                Debug.WriteLine("[App] Starting minimized to tray...");
+                Debug.WriteLine("[App] Starting minimized to tray");
 
                 mainWindow.Show();
                 await Task.Delay(50);
@@ -223,7 +223,7 @@ namespace AkademiTrack
                         
                         if (mainWindowViewModel.IsLoading)
                         {
-                            Debug.WriteLine("[App] ⚠️ Loading took too long, showing notification dialog anyway");
+                            Debug.WriteLine("[App] Loading took too long, showing notification dialog anyway");
                         }
                         else
                         {
@@ -235,7 +235,7 @@ namespace AkademiTrack
                         
                         try
                         {
-                            Debug.WriteLine("[App] Checking if notification overlay should be shown...");
+                            Debug.WriteLine("[App] Checking if notification overlay should be shown");
                             
                             bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
                                 .ShouldShowPermissionDialogAsync();
@@ -244,7 +244,7 @@ namespace AkademiTrack
                             
                             if (shouldShow)
                             {
-                                Debug.WriteLine("[App] Creating notification permission overlay...");
+                                Debug.WriteLine("[App] Creating notification permission overlay");
                                 
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
@@ -268,7 +268,7 @@ namespace AkademiTrack
                                 }
                                 else
                                 {
-                                    Debug.WriteLine("[App] ❌ ERROR: Could not find OverlayContainer in MainWindow");
+                                    Debug.WriteLine("[App] ERROR: Could not find OverlayContainer in MainWindow");
                                     Debug.WriteLine("[App] Make sure you added <ContentControl Name=\"OverlayContainer\" .../> to MainWindow.axaml");
                                 }
                             }
@@ -279,7 +279,7 @@ namespace AkademiTrack
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[App] ❌ ERROR showing notification overlay: {ex.Message}");
+                            Debug.WriteLine($"[App] ERROR showing notification overlay: {ex.Message}");
                             Debug.WriteLine($"[App] Stack trace: {ex.StackTrace}");
                         }
                     }, DispatcherPriority.Background);

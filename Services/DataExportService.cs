@@ -72,7 +72,7 @@ namespace AkademiTrack.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"⚠️ Error loading settings: {ex.Message}");
+                    Debug.WriteLine($"Error loading settings: {ex.Message}");
                 }
             }
 
@@ -118,13 +118,13 @@ namespace AkademiTrack.Services
                         }
                         catch (Exception contentEx)
                         {
-                            Debug.WriteLine($"⚠️ Could not read content from {fileInfo.Name}: {contentEx.Message}");
+                            Debug.WriteLine($"Could not read content from {fileInfo.Name}: {contentEx.Message}");
                             localData.FileContents[relativePath] = $"[Could not read file: {contentEx.Message}]";
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"⚠️ Could not process file {file}: {ex.Message}");
+                        Debug.WriteLine($"Could not process file {file}: {ex.Message}");
                     }
                 }
             }

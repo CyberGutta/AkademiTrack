@@ -46,7 +46,7 @@ namespace AkademiTrack.Services.DependencyInjection
                     return;
                 }
 
-                Debug.WriteLine("[ServiceContainer] Initializing dependency injection container...");
+                Debug.WriteLine("[ServiceContainer] Initializing dependency injection container");
 
                 try
                 {
@@ -64,7 +64,7 @@ namespace AkademiTrack.Services.DependencyInjection
                     _host = builder.Build();
                     _serviceProvider = _host.Services;
 
-                    Debug.WriteLine("[ServiceContainer] ✓ Dependency injection container initialized successfully");
+                    Debug.WriteLine("[ServiceContainer] Dependency injection container initialized successfully");
 
                     // Start background services
                     _ = Task.Run(async () =>
@@ -98,7 +98,7 @@ namespace AkademiTrack.Services.DependencyInjection
         /// </summary>
         private static void ConfigureServices(IServiceCollection services)
         {
-            Debug.WriteLine("[ServiceContainer] Configuring services...");
+            Debug.WriteLine("[ServiceContainer] Configuring services");
 
             // Core interfaces and implementations
             services.AddSingleton<ILoggingService, LoggingService>();
@@ -155,34 +155,34 @@ namespace AkademiTrack.Services.DependencyInjection
                 services.AddSingleton<LinuxPinAuthService>();
             }
 
-            Debug.WriteLine("[ServiceContainer] ✓ All services configured");
+            Debug.WriteLine("[ServiceContainer] All services configured");
         }
 
         /// <summary>
         /// </summary>
         private static async Task InitializeBackgroundServicesAsync()
         {
-            Debug.WriteLine("[ServiceContainer] Initializing background services...");
+            Debug.WriteLine("[ServiceContainer] Initializing background services");
 
             try
             {
                 // Initialize settings service
                 var settingsService = GetService<ISettingsService>();
                 await settingsService.LoadSettingsAsync();
-                Debug.WriteLine("[ServiceContainer] ✓ Settings service initialized");
+                Debug.WriteLine("[ServiceContainer] Settings service initialized");
 
                 // Initialize analytics service
                 var analyticsService = GetService<AnalyticsService>();
                 await analyticsService.StartSessionAsync();
-                Debug.WriteLine("[ServiceContainer] ✓ Analytics service initialized");
+                Debug.WriteLine("[ServiceContainer] Analytics service initialized");
 
                 // Start log retention manager
                 var loggingService = GetService<ILoggingService>();
                 var retentionManager = new LogRetentionManager(loggingService);
                 retentionManager.Start();
-                Debug.WriteLine("[ServiceContainer] ✓ Log retention manager started");
+                Debug.WriteLine("[ServiceContainer] Log retention manager started");
 
-                Debug.WriteLine("[ServiceContainer] ✓ All background services initialized successfully");
+                Debug.WriteLine("[ServiceContainer] All background services initialized successfully");
             }
             catch (Exception ex)
             {
@@ -251,7 +251,7 @@ namespace AkademiTrack.Services.DependencyInjection
         /// </summary>
         public static async Task ShutdownAsync()
         {
-            Debug.WriteLine("[ServiceContainer] Shutting down...");
+            Debug.WriteLine("[ServiceContainer] Shutting down");
 
             try
             {
@@ -263,7 +263,7 @@ namespace AkademiTrack.Services.DependencyInjection
                 }
 
                 _serviceProvider = null;
-                Debug.WriteLine("[ServiceContainer] ✓ Shutdown completed");
+                Debug.WriteLine("[ServiceContainer] Shutdown completed");
             }
             catch (Exception ex)
             {

@@ -86,7 +86,7 @@ namespace AkademiTrack.Services
         {
             await _notificationService.ShowNotificationAsync(
                 "Våknet fra Dvale",
-                "AkademiTrack har oppdaget at datamaskinen våknet fra dvale. Sjekker automatiseringsstatus...",
+                "AkademiTrack har oppdaget at datamaskinen våknet fra dvale. Sjekker automatiseringsstatus",
                 NotificationLevel.Info
             );
         }

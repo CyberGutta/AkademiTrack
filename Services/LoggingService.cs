@@ -36,7 +36,7 @@ namespace AkademiTrack.Services
             // Start log cleanup timer (runs every 6 hours)
             StartLogCleanupTimer();
             
-            LogInfo("✓ LoggingService initialized with 7-day retention policy");
+            LogInfo("LoggingService initialized with 7-day retention policy");
         }
 
         private void StartLogCleanupTimer()
@@ -48,7 +48,7 @@ namespace AkademiTrack.Services
                 TimeSpan.FromHours(6)   // Then every 6 hours
             );
             
-            Debug.WriteLine("✓ Log retention timer started (7-day rolling window, checks every 6 hours)");
+            Debug.WriteLine("Log retention timer started (7-day rolling window, checks every 6 hours)");
         }
 
         private async System.Threading.Tasks.Task CleanOldLogsAsync()
@@ -70,7 +70,7 @@ namespace AkademiTrack.Services
                         }
                     });
 
-                    Debug.WriteLine($"✓ Log retention: Cleaned {logsToRemove.Count} old logs (older than {LOG_RETENTION_DAYS} days)");
+                    Debug.WriteLine($"Log retention: Cleaned {logsToRemove.Count} old logs (older than {LOG_RETENTION_DAYS} days)");
                 }
                 
                 // Also enforce max entry limit as safety measure

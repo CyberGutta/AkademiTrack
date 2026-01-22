@@ -47,7 +47,7 @@ namespace AkademiTrack.Services.Utilities
                         maxDelayMs
                     );
 
-                    Debug.WriteLine($"[RetryPolicy] Attempt {attempt + 1}/{maxRetries + 1} failed: {ex.Message}. Retrying in {delay}ms...");
+                    Debug.WriteLine($"[RetryPolicy] Attempt {attempt + 1}/{maxRetries + 1} failed: {ex.Message}. Retrying in {delay}ms");
                     
                     onRetry?.Invoke(attempt + 1, ex);
                     
