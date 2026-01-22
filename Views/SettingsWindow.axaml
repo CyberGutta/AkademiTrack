@@ -919,6 +919,26 @@
 								</Grid>
 							</StackPanel>
 						</Border>
+
+						<!-- Save Login Credentials Button -->
+						<Border Classes="setting-item-compact">
+							<Button Content="Lagre"
+									Classes="settings-action"
+									Command="{Binding SaveLoginCredentialsCommand}"
+									IsEnabled="{Binding HasUnsavedLoginChanges}"
+									HorizontalAlignment="Right"
+									Margin="0,8,0,0">
+								<Button.Styles>
+									<Style Selector="Button.settings-action[IsEnabled=False]">
+										<Setter Property="Background" Value="#C7C7CC"/>
+										<Setter Property="Foreground" Value="#8E8E93"/>
+									</Style>
+									<Style Selector="Button.settings-action[IsEnabled=False] /template/ ContentPresenter#PART_ContentPresenter">
+										<Setter Property="Background" Value="#C7C7CC"/>
+									</Style>
+								</Button.Styles>
+							</Button>
+						</Border>
 					</StackPanel>
 
 					<!-- Automation Category -->

@@ -517,6 +517,12 @@ Terminal=false
         private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
 
+        // Save button state tracking
+        private bool _hasUnsavedLoginChanges = false;
+        private string _originalLoginEmail = "";
+        private string _originalSchoolName = "";
+        private string _originalLoginPassword = "";
+
         public ObservableCollection<string> Schools { get; }
 
         private string _updateStatus = "Klikk for å sjekke etter oppdateringer";
@@ -841,6 +847,7 @@ Terminal=false
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
         public ICommand ToggleNotificationsCommand { get; }
+        public ICommand SaveLoginCredentialsCommand { get; }
 
         public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
@@ -1076,10 +1083,33 @@ Terminal=false
             }
         }
 
+        public bool HasUnsavedLoginChanges
+        {
+            get => _hasUnsavedLoginChanges;
+            set
+            {
+                if (_hasUnsavedLoginChanges != value)
+                {
+                    _hasUnsavedLoginChanges = value;
+                    OnPropertyChanged();
+                    (SaveLoginCredentialsCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                }
+            }
+        }
+
         public string LoginEmail
         {
             get => _loginEmail;
-            set { if (_loginEmail != value) { _loginEmail = value; OnPropertyChanged(); _ = SaveSettingsAsync(); } }
+            set 
+            { 
+                if (_loginEmail != value) 
+                { 
+                    _loginEmail = value; 
+                    OnPropertyChanged(); 
+                    CheckForLoginChanges();
+                    _ = SaveSettingsAsync(); 
+                } 
+            }
         }
 
         public string LoginPassword
@@ -1093,6 +1123,7 @@ Terminal=false
                     _loginPasswordSecure?.Dispose();
                     _loginPasswordSecure = StringToSecureString(value);
                     OnPropertyChanged();
+                    CheckForLoginChanges();
                     _ = SaveSettingsAsync();
                 }
             }
@@ -1101,7 +1132,16 @@ Terminal=false
         public string SchoolName
         {
             get => _schoolName;
-            set { if (_schoolName != value) { _schoolName = value; OnPropertyChanged(); _ = SaveSettingsAsync(); } }
+            set 
+            { 
+                if (_schoolName != value) 
+                { 
+                    _schoolName = value; 
+                    OnPropertyChanged(); 
+                    CheckForLoginChanges();
+                    _ = SaveSettingsAsync(); 
+                } 
+            }
         }
 
         public bool ShowActivityLog
@@ -1173,6 +1213,7 @@ Terminal=false
             ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
             RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
+            SaveLoginCredentialsCommand = new RelayCommand(SaveLoginCredentials, () => HasUnsavedLoginChanges);
     
               _ = CleanOldLogsAsync();
 
@@ -2869,6 +2910,10 @@ Terminal=false
                 });
 
                 RefreshDisplayedLogs();
+                
+                // Initialize original values for change tracking
+                InitializeOriginalLoginValues();
+                
                 _ = Task.Run(() =>
                 {
                     try
@@ -2912,7 +2957,11 @@ Terminal=false
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
 
                 if (!string.IsNullOrEmpty(_loginEmail))
+                {
+                    await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", _loginEmail);
+                    // Also save to legacy key for backwards compatibility
                     await SecureCredentialStorage.SaveCredentialAsync("feide_username", _loginEmail);
+                }
 
                 var passwordPlain = SecureStringToString(_loginPasswordSecure);
                 try
@@ -2935,6 +2984,47 @@ Terminal=false
             {
                 Debug.WriteLine($"Error saving settings: {ex.Message}");
             }
+        }
+
+        private void CheckForLoginChanges()
+        {
+            var currentEmail = _loginEmail ?? "";
+            var currentPassword = SecureStringToString(_loginPasswordSecure) ?? "";
+            var currentSchool = _schoolName ?? "";
+
+            bool hasChanges = currentEmail != _originalLoginEmail ||
+                             currentPassword != _originalLoginPassword ||
+                             currentSchool != _originalSchoolName;
+
+            HasUnsavedLoginChanges = hasChanges;
+        }
+
+        private void SaveLoginCredentials()
+        {
+            try
+            {
+                // Update the original values to match current values
+                _originalLoginEmail = _loginEmail ?? "";
+                _originalLoginPassword = SecureStringToString(_loginPasswordSecure) ?? "";
+                _originalSchoolName = _schoolName ?? "";
+
+                // Reset the unsaved changes flag
+                HasUnsavedLoginChanges = false;
+
+                Debug.WriteLine("[Settings] Login credentials saved successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Settings] Error saving login credentials: {ex.Message}");
+            }
+        }
+
+        private void InitializeOriginalLoginValues()
+        {
+            _originalLoginEmail = _loginEmail ?? "";
+            _originalLoginPassword = SecureStringToString(_loginPasswordSecure) ?? "";
+            _originalSchoolName = _schoolName ?? "";
+            HasUnsavedLoginChanges = false;
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
