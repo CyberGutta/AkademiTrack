@@ -814,6 +814,7 @@ Terminal=false
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
+        public event EventHandler? SchoolHoursChanged;
 
         public ApplicationInfo ApplicationInfo { get; }
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
@@ -925,6 +926,14 @@ Terminal=false
             SundayEnabled = defaults.WeekSchedule[DayOfWeek.Sunday].IsEnabled;
             SundayStart = defaults.WeekSchedule[DayOfWeek.Sunday].StartTime;
             SundayEnd = defaults.WeekSchedule[DayOfWeek.Sunday].EndTime;
+
+            // Ensure cache is invalidated immediately after reset
+            SchoolTimeChecker.InvalidateSchoolHoursCache();
+            
+            // Notify that school hours have changed
+            SchoolHoursChanged?.Invoke(this, EventArgs.Empty);
+            
+            Debug.WriteLine("✓ School hours reset to defaults and cache invalidated");
         }
 
         private async Task LoadSchoolHoursAsync()
@@ -1015,7 +1024,13 @@ Terminal=false
                 var json = JsonSerializer.Serialize(_schoolHours, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(filePath, json);
 
-                Debug.WriteLine("School hours saved successfully");
+                // Invalidate the cache so SchoolTimeChecker picks up the new times immediately
+                SchoolTimeChecker.InvalidateSchoolHoursCache();
+
+                // Notify that school hours have changed
+                SchoolHoursChanged?.Invoke(this, EventArgs.Empty);
+
+                Debug.WriteLine("✓ School hours saved successfully and cache invalidated");
             }
             catch (Exception ex)
             {

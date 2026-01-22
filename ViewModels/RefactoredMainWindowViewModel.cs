@@ -621,6 +621,50 @@ namespace AkademiTrack.ViewModels
             {
                 OnPropertyChanged(nameof(ShowDetailedLogs));
             }
+            else if (e.PropertyName == nameof(_settingsService.AutoStartAutomation))
+            {
+                _loggingService.LogInfo($"AutoStartAutomation setting changed to: {e.NewValue}");
+                
+                // Restart auto-start checking when the setting changes
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await CheckAutoStartAutomationAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error restarting auto-start check: {ex.Message}");
+                    }
+                });
+            }
+            else if (e.PropertyName?.Contains("SchoolHours") == true || e.PropertyName?.Contains("Day") == true)
+            {
+                _loggingService.LogInfo($"School hours setting changed: {e.PropertyName}");
+                
+                // Invalidate cache and re-check auto-start when school hours change
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        SchoolTimeChecker.InvalidateSchoolHoursCache();
+                        
+                        // Clear manual stop flag when school hours change - this allows auto-start to work again
+                        await SchoolTimeChecker.ClearManualStopAsync();
+                        _loggingService.LogInfo("✓ Manual stop flag cleared due to school hours change");
+                        
+                        // Perform immediate auto-start check
+                        await PerformAutoStartCheckAsync();
+                        
+                        // Reschedule timer with new school hours
+                        await RescheduleAutoStartTimer();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error handling school hours change: {ex.Message}");
+                    }
+                });
+            }
         }
 
         private void OnAutomationStatusChanged(object? sender, AutomationStatusChangedEventArgs e)
@@ -900,7 +944,36 @@ namespace AkademiTrack.ViewModels
             SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
             SettingsViewModel.CloseRequested += OnSettingsCloseRequested;
 
+            // Subscribe to school hours changes
+            SettingsViewModel.SchoolHoursChanged -= OnSchoolHoursChanged;
+            SettingsViewModel.SchoolHoursChanged += OnSchoolHoursChanged;
+
             return Task.CompletedTask;
+        }
+
+        private void OnSchoolHoursChanged(object? sender, EventArgs e)
+        {
+            _loggingService.LogInfo("🕐 School hours changed - clearing manual stop flag and re-checking auto-start");
+            
+            // Clear manual stop flag when school hours change - this allows auto-start to work again
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SchoolTimeChecker.ClearManualStopAsync();
+                    _loggingService.LogInfo("✓ Manual stop flag cleared due to school hours change");
+                    
+                    // Perform immediate auto-start check
+                    await PerformAutoStartCheckAsync();
+                    
+                    // Reschedule timer with new school hours
+                    await RescheduleAutoStartTimer();
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Error re-checking auto-start after school hours change: {ex.Message}");
+                }
+            });
         }
 
         private Task OpenFeideAsync()
@@ -1185,28 +1258,55 @@ namespace AkademiTrack.ViewModels
                     }
                 }
                 
-                // START PERIODIC CHECKING (every 30 seconds) - must be on UI thread
+                // SMART PERIODIC CHECKING - checks frequently near start times, less frequently otherwise
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (_autoStartCheckTimer == null)
                     {
-                        _loggingService.LogInfo("Starting periodic auto-start checker (checks every 30 seconds)");
+                        _loggingService.LogInfo("⏰ Starting smart auto-start checker (frequent checks near start times)");
                         _autoStartCheckTimer = new Timer(
                             async _ => 
                             {
                                 try
                                 {
-                                    await CheckAutoStartAutomationAsync();
+                                    // Check for wake from sleep first
+                                    if (SchoolTimeChecker.DetectWakeFromSleep())
+                                    {
+                                        _loggingService.LogInfo("💤 Wake from sleep detected - checking auto-start conditions");
+                                    }
+                                    
+                                    // Perform the auto-start check
+                                    await PerformAutoStartCheckAsync();
+                                    
+                                    // Reschedule next check based on how close we are to start time
+                                    await RescheduleAutoStartTimer();
                                 }
                                 catch (Exception ex)
                                 {
                                     _loggingService.LogError($"Error in auto-start timer: {ex.Message}");
+                                    
+                                    // Fallback rescheduling on error
+                                    try
+                                    {
+                                        await Dispatcher.UIThread.InvokeAsync(() =>
+                                        {
+                                            _autoStartCheckTimer?.Change(TimeSpan.FromSeconds(30), Timeout.InfiniteTimeSpan);
+                                        });
+                                    }
+                                    catch (Exception rescheduleEx)
+                                    {
+                                        _loggingService.LogError($"Error rescheduling timer after failure: {rescheduleEx.Message}");
+                                    }
                                 }
                             },
                             null,
-                            TimeSpan.FromSeconds(30), // First check after 30 seconds
-                            TimeSpan.FromSeconds(30)  // Then every 30 seconds
+                            TimeSpan.FromSeconds(5), // First check after 5 seconds
+                            Timeout.InfiniteTimeSpan  // We'll reschedule manually for smart timing
                         );
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug("⏰ Smart auto-start checker already running");
                     }
                 });
             }
@@ -1217,6 +1317,130 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+
+        private async Task PerformAutoStartCheckAsync()
+        {
+            try
+            {
+                await _settingsService.LoadSettingsAsync();
+                var autoStartEnabled = _settingsService.AutoStartAutomation;
+                
+                if (!autoStartEnabled)
+                {
+                    _loggingService.LogDebug("Auto-start disabled in settings");
+                    return;
+                }
+
+                // Use the proper method that checks manual stops and completion
+                var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+                
+                if (shouldStart && !IsAutomationRunning)
+                {
+                    _loggingService.LogInfo($"🚀 Auto-starting automation: {reason}");
+                    
+                    // Mark as started
+                    await SchoolTimeChecker.MarkTodayAsStartedAsync();
+                    
+                    // Start automation on UI thread
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await StartAutomationAsync();
+                    });
+                }
+                else if (shouldStart && IsAutomationRunning)
+                {
+                    _loggingService.LogDebug("Automation already running");
+                }
+                else
+                {
+                    _loggingService.LogDebug($"Not auto-starting: {reason}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error in auto-start check: {ex.Message}");
+            }
+        }
+
+        private async Task RescheduleAutoStartTimer()
+        {
+            try
+            {
+                if (_autoStartCheckTimer == null) return;
+
+                // Get the next start time to determine optimal check frequency
+                var (_, _, nextStartTime, _) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+                
+                TimeSpan nextCheckInterval;
+                
+                if (nextStartTime.HasValue)
+                {
+                    var timeUntilStart = nextStartTime.Value - DateTime.Now;
+                    
+                    if (timeUntilStart.TotalMinutes <= 2)
+                    {
+                        // Very close to start time - check every 5 seconds for precision
+                        nextCheckInterval = TimeSpan.FromSeconds(5);
+                        _loggingService.LogDebug($"⏰ Next check in 5s (start time in {timeUntilStart.TotalMinutes:F1} min)");
+                    }
+                    else if (timeUntilStart.TotalMinutes <= 10)
+                    {
+                        // Close to start time - check every 15 seconds
+                        nextCheckInterval = TimeSpan.FromSeconds(15);
+                        _loggingService.LogDebug($"⏰ Next check in 15s (start time in {timeUntilStart.TotalMinutes:F0} min)");
+                    }
+                    else if (timeUntilStart.TotalHours <= 1)
+                    {
+                        // Within an hour - check every minute
+                        nextCheckInterval = TimeSpan.FromMinutes(1);
+                        _loggingService.LogDebug($"⏰ Next check in 1m (start time in {timeUntilStart.TotalHours:F1} hours)");
+                    }
+                    else
+                    {
+                        // Far from start time - check every 5 minutes
+                        nextCheckInterval = TimeSpan.FromMinutes(5);
+                        _loggingService.LogDebug($"⏰ Next check in 5m (start time in {timeUntilStart.TotalHours:F1} hours)");
+                    }
+                }
+                else
+                {
+                    // No next start time - check every 30 seconds for settings changes
+                    nextCheckInterval = TimeSpan.FromSeconds(30);
+                    _loggingService.LogDebug("⏰ Next check in 30s (no scheduled start time)");
+                }
+
+                // Reschedule the timer on UI thread to avoid threading issues
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        _autoStartCheckTimer?.Change(nextCheckInterval, Timeout.InfiniteTimeSpan);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Timer was disposed, ignore
+                        _loggingService.LogDebug("Timer was disposed during rescheduling");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error rescheduling auto-start timer: {ex.Message}");
+                
+                // Fallback to 30-second interval
+                try
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        _autoStartCheckTimer?.Change(TimeSpan.FromSeconds(30), Timeout.InfiniteTimeSpan);
+                    });
+                }
+                catch (Exception fallbackEx)
+                {
+                    _loggingService.LogError($"Error in fallback timer rescheduling: {fallbackEx.Message}");
+                }
+            }
+        }
 
         private new bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
