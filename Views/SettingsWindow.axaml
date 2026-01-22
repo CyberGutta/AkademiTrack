@@ -42,6 +42,185 @@
 			<Setter Property="BorderThickness" Value="2"/>
 		</Style>
 
+		<!-- ComboBox Styles (modern light mode, theme-adaptive for dark mode) -->
+		<Style Selector="ComboBox">
+			<Setter Property="Padding" Value="16,14"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Border#Background">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="8"/>
+		</Style>
+
+		<Style Selector="ComboBox:focus /template/ Border#Background">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="BoxShadow" Value="0 0 0 3 #007ACC15"/>
+		</Style>
+
+		<Style Selector="ComboBox:pointerover /template/ Border#Background">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ Border#Background">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=InputBackground}"/>
+			<Setter Property="BorderBrush" Value="#007ACC"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Popup > Border">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="BoxShadow" Value="0 10 25 0 #00000015, 0 4 6 0 #00000010"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ Popup ScrollViewer">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Padding" Value="16,12"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="MinHeight" Value="40"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected">
+			<Setter Property="Foreground" Value="#007ACC"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="Foreground" Value="#007ACC"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover">
+			<Setter Property="Foreground" Value="#007ACC"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+		</Style>
+
+		<Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="Foreground" Value="#007ACC"/>
+		</Style>
+
+		<!-- ComboBox text color fixes to prevent disappearing text -->
+		<Style Selector="ComboBox /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ComboBox /template/ TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<!-- Force text visibility in pressed state for light mode -->
+		<Style Selector="ComboBox:pressed /template/ ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<!-- Additional comprehensive pressed state fixes -->
+		<Style Selector="ComboBox:pressed /template/ Button#PART_FlyoutButton TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ Button#PART_FlyoutButton ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<!-- Additional fixes for all ComboBox states -->
+		<Style Selector="ComboBox:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ComboBox:pointerover /template/ TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:focus /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ComboBox:focus /template/ TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<!-- Ensure placeholder text is visible -->
+		<Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
+		</Style>
+
+		<!-- Theme-aware pressed state fix - force text visibility in both modes -->
+		<Style Selector="ComboBox:pressed">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ ContentPresenter#PART_ContentPresenter TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<!-- Override any default pressed state styling that might be hiding text -->
+		<Style Selector="ComboBox:pressed /template/ Border#Background TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
+		<Style Selector="ComboBox:pressed /template/ Grid TextBlock">
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+		</Style>
+
 		<!-- Password Toggle Button -->
 		<Style Selector="Button.passwordToggle">
 			<Setter Property="Background" Value="Transparent"/>
@@ -688,9 +867,12 @@
 								<TextBlock Text="Skolenavn" Classes="setting-title"/>
 								<TextBlock Text="Navnet på din skole som det vises i FEIDE-organisasjonsvalget"
 										   Classes="setting-description-compact"/>
-								<TextBox Text="{Binding SchoolName}"
-										 Classes="credential-input"
-										 Watermark="Akademiet Drammen AS"/>
+								<ComboBox ItemsSource="{Binding Schools}"
+										  SelectedItem="{Binding SchoolName}"
+										  PlaceholderText="Velg din skole eller institusjon"
+										  HorizontalAlignment="Stretch"
+										  MaxDropDownHeight="280"
+										  IsEditable="False"/>
 							</StackPanel>
 						</Border>
 
