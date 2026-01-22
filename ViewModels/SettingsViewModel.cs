@@ -37,7 +37,7 @@ namespace AkademiTrack.ViewModels
         public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true;
-        public bool AutoStartAutomation { get; set; } = false;
+        public bool AutoStartAutomation { get; set; } = true;
         public bool StartMinimized { get; set; } = false;
         public bool EnableNotifications { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
@@ -509,7 +509,7 @@ Terminal=false
         private bool _showActivityLog = false;
         private bool _showDetailedLogs = true;
         private bool _startWithSystem = true;
-        private bool _autoStartAutomation = false;
+        private bool _autoStartAutomation = true;
 
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
