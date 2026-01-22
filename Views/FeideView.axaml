@@ -224,7 +224,7 @@
 	</UserControl.Styles>
 
 	<!-- Full-width split layout -->
-	<Grid ColumnDefinitions="1*,1*">
+	<Grid ColumnDefinitions="1*,1*" KeyDown="OnKeyDown">
 		
 		<!-- Left Side - Login Form -->
 		<Border Grid.Column="0" Background="White" Padding="0">

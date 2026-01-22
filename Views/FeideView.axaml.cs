@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.Input;
 using System;
 using AkademiTrack.ViewModels;
 
@@ -108,6 +109,23 @@ namespace AkademiTrack.Views
         {
             base.OnDetachedFromVisualTree(e);
             StopLoadingAnimation();
+        }
+
+        private void OnKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && DataContext is FeideWindowViewModel viewModel)
+            {
+                // Only trigger if all fields are filled and not currently loading
+                if (viewModel.CanSave)
+                {
+                    // Execute the save command (same as clicking the test button)
+                    if (viewModel.SaveCommand.CanExecute(null))
+                    {
+                        viewModel.SaveCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                }
+            }
         }
     }
 }
