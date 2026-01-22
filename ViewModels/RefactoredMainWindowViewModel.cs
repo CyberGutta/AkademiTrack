@@ -225,6 +225,7 @@ namespace AkademiTrack.ViewModels
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
         public ICommand RetryAuthenticationCommand { get; }
+        public ICommand ToggleClassViewCommand { get; }
         #endregion
 
         #region Constructor
@@ -260,6 +261,7 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
             RetryAuthenticationCommand = new AsyncRelayCommand(RetryAuthenticationAsync, () => !IsAuthenticated && !IsLoading);
+            ToggleClassViewCommand = new RelayCommand(() => Dashboard.ShowCurrentClass = !Dashboard.ShowCurrentClass);
 
             // Subscribe to service events
             SubscribeToServiceEvents();

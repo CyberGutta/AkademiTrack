@@ -175,6 +175,48 @@
 			<Setter Property="Foreground" Value="#888888"/>
 		</Style>
 
+		<!-- Class Toggle Button -->
+		<Style Selector="Button.class-toggle-button">
+			<Setter Property="Background" Value="#5B9BFF"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="CornerRadius" Value="14"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Name="PART_Border"
+							Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<Border.Transitions>
+							<Transitions>
+								<BrushTransition Property="Background" Duration="0:0:0.2"/>
+							</Transitions>
+						</Border.Transitions>
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+										  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.class-toggle-button:pointerover">
+			<Setter Property="Background" Value="#4080E8"/>
+		</Style>
+
+		<Style Selector="Button.class-toggle-button:pressed">
+			<Setter Property="Background" Value="#3366CC"/>
+		</Style>
+
 		<!-- Title Styles -->
 		<Style Selector="TextBlock.main-title">
 			<Setter Property="FontSize" Value="32"/>
@@ -406,8 +448,24 @@
 						<Border Grid.Column="2" Classes="dashboard-card">
 							<StackPanel VerticalAlignment="Center">
 								<Grid>
-									<TextBlock Text="NESTE TIME" Classes="card-label"/>
-									<TextBlock Text="⏰" FontSize="20" HorizontalAlignment="Right"/>
+									<TextBlock Classes="card-label"
+											   Text="{Binding Dashboard.ShowCurrentClass, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='NESTE TIME|NÅVÆRENDE TIME'}"/>
+									<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+										<TextBlock Text="⏰" FontSize="20" VerticalAlignment="Center"/>
+										<Button Classes="class-toggle-button"
+												Command="{Binding ToggleClassViewCommand}"
+												Width="60"
+												Height="28"
+												ToolTip.Tip="Bytt mellom nåværende og neste time"
+												Cursor="Hand">
+											<TextBlock Text="{Binding Dashboard.ClassToggleLabel}"
+													   FontSize="12"
+													   FontWeight="SemiBold"
+													   HorizontalAlignment="Center"
+													   VerticalAlignment="Center"
+													   Foreground="White"/>
+										</Button>
+									</StackPanel>
 								</Grid>
 								<TextBlock Text="{Binding Dashboard.NextClassName}"
 										FontSize="{Binding Dashboard.NextClassName, Converter={StaticResource TextLengthToFontSizeConverter}}"

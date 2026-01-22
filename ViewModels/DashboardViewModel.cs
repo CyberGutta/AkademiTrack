@@ -29,6 +29,7 @@ namespace AkademiTrack.ViewModels
         private string _nextClassTime = "--:-- - --:--";
         private string _nextClassRoom = "";
         private System.Timers.Timer? _nextClassUpdateTimer;
+        private bool _showCurrentClass = false; // Toggle between next and current class
         private DateTime _lastSystemTime = DateTime.Now; // For sleep detection
 
 
@@ -174,6 +175,21 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged(nameof(NextClassRoom));
             }
         }
+
+        // Toggle between next and current class
+        public bool ShowCurrentClass
+        {
+            get => _showCurrentClass;
+            set
+            {
+                _showCurrentClass = value;
+                OnPropertyChanged(nameof(ShowCurrentClass));
+                OnPropertyChanged(nameof(ClassToggleLabel));
+                RefreshClassDisplay();
+            }
+        }
+
+        public string ClassToggleLabel => _showCurrentClass ? "Neste" : "Nå";
 
         // Over/Undertid (Overtime)
         public string OvertimeValue
@@ -645,11 +661,25 @@ namespace AkademiTrack.ViewModels
 
         private void UpdateNextClassDisplay(TodayScheduleData data)
         {
+            _cachedTodaySchedule = data; // Store data for toggle functionality
+            RefreshClassDisplay();
+        }
+
+        private void RefreshClassDisplay()
+        {
+            if (_cachedTodaySchedule == null) return;
+
             Services.ScheduleItem? displayClass = null;
 
-            if (data.NextClass != null)
+            if (_showCurrentClass)
             {
-                displayClass = data.NextClass;
+                // Show current class
+                displayClass = _cachedTodaySchedule.CurrentClass;
+            }
+            else
+            {
+                // Show next class
+                displayClass = _cachedTodaySchedule.NextClass;
             }
 
             if (displayClass != null)
@@ -683,7 +713,14 @@ namespace AkademiTrack.ViewModels
             }
             else
             {
-                NextClassName = "Ingen flere timer";
+                if (_showCurrentClass)
+                {
+                    NextClassName = "Ingen pågående time";
+                }
+                else
+                {
+                    NextClassName = "Ingen flere timer";
+                }
                 NextClassTime = "--:-- - --:--";
                 NextClassRoom = "";
             }
