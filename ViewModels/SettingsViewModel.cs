@@ -517,6 +517,8 @@ Terminal=false
         private SecureString? _loginPasswordSecure;
         private string _schoolName = "";
 
+        public ObservableCollection<string> Schools { get; }
+
         private string _updateStatus = "Klikk for å sjekke etter oppdateringer";
         private bool _isCheckingForUpdates = false;
         private bool _updateAvailable = false;
@@ -1123,6 +1125,31 @@ Terminal=false
         public SettingsViewModel()
         {
             ApplicationInfo = new ApplicationInfo();
+            
+            Schools = new ObservableCollection<string>
+            {
+                 "Akademiet Drammen AS",
+                /* "Akademiet Fagskole AS",
+                "Akademiet Kristiansand AS",
+                "Akademiet Næringsakademi AS",
+                "Akademiet Oslo AS",
+                "Akademiet Stavanger AS",
+                "Akademiet Trondheim AS",
+                "Akademiet Ålesund AS",
+                "Akademiet Bergen AS",
+                "Akademiet Bodø AS",
+                "Akademiet Tromsø AS",
+                "Akademiet Haugesund AS",
+                "Akademiet Fredrikstad AS",
+                "Akademiet Tønsberg AS",
+                "Akademiet Lillehammer AS",
+                "Akademiet Hamar AS",
+                "Akademiet Moss AS",
+                "Akademiet Sarpsborg AS",
+                "Akademiet Sandefjord AS",
+                "Akademiet Skien AS" */
+            };
+            
             CloseCommand = new RelayCommand(CloseWindow);
             BackToDashboardCommand = new RelayCommand(BackToDashboard);  
             ToggleThemeCommand = new RelayCommand(ToggleTheme);
