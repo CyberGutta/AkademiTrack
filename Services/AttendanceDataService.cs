@@ -393,9 +393,9 @@ namespace AkademiTrack.Services
                 }
             }
 
-            // Find next class (not STU, after current time)
+            // Find next class (including STU, after current time)
             var nextDailyItem = validDailyItems
-                .Where(item => !item.Fag?.Contains("STU") == true && IsUpcomingClassSimple(item, now))
+                .Where(item => IsUpcomingClassSimple(item, now))
                 .OrderBy(item => item.StartKl)
                 .FirstOrDefault();
 
@@ -895,11 +895,9 @@ namespace AkademiTrack.Services
 
             MonthlyScheduleItem? currentClass = currentClasses.FirstOrDefault()?.Item;
 
-            // Find next class from ALL items (today and tomorrow), excluding STU sessions
+            // Find next class from ALL items (today and tomorrow), including STU sessions
             var upcomingClasses = items
-                .Where(i => !string.IsNullOrEmpty(i.Fradato) && 
-                           i.Fagnavn != null && 
-                           !i.Fagnavn.Contains("Studietid")) // Exclude STU sessions from next class display
+                .Where(i => !string.IsNullOrEmpty(i.Fradato))
                 .Select(i => new
                 {
                     Item = i,
