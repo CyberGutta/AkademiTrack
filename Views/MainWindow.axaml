@@ -390,14 +390,6 @@
 								HorizontalAlignment="Stretch"
 								Height="42"/>
 
-						<!-- Retry Authentication Button (only visible when not authenticated) -->
-						<Button Content="🔄 Prøv autentisering igjen"
-								Classes="start-button"
-								Command="{Binding RetryAuthenticationCommand}"
-								IsVisible="{Binding !IsAuthenticated}"
-								HorizontalAlignment="Stretch"
-								Height="42"/>
-
 						<!-- Status Box -->
 						<Border Background="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"
 								CornerRadius="8"

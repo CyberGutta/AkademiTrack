@@ -82,7 +82,7 @@ namespace AkademiTrack.ViewModels
                 if (SetProperty(ref _isLoading, value))
                 {
                     // Update command states when loading changes
-                    ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 }
             }
         }
@@ -97,7 +97,6 @@ namespace AkademiTrack.ViewModels
                     // Update command states when authentication changes
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
                 }
             }
         }
@@ -224,7 +223,6 @@ namespace AkademiTrack.ViewModels
         public ICommand ToggleDetailedLogsCommand { get; }
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
-        public ICommand RetryAuthenticationCommand { get; }
         public ICommand ToggleClassViewCommand { get; }
         #endregion
 
@@ -260,8 +258,7 @@ namespace AkademiTrack.ViewModels
             ToggleDetailedLogsCommand = new AsyncRelayCommand(ToggleDetailedLogsAsync);
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
-            RetryAuthenticationCommand = new AsyncRelayCommand(RetryAuthenticationAsync, () => !IsAuthenticated && !IsLoading);
-            ToggleClassViewCommand = new RelayCommand(() => Dashboard.ShowCurrentClass = !Dashboard.ShowCurrentClass);
+            ToggleClassViewCommand = new AsyncRelayCommand(ToggleClassViewAsync);
 
             // Subscribe to service events
             SubscribeToServiceEvents();
@@ -1101,26 +1098,11 @@ namespace AkademiTrack.ViewModels
             return Task.CompletedTask;
         }
 
-        private async Task RetryAuthenticationAsync()
+        private Task ToggleClassViewAsync()
         {
-            _loggingService.LogInfo("Manuell retry av autentisering startet...");
-            
-            // Reset retry count for manual retry
-            _initializationRetryCount = 0;
-            
-            // Reset authentication state
-            IsAuthenticated = false;
-            _userParameters = null;
-            
-            // Update command states
-            ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-            ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-            ((AsyncRelayCommand)RetryAuthenticationCommand).RaiseCanExecuteChanged();
-            
-            // Start initialization again
-            await InitializeAsync();
+            Dashboard.ToggleClassView();
+            return Task.CompletedTask;
         }
-
 
         private async Task CheckMidnightResetAsync()
         {

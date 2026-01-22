@@ -191,6 +191,11 @@ namespace AkademiTrack.ViewModels
 
         public string ClassToggleLabel => _showCurrentClass ? "Neste" : "Nå";
 
+        public void ToggleClassView()
+        {
+            ShowCurrentClass = !ShowCurrentClass;
+        }
+
         // Over/Undertid (Overtime)
         public string OvertimeValue
         {
