@@ -884,7 +884,9 @@ namespace AkademiTrack.ViewModels
         {
             double saldo = summary.Saldo;
 
-            OvertimeValue = saldo >= 0 ? $"+{saldo:F1}" : $"{saldo:F1}";
+            // Use exact formatting without rounding - show up to 2 decimals but remove trailing zeros
+            string formattedSaldo = saldo.ToString("0.##");
+            OvertimeValue = saldo >= 0 ? $"+{formattedSaldo}" : formattedSaldo;
 
             if (saldo > 0)
             {
