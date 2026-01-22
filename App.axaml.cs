@@ -396,7 +396,7 @@ namespace AkademiTrack
 
         private void ShowAbout(object? sender, EventArgs e)
         {
-            var aboutText = @"AkademiTrack v1.1.0
+            var aboutText = $@"AkademiTrack v1.1.0
 
 Automatisk oppmøteregistrering for STU-økter på Akademiet
 
@@ -405,7 +405,7 @@ Utviklet av:
 - Mathias Hansen (@CyberHansen)
 
 Lisens: MIT
-© 2026 CyberGutta
+© {DateTime.Now.Year} CyberGutta
 
 github.com/CyberGutta/AkademiTrack";
 
