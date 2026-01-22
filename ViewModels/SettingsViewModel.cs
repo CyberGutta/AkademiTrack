@@ -1,4 +1,5 @@
 ﻿using AkademiTrack.Services;
+using AkademiTrack.Services.Configuration;
 using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Converters;
@@ -1493,7 +1494,7 @@ Terminal=false
                 try
                 {
                     Debug.WriteLine("Tracking user deletion in analytics...");
-                    var analyticsService = Services.ServiceLocator.Instance.GetService<AnalyticsService>();
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
                     
                     // Make sure we have a valid session before tracking
                     var currentUserId = analyticsService.GetPersistentUserId();
@@ -1760,9 +1761,10 @@ Terminal=false
                 // 1. Track uninstall in analytics (before deleting data)
                 try
                 {
-                    Debug.WriteLine("Tracking app uninstall in analytics...");
-                    var analyticsService = Services.ServiceLocator.Instance.GetService<AnalyticsService>();
+                    Debug.WriteLine("Tracking user deletion in analytics...");
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
                     
+                    // Make sure we have a valid session before tracking
                     var currentUserId = analyticsService.GetPersistentUserId();
                     var currentSessionId = analyticsService.GetSessionId();
                     
@@ -1771,16 +1773,21 @@ Terminal=false
                     
                     if (!string.IsNullOrEmpty(currentSessionId))
                     {
-                        await analyticsService.TrackAppUninstalledAsync();
-                        Debug.WriteLine("✓ App uninstall tracked in analytics");
+                        await analyticsService.TrackUserDeletedDataAsync();
+                        Debug.WriteLine("✓ User deletion tracked in analytics");
                         
                         // Give it time to send the request
                         await Task.Delay(2000);
                     }
+                    else
+                    {
+                        Debug.WriteLine("⚠️ No active session - cannot track deletion");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"⚠️ Could not track uninstall in analytics: {ex.Message}");
+                    Debug.WriteLine($"⚠️ Could not track deletion in analytics: {ex.Message}");
+                    Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
 
                 // 2. Remove from auto-start
@@ -2086,6 +2093,31 @@ Terminal=false
             }
         }
 
+        private static string GetAppVersion()
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                var version = assembly.GetName().Version;
+                return version?.ToString() ?? "Unknown";
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private static string GetPlatform()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return "Windows";
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return "macOS";
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                return "Linux";
+            else
+                return "Unknown";
+        }
 
         private async Task<bool> ShowConfirmationDialog(string title, string message, bool isDangerous = false)
         {

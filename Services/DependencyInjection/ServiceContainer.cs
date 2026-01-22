@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -255,6 +257,9 @@ namespace AkademiTrack.Services.DependencyInjection
 
             try
             {
+                // Create uninstall detector before shutting down
+                await CreateUninstallDetectorAsync();
+
                 if (_host != null)
                 {
                     await _host.StopAsync();
@@ -268,6 +273,106 @@ namespace AkademiTrack.Services.DependencyInjection
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ServiceContainer] Shutdown error: {ex.Message}");
+            }
+        }
+
+        private static async Task CreateUninstallDetectorAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[ServiceContainer] Creating uninstall detector");
+
+                // Get analytics service to get user ID and config
+                var analyticsService = GetOptionalService<AnalyticsService>();
+                if (analyticsService == null) return;
+
+                var userId = analyticsService.GetPersistentUserId();
+                var config = Services.Configuration.AppConfiguration.Instance;
+                var supabaseUrl = config.SupabaseUrl;
+                var apiKey = config.SupabaseAnonKey;
+
+                if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(apiKey) || apiKey == "disabled")
+                {
+                    Debug.WriteLine("[ServiceContainer] Missing data for uninstall detection");
+                    return;
+                }
+
+                // Get current app executable path
+                var currentProcess = Process.GetCurrentProcess();
+                var appPath = currentProcess.MainModule?.FileName ?? "";
+
+                Debug.WriteLine($"[ServiceContainer] Creating detector for user: {userId}");
+                Debug.WriteLine($"[ServiceContainer] Monitoring app: {appPath}");
+
+                // Create JSON payload
+                var jsonPayload = $"{{\"user_id\":\"{userId}\",\"event_name\":\"user_deleted_app\",\"properties\":\"{{\\\"deletion_time\\\":\\\"{DateTime.UtcNow:o}\\\",\\\"platform\\\":\\\"Windows\\\"}}\",\"session_id\":\"uninstall_detector\"}}";
+
+                // Create platform-specific detector script
+                var tempDir = Path.GetTempPath();
+                string scriptPath;
+                string scriptContent;
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    scriptPath = Path.Combine(tempDir, $"uninstall_detector_{userId}.bat");
+                    scriptContent = $@"@echo off
+timeout /t 15 /nobreak >nul 2>nul
+if not exist ""{appPath}"" (
+    echo Sending uninstall notification for user {userId}
+    curl -s -X POST ""{supabaseUrl}/rest/v1/events"" -H ""apikey: {apiKey}"" -H ""Authorization: Bearer {apiKey}"" -H ""Content-Type: application/json"" -d ""{jsonPayload}""
+)
+del ""%~f0"" >nul 2>nul";
+                }
+                else
+                {
+                    var unixJsonPayload = $"{{\\\"user_id\\\":\\\"{userId}\\\",\\\"event_name\\\":\\\"user_deleted_app\\\",\\\"properties\\\":\\\"{{\\\\\\\"deletion_time\\\\\\\":\\\\\\\"{DateTime.UtcNow:o}\\\\\\\",\\\\\\\"platform\\\\\\\":\\\\\\\"Unix\\\\\\\"}}\\\",\\\"session_id\\\":\\\"uninstall_detector\\\"}}";
+                    scriptPath = Path.Combine(tempDir, $"uninstall_detector_{userId}.sh");
+                    scriptContent = $@"#!/bin/bash
+sleep 15
+if [ ! -e ""{appPath}"" ]; then
+    echo ""Sending uninstall notification for user {userId}""
+    curl -s -X POST ""{supabaseUrl}/rest/v1/events"" \
+         -H ""apikey: {apiKey}"" \
+         -H ""Authorization: Bearer {apiKey}"" \
+         -H ""Content-Type: application/json"" \
+         -d '{unixJsonPayload}'
+fi
+rm ""$0"" 2>/dev/null";
+                }
+
+                await File.WriteAllTextAsync(scriptPath, scriptContent);
+
+                // Make executable on Unix
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
+                }
+
+                // Launch the detector script in background
+                var startInfo = new ProcessStartInfo
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    startInfo.FileName = "cmd.exe";
+                    startInfo.Arguments = $"/c start /b \"{scriptPath}\"";
+                }
+                else
+                {
+                    startInfo.FileName = "/bin/bash";
+                    startInfo.Arguments = $"\"{scriptPath}\" &";
+                }
+
+                Process.Start(startInfo);
+                Debug.WriteLine("[ServiceContainer] Uninstall detector created and launched");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ServiceContainer] Error creating uninstall detector: {ex.Message}");
             }
         }
 
