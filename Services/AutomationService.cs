@@ -412,7 +412,7 @@ namespace AkademiTrack.Services
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
 
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
-                        $"Syklus #{cycleCount} - Sjekker registreringsvinduer", cycleCount));
+                        "Sjekker registreringsvinduer", cycleCount));
 
                     bool allSessionsComplete = true;
                     int openWindows = 0;

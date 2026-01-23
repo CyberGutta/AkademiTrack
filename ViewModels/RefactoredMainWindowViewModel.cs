@@ -1172,7 +1172,7 @@ namespace AkademiTrack.ViewModels
                 "Registreringsvindu er åpent",
                 "Forsøker å registrere oppmøte",
                 "Alle STU-økter er håndtert",
-                "Syklus #"
+                "Sjekker registreringsvinduer"
             };
 
             return importantMessages.Any(important => message.StartsWith(important));
