@@ -1,0 +1,135 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:AkademiTrack.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="450"
+        x:Class="AkademiTrack.Views.DependencyDownloadWindow"
+        x:DataType="vm:DependencyDownloadViewModel"
+        Title="AkademiTrack - Forbereder applikasjon"
+        Width="500" Height="450"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        Icon="/Assets/AT-1024.ico">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#2196F3"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+        </Style>
+        
+        <Style Selector="TextBlock.subtitle">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+        
+        <Style Selector="TextBlock.description">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="20,0"/>
+            <Setter Property="Foreground" Value="#666666"/>
+        </Style>
+        
+        <Style Selector="ProgressBar">
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Margin" Value="40,20"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+        
+        <Style Selector="TextBlock.progress">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="FontFamily" Value="Consolas, Monaco, monospace"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid Background="#FAFAFA">
+        <StackPanel VerticalAlignment="Center" Margin="40">
+            
+            <!-- App Icon/Logo Area -->
+            <Border Width="80" Height="80" 
+                    CornerRadius="16" 
+                    Background="#2196F3"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,30">
+                <TextBlock Text="AT" 
+                          FontSize="32" 
+                          FontWeight="Bold" 
+                          Foreground="White"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
+            </Border>
+            
+            <!-- Title -->
+            <TextBlock Classes="title" Text="AkademiTrack"/>
+            
+            <!-- Subtitle -->
+            <TextBlock Classes="subtitle" Text="Forbereder applikasjon..."/>
+            
+            <!-- Description -->
+            <TextBlock Classes="description" 
+                       Text="Laster ned nødvendige komponenter for automatisering. Dette skjer kun ved første oppstart."/>
+            
+            <!-- Progress Bar -->
+            <ProgressBar Value="{Binding ProgressPercentage}" 
+                        Maximum="100"
+                        IsIndeterminate="{Binding IsIndeterminate}"/>
+            
+            <!-- Status Text -->
+            <TextBlock Classes="status" 
+                       Text="{Binding StatusMessage}"/>
+            
+            <!-- Progress Details -->
+            <TextBlock Classes="progress" 
+                       Text="{Binding ProgressDetails}"
+                       IsVisible="{Binding ShowProgressDetails}"/>
+            
+            <!-- Error Panel -->
+            <Border Background="#FFEBEE" 
+                    BorderBrush="#F44336" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15" 
+                    Margin="0,20,0,0"
+                    IsVisible="{Binding HasError}">
+                <StackPanel>
+                    <TextBlock Text="⚠️ Feil under nedlasting" 
+                              FontWeight="SemiBold" 
+                              Foreground="#D32F2F" 
+                              HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding ErrorMessage}" 
+                              FontSize="12" 
+                              TextWrapping="Wrap" 
+                              Margin="0,5,0,0"
+                              HorizontalAlignment="Center"/>
+                    <Button Content="Prøv igjen" 
+                           Command="{Binding RetryCommand}"
+                           HorizontalAlignment="Center"
+                           Margin="0,10,0,0"
+                           Padding="20,8"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Success Panel - REMOVED since text is not visible and not needed -->
+            
+        </StackPanel>
+    </Grid>
+</Window>

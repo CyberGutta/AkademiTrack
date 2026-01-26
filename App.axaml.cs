@@ -85,28 +85,6 @@ namespace AkademiTrack
                     // Continue without global exception handler - not critical
                 }
                 
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Pre-initialize browser if needed
-                        var browserFetcher = new PuppeteerSharp.BrowserFetcher();
-                        await browserFetcher.DownloadAsync();
-                        Debug.WriteLine("[App] Puppeteer pre-initialization completed");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[App] Puppeteer pre-initialization failed: {ex.Message}");
-                        // Not critical - continue without pre-initialization
-                    }
-                }).ContinueWith(t =>
-                {
-                    if (t.IsFaulted && t.Exception != null)
-                    {
-                        Debug.WriteLine($"[App] Puppeteer task failed: {t.Exception.GetBaseException().Message}");
-                    }
-                }, TaskContinuationOptions.OnlyOnFaulted);
-                
                 Debug.WriteLine("[App] Initialize() completed successfully");
             }
             catch (Exception ex)
@@ -134,10 +112,106 @@ namespace AkademiTrack
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose;
-                ContinueNormalFlow(desktop);
+                
+                // Check if we need to download dependencies first
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await CheckAndDownloadDependenciesAsync(desktop);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[App] Dependency check failed: {ex.Message}");
+                        // Continue with normal flow even if dependency check fails
+                        await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
+                    }
+                });
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private async Task CheckAndDownloadDependenciesAsync(IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            try
+            {
+                Debug.WriteLine("[App] Checking if Chromium dependencies need to be downloaded...");
+                
+                // Check for test mode argument
+                var args = Environment.GetCommandLineArgs();
+                bool forceShowDependencyWindow = args.Contains("--test-dependency-window");
+                
+                if (!forceShowDependencyWindow)
+                {
+                    // Quick check if Chromium is already available
+                    var browserFetcher = new PuppeteerSharp.BrowserFetcher();
+                    var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                    
+                    if (installedBrowsers.Any())
+                    {
+                        Debug.WriteLine("[App] Chromium already installed, continuing with normal flow");
+                        await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
+                        return;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine("[App] Force showing dependency window for testing");
+                }
+                
+                Debug.WriteLine("[App] Chromium not found, showing dependency download window");
+                
+                // Show dependency download window on UI thread
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    var dependencyViewModel = new ViewModels.DependencyDownloadViewModel();
+                    var dependencyWindow = new Views.DependencyDownloadWindow(dependencyViewModel);
+                    
+                    // Set as main window temporarily
+                    desktop.MainWindow = dependencyWindow;
+                    
+                    // Handle completion
+                    dependencyViewModel.DownloadCompleted += (sender, e) =>
+                    {
+                        Debug.WriteLine("[App] Dependency download completed, transitioning to main app");
+                        // Don't close the window, just hide it and continue with normal flow
+                        dependencyWindow.Hide();
+                        ContinueNormalFlow(desktop);
+                    };
+                    
+                    // Handle failure
+                    dependencyViewModel.DownloadFailed += (sender, errorMessage) =>
+                    {
+                        Debug.WriteLine($"[App] Dependency download failed: {errorMessage}");
+                        // Continue anyway - the app might still work or show a better error later
+                        dependencyWindow.Hide();
+                        ContinueNormalFlow(desktop);
+                    };
+                    
+                    // Handle window closing without completion (user cancelled)
+                    dependencyWindow.Closed += (sender, e) =>
+                    {
+                        if (!dependencyViewModel.IsCompleted)
+                        {
+                            Debug.WriteLine("[App] Dependency window closed before completion - user cancelled");
+                            // Exit the app since Chromium is required
+                            desktop.Shutdown();
+                            return;
+                        }
+                    };
+                    
+                    // Show window and start download
+                    dependencyWindow.Show();
+                    await dependencyViewModel.StartDownloadAsync();
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] Error in dependency check: {ex.Message}");
+                // Continue with normal flow if dependency check fails
+                await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
+            }
         }
 
         private async void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
