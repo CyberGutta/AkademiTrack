@@ -121,11 +121,11 @@ namespace AkademiTrack.ViewModels
                         return;
                     }
 
-                    StatusMessage = "Laster ned Chromium browser...";
+                    StatusMessage = "Forbereder Chromium-nedlasting...";
                     ShowProgressDetails = true;
-                    ProgressDetails = "Starter nedlasting (~151 MB)...";
+                    ProgressDetails = "Henter nedlastingsinformasjon...";
 
-                    // Start monitoring download progress in a more realistic way
+                    // Use our custom download method with real progress tracking
                     await DownloadWithRealProgressAsync(browserFetcher, _cancellationTokenSource.Token);
                 }
                 else
@@ -171,226 +171,160 @@ namespace AkademiTrack.ViewModels
 
         private async Task DownloadWithRealProgressAsync(BrowserFetcher browserFetcher, CancellationToken cancellationToken)
         {
-            // Start the actual download
+            IsIndeterminate = false;
+            var startTime = DateTime.Now;
+            
+            StatusMessage = "Forbereder Chromium-nedlasting...";
+            ProgressDetails = "Starter nedlasting...";
+            
+            // Get the cache directory where Chromium will be downloaded
+            var cacheDir = browserFetcher.CacheDir;
+            var initialDirSize = GetDirectorySize(cacheDir);
+            
+            // Start the download task
             var downloadTask = browserFetcher.DownloadAsync();
             
-            var startTime = DateTime.Now;
-            IsIndeterminate = false;
-            
-            // Try to find the download directory where Chromium will be downloaded
-            string? downloadDir = null;
-            long totalExpectedSize = 151 * 1024 * 1024; // Default to 151 MB, will update if we can detect actual size
-            
-            try
-            {
-                // Check common PuppeteerSharp download locations
-                var possiblePaths = new[]
-                {
-                    Path.Combine(Directory.GetCurrentDirectory(), "bin", "Debug", "net9.0", "chromium"),
-                    Path.Combine(Directory.GetCurrentDirectory(), "bin", "Release", "net9.0", "chromium"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "chromium"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local-chromium"),
-                    Path.Combine(Path.GetTempPath(), "chromium-download")
-                };
-                
-                // Monitor for directory creation
-                foreach (var path in possiblePaths)
-                {
-                    var parentDir = Path.GetDirectoryName(path);
-                    if (Directory.Exists(parentDir))
-                    {
-                        downloadDir = path;
-                        break;
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore errors in finding download directory
-            }
-            
-            // Progress monitoring loop with real size tracking
-            long lastSize = 0;
-            var stagnantCount = 0;
+            // Monitor progress by checking directory size
+            var lastSize = initialDirSize;
+            var lastUpdateTime = DateTime.Now;
+            var estimatedTotalSize = 150L * 1024 * 1024; // Start with 150MB estimate
             var hasStartedDownloading = false;
+            
+            StatusMessage = "Laster ned Chromium browser...";
             
             while (!downloadTask.IsCompleted && !cancellationToken.IsCancellationRequested)
             {
-                var elapsed = DateTime.Now - startTime;
-                var elapsedSeconds = elapsed.TotalSeconds;
+                var now = DateTime.Now;
+                var currentSize = GetDirectorySize(cacheDir);
+                var downloadedBytes = currentSize - initialDirSize;
                 
-                long currentSize = 0;
-                double currentProgress = 0;
-                
-                // Try to get real progress by checking directory/file size
-                try
+                // Check if download has actually started
+                if (downloadedBytes > 1024 * 1024) // More than 1MB downloaded
                 {
-                    if (downloadDir != null)
-                    {
-                        if (Directory.Exists(downloadDir))
-                        {
-                            var dirInfo = new DirectoryInfo(downloadDir);
-                            currentSize = dirInfo.GetFiles("*", SearchOption.AllDirectories)
-                                .Sum(file => file.Length);
-                            hasStartedDownloading = true;
-                        }
-                        else
-                        {
-                            // Check if parent directory has any chromium-related files
-                            var parentDir = Path.GetDirectoryName(downloadDir);
-                            if (Directory.Exists(parentDir))
-                            {
-                                var chromiumFiles = Directory.GetFiles(parentDir, "*chromium*", SearchOption.AllDirectories);
-                                if (chromiumFiles.Length > 0)
-                                {
-                                    currentSize = chromiumFiles.Sum(file => new FileInfo(file).Length);
-                                    hasStartedDownloading = true;
-                                }
-                            }
-                        }
-                    }
+                    hasStartedDownloading = true;
                     
-                    // If we have real size data, use it
-                    if (currentSize > 0)
+                    // Adjust estimate if we're downloading more than expected
+                    if (downloadedBytes > estimatedTotalSize * 0.8)
                     {
-                        // Update expected size if we detect it's larger than our estimate
-                        if (currentSize > totalExpectedSize * 0.9) // If we're near our estimate but still downloading
-                        {
-                            totalExpectedSize = (long)(currentSize * 1.1); // Increase estimate by 10%
-                        }
-                        
-                        currentProgress = Math.Min((double)currentSize / totalExpectedSize * 100, 95);
-                        
-                        if (currentSize > lastSize)
-                        {
-                            lastSize = currentSize;
-                            stagnantCount = 0;
-                        }
-                        else
-                        {
-                            stagnantCount++;
-                        }
+                        estimatedTotalSize = (long)(downloadedBytes * 1.25); // Increase estimate
                     }
-                    else if (!hasStartedDownloading && elapsedSeconds < 30)
+                }
+                
+                // Update progress every 500ms
+                if ((now - lastUpdateTime).TotalMilliseconds >= 500)
+                {
+                    var currentMB = downloadedBytes / (1024.0 * 1024.0);
+                    var estimatedTotalMB = estimatedTotalSize / (1024.0 * 1024.0);
+                    
+                    double progressPercent = 0;
+                    if (hasStartedDownloading && estimatedTotalSize > 0)
                     {
-                        // Initial phase - preparing download
-                        currentProgress = Math.Min(elapsedSeconds / 30.0 * 5, 5); // 0-5% in first 30 seconds
-                        StatusMessage = "Forbereder nedlasting...";
+                        progressPercent = Math.Min((double)downloadedBytes / estimatedTotalSize * 100, 95);
                     }
                     else
                     {
-                        // Fallback to time-based estimation if we can't track real size
-                        if (elapsedSeconds < 60)
-                            currentProgress = 5 + ((elapsedSeconds - 30) / 30.0 * 15); // 5-20% in next 30 seconds
-                        else if (elapsedSeconds < 180)
-                            currentProgress = 20 + ((elapsedSeconds - 60) / 120.0 * 50); // 20-70% in next 2 minutes
-                        else
-                            currentProgress = 70 + ((elapsedSeconds - 180) / 60.0 * 20); // 70-90% in final minute
-                        
-                        currentProgress = Math.Min(currentProgress, 90);
+                        // Use time-based estimation for initial phase
+                        var elapsedSeconds = (now - startTime).TotalSeconds;
+                        progressPercent = Math.Min(elapsedSeconds / 30.0 * 10, 10); // 0-10% in first 30 seconds
                     }
-                }
-                catch
-                {
-                    // Fallback to time-based if monitoring fails
-                    currentProgress = Math.Min(elapsedSeconds / 180.0 * 85, 85);
+                    
+                    ProgressPercentage = progressPercent;
+                    
+                    // Calculate download speed
+                    var timeDiff = (now - lastUpdateTime).TotalSeconds;
+                    var sizeDiff = currentSize - lastSize;
+                    var speedMBps = timeDiff > 0 ? (sizeDiff / (1024.0 * 1024.0)) / timeDiff : 0;
+                    
+                    if (hasStartedDownloading)
+                    {
+                        ProgressDetails = $"{currentMB:F1} MB / ~{estimatedTotalMB:F0} MB ({progressPercent:F0}%) - {speedMBps:F1} MB/s";
+                    }
+                    else
+                    {
+                        ProgressDetails = $"Forbereder nedlasting... ({progressPercent:F0}%)";
+                    }
+                    
+                    // Update status based on progress
+                    if (progressPercent < 25)
+                        StatusMessage = "Laster ned Chromium browser...";
+                    else if (progressPercent < 50)
+                        StatusMessage = "Nedlasting pågår...";
+                    else if (progressPercent < 75)
+                        StatusMessage = "Mer enn halvveis...";
+                    else if (progressPercent < 90)
+                        StatusMessage = "Nesten ferdig...";
+                    else
+                        StatusMessage = "Fullfører nedlasting...";
+                    
+                    lastUpdateTime = now;
+                    lastSize = currentSize;
                 }
                 
-                ProgressPercentage = currentProgress;
-                
-                // Show real download progress
-                if (currentSize > 0)
-                {
-                    var currentMB = currentSize / (1024.0 * 1024.0);
-                    var totalMB = totalExpectedSize / (1024.0 * 1024.0);
-                    ProgressDetails = $"{currentMB:F1} MB / {totalMB:F0} MB ({currentProgress:F0}%)";
-                }
-                else
-                {
-                    // Show estimated progress when we can't track real size yet
-                    var estimatedMB = (totalExpectedSize / (1024.0 * 1024.0) * currentProgress) / 100.0;
-                    ProgressDetails = $"~{estimatedMB:F1} MB / 151 MB (forbereder...)";
-                }
-                
-                // Update status message based on progress
-                if (currentProgress < 10)
-                    StatusMessage = "Starter nedlasting...";
-                else if (currentProgress < 30)
-                    StatusMessage = "Laster ned Chromium browser...";
-                else if (currentProgress < 60)
-                    StatusMessage = "Nedlasting pågår...";
-                else if (currentProgress < 85)
-                    StatusMessage = "Nesten ferdig...";
-                else
-                    StatusMessage = "Fullfører nedlasting...";
-                
-                // Check every 1 second for more responsive updates
-                await Task.Delay(1000, cancellationToken);
+                // Wait before next check
+                await Task.Delay(500, cancellationToken);
             }
             
             // Handle cancellation
             if (cancellationToken.IsCancellationRequested)
             {
-                throw new OperationCanceledException("Download was cancelled by user");
+                throw new OperationCanceledException("Nedlasting avbrutt av bruker");
             }
             
-            // Wait for download to actually complete
+            // Wait for download to complete
             var installedBrowser = await downloadTask;
             
-            if (installedBrowser != null && File.Exists(installedBrowser.GetExecutablePath()))
+            if (installedBrowser != null)
             {
-                // Get final size for verification
-                try
-                {
-                    if (downloadDir != null && Directory.Exists(downloadDir))
-                    {
-                        var dirInfo = new DirectoryInfo(downloadDir);
-                        var finalSize = dirInfo.GetFiles("*", SearchOption.AllDirectories)
-                            .Sum(file => file.Length);
-                        var finalMB = finalSize / (1024.0 * 1024.0);
-                        ProgressDetails = $"{finalMB:F1} MB nedlastet";
-                    }
-                }
-                catch
-                {
-                    ProgressDetails = "Nedlasting fullført";
-                }
+                // Get final size
+                var finalSize = GetDirectorySize(cacheDir) - initialDirSize;
+                var finalMB = finalSize / (1024.0 * 1024.0);
                 
                 StatusMessage = "Verifiserer Chromium...";
-                ProgressPercentage = 95;
-                IsIndeterminate = false;
+                ProgressPercentage = 98;
+                ProgressDetails = $"{finalMB:F1} MB nedlastet - verifiserer...";
                 
-                // Quick verification by trying to get version
-                await Task.Delay(1000, cancellationToken);
+                await Task.Delay(500, cancellationToken);
                 
+                // Try to verify the executable
                 try
                 {
-                    var startInfo = new ProcessStartInfo
+                    var executablePath = installedBrowser.GetExecutablePath();
+                    if (File.Exists(executablePath))
                     {
-                        FileName = installedBrowser.GetExecutablePath(),
-                        Arguments = "--version",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    };
-                    
-                    using var process = Process.Start(startInfo);
-                    if (process != null)
-                    {
-                        await process.WaitForExitAsync(cancellationToken);
-                        if (process.ExitCode == 0)
+                        var startInfo = new ProcessStartInfo
                         {
-                            var version = await process.StandardOutput.ReadToEndAsync();
-                            ProgressDetails = $"Chromium klar: {version.Trim()}";
+                            FileName = executablePath,
+                            Arguments = "--version",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        };
+                        
+                        using var process = Process.Start(startInfo);
+                        if (process != null)
+                        {
+                            await process.WaitForExitAsync(cancellationToken);
+                            if (process.ExitCode == 0)
+                            {
+                                var version = await process.StandardOutput.ReadToEndAsync();
+                                ProgressDetails = $"{finalMB:F1} MB - {version.Trim()}";
+                            }
+                            else
+                            {
+                                ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
+                            }
                         }
+                    }
+                    else
+                    {
+                        ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
                     }
                 }
                 catch
                 {
-                    // Version check failed, but file exists so probably OK
-                    ProgressDetails = "Chromium installert og klar";
+                    ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
                 }
-
+                
                 await CompleteSuccessfully();
             }
             else
@@ -398,6 +332,24 @@ namespace AkademiTrack.ViewModels
                 throw new InvalidOperationException("Chromium ble ikke lastet ned korrekt");
             }
         }
+        
+        private static long GetDirectorySize(string directoryPath)
+        {
+            try
+            {
+                if (!Directory.Exists(directoryPath))
+                    return 0;
+                
+                var dirInfo = new DirectoryInfo(directoryPath);
+                return dirInfo.GetFiles("*", SearchOption.AllDirectories)
+                    .Sum(file => file.Length);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
 
         private async Task SimulateProgressAsync(CancellationToken cancellationToken)
         {
@@ -406,29 +358,70 @@ namespace AkademiTrack.ViewModels
                 IsIndeterminate = false;
                 var random = new Random();
                 
-                // Simulate download progress over ~2 minutes for 151 MB
-                for (int i = 0; i <= 90; i += random.Next(1, 4))
+                // Simulate realistic download with variable speeds
+                var totalMB = 151.0;
+                var downloadedMB = 0.0;
+                var startTime = DateTime.Now;
+                var lastUpdateTime = startTime;
+                var lastDownloadedMB = 0.0;
+                
+                // Simulate network conditions with variable download speeds
+                var baseSpeedMBps = 2.0; // Base 2 MB/s
+                
+                while (downloadedMB < totalMB && !cancellationToken.IsCancellationRequested)
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
+                    var now = DateTime.Now;
+                    var timeDelta = (now - lastUpdateTime).TotalSeconds;
+                    
+                    if (timeDelta >= 0.5) // Update every 500ms
+                    {
+                        // Simulate variable network speed (0.5x to 3x base speed)
+                        var speedMultiplier = 0.5 + (random.NextDouble() * 2.5);
+                        var currentSpeedMBps = baseSpeedMBps * speedMultiplier;
                         
-                    ProgressPercentage = Math.Min(i, 90);
+                        // Calculate how much to download in this interval
+                        var mbToDownload = currentSpeedMBps * timeDelta;
+                        downloadedMB = Math.Min(downloadedMB + mbToDownload, totalMB);
+                        
+                        var progressPercent = (downloadedMB / totalMB) * 100;
+                        ProgressPercentage = Math.Min(progressPercent, 95); // Cap at 95% until "extraction"
+                        
+                        // Calculate actual speed for this interval
+                        var actualSpeedMBps = (downloadedMB - lastDownloadedMB) / timeDelta;
+                        
+                        ProgressDetails = $"{downloadedMB:F1} MB / {totalMB:F1} MB ({progressPercent:F0}%) - {actualSpeedMBps:F1} MB/s";
+                        
+                        // Update status based on progress
+                        if (progressPercent < 25)
+                            StatusMessage = "TEST: Laster ned Chromium browser...";
+                        else if (progressPercent < 50)
+                            StatusMessage = "TEST: Nedlasting pågår...";
+                        else if (progressPercent < 75)
+                            StatusMessage = "TEST: Mer enn halvveis...";
+                        else if (progressPercent < 90)
+                            StatusMessage = "TEST: Nesten ferdig...";
+                        else
+                            StatusMessage = "TEST: Fullfører nedlasting...";
+                        
+                        lastUpdateTime = now;
+                        lastDownloadedMB = downloadedMB;
+                    }
                     
-                    var estimatedMB = (151.0 * i) / 100.0;
-                    ProgressDetails = $"{estimatedMB:F1} MB / 151.0 MB ({i}%)";
+                    // Small delay to prevent busy waiting
+                    await Task.Delay(100, cancellationToken);
+                }
+                
+                // Simulate extraction phase
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    StatusMessage = "TEST: Pakker ut Chromium...";
+                    ProgressPercentage = 95;
+                    ProgressDetails = $"{totalMB:F1} MB nedlastet - pakker ut...";
+                    await Task.Delay(1000, cancellationToken);
                     
-                    if (i < 25)
-                        StatusMessage = "Laster ned Chromium browser...";
-                    else if (i < 50)
-                        StatusMessage = "Nedlasting pågår...";
-                    else if (i < 75)
-                        StatusMessage = "Nesten ferdig...";
-                    else
-                        StatusMessage = "Fullfører nedlasting...";
-                    
-                    // Variable delay to simulate network fluctuations
-                    var delay = random.Next(800, 2000);
-                    await Task.Delay(delay, cancellationToken);
+                    ProgressPercentage = 98;
+                    ProgressDetails = "TEST: Sjekker installasjon...";
+                    await Task.Delay(500, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
