@@ -105,15 +105,6 @@ namespace AkademiTrack.ViewModels
                 
                 if (!isTestMode)
                 {
-                    // Check if we're running from a packaged app
-                    var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                    bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
-                                       currentExecutable.Contains("Program Files") ||
-                                       !currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release");
-                    
-                    Debug.WriteLine($"[DependencyDownload] Current executable: {currentExecutable}");
-                    Debug.WriteLine($"[DependencyDownload] Is packaged app: {isPackagedApp}");
-                    
                     // Use consistent cache directory
                     var cacheDir = GetChromiumCacheDirectory();
                     var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
@@ -121,26 +112,30 @@ namespace AkademiTrack.ViewModels
                         Path = cacheDir
                     });
                     
-                    // For packaged apps, always download to ensure it works properly
-                    if (!isPackagedApp)
+                    // Quick check if Chromium is already properly installed
+                    var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                    
+                    if (installedBrowsers.Any())
                     {
-                        var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                        // Verify the installation is complete and working
+                        var browser = installedBrowsers.First();
+                        var executablePath = browser.GetExecutablePath();
                         
-                        if (installedBrowsers.Any())
+                        if (!string.IsNullOrEmpty(executablePath) && File.Exists(executablePath))
                         {
-                            StatusMessage = "Chromium allerede installert";
-                            ProgressPercentage = 100;
-                            IsIndeterminate = false;
-                            
-                            // Quick validation
-                            await Task.Delay(500, _cancellationTokenSource.Token);
-                            await CompleteSuccessfully();
-                            return;
+                            var fileInfo = new System.IO.FileInfo(executablePath);
+                            if (fileInfo.Length > 0) // Basic check that file isn't empty/corrupted
+                            {
+                                StatusMessage = "Chromium allerede installert";
+                                ProgressPercentage = 100;
+                                IsIndeterminate = false;
+                                
+                                // Quick validation delay
+                                await Task.Delay(800, _cancellationTokenSource.Token);
+                                await CompleteSuccessfully();
+                                return;
+                            }
                         }
-                    }
-                    else
-                    {
-                        Debug.WriteLine("[DependencyDownload] Packaged app detected - forcing Chromium download");
                     }
 
                     StatusMessage = "Forbereder Chromium-nedlasting...";

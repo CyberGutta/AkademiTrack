@@ -149,6 +149,10 @@ namespace AkademiTrack
                 
                 if (!forceShowDependencyWindow)
                 {
+                    // Give it a moment to check properly - as requested by user
+                    Debug.WriteLine("[App] Taking a moment to verify Chromium installation...");
+                    await Task.Delay(1000); // 1 second delay as requested
+                    
                     // More thorough check if Chromium is actually working
                     bool chromiumWorking = await IsChromiumWorkingAsync();
                     
@@ -246,40 +250,23 @@ namespace AkademiTrack
                     Debug.WriteLine($"[App] - Browser: {browser.Browser} {browser.BuildId} at {browser.GetExecutablePath()}");
                 }
                 
-                // If we're running from a packaged app, always force download to ensure it works
-                var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
-                                   currentExecutable.Contains("Program Files") ||
-                                   !currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release");
-                
-                Debug.WriteLine($"[App] Current executable: {currentExecutable}");
-                Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
-                
-                if (isPackagedApp)
-                {
-                    Debug.WriteLine("[App] Running from packaged app - forcing Chromium download to ensure it works");
-                    return false; // Always show download window for packaged apps
-                }
-                
                 if (!installedBrowsers.Any())
                 {
                     Debug.WriteLine("[App] No Chromium installations found");
                     return false;
                 }
                 
-                // Try to actually launch and test Chromium
-                Debug.WriteLine("[App] Found Chromium installation, testing if it launches...");
-                
-                // Use a timeout for the test
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                // Quick check - verify executable exists and is accessible
+                Debug.WriteLine("[App] Found Chromium installation, doing quick verification...");
                 
                 try
                 {
-                    // Try to download if needed (this should be quick if already downloaded)
+                    // Try to download if needed (this should be very quick if already downloaded)
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
                     var downloadedBrowser = await browserFetcher.DownloadAsync();
                     Debug.WriteLine($"[App] Download check complete. Executable at: {downloadedBrowser?.GetExecutablePath()}");
                     
-                    // Verify the executable actually exists
+                    // Verify the executable actually exists and is accessible
                     var executablePath = downloadedBrowser?.GetExecutablePath();
                     if (string.IsNullOrEmpty(executablePath) || !File.Exists(executablePath))
                     {
@@ -287,30 +274,67 @@ namespace AkademiTrack
                         return false;
                     }
                     
-                    // Try to launch browser briefly to verify it works
-                    using var browser = await PuppeteerSharp.Puppeteer.LaunchAsync(new PuppeteerSharp.LaunchOptions
+                    // Check if we can read the file (basic accessibility test)
+                    var fileInfo = new System.IO.FileInfo(executablePath);
+                    if (fileInfo.Length == 0)
                     {
-                        Headless = true,
-                        ExecutablePath = executablePath, // Explicitly use the path we found
-                        Args = new[] { 
-                            "--no-sandbox", 
-                            "--disable-setuid-sandbox",
-                            "--disable-dev-shm-usage",
-                            "--disable-gpu",
-                            "--no-first-run"
+                        Debug.WriteLine($"[App] Executable file is empty: {executablePath}");
+                        return false;
+                    }
+                    
+                    Debug.WriteLine($"[App] Chromium executable verified: {executablePath} ({fileInfo.Length / (1024 * 1024)} MB)");
+                    
+                    // For packaged apps, do a quick launch test to ensure it actually works
+                    var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                    bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
+                                       currentExecutable.Contains("Program Files") ||
+                                       (!currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release"));
+                    
+                    Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
+                    
+                    if (isPackagedApp)
+                    {
+                        Debug.WriteLine("[App] Packaged app detected - doing quick launch test...");
+                        
+                        // Quick launch test with short timeout
+                        using var launchCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        
+                        try
+                        {
+                            using var browser = await PuppeteerSharp.Puppeteer.LaunchAsync(new PuppeteerSharp.LaunchOptions
+                            {
+                                Headless = true,
+                                ExecutablePath = executablePath,
+                                Args = new[] { 
+                                    "--no-sandbox", 
+                                    "--disable-setuid-sandbox",
+                                    "--disable-dev-shm-usage",
+                                    "--disable-gpu",
+                                    "--no-first-run",
+                                    "--disable-extensions",
+                                    "--disable-default-apps"
+                                }
+                            });
+                            
+                            Debug.WriteLine("[App] Chromium launch test successful");
+                            return true;
                         }
-                    });
-                    
-                    // Quick test - create a page and navigate to a simple page
-                    using var page = await browser.NewPageAsync();
-                    await page.GoToAsync("about:blank", new PuppeteerSharp.NavigationOptions { Timeout = 5000 });
-                    
-                    Debug.WriteLine("[App] Chromium test successful");
-                    return true;
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[App] Chromium launch test failed: {ex.Message}");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        // For development builds, just check if the file exists and is accessible
+                        Debug.WriteLine("[App] Development build - skipping launch test");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[App] Chromium test failed: {ex.Message}");
+                    Debug.WriteLine($"[App] Chromium verification failed: {ex.Message}");
                     return false;
                 }
             }
