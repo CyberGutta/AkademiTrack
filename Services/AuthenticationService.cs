@@ -136,13 +136,44 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine("[PUPPETEER] Starting browser");
                 
-                // Download Chromium if needed
-                await new BrowserFetcher().DownloadAsync();
+                // Ensure Chromium is downloaded and working with consistent cache directory
+                var chromiumCacheDir = GetChromiumCacheDirectory();
+                var chromiumBrowserFetcher = new BrowserFetcher(new BrowserFetcherOptions
+                {
+                    Path = chromiumCacheDir
+                });
                 
-                // Launch browser
+                try
+                {
+                    Debug.WriteLine("[PUPPETEER] Downloading/verifying Chromium...");
+                    var downloadedBrowser = await chromiumBrowserFetcher.DownloadAsync();
+                    Debug.WriteLine($"[PUPPETEER] Chromium ready at: {downloadedBrowser?.GetExecutablePath()}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[PUPPETEER] Failed to download Chromium: {ex.Message}");
+                    return new AuthenticationResult 
+                    { 
+                        Success = false, 
+                        ErrorMessage = $"Kunne ikke laste ned nødvendige komponenter for automatisering. Vennligst start appen på nytt eller kontakt support. Feil: {ex.Message}" 
+                    };
+                }
+                
+                // Launch browser with explicit cache directory
+                var installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
+                var firstInstalledBrowser = installedBrowsers.FirstOrDefault();
+                
+                string? executablePath = null;
+                if (firstInstalledBrowser != null)
+                {
+                    executablePath = firstInstalledBrowser.GetExecutablePath();
+                    Debug.WriteLine($"[PUPPETEER] Using Chromium at: {executablePath}");
+                }
+                
                 browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
                     Headless = true, // Hide Chrome window
+                    ExecutablePath = executablePath, // Explicitly set the path
                     Args = new[] { 
                         "--no-sandbox", 
                         "--disable-setuid-sandbox",
@@ -608,6 +639,18 @@ namespace AkademiTrack.Services
             }
             secureString.MakeReadOnly();
             return secureString;
+        }
+        
+        private static string GetChromiumCacheDirectory()
+        {
+            // Use a consistent cache directory regardless of how the app is launched
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
+            
+            // Ensure directory exists
+            Directory.CreateDirectory(cacheDir);
+            
+            return cacheDir;
         }
 
         public void Dispose()

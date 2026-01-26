@@ -105,20 +105,42 @@ namespace AkademiTrack.ViewModels
                 
                 if (!isTestMode)
                 {
-                    // Check if Chromium is already downloaded
-                    var browserFetcher = new BrowserFetcher();
-                    var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                    // Check if we're running from a packaged app
+                    var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                    bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
+                                       currentExecutable.Contains("Program Files") ||
+                                       !currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release");
                     
-                    if (installedBrowsers.Any())
+                    Debug.WriteLine($"[DependencyDownload] Current executable: {currentExecutable}");
+                    Debug.WriteLine($"[DependencyDownload] Is packaged app: {isPackagedApp}");
+                    
+                    // Use consistent cache directory
+                    var cacheDir = GetChromiumCacheDirectory();
+                    var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
                     {
-                        StatusMessage = "Chromium allerede installert";
-                        ProgressPercentage = 100;
-                        IsIndeterminate = false;
+                        Path = cacheDir
+                    });
+                    
+                    // For packaged apps, always download to ensure it works properly
+                    if (!isPackagedApp)
+                    {
+                        var installedBrowsers = browserFetcher.GetInstalledBrowsers();
                         
-                        // Quick validation
-                        await Task.Delay(500, _cancellationTokenSource.Token);
-                        await CompleteSuccessfully();
-                        return;
+                        if (installedBrowsers.Any())
+                        {
+                            StatusMessage = "Chromium allerede installert";
+                            ProgressPercentage = 100;
+                            IsIndeterminate = false;
+                            
+                            // Quick validation
+                            await Task.Delay(500, _cancellationTokenSource.Token);
+                            await CompleteSuccessfully();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[DependencyDownload] Packaged app detected - forcing Chromium download");
                     }
 
                     StatusMessage = "Forbereder Chromium-nedlasting...";
@@ -348,6 +370,18 @@ namespace AkademiTrack.ViewModels
             {
                 return 0;
             }
+        }
+        
+        private static string GetChromiumCacheDirectory()
+        {
+            // Use a consistent cache directory regardless of how the app is launched
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
+            
+            // Ensure directory exists
+            Directory.CreateDirectory(cacheDir);
+            
+            return cacheDir;
         }
 
 

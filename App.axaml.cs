@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using AkademiTrack.ViewModels;
@@ -138,21 +138,29 @@ namespace AkademiTrack
             {
                 Debug.WriteLine("[App] Checking if Chromium dependencies need to be downloaded...");
                 
-                // Check for test mode argument
+                // Check for test mode argument or force dependency window
                 var args = Environment.GetCommandLineArgs();
-                bool forceShowDependencyWindow = args.Contains("--test-dependency-window");
+                bool forceShowDependencyWindow = args.Contains("--test-dependency-window") || 
+                                               args.Contains("--force-dependency-download") ||
+                                               args.Contains("--reinstall-chromium");
+                
+                Debug.WriteLine($"[App] Command line args: {string.Join(" ", args)}");
+                Debug.WriteLine($"[App] Force show dependency window: {forceShowDependencyWindow}");
                 
                 if (!forceShowDependencyWindow)
                 {
-                    // Quick check if Chromium is already available
-                    var browserFetcher = new PuppeteerSharp.BrowserFetcher();
-                    var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                    // More thorough check if Chromium is actually working
+                    bool chromiumWorking = await IsChromiumWorkingAsync();
                     
-                    if (installedBrowsers.Any())
+                    if (chromiumWorking)
                     {
-                        Debug.WriteLine("[App] Chromium already installed, continuing with normal flow");
+                        Debug.WriteLine("[App] Chromium is working properly, continuing with normal flow");
                         await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
                         return;
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[App] Chromium not working properly, need to download");
                     }
                 }
                 else
@@ -160,7 +168,7 @@ namespace AkademiTrack
                     Debug.WriteLine("[App] Force showing dependency window for testing");
                 }
                 
-                Debug.WriteLine("[App] Chromium not found, showing dependency download window");
+                Debug.WriteLine("[App] Showing dependency download window");
                 
                 // Show dependency download window on UI thread
                 await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -209,9 +217,120 @@ namespace AkademiTrack
             catch (Exception ex)
             {
                 Debug.WriteLine($"[App] Error in dependency check: {ex.Message}");
+                Debug.WriteLine($"[App] Stack trace: {ex.StackTrace}");
                 // Continue with normal flow if dependency check fails
                 await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
             }
+        }
+        
+        private async Task<bool> IsChromiumWorkingAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[App] Testing if Chromium is working...");
+                
+                // Create BrowserFetcher with explicit cache directory for consistency
+                var cacheDir = GetChromiumCacheDirectory();
+                Debug.WriteLine($"[App] Using Chromium cache directory: {cacheDir}");
+                
+                var browserFetcher = new PuppeteerSharp.BrowserFetcher(new PuppeteerSharp.BrowserFetcherOptions
+                {
+                    Path = cacheDir
+                });
+                
+                var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                Debug.WriteLine($"[App] Found {installedBrowsers.Count()} installed browsers");
+                
+                foreach (var browser in installedBrowsers)
+                {
+                    Debug.WriteLine($"[App] - Browser: {browser.Browser} {browser.BuildId} at {browser.GetExecutablePath()}");
+                }
+                
+                // If we're running from a packaged app, always force download to ensure it works
+                var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
+                                   currentExecutable.Contains("Program Files") ||
+                                   !currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release");
+                
+                Debug.WriteLine($"[App] Current executable: {currentExecutable}");
+                Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
+                
+                if (isPackagedApp)
+                {
+                    Debug.WriteLine("[App] Running from packaged app - forcing Chromium download to ensure it works");
+                    return false; // Always show download window for packaged apps
+                }
+                
+                if (!installedBrowsers.Any())
+                {
+                    Debug.WriteLine("[App] No Chromium installations found");
+                    return false;
+                }
+                
+                // Try to actually launch and test Chromium
+                Debug.WriteLine("[App] Found Chromium installation, testing if it launches...");
+                
+                // Use a timeout for the test
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                
+                try
+                {
+                    // Try to download if needed (this should be quick if already downloaded)
+                    var downloadedBrowser = await browserFetcher.DownloadAsync();
+                    Debug.WriteLine($"[App] Download check complete. Executable at: {downloadedBrowser?.GetExecutablePath()}");
+                    
+                    // Verify the executable actually exists
+                    var executablePath = downloadedBrowser?.GetExecutablePath();
+                    if (string.IsNullOrEmpty(executablePath) || !File.Exists(executablePath))
+                    {
+                        Debug.WriteLine($"[App] Executable not found at expected path: {executablePath}");
+                        return false;
+                    }
+                    
+                    // Try to launch browser briefly to verify it works
+                    using var browser = await PuppeteerSharp.Puppeteer.LaunchAsync(new PuppeteerSharp.LaunchOptions
+                    {
+                        Headless = true,
+                        ExecutablePath = executablePath, // Explicitly use the path we found
+                        Args = new[] { 
+                            "--no-sandbox", 
+                            "--disable-setuid-sandbox",
+                            "--disable-dev-shm-usage",
+                            "--disable-gpu",
+                            "--no-first-run"
+                        }
+                    });
+                    
+                    // Quick test - create a page and navigate to a simple page
+                    using var page = await browser.NewPageAsync();
+                    await page.GoToAsync("about:blank", new PuppeteerSharp.NavigationOptions { Timeout = 5000 });
+                    
+                    Debug.WriteLine("[App] Chromium test successful");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[App] Chromium test failed: {ex.Message}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] Error testing Chromium: {ex.Message}");
+                return false;
+            }
+        }
+        
+        private static string GetChromiumCacheDirectory()
+        {
+            // Use a consistent cache directory regardless of how the app is launched
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
+            
+            // Ensure directory exists
+            Directory.CreateDirectory(cacheDir);
+            
+            return cacheDir;
         }
 
         private async void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
