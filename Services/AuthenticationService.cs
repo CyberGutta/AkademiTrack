@@ -136,6 +136,10 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine("[PUPPETEER] Starting browser");
                 
+                // Set environment variables to disable keychain access
+                Environment.SetEnvironmentVariable("CHROME_KEYCHAIN", "0");
+                Environment.SetEnvironmentVariable("CHROME_PASSWORD_STORE", "basic");
+                
                 // Ensure Chromium is downloaded and working with consistent cache directory
                 var chromiumCacheDir = GetChromiumCacheDirectory();
                 var chromiumBrowserFetcher = new BrowserFetcher(new BrowserFetcherOptions
@@ -174,6 +178,7 @@ namespace AkademiTrack.Services
                 {
                     Headless = true, // Hide Chrome window
                     ExecutablePath = executablePath, // Explicitly set the path
+                    UserDataDir = GetChromiumUserDataDirectory(), // Use isolated user data directory
                     Args = new[] { 
                         "--no-sandbox", 
                         "--disable-setuid-sandbox",
@@ -184,7 +189,22 @@ namespace AkademiTrack.Services
                         "--disable-default-apps",
                         "--disable-web-security", // Disable CSS loading for speed
                         "--disable-features=VizDisplayCompositor",
-                        "--blink-settings=imagesEnabled=false" // Disable images for faster loading
+                        "--blink-settings=imagesEnabled=false", // Disable images for faster loading
+                        "--use-mock-keychain", // Prevent keychain access popup
+                        "--password-store=basic", // Use basic password store instead of keychain
+                        "--disable-password-generation", // Disable password generation features
+                        "--disable-save-password-bubble", // Disable save password prompts
+                        "--disable-background-networking", // Disable background network requests
+                        "--disable-sync", // Disable Chrome sync
+                        "--disable-translate", // Disable translate service
+                        "--disable-ipc-flooding-protection", // Disable IPC flooding protection
+                        "--disable-renderer-backgrounding", // Disable renderer backgrounding
+                        "--disable-backgrounding-occluded-windows", // Disable backgrounding occluded windows
+                        "--disable-features=TranslateUI,BlinkGenPropertyTrees", // Disable more features
+                        "--aggressive-cache-discard", // Aggressively discard cache
+                        "--disable-extensions", // Disable extensions
+                        "--disable-plugins", // Disable plugins
+                        "--incognito" // Use incognito mode to avoid accessing stored data
                     }
                 });
 
@@ -651,6 +671,44 @@ namespace AkademiTrack.Services
             Directory.CreateDirectory(cacheDir);
             
             return cacheDir;
+        }
+        
+        private static string GetChromiumUserDataDirectory()
+        {
+            // Create isolated user data directory to prevent keychain access
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var userDataDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-userdata");
+            
+            // Ensure directory exists
+            Directory.CreateDirectory(userDataDir);
+            
+            // Create preferences file to disable keychain access
+            var defaultDir = Path.Combine(userDataDir, "Default");
+            Directory.CreateDirectory(defaultDir);
+            
+            var preferencesPath = Path.Combine(defaultDir, "Preferences");
+            if (!File.Exists(preferencesPath))
+            {
+                var preferences = new
+                {
+                    profile = new
+                    {
+                        password_manager_enabled = false,
+                        password_manager_leak_detection_enabled = false
+                    },
+                    credentials_enable_service = false,
+                    credentials_enable_autosignin = false,
+                    password_manager = new
+                    {
+                        os_password_store = "basic"
+                    }
+                };
+                
+                var json = System.Text.Json.JsonSerializer.Serialize(preferences, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(preferencesPath, json);
+            }
+            
+            return userDataDir;
         }
 
         public void Dispose()
