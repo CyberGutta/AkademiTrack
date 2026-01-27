@@ -64,18 +64,17 @@
     <Grid Background="#FAFAFA">
         <StackPanel VerticalAlignment="Center" Margin="40">
             
-            <!-- App Icon/Logo Area -->
             <Border Width="80" Height="80" 
                     CornerRadius="16" 
-                    Background="#2196F3"
+                    Background="White"
+                    BoxShadow="0 2 8 0 #00000020"
                     HorizontalAlignment="Center"
                     Margin="0,0,0,30">
-                <TextBlock Text="AT" 
-                          FontSize="32" 
-                          FontWeight="Bold" 
-                          Foreground="White"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"/>
+                <Image Source="/Assets/AT-Transparrent.png" 
+                       Width="60" 
+                       Height="60"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
             </Border>
             
             <!-- Title -->
