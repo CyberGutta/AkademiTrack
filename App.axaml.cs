@@ -292,38 +292,12 @@ namespace AkademiTrack
                     
                     Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
                     
+                    // Skip launch test to prevent Chrome from briefly appearing
                     if (isPackagedApp)
                     {
-                        Debug.WriteLine("[App] Packaged app detected - doing quick launch test...");
-                        
-                        // Quick launch test with short timeout
-                        using var launchCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
-                        
-                        try
-                        {
-                            using var browser = await PuppeteerSharp.Puppeteer.LaunchAsync(new PuppeteerSharp.LaunchOptions
-                            {
-                                Headless = true,
-                                ExecutablePath = executablePath,
-                                Args = new[] { 
-                                    "--no-sandbox", 
-                                    "--disable-setuid-sandbox",
-                                    "--disable-dev-shm-usage",
-                                    "--disable-gpu",
-                                    "--no-first-run",
-                                    "--disable-extensions",
-                                    "--disable-default-apps"
-                                }
-                            });
-                            
-                            Debug.WriteLine("[App] Chromium launch test successful");
-                            return true;
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[App] Chromium launch test failed: {ex.Message}");
-                            return false;
-                        }
+                        Debug.WriteLine("[App] Packaged app detected - skipping launch test to prevent Chrome window");
+                        Debug.WriteLine("[App] Chromium will be tested during first actual use");
+                        return true;
                     }
                     else
                     {

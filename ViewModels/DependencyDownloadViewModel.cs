@@ -302,34 +302,23 @@ namespace AkademiTrack.ViewModels
                 
                 await Task.Delay(500, cancellationToken);
                 
-                // Try to verify the executable
+                // Skip verification to prevent Chrome window from opening
                 try
                 {
                     var executablePath = installedBrowser.GetExecutablePath();
                     if (File.Exists(executablePath))
                     {
-                        var startInfo = new ProcessStartInfo
-                        {
-                            FileName = executablePath,
-                            Arguments = "--version",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            CreateNoWindow = true
-                        };
+                        // Just check file size instead of running Chrome
+                        var fileInfo = new FileInfo(executablePath);
+                        var fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
                         
-                        using var process = Process.Start(startInfo);
-                        if (process != null)
+                        if (fileSizeMB > 50) // Chrome executable should be at least 50MB
                         {
-                            await process.WaitForExitAsync(cancellationToken);
-                            if (process.ExitCode == 0)
-                            {
-                                var version = await process.StandardOutput.ReadToEndAsync();
-                                ProgressDetails = $"{finalMB:F1} MB - {version.Trim()}";
-                            }
-                            else
-                            {
-                                ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
-                            }
+                            ProgressDetails = $"{finalMB:F1} MB - Chromium installert ({fileSizeMB:F0} MB)";
+                        }
+                        else
+                        {
+                            ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
                         }
                     }
                     else
