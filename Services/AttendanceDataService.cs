@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AkademiTrack.Services.Interfaces;
 using AkademiTrack.Services.Http;
+using System.Diagnostics;
 
 namespace AkademiTrack.Services
 {
@@ -513,7 +514,7 @@ namespace AkademiTrack.Services
             {
                 if (_userParameters == null || _cookies == null)
                 {
-                    Console.WriteLine("[MONTHLY DEBUG] No parameters or cookies available");
+                    Debug.WriteLine("[MONTHLY DEBUG] No parameters or cookies available");
                     return null;
                 }
 
@@ -611,7 +612,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[MONTHLY DEBUG] Exception: {ex.Message}");
+                Debug.WriteLine($"[MONTHLY DEBUG] Exception: {ex.Message}");
                 return null;
             }
         }

@@ -33,39 +33,39 @@ namespace AkademiTrack.Services
 
             try
             {
-                Console.WriteLine("[PermissionChecker] ========== CheckMacNotificationPermissionAsync ==========");
+                Debug.WriteLine("[PermissionChecker] ========== CheckMacNotificationPermissionAsync ==========");
                 
                 var hasDismissed = await HasDismissedDialog();
-                Console.WriteLine($"[PermissionChecker] HasDismissedDialog result: {hasDismissed}");
+                Debug.WriteLine($"[PermissionChecker] HasDismissedDialog result: {hasDismissed}");
                 
                 if (hasDismissed)
                 {
-                    Console.WriteLine("[PermissionChecker] User has dismissed dialog before, not showing again");
+                    Debug.WriteLine("[PermissionChecker] User has dismissed dialog before, not showing again");
                     return PermissionStatus.Authorized;
                 }
 
                 var isEnabled = await CheckIfNotificationsEnabled();
-                Console.WriteLine($"[PermissionChecker] CheckIfNotificationsEnabled result: {isEnabled}");
+                Debug.WriteLine($"[PermissionChecker] CheckIfNotificationsEnabled result: {isEnabled}");
                 
                 if (isEnabled)
                 {
-                    Console.WriteLine("[PermissionChecker] Notifications are enabled in system");
+                    Debug.WriteLine("[PermissionChecker] Notifications are enabled in system");
                     return PermissionStatus.Authorized;
                 }
 
-                Console.WriteLine("[PermissionChecker] Notifications not enabled, should show dialog");
+                Debug.WriteLine("[PermissionChecker] Notifications not enabled, should show dialog");
                 return PermissionStatus.NotDetermined;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Error checking notification permission: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Error checking notification permission: {ex.Message}");
                 return PermissionStatus.Unknown;
             }
         }
 
         private static async Task<bool> CheckIfNotificationsEnabled()
         {
-            Console.WriteLine("[PermissionChecker] ========== CheckIfNotificationsEnabled ==========");
+            Debug.WriteLine("[PermissionChecker] ========== CheckIfNotificationsEnabled ==========");
             
             try
             {
@@ -79,65 +79,65 @@ namespace AkademiTrack.Services
                     CreateNoWindow = true
                 };
 
-                Console.WriteLine("[PermissionChecker] Running check: flags = 16");
+                Debug.WriteLine("[PermissionChecker] Running check: flags = 16");
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
                     var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
 
-                    Console.WriteLine($"[PermissionChecker] Check output: '{output}'");
+                    Debug.WriteLine($"[PermissionChecker] Check output: '{output}'");
 
                     if (output == "enabled")
                     {
-                        Console.WriteLine("[PermissionChecker] Found enabled notification settings (flags = 16)");
+                        Debug.WriteLine("[PermissionChecker] Found enabled notification settings (flags = 16)");
                         await MarkDialogDismissedAsync();
                         return true;
                     }
                 }
 
-                Console.WriteLine("[PermissionChecker] ✗ Notifications NOT enabled");
+                Debug.WriteLine("[PermissionChecker] ✗ Notifications NOT enabled");
                 return false;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Error checking if notifications enabled: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Error checking if notifications enabled: {ex.Message}");
                 return false;
             }
         }
 
         private static async Task<bool> HasDismissedDialog()
         {
-            Console.WriteLine("[PermissionChecker] ========== HasDismissedDialog ==========");
+            Debug.WriteLine("[PermissionChecker] ========== HasDismissedDialog ==========");
             
             try
             {
-                Console.WriteLine($"[PermissionChecker] Checking state file: {NotificationStatePath}");
-                Console.WriteLine($"[PermissionChecker] File exists: {File.Exists(NotificationStatePath)}");
+                Debug.WriteLine($"[PermissionChecker] Checking state file: {NotificationStatePath}");
+                Debug.WriteLine($"[PermissionChecker] File exists: {File.Exists(NotificationStatePath)}");
 
                 if (File.Exists(NotificationStatePath))
                 {
                     string json = await File.ReadAllTextAsync(NotificationStatePath);
-                    Console.WriteLine($"[PermissionChecker] State content: {json}");
+                    Debug.WriteLine($"[PermissionChecker] State content: {json}");
                     
                     bool hasDismissed = json.Contains("\"dismissed\"") && json.Contains("true");
-                    Console.WriteLine($"[PermissionChecker] HasDismissed result: {hasDismissed}");
+                    Debug.WriteLine($"[PermissionChecker] HasDismissed result: {hasDismissed}");
                     
                     return hasDismissed;
                 }
                 
-                Console.WriteLine("[PermissionChecker] State file does not exist - returning false");
+                Debug.WriteLine("[PermissionChecker] State file does not exist - returning false");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Error checking if dismissed: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Error checking if dismissed: {ex.Message}");
             }
             return false;
         }
 
         public static async Task MarkDialogDismissedAsync()
         {
-            Console.WriteLine("[PermissionChecker] ========== MarkDialogDismissedAsync ==========");
+            Debug.WriteLine("[PermissionChecker] ========== MarkDialogDismissedAsync ==========");
             
             try
             {
@@ -148,11 +148,11 @@ namespace AkademiTrack.Services
                 
                 if (!Directory.Exists(appDataDir))
                 {
-                    Console.WriteLine($"[PermissionChecker] Creating directory: {appDataDir}");
+                    Debug.WriteLine($"[PermissionChecker] Creating directory: {appDataDir}");
                     Directory.CreateDirectory(appDataDir);
                 }
 
-                Console.WriteLine($"[PermissionChecker] State file path: {NotificationStatePath}");
+                Debug.WriteLine($"[PermissionChecker] State file path: {NotificationStatePath}");
                 
                 var state = new
                 {
@@ -165,13 +165,13 @@ namespace AkademiTrack.Services
                     WriteIndented = true 
                 });
                 
-                Console.WriteLine($"[PermissionChecker] Writing state: {json}");
+                Debug.WriteLine($"[PermissionChecker] Writing state: {json}");
                 await File.WriteAllTextAsync(NotificationStatePath, json);
-                Console.WriteLine("[PermissionChecker] Marked dialog as permanently dismissed");
+                Debug.WriteLine("[PermissionChecker] Marked dialog as permanently dismissed");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Error marking dialog dismissed: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Error marking dialog dismissed: {ex.Message}");
             }
         }
 
@@ -195,63 +195,63 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Failed to open notification settings: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Failed to open notification settings: {ex.Message}");
             }
         }
 
         public static async Task<bool> ShouldShowPermissionDialogAsync()
         {
-            Console.WriteLine("[PermissionChecker] ========== ShouldShowPermissionDialogAsync ==========");
+            Debug.WriteLine("[PermissionChecker] ========== ShouldShowPermissionDialogAsync ==========");
             
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                Console.WriteLine("[PermissionChecker] Not macOS, skipping dialog");
+                Debug.WriteLine("[PermissionChecker] Not macOS, skipping dialog");
                 return false;
             }
 
             try
             {
                 var hasDismissed = await HasDismissedDialog();
-                Console.WriteLine($"[PermissionChecker] HasDismissed (user permanently dismissed): {hasDismissed}");
+                Debug.WriteLine($"[PermissionChecker] HasDismissed (user permanently dismissed): {hasDismissed}");
                 
                 if (hasDismissed)
                 {
-                    Console.WriteLine("[PermissionChecker] User permanently dismissed dialog");
+                    Debug.WriteLine("[PermissionChecker] User permanently dismissed dialog");
                     return false;
                 }
 
                 var isEnabled = await CheckIfNotificationsEnabled();
-                Console.WriteLine($"[PermissionChecker] IsEnabled (system has notifications on): {isEnabled}");
+                Debug.WriteLine($"[PermissionChecker] IsEnabled (system has notifications on): {isEnabled}");
                 
                 if (isEnabled)
                 {
-                    Console.WriteLine("[PermissionChecker] Notifications already enabled in system");
+                    Debug.WriteLine("[PermissionChecker] Notifications already enabled in system");
                     return false;
                 }
 
-                Console.WriteLine("[PermissionChecker] ✅ SHOULD SHOW DIALOG - user needs to enable notifications");
+                Debug.WriteLine("[PermissionChecker] ✅ SHOULD SHOW DIALOG - user needs to enable notifications");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Error: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Error: {ex.Message}");
                 return false;
             }
         }
 
         public static async Task RequestPermissionAsync()
         {
-            Console.WriteLine("[PermissionChecker] ========== RequestPermissionAsync ==========");
+            Debug.WriteLine("[PermissionChecker] ========== RequestPermissionAsync ==========");
             
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                Console.WriteLine("[PermissionChecker] Not macOS, skipping");
+                Debug.WriteLine("[PermissionChecker] Not macOS, skipping");
                 return;
             }
 
             try
             {
-                Console.WriteLine("[PermissionChecker] Sending test notification");
+                Debug.WriteLine("[PermissionChecker] Sending test notification");
                 
                 await NativeNotificationService.ShowAsync(
                     "Varsler Aktivert",
@@ -259,11 +259,11 @@ namespace AkademiTrack.Services
                     "SUCCESS"
                 );
                 
-                Console.WriteLine("[PermissionChecker] Test notification sent");
+                Debug.WriteLine("[PermissionChecker] Test notification sent");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[PermissionChecker] Failed to request notification permission: {ex.Message}");
+                Debug.WriteLine($"[PermissionChecker] Failed to request notification permission: {ex.Message}");
             }
         }
     }
