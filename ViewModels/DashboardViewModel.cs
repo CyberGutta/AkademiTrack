@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
 using AkademiTrack.Services;
+using AkademiTrack.Services.DependencyInjection;
 using Avalonia.Threading;
 using AkademiTrack.Services.Interfaces;
 
@@ -115,7 +116,7 @@ namespace AkademiTrack.ViewModels
             _attendanceService = new AttendanceDataService();
             
             // Connect logging service for auto-retry functionality
-            _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
+            _loggingService = ServiceContainer.GetService<ILoggingService>();
             _attendanceService.SetLoggingService(_loggingService);
             
             _weeklyDays = InitializeEmptyWeek();

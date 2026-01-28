@@ -42,7 +42,7 @@ namespace AkademiTrack.Services
                 // Get API key securely - handle missing key gracefully
                 try
                 {
-                    _supabaseAnonKey = config.SupabaseAnonKey;
+                    _supabaseAnonKey = config.SupabaseAnonKey ?? "";
                     
                     if (string.IsNullOrEmpty(_supabaseAnonKey))
                     {

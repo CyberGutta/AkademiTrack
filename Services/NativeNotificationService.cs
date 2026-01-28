@@ -72,7 +72,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        private static async Task ShowMacNotificationAsync(string title, string message)
+        private static Task ShowMacNotificationAsync(string title, string message)
         {
             try
             {
@@ -86,7 +86,7 @@ namespace AkademiTrack.Services
                 if (!File.Exists(helperPath))
                 {
                     Console.WriteLine("AkademiTrackHelper not found");
-                    return;
+                    return Task.CompletedTask;
                 }
 
                 var startInfo = new ProcessStartInfo
@@ -133,6 +133,8 @@ namespace AkademiTrack.Services
             {
                 Console.WriteLine($"Failed to launch AkademiTrackHelper: {ex.Message}");
             }
+            
+            return Task.CompletedTask;
         }
 
         private static async Task ShowWindowsNotificationAsync(string title, string message)

@@ -614,12 +614,12 @@ namespace AkademiTrack.Services
             }
         }
 
-        private static async Task ClearWindowsRegistryDataAsync()
+        private static Task ClearWindowsRegistryDataAsync()
         {
             try
             {
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    return;
+                    return Task.CompletedTask;
 
                 Debug.WriteLine("Clearing Windows registry data");
 
@@ -639,6 +639,8 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine($"❌ Failed to clear Windows registry data: {ex.Message}");
             }
+            
+            return Task.CompletedTask;
         }
 
         private static async Task ClearMacOSKeychainDataAsync()

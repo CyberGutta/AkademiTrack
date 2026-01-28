@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using AkademiTrack.Services;
+using AkademiTrack.Services.DependencyInjection;
 using AkademiTrack.Services.Utilities;
 using System.Diagnostics;
 using System.Security;
@@ -34,7 +35,7 @@ namespace AkademiTrack.ViewModels
         public FeideWindowViewModel()
         {
             // Get analytics service
-            _analyticsService = ServiceLocator.Instance.GetService<AnalyticsService>();
+            _analyticsService = ServiceContainer.GetService<AnalyticsService>();
             
             SaveCommand = new RelayCommand(async () => await SaveFeideCredentialsAsync(), () => CanSave);
             ExitCommand = new RelayCommand(() => ExitApplication());

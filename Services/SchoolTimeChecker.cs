@@ -400,7 +400,7 @@ namespace AkademiTrack.Services
         }
 
         // NEW: Clear manual stop flag when user manually starts automation again
-        public static async Task ClearManualStopAsync()
+        public static Task ClearManualStopAsync()
         {
             try
             {
@@ -415,6 +415,8 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine($"[MANUAL STOP] Error clearing manual stop flag: {ex.Message}");
             }
+            
+            return Task.CompletedTask;
         }
 
         private static async Task<DateTime?> GetManualStopStatusAsync()

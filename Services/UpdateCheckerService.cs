@@ -1,5 +1,6 @@
 ﻿using AkademiTrack.ViewModels;
 using AkademiTrack.Services.Interfaces;
+using AkademiTrack.Services.DependencyInjection;
 using Avalonia.Threading;
 using System;
 using System.Diagnostics;
@@ -39,7 +40,7 @@ namespace AkademiTrack.Services
         public UpdateCheckerService(SettingsViewModel settingsViewModel)
         {
             _settingsViewModel = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
-            _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
+            _loggingService = ServiceContainer.GetService<ILoggingService>();
         }
 
         private void Log(string message, string level = "INFO")

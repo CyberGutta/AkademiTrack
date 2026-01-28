@@ -17,18 +17,18 @@ namespace AkademiTrack.Services
         /// <summary>
         /// Start caffinate to prevent system sleep
         /// </summary>
-        public async Task StartCaffinateAsync()
+        public Task StartCaffinateAsync()
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 Debug.WriteLine("[Caffinate] Not on macOS - skipping caffinate");
-                return;
+                return Task.CompletedTask;
             }
 
             if (_isActive)
             {
                 Debug.WriteLine("[Caffinate] Already active - skipping");
-                return;
+                return Task.CompletedTask;
             }
 
             try
@@ -65,6 +65,8 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine($"[Caffinate] ❌ Error starting caffinate: {ex.Message}");
             }
+            
+            return Task.CompletedTask;
         }
 
         /// <summary>

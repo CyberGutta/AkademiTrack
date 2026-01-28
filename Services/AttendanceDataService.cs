@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AkademiTrack.Services.Interfaces;
 using AkademiTrack.Services.Http;
+using AkademiTrack.Services.DependencyInjection;
 using System.Diagnostics;
 
 namespace AkademiTrack.Services
@@ -81,7 +82,7 @@ namespace AkademiTrack.Services
                 {
                     _loggingService?.LogInfo("Data kunne ikke hentes - prøver å oppdatere autentisering");
                     
-                    var notificationService = ServiceLocator.Instance.GetService<INotificationService>();
+                    var notificationService = ServiceContainer.GetService<INotificationService>();
                     using var authService = new AuthenticationService(notificationService);
                     var authResult = await authService.AuthenticateAsync();
                     
@@ -168,7 +169,7 @@ namespace AkademiTrack.Services
                 request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
                 request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
 
-                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                var cookieString = string.Join("; ", _cookies?.Select(c => $"{c.Key}={c.Value}") ?? Enumerable.Empty<string>());
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);
@@ -277,11 +278,11 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                var jsessionId = _cookies?.GetValueOrDefault("JSESSIONID", "") ?? "";
                 var today = DateTime.Now.ToString("yyyyMMdd");
                 
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_dato;jsessionid={jsessionId}";
-                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},dato={today}&onlyData=true";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters?.FylkeId},planperi={_userParameters?.PlanPeri},skoleid={_userParameters?.SkoleId},dato={today}&onlyData=true";
 
                 _loggingService?.LogDebug($"🌐 [DAILY] Fetching daily schedule from: {url.Replace(jsessionId, "***")}");
 
@@ -292,7 +293,7 @@ namespace AkademiTrack.Services
                 request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
                 request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
 
-                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                var cookieString = string.Join("; ", _cookies?.Select(c => $"{c.Key}={c.Value}") ?? Enumerable.Empty<string>());
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);
@@ -330,12 +331,12 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                var jsessionId = _cookies?.GetValueOrDefault("JSESSIONID", "") ?? "";
                 var today = DateTime.Now.ToString("yyyyMMdd");
                 var tomorrow = DateTime.Now.AddDays(1).ToString("yyyyMMdd");
                 
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
-                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={today},endDate={tomorrow}&onlyData=true&limit=1000&totalResults=true";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters?.FylkeId},planperi={_userParameters?.PlanPeri},skoleid={_userParameters?.SkoleId},startDate={today},endDate={tomorrow}&onlyData=true&limit=1000&totalResults=true";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("Host", "iskole.net");
@@ -344,7 +345,7 @@ namespace AkademiTrack.Services
                 request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
                 request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
 
-                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                var cookieString = string.Join("; ", _cookies?.Select(c => $"{c.Key}={c.Value}") ?? Enumerable.Empty<string>());
                 request.Headers.Add("Cookie", cookieString);
 
                 var response = await _httpClient.SendAsync(request);

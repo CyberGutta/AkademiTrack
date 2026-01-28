@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using AkademiTrack.Common;
 using AkademiTrack.Services;
+using AkademiTrack.Services.DependencyInjection;
 using AkademiTrack.Services.Interfaces;
 using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -230,11 +231,11 @@ namespace AkademiTrack.ViewModels
         public RefactoredMainWindowViewModel(bool skipInitialization = false)
         {
             // Get services from service locator
-            _loggingService = ServiceLocator.Instance.GetService<ILoggingService>();
-            _notificationService = ServiceLocator.Instance.GetService<INotificationService>();
-            _settingsService = ServiceLocator.Instance.GetService<ISettingsService>();
-            _automationService = ServiceLocator.Instance.GetService<IAutomationService>();
-            _analyticsService = ServiceLocator.Instance.GetService<AnalyticsService>();
+            _loggingService = ServiceContainer.GetService<ILoggingService>();
+            _notificationService = ServiceContainer.GetService<INotificationService>();
+            _settingsService = ServiceContainer.GetService<ISettingsService>();
+            _automationService = ServiceContainer.GetService<IAutomationService>();
+            _analyticsService = ServiceContainer.GetService<AnalyticsService>();
             
             // Initialize other services
             _httpClient = new HttpClient();

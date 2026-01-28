@@ -535,24 +535,24 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<UserParameters?> FallbackParameterExtraction(IPage page)
+        private Task<UserParameters?> FallbackParameterExtraction(IPage page)
         {
             try
             {
                 Debug.WriteLine("[PARAMS] Starting fallback parameter extraction");
                 
                 Debug.WriteLine("[PARAMS] All extraction methods failed, using CORRECT hardcoded parameters");
-                return new UserParameters 
+                return Task.FromResult<UserParameters?>(new UserParameters 
                 { 
                     FylkeId = "00", 
                     SkoleId = "312", 
                     PlanPeri = "2025-26" 
-                };
+                });
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[PARAMS] Fallback extraction failed: {ex.Message}");
-                return new UserParameters { FylkeId = "00", SkoleId = "312", PlanPeri = "2025-26" };
+                return Task.FromResult<UserParameters?>(new UserParameters { FylkeId = "00", SkoleId = "312", PlanPeri = "2025-26" });
             }
         }
 
