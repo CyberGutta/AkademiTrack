@@ -853,8 +853,6 @@ Terminal=false
         public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
 
-        public ICommand UninstallCompletelyCommand { get; }
-
 
         public string UpdateStatus
         {
@@ -1207,7 +1205,6 @@ Terminal=false
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
             ClearSecureStorageCommand = new RelayCommand(async () => await ClearSecureStorageAsync());
-            UninstallCompletelyCommand = new RelayCommand(async () => await UninstallCompletelyAsync());
             ExportDataAsJsonCommand = new RelayCommand(async () => await ExportDataAsync("json"));
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
@@ -1480,7 +1477,7 @@ Terminal=false
                     "• Cookies og tokens\n" +
                     "• Appinnstillinger\n" +
                     "• Cache-data\n\n" +
-                    "Programmet starter på nytt etter sletting.",
+                    "Applikasjonen vil lukkes etter sletting.",
                     false
                 );
 
@@ -1547,9 +1544,11 @@ Terminal=false
 
                 Debug.WriteLine("=== LOCAL DATA DELETED SUCCESSFULLY ===");
 
-                CloseRequested?.Invoke(this, EventArgs.Empty);
-                await Task.Delay(300);
-                RestartApplication();
+                // Close the application directly without showing any dialog
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown(0);
+                }
             }
             catch (Exception ex)
             {
@@ -1559,53 +1558,6 @@ Terminal=false
             finally
             {
                 IsDeleting = false;
-            }
-        }
-
-        private void RestartApplication()
-        {
-            try
-            {
-                Debug.WriteLine("=== RESTARTING APPLICATION ===");
-
-                var exePath = Environment.ProcessPath;
-                if (string.IsNullOrEmpty(exePath))
-                {
-                    exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                }
-
-                Debug.WriteLine($"Executable path: {exePath}");
-
-                if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = exePath,
-                        UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(exePath)
-                    });
-
-                    Debug.WriteLine("New instance started, shutting down current instance...");
-                }
-                else
-                {
-                    Debug.WriteLine("Could not find executable path");
-                }
-
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    desktop.Shutdown(0);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error restarting application: {ex.Message}");
-                Debug.WriteLine($"Falling back to simple shutdown...");
-
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    desktop.Shutdown(0);
-                }
             }
         }
 
@@ -1711,7 +1663,11 @@ Terminal=false
                 CloseRequested?.Invoke(this, EventArgs.Empty);
                 await Task.Delay(300);
 
-                RestartApplication();
+                // Close the application without restarting
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown(0);
+                }
             }
             catch (Exception ex)
             {

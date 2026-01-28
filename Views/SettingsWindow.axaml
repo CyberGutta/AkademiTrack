@@ -1659,9 +1659,9 @@
 						<StackPanel Spacing="5">
 							<TextBlock Text="Slett lokal data" Classes="setting-title"/>
 							<TextBlock Classes="setting-description">
-								<Run Text="Fjern all lagret data fra denne maskinen, inkludert innloggingsopplysninger,"/>
+								<Run Text="Fjern all lagret data fra denne maskinen og lukk applikasjonen."/>
 								<LineBreak/>
-								<Run Text="cookies, og innstillinger. Du må logge inn på nytt etter sletting."/>
+								<Run Text="Appen starter IKKE på nytt - du må åpne den manuelt hvis ønskelig."/>
 							</TextBlock>
 
 							<Border Classes="info-panel-compact" Margin="0,8,0,0">
@@ -1672,7 +1672,7 @@
 																   Height="16"
 																   Foreground="#007ACC"
 																   VerticalAlignment="Center"/>
-										<TextBlock Text="Dette sletter:"
+										<TextBlock Text="Dette sletter ALL lokal data:"
 												   FontWeight="SemiBold"
 												   FontSize="13"
 												   Foreground="#007ACC"
@@ -1689,11 +1689,40 @@
 										<Run Text="• Alle appinnstillinger"/>
 										<LineBreak/>
 										<Run Text="• Cache-filer"/>
+										<LineBreak/>
+										<Run Text="• Skoletimer og automatiseringsinnstillinger"/>
 									</TextBlock>
 								</StackPanel>
 							</Border>
 
-							<Button Content="Slett lokal data"
+							<Border Classes="warning-panel-compact" Margin="0,8,0,0">
+								<StackPanel Spacing="6">
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="AlertOutline" 
+																   Width="16" 
+																   Height="16"
+																   Foreground="#FF6B35"
+																   VerticalAlignment="Center"/>
+										<TextBlock Text="Viktig å vite:"
+												   FontWeight="SemiBold"
+												   FontSize="13"
+												   Foreground="#FF6B35"
+												   VerticalAlignment="Center"/>
+									</StackPanel>
+									<TextBlock FontSize="12"
+											   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+											   TextWrapping="Wrap"
+											   LineHeight="18">
+										<Run Text="• Applikasjonen lukkes permanent etter sletting"/>
+										<LineBreak/>
+										<Run Text="• Du må åpne AkademiTrack manuelt hvis du vil bruke den igjen"/>
+										<LineBreak/>
+										<Run Text="• All data må settes opp på nytt"/>
+									</TextBlock>
+								</StackPanel>
+							</Border>
+
+							<Button Content="Slett lokal data og lukk app"
 									Classes="settings-action"
 									Command="{Binding DeleteLocalDataCommand}"
 									IsEnabled="{Binding !IsDeleting}"
@@ -1703,63 +1732,6 @@
 									
 						</StackPanel>
 					</Border>
-
-					<Border Classes="setting-card">
-						<StackPanel Spacing="12">
-							<TextBlock Text="Avinstaller applikasjonen fullstendig" Classes="setting-title"/>
-							<TextBlock Classes="setting-description">
-								<Run Text="Fjern AkademiTrack permanent fra datamaskinen din."/>
-								<LineBreak/>
-								<Run Text="Dette sletter ALL data OG selve applikasjonen. Dette kan IKKE angres!"/>
-							</TextBlock>
-
-							<Border Classes="warning-panel-compact" Margin="0,0,0,0">
-								<StackPanel Spacing="6">
-									<StackPanel Orientation="Horizontal" Spacing="8">
-										<materialIcons:MaterialIcon Kind="AlertCircle" 
-																Width="16" 
-																Height="16"
-																Foreground="#DC3545"
-																VerticalAlignment="Center"/>
-										<TextBlock Text="⚠️ ADVARSEL - Permanent sletting"
-												FontWeight="SemiBold"
-												FontSize="13"
-												Foreground="#DC3545"
-												VerticalAlignment="Center"/>
-									</StackPanel>
-									<TextBlock FontSize="12"
-											Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-											TextWrapping="Wrap"
-											LineHeight="18">
-										<Run Text="Dette vil fullstendig fjerne:"/>
-										<LineBreak/>
-										<Run Text="• All lokal data og innstillinger"/>
-										<LineBreak/>
-										<Run Text="• Selve applikasjonen fra datamaskinen"/>
-										<LineBreak/>
-										<Run Text="• Autostart-oppsettet"/>
-										<LineBreak/>
-										<Run Text="• Alle spor av AkademiTrack"/>
-									</TextBlock>
-								</StackPanel>
-							</Border>
-
-							<Button Content="Avinstaller AkademiTrack Fullstendig"
-									Classes="settings-action"
-									Command="{Binding UninstallCompletelyCommand}"
-									IsEnabled="{Binding !IsDeleting}"
-									Background="#DC3545"
-									Margin="0,8,0,0">
-								<Button.Styles>
-									<Style Selector="Button.settings-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-										<Setter Property="Background" Value="#C82333"/>
-									</Style>
-								</Button.Styles>
-							</Button>
-						</StackPanel>
-					</Border>
-
-					
 
 					<TextBlock Text="Systemdiagnose"
 							   Classes="section-header"
