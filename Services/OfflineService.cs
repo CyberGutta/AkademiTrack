@@ -333,7 +333,7 @@ namespace AkademiTrack.Services
                     if (success)
                     {
                         processedActions.Add(action);
-                        _loggingService.LogInfo($"✅ Processed queued action: {action.ActionType}");
+                        _loggingService.LogInfo($"Processed queued action: {action.ActionType}");
                     }
                     else
                     {
@@ -341,7 +341,7 @@ namespace AkademiTrack.Services
                         if (action.RetryCount >= Constants.Network.MAX_RETRY_ATTEMPTS)
                         {
                             processedActions.Add(action); // Remove failed actions after max retries
-                            _loggingService.LogError($"❌ Failed to process action after {action.RetryCount} retries: {action.ActionType}");
+                            _loggingService.LogError($"Failed to process action after {action.RetryCount} retries: {action.ActionType}");
                         }
                     }
                 }

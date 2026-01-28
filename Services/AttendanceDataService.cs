@@ -103,12 +103,12 @@ namespace AkademiTrack.Services
                         
                         if (result == null)
                         {
-                            _loggingService?.LogError("❌ Kunne ikke hente data selv etter re-autentisering");
+                            _loggingService?.LogError("Kunne ikke hente data selv etter re-autentisering");
                         }
                     }
                     else
                     {
-                        _loggingService?.LogError("❌ Re-autentisering feilet");
+                        _loggingService?.LogError("Re-autentisering feilet");
                     }
                 }
                 
@@ -145,14 +145,14 @@ namespace AkademiTrack.Services
             {
                 if (_userParameters == null || _cookies == null)
                 {
-                    _loggingService?.LogError("❌ [ATTENDANCE] Missing parameters or cookies for summary fetch");
+                    _loggingService?.LogError("[ATTENDANCE] Missing parameters or cookies for summary fetch");
                     return null;
                 }
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 if (string.IsNullOrEmpty(jsessionId))
                 {
-                    _loggingService?.LogError("❌ [ATTENDANCE] Missing JSESSIONID cookie");
+                    _loggingService?.LogError("[ATTENDANCE] Missing JSESSIONID cookie");
                     return null;
                 }
 
@@ -215,7 +215,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                _loggingService?.LogError($"❌ [ATTENDANCE] Exception in FetchAttendanceSummaryAsync: {ex.Message}");
+                _loggingService?.LogError($"[ATTENDANCE] Exception in FetchAttendanceSummaryAsync: {ex.Message}");
                 return null;
             }
         }
@@ -242,14 +242,14 @@ namespace AkademiTrack.Services
             {
                 if (_userParameters == null || _cookies == null)
                 {
-                    _loggingService?.LogError("❌ [TODAY] Missing parameters or cookies for today schedule fetch");
+                    _loggingService?.LogError("[TODAY] Missing parameters or cookies for today schedule fetch");
                     return null;
                 }
 
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 if (string.IsNullOrEmpty(jsessionId))
                 {
-                    _loggingService?.LogError("❌ [TODAY] Missing JSESSIONID cookie");
+                    _loggingService?.LogError("[TODAY] Missing JSESSIONID cookie");
                     return null;
                 }
                 
@@ -259,7 +259,7 @@ namespace AkademiTrack.Services
                 
                 if (dailyData == null || monthlyData == null)
                 {
-                    _loggingService?.LogError("❌ [TODAY] Failed to fetch both daily and monthly data");
+                    _loggingService?.LogError("[TODAY] Failed to fetch both daily and monthly data");
                     return null;
                 }
 
@@ -268,7 +268,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                _loggingService?.LogError($"❌ [TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
+                _loggingService?.LogError($"[TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
                 return null;
             }
         }
@@ -321,7 +321,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                _loggingService?.LogError($"❌ [DAILY] Exception: {ex.Message}");
+                _loggingService?.LogError($"[DAILY] Exception: {ex.Message}");
                 return null;
             }
         }
@@ -360,7 +360,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                _loggingService?.LogError($"❌ [MONTHLY] Exception: {ex.Message}");
+                _loggingService?.LogError($"[MONTHLY] Exception: {ex.Message}");
                 return null;
             }
         }

@@ -132,7 +132,7 @@ namespace AkademiTrack.Services.Configuration
             }
 
             // 4. Last resort: Use a temporary fallback for development
-            System.Diagnostics.Debug.WriteLine("❌ CRITICAL: No Supabase API key found!");
+            System.Diagnostics.Debug.WriteLine("   CRITICAL: No Supabase API key found!");
             System.Diagnostics.Debug.WriteLine("   Set AKADEMITRACK_SUPABASE_KEY environment variable");
             System.Diagnostics.Debug.WriteLine("   or configure through settings UI");
             System.Diagnostics.Debug.WriteLine("   Using temporary fallback for development...");
