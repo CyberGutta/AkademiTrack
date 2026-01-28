@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -264,8 +266,35 @@ namespace AkademiTrack.Services
 
             try
             {
-                // Test PuppeteerSharp browser initialization
-                var browserFetcher = new BrowserFetcher();
+                // Use consistent cache directory like other services
+                var chromiumCacheDir = GetChromiumCacheDirectory();
+                var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
+                {
+                    Path = chromiumCacheDir
+                });
+                
+                // Check if browser is already installed first
+                var installedBrowsers = browserFetcher.GetInstalledBrowsers();
+                if (installedBrowsers.Any())
+                {
+                    var browser = installedBrowsers.First();
+                    var executablePath = browser.GetExecutablePath();
+                    
+                    if (!string.IsNullOrEmpty(executablePath) && File.Exists(executablePath))
+                    {
+                        stopwatch.Stop();
+                        return new HealthCheckResult
+                        {
+                            ComponentName = "Browser Driver",
+                            Status = HealthStatus.Healthy,
+                            Message = "Tilgjengelig",
+                            ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                            Details = $"Chromium installert og klar på {stopwatch.ElapsedMilliseconds}ms"
+                        };
+                    }
+                }
+                
+                // If not installed, try to download
                 var revisionInfo = await browserFetcher.DownloadAsync();
                 
                 if (revisionInfo != null)
@@ -275,9 +304,9 @@ namespace AkademiTrack.Services
                     {
                         ComponentName = "Browser Driver",
                         Status = HealthStatus.Healthy,
-                        Message = "Fungerer",
+                        Message = "Tilgjengelig",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = $"PuppeteerSharp browser tilgjengelig på {stopwatch.ElapsedMilliseconds}ms"
+                        Details = $"Chromium lastet ned og klar på {stopwatch.ElapsedMilliseconds}ms"
                     };
                 }
                 else
@@ -287,9 +316,9 @@ namespace AkademiTrack.Services
                     {
                         ComponentName = "Browser Driver",
                         Status = HealthStatus.Error,
-                        Message = "Browser ikke tilgjengelig",
+                        Message = "Browser feil",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = "PuppeteerSharp browser kunne ikke lastes ned"
+                        Details = "Chromium kunne ikke lastes ned"
                     };
                 }
             }
@@ -318,6 +347,18 @@ namespace AkademiTrack.Services
             };
 
             return await Task.WhenAll(tasks);
+        }
+        
+        private static string GetChromiumCacheDirectory()
+        {
+            // Use a consistent cache directory regardless of how the app is launched
+            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
+            
+            // Ensure directory exists
+            Directory.CreateDirectory(cacheDir);
+            
+            return cacheDir;
         }
     }
 }
