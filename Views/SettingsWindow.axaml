@@ -1017,26 +1017,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding MondayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12" 
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding MondayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding MondayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding MondayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding MondayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding MondayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1056,26 +1060,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding TuesdayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding TuesdayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding TuesdayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding TuesdayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding TuesdayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding TuesdayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1095,26 +1103,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding WednesdayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding WednesdayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding WednesdayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding WednesdayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding WednesdayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding WednesdayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1134,26 +1146,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding ThursdayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding ThursdayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding ThursdayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding ThursdayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding ThursdayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding ThursdayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1173,26 +1189,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding FridayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding FridayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding FridayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding FridayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding FridayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding FridayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1212,26 +1232,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SaturdayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding SaturdayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding SaturdayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding SaturdayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding SaturdayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding SaturdayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
@@ -1251,26 +1275,30 @@
 												   VerticalAlignment="Center"
 												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
 									</Grid>
-									<Grid ColumnDefinitions="1*,Auto,1*" IsEnabled="{Binding SundayEnabled}">
-										<StackPanel Grid.Column="0" Spacing="4">
-											<TextBlock Text="Start" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding SundayStart}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
-										<TextBlock Grid.Column="1" Text="—" 
+									<Grid ColumnDefinitions="*,40,*" RowDefinitions="Auto,Auto" IsEnabled="{Binding SundayEnabled}">
+										<!-- Labels Row -->
+										<TextBlock Grid.Column="0" Grid.Row="0" Text="Start" FontSize="12" 
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Grid.Row="0" Text="Slutt" FontSize="12"
+												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+												   Margin="0,0,0,4" HorizontalAlignment="Center"/>
+										
+										<!-- TimePickers and Line Row -->
+										<TimePicker Grid.Column="0" Grid.Row="1" SelectedTime="{Binding SundayStart}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
+										<Rectangle Grid.Column="1" Grid.Row="1"
+												   Width="20" 
+												   Height="2"
+												   Fill="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
 												   VerticalAlignment="Center" 
-												   Margin="16,20,16,0"
-												   FontSize="16"
-												   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-										<StackPanel Grid.Column="2" Spacing="4">
-											<TextBlock Text="Slutt" FontSize="12"
-													   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
-											<TimePicker SelectedTime="{Binding SundayEnd}" 
-														MinuteIncrement="5"
-														ClockIdentifier="24HourClock"/>
-										</StackPanel>
+												   HorizontalAlignment="Center"/>
+										<TimePicker Grid.Column="2" Grid.Row="1" SelectedTime="{Binding SundayEnd}" 
+													MinuteIncrement="5"
+													ClockIdentifier="24HourClock"
+													HorizontalAlignment="Center"/>
 									</Grid>
 								</StackPanel>
 							</Border>
