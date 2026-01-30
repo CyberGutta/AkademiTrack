@@ -248,11 +248,6 @@ Built for the Akademiet student community. Special thanks to all contributors an
 
 <div align="center">
 
-**[⬆ Back to Top](#akademitrack)**
-
-
-**Full Changelog:** [v1.0.0...v1.1.0](https://github.com/CyberGutta/AkademiTrack/compare/v1.0.0...v1.1.0)
-
 Made with ❤️ for Akademiet students
 
 </div>
