@@ -186,39 +186,8 @@ namespace AkademiTrack.Services
                     Debug.WriteLine($"[PUPPETEER] Using Chromium at: {executablePath}");
                 }
                 
-                browser = await Puppeteer.LaunchAsync(new LaunchOptions
-                {
-                    Headless = true, // Hide Chrome window
-                    ExecutablePath = executablePath, // Explicitly set the path
-                    UserDataDir = GetChromiumUserDataDirectory(), // Use isolated user data directory
-                    Args = new[] { 
-                        "--no-sandbox", 
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--no-first-run",
-                        "--no-default-browser-check",
-                        "--disable-default-apps",
-                        "--disable-web-security", // Disable CSS loading for speed
-                        "--disable-features=VizDisplayCompositor",
-                        "--blink-settings=imagesEnabled=false", // Disable images for faster loading
-                        "--use-mock-keychain", // Prevent keychain access popup
-                        "--password-store=basic", // Use basic password store instead of keychain
-                        "--disable-password-generation", // Disable password generation features
-                        "--disable-save-password-bubble", // Disable save password prompts
-                        "--disable-background-networking", // Disable background network requests
-                        "--disable-sync", // Disable Chrome sync
-                        "--disable-translate", // Disable translate service
-                        "--disable-ipc-flooding-protection", // Disable IPC flooding protection
-                        "--disable-renderer-backgrounding", // Disable renderer backgrounding
-                        "--disable-backgrounding-occluded-windows", // Disable backgrounding occluded windows
-                        "--disable-features=TranslateUI,BlinkGenPropertyTrees", // Disable more features
-                        "--aggressive-cache-discard", // Aggressively discard cache
-                        "--disable-extensions", // Disable extensions
-                        "--disable-plugins", // Disable plugins
-                        "--incognito" // Use incognito mode to avoid accessing stored data
-                    }
-                });
+                // Use the new ChromeManager for cross-platform Chrome detection/installation
+                browser = await ChromeManager.LaunchBrowserAsync(headless: true);
 
                 page = await browser.NewPageAsync();
                 await page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 });

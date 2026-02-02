@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using PuppeteerSharp;
+using AkademiTrack.Services;
 
 namespace AkademiTrack.ViewModels
 {
@@ -101,358 +102,79 @@ namespace AkademiTrack.ViewModels
                 var args = Environment.GetCommandLineArgs();
                 bool isTestMode = args.Contains("--test-dependency-window");
 
-                StatusMessage = "Sjekker Chromium-status...";
+                StatusMessage = "Sjekker Chrome/Chromium-status...";
                 
                 if (!isTestMode)
                 {
-                    // Check if we have bundled Chromium first
-                    var bundledChromiumPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "chromium-cache");
-                    bool hasBundledChromium = Directory.Exists(bundledChromiumPath);
+                    // Use ChromeManager to handle all Chrome detection/installation
+                    StatusMessage = "Forbereder Chrome/Chromium...";
+                    ProgressDetails = "Sjekker installerte nettlesere...";
+                    ShowProgressDetails = true;
                     
-                    if (hasBundledChromium)
+                    var chromePath = await ChromeManager.GetChromeExecutablePathAsync();
+                    
+                    if (!string.IsNullOrEmpty(chromePath))
                     {
-                        StatusMessage = "Bruker bundled Chromium...";
+                        StatusMessage = "Chrome/Chromium klar!";
                         ProgressPercentage = 100;
                         IsIndeterminate = false;
+                        ProgressDetails = $"Bruker: {Path.GetFileName(chromePath)}";
                         
-                        // Quick validation delay
                         await Task.Delay(800, _cancellationTokenSource.Token);
                         await CompleteSuccessfully();
                         return;
                     }
-                    
-                    // Use consistent cache directory for fallback download
-                    var cacheDir = GetChromiumCacheDirectory();
-                    var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
+                    else
                     {
-                        Path = cacheDir
-                    });
-                    
-                    // Quick check if Chromium is already properly installed
-                    var installedBrowsers = browserFetcher.GetInstalledBrowsers();
-                    
-                    if (installedBrowsers.Any())
-                    {
-                        // Verify the installation is complete and working
-                        var browser = installedBrowsers.First();
-                        var executablePath = browser.GetExecutablePath();
-                        
-                        if (!string.IsNullOrEmpty(executablePath) && File.Exists(executablePath))
-                        {
-                            var fileInfo = new System.IO.FileInfo(executablePath);
-                            if (fileInfo.Length > 0) // Basic check that file isn't empty/corrupted
-                            {
-                                StatusMessage = "Chromium allerede installert";
-                                ProgressPercentage = 100;
-                                IsIndeterminate = false;
-                                
-                                // Quick validation delay
-                                await Task.Delay(800, _cancellationTokenSource.Token);
-                                await CompleteSuccessfully();
-                                return;
-                            }
-                        }
+                        // This should rarely happen with ChromeManager's fallbacks
+                        StatusMessage = "Kunne ikke installere Chrome/Chromium";
+                        HasError = true;
+                        ErrorMessage = "AkademiTrack kunne ikke finne eller installere en kompatibel nettleser.\n\n" +
+                                     "Vennligst installer Google Chrome manuelt og start AkademiTrack på nytt.";
+                        DownloadFailed?.Invoke(this, ErrorMessage);
+                        return;
                     }
-
-                    StatusMessage = "Forbereder Chromium-nedlasting...";
-                    ShowProgressDetails = true;
-                    ProgressDetails = "Henter nedlastingsinformasjon...";
-
-                    // Use our custom download method with real progress tracking
-                    await DownloadWithRealProgressAsync(browserFetcher, _cancellationTokenSource.Token);
                 }
                 else
                 {
-                    StatusMessage = "TEST MODE: Simulerer Chromium-nedlasting...";
+                    StatusMessage = "TEST MODE: Simulerer Chrome-sjekk...";
                     ShowProgressDetails = true;
-                    ProgressDetails = "TEST: Starter simulert nedlasting (~120 MB)...";
+                    ProgressDetails = "TEST: Starter simulert sjekk...";
                     
                     await SimulateProgressAsync(_cancellationTokenSource.Token);
                     
-                    StatusMessage = "TEST: Verifiserer Chromium...";
-                    ProgressDetails = "TEST: Sjekker integritet...";
+                    StatusMessage = "TEST: Chrome klar (simulert)";
+                    ProgressDetails = "TEST: Chrome klar (simulert)";
                     ProgressPercentage = 95;
                     IsIndeterminate = false;
                     
                     await Task.Delay(1000, _cancellationTokenSource.Token);
-                    ProgressDetails = "TEST: Chromium klar (simulert)";
+                    ProgressDetails = "TEST: Chrome klar (simulert)";
                     
                     await CompleteSuccessfully();
                 }
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "Nedlasting avbrutt";
+                StatusMessage = "Operasjon avbrutt";
                 HasError = true;
-                ErrorMessage = "Nedlastingen ble avbrutt av brukeren";
+                ErrorMessage = "Operasjonen ble avbrutt av brukeren";
             }
             catch (HttpRequestException ex)
             {
                 StatusMessage = "Nettverksfeil";
                 HasError = true;
-                ErrorMessage = $"Kunne ikke laste ned Chromium: {ex.Message}";
+                ErrorMessage = $"Kunne ikke laste ned Chrome: {ex.Message}";
                 DownloadFailed?.Invoke(this, ErrorMessage);
             }
             catch (Exception ex)
             {
-                StatusMessage = "Nedlasting feilet";
+                StatusMessage = "Installasjon feilet";
                 HasError = true;
                 ErrorMessage = $"En uventet feil oppstod: {ex.Message}";
                 DownloadFailed?.Invoke(this, ErrorMessage);
             }
         }
-
-        private async Task DownloadWithRealProgressAsync(BrowserFetcher browserFetcher, CancellationToken cancellationToken)
-        {
-            IsIndeterminate = false;
-            var startTime = DateTime.Now;
-            
-            StatusMessage = "Forbereder Chromium-nedlasting...";
-            ProgressDetails = "Starter nedlasting...";
-            
-            // Get the cache directory where Chromium will be downloaded
-            var cacheDir = browserFetcher.CacheDir;
-            var initialDirSize = GetDirectorySize(cacheDir);
-            
-            // Start the download task
-            var downloadTask = browserFetcher.DownloadAsync();
-            
-            // Monitor progress by checking directory size
-            var lastSize = initialDirSize;
-            var lastUpdateTime = DateTime.Now;
-            var estimatedTotalSize = 150L * 1024 * 1024; // Start with 150MB estimate
-            var hasStartedDownloading = false;
-            
-            StatusMessage = "Laster ned Chromium browser...";
-            
-            while (!downloadTask.IsCompleted && !cancellationToken.IsCancellationRequested)
-            {
-                var now = DateTime.Now;
-                var currentSize = GetDirectorySize(cacheDir);
-                var downloadedBytes = currentSize - initialDirSize;
-                
-                // Check if download has actually started
-                if (downloadedBytes > 1024 * 1024) // More than 1MB downloaded
-                {
-                    hasStartedDownloading = true;
-                    
-                    // Adjust estimate if we're downloading more than expected
-                    if (downloadedBytes > estimatedTotalSize * 0.8)
-                    {
-                        estimatedTotalSize = (long)(downloadedBytes * 1.25); // Increase estimate
-                    }
-                }
-                
-                // Update progress every 500ms
-                if ((now - lastUpdateTime).TotalMilliseconds >= 500)
-                {
-                    var currentMB = downloadedBytes / (1024.0 * 1024.0);
-                    var estimatedTotalMB = estimatedTotalSize / (1024.0 * 1024.0);
-                    
-                    double progressPercent = 0;
-                    if (hasStartedDownloading && estimatedTotalSize > 0)
-                    {
-                        progressPercent = Math.Min((double)downloadedBytes / estimatedTotalSize * 100, 95);
-                    }
-                    else
-                    {
-                        // Use time-based estimation for initial phase
-                        var elapsedSeconds = (now - startTime).TotalSeconds;
-                        progressPercent = Math.Min(elapsedSeconds / 30.0 * 10, 10); // 0-10% in first 30 seconds
-                    }
-                    
-                    ProgressPercentage = progressPercent;
-                    
-                    // Calculate download speed
-                    var timeDiff = (now - lastUpdateTime).TotalSeconds;
-                    var sizeDiff = currentSize - lastSize;
-                    var speedMBps = timeDiff > 0 ? (sizeDiff / (1024.0 * 1024.0)) / timeDiff : 0;
-                    
-                    if (hasStartedDownloading)
-                    {
-                        ProgressDetails = $"{currentMB:F1} MB / ~{estimatedTotalMB:F0} MB ({progressPercent:F0}%) - {speedMBps:F1} MB/s";
-                    }
-                    else
-                    {
-                        ProgressDetails = $"Forbereder nedlasting... ({progressPercent:F0}%)";
-                    }
-                    
-                    // Update status based on progress
-                    if (progressPercent < 25)
-                        StatusMessage = "Laster ned Chromium browser...";
-                    else if (progressPercent < 50)
-                        StatusMessage = "Nedlasting pågår...";
-                    else if (progressPercent < 75)
-                        StatusMessage = "Mer enn halvveis...";
-                    else if (progressPercent < 90)
-                        StatusMessage = "Nesten ferdig...";
-                    else
-                        StatusMessage = "Fullfører nedlasting...";
-                    
-                    lastUpdateTime = now;
-                    lastSize = currentSize;
-                }
-                
-                // Wait before next check
-                await Task.Delay(500, cancellationToken);
-            }
-            
-            // Handle cancellation
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException("Nedlasting avbrutt av bruker");
-            }
-            
-            // Wait for download to complete
-            var installedBrowser = await downloadTask;
-            
-            if (installedBrowser != null)
-            {
-                // Get final size
-                var finalSize = GetDirectorySize(cacheDir) - initialDirSize;
-                var finalMB = finalSize / (1024.0 * 1024.0);
-                
-                StatusMessage = "Verifiserer Chromium...";
-                ProgressPercentage = 98;
-                ProgressDetails = $"{finalMB:F1} MB nedlastet - verifiserer...";
-                
-                await Task.Delay(500, cancellationToken);
-                
-                // Skip verification to prevent Chrome window from opening
-                try
-                {
-                    var executablePath = installedBrowser.GetExecutablePath();
-                    if (File.Exists(executablePath))
-                    {
-                        // Just check file size instead of running Chrome
-                        var fileInfo = new FileInfo(executablePath);
-                        var fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
-                        
-                        if (fileSizeMB > 50) // Chrome executable should be at least 50MB
-                        {
-                            ProgressDetails = $"{finalMB:F1} MB - Chromium installert ({fileSizeMB:F0} MB)";
-                        }
-                        else
-                        {
-                            ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
-                        }
-                    }
-                    else
-                    {
-                        ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
-                    }
-                }
-                catch
-                {
-                    ProgressDetails = $"{finalMB:F1} MB - Chromium installert";
-                }
-                
-                await CompleteSuccessfully();
-            }
-            else
-            {
-                throw new InvalidOperationException("Chromium ble ikke lastet ned korrekt");
-            }
-        }
-        
-        private static long GetDirectorySize(string directoryPath)
-        {
-            try
-            {
-                if (!Directory.Exists(directoryPath))
-                    return 0;
-                
-                var dirInfo = new DirectoryInfo(directoryPath);
-                return dirInfo.GetFiles("*", SearchOption.AllDirectories)
-                    .Sum(file => file.Length);
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-        
-        private static string GetChromiumCacheDirectory()
-        {
-            // EXTERNAL CHROMIUM APPROACH: Check for external signed Chromium first
-            var externalChromiumPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AkademiTrack-Chromium");
-            
-            if (Directory.Exists(externalChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using external signed Chromium at: {externalChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(externalChromiumPath);
-                }
-                
-                return externalChromiumPath;
-            }
-            
-            // Fallback: Check for bundled Chromium (legacy)
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var bundledChromiumPath = Path.Combine(appDirectory, "Assets", "chromium-cache");
-            
-            if (Directory.Exists(bundledChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using bundled Chromium at: {bundledChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(bundledChromiumPath);
-                }
-                
-                return bundledChromiumPath;
-            }
-            
-            // Final fallback: AppData directory for download
-            Debug.WriteLine("[CHROMIUM] No external or bundled Chromium found, falling back to AppData directory");
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
-            
-            // Ensure directory exists
-            Directory.CreateDirectory(cacheDir);
-            
-            return cacheDir;
-        }
-        
-        private static void EnsureExecutablePermissions(string chromiumPath)
-        {
-            try
-            {
-                // Find Chrome executable in the bundled path
-                var chromeExecutables = Directory.GetFiles(chromiumPath, "*Chrome*", SearchOption.AllDirectories)
-                    .Where(f => Path.GetFileName(f).Contains("Chrome") && !Path.GetExtension(f).Equals(".app", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                
-                foreach (var executable in chromeExecutables)
-                {
-                    if (File.Exists(executable))
-                    {
-                        Debug.WriteLine($"[CHROMIUM] Setting executable permissions for: {executable}");
-                        var process = new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "chmod",
-                                Arguments = $"+x \"{executable}\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CHROMIUM] Failed to set executable permissions: {ex.Message}");
-            }
-        }
-
 
         private async Task SimulateProgressAsync(CancellationToken cancellationToken)
         {
@@ -461,70 +183,36 @@ namespace AkademiTrack.ViewModels
                 IsIndeterminate = false;
                 var random = new Random();
                 
-                // Simulate realistic download with variable speeds
-                var totalMB = 151.0;
-                var downloadedMB = 0.0;
+                // Simulate realistic Chrome detection/installation
+                var totalSteps = 100.0;
+                var currentStep = 0.0;
                 var startTime = DateTime.Now;
                 var lastUpdateTime = startTime;
-                var lastDownloadedMB = 0.0;
                 
-                // Simulate network conditions with variable download speeds
-                var baseSpeedMBps = 2.0; // Base 2 MB/s
-                
-                while (downloadedMB < totalMB && !cancellationToken.IsCancellationRequested)
+                var phases = new[]
                 {
-                    var now = DateTime.Now;
-                    var timeDelta = (now - lastUpdateTime).TotalSeconds;
+                    ("Sjekker system Chrome...", 20),
+                    ("Laster ned Chrome installer...", 40),
+                    ("Installerer Chrome...", 30),
+                    ("Verifiserer installasjon...", 10)
+                };
+                
+                foreach (var (phaseName, phaseSteps) in phases)
+                {
+                    StatusMessage = $"TEST: {phaseName}";
                     
-                    if (timeDelta >= 0.5) // Update every 500ms
+                    for (int i = 0; i < phaseSteps && !cancellationToken.IsCancellationRequested; i++)
                     {
-                        // Simulate variable network speed (0.5x to 3x base speed)
-                        var speedMultiplier = 0.5 + (random.NextDouble() * 2.5);
-                        var currentSpeedMBps = baseSpeedMBps * speedMultiplier;
+                        currentStep++;
+                        var progressPercent = (currentStep / totalSteps) * 100;
+                        ProgressPercentage = Math.Min(progressPercent, 95);
                         
-                        // Calculate how much to download in this interval
-                        var mbToDownload = currentSpeedMBps * timeDelta;
-                        downloadedMB = Math.Min(downloadedMB + mbToDownload, totalMB);
+                        ProgressDetails = $"TEST: {phaseName} ({progressPercent:F0}%)";
                         
-                        var progressPercent = (downloadedMB / totalMB) * 100;
-                        ProgressPercentage = Math.Min(progressPercent, 95); // Cap at 95% until "extraction"
-                        
-                        // Calculate actual speed for this interval
-                        var actualSpeedMBps = (downloadedMB - lastDownloadedMB) / timeDelta;
-                        
-                        ProgressDetails = $"{downloadedMB:F1} MB / {totalMB:F1} MB ({progressPercent:F0}%) - {actualSpeedMBps:F1} MB/s";
-                        
-                        // Update status based on progress
-                        if (progressPercent < 25)
-                            StatusMessage = "TEST: Laster ned Chromium browser...";
-                        else if (progressPercent < 50)
-                            StatusMessage = "TEST: Nedlasting pågår...";
-                        else if (progressPercent < 75)
-                            StatusMessage = "TEST: Mer enn halvveis...";
-                        else if (progressPercent < 90)
-                            StatusMessage = "TEST: Nesten ferdig...";
-                        else
-                            StatusMessage = "TEST: Fullfører nedlasting...";
-                        
-                        lastUpdateTime = now;
-                        lastDownloadedMB = downloadedMB;
+                        // Variable delay to simulate real work
+                        var delay = 50 + random.Next(0, 100);
+                        await Task.Delay(delay, cancellationToken);
                     }
-                    
-                    // Small delay to prevent busy waiting
-                    await Task.Delay(100, cancellationToken);
-                }
-                
-                // Simulate extraction phase
-                if (!cancellationToken.IsCancellationRequested)
-                {
-                    StatusMessage = "TEST: Pakker ut Chromium...";
-                    ProgressPercentage = 95;
-                    ProgressDetails = $"{totalMB:F1} MB nedlastet - pakker ut...";
-                    await Task.Delay(1000, cancellationToken);
-                    
-                    ProgressPercentage = 98;
-                    ProgressDetails = "TEST: Sjekker installasjon...";
-                    await Task.Delay(500, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
