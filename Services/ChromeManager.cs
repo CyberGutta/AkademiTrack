@@ -73,10 +73,10 @@ namespace AkademiTrack.Services
             if (args.Contains("--test-private-chrome"))
             {
                 Debug.WriteLine("[ChromeManager] TEST MODE: Testing private Chrome path");
-                var privateChrome = GetPrivateChromeInstallPath();
-                if (File.Exists(privateChrome))
+                var testPrivateChrome = GetPrivateChromeInstallPath();
+                if (File.Exists(testPrivateChrome))
                 {
-                    return privateChrome;
+                    return testPrivateChrome;
                 }
                 else
                 {
