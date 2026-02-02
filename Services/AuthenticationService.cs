@@ -187,7 +187,8 @@ namespace AkademiTrack.Services
                 }
                 
                 // Use the new ChromeManager for cross-platform Chrome detection/installation
-                browser = await ChromeManager.LaunchBrowserAsync(headless: true);
+                // Prefer Chromium for automation to avoid dock visibility issues
+                browser = await ChromeManager.LaunchBrowserAsync(headless: true, preferChromiumForAutomation: true);
 
                 page = await browser.NewPageAsync();
                 await page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 });

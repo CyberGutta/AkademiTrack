@@ -56,7 +56,7 @@ namespace AkademiTrack.Services
             [OSPlatform.Linux] = "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
         };
 
-        public static async Task<string?> GetChromeExecutablePathAsync(bool forceRefresh = false)
+        public static async Task<string?> GetChromeExecutablePathAsync(bool forceRefresh = false, bool preferChromiumForAutomation = false)
         {
             // Test mode: Force specific scenarios
             var args = Environment.GetCommandLineArgs();
@@ -69,6 +69,31 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine("[ChromeManager] TEST MODE: Forcing Chrome installation");
                 return await InstallChromePrivatelyAsync();
+            }
+
+            // If preferring Chromium for automation (to avoid dock issues), skip system Chrome
+            if (preferChromiumForAutomation)
+            {
+                Debug.WriteLine("[ChromeManager] Preferring Chromium for automation to avoid dock visibility");
+                
+                // Check for app-private Chrome first
+                var privateChrome = GetPrivateChromeInstallPath();
+                if (File.Exists(privateChrome))
+                {
+                    Debug.WriteLine($"[ChromeManager] ✅ Found private Chrome: {privateChrome}");
+                    _cachedChromePath = privateChrome;
+                    _lastCacheTime = DateTime.Now;
+                    return privateChrome;
+                }
+                
+                // Fall back to Chromium
+                var chromiumPath = await FallbackToChromiumAsync();
+                if (!string.IsNullOrEmpty(chromiumPath))
+                {
+                    _cachedChromePath = chromiumPath;
+                    _lastCacheTime = DateTime.Now;
+                }
+                return chromiumPath;
             }
 
             // Use cache unless forced refresh or cache expired
@@ -474,9 +499,9 @@ namespace AkademiTrack.Services
             }
         }
 
-        public static async Task<IBrowser> LaunchBrowserAsync(bool headless = true)
+        public static async Task<IBrowser> LaunchBrowserAsync(bool headless = true, bool preferChromiumForAutomation = true)
         {
-            var executablePath = await GetChromeExecutablePathAsync();
+            var executablePath = await GetChromeExecutablePathAsync(forceRefresh: false, preferChromiumForAutomation: preferChromiumForAutomation);
             
             if (string.IsNullOrEmpty(executablePath))
             {
@@ -501,7 +526,31 @@ namespace AkademiTrack.Services
                     "--disable-extensions",
                     "--disable-background-timer-throttling",
                     "--disable-backgrounding-occluded-windows",
-                    "--disable-renderer-backgrounding"
+                    "--disable-renderer-backgrounding",
+                    "--disable-features=VizDisplayCompositor",
+                    "--disable-ipc-flooding-protection",
+                    "--disable-renderer-backgrounding",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-features=TranslateUI,BlinkGenPropertyTrees",
+                    "--disable-background-networking",
+                    "--disable-sync",
+                    "--disable-translate",
+                    "--aggressive-cache-discard",
+                    "--disable-plugins",
+                    "--incognito", // Use incognito mode
+                    "--silent-launch", // Prevent Chrome from showing in dock/taskbar
+                    "--no-startup-window", // Don't show startup window
+                    "--disable-background-mode", // Disable background mode
+                    "--disable-component-update", // Disable component updates
+                    "--disable-domain-reliability", // Disable domain reliability
+                    "--disable-features=MediaRouter", // Disable media router
+                    "--disable-print-preview", // Disable print preview
+                    "--disable-speech-api", // Disable speech API
+                    "--hide-scrollbars", // Hide scrollbars
+                    "--mute-audio", // Mute audio
+                    "--no-pings", // Disable pings
+                    "--no-zygote", // Disable zygote process
+                    "--single-process" // Use single process (helps with dock visibility)
                 }
             };
 
@@ -511,7 +560,19 @@ namespace AkademiTrack.Services
                 launchOptions.Args = launchOptions.Args.Concat(new[]
                 {
                     "--disable-background-mode",
-                    "--disable-features=TranslateUI"
+                    "--disable-features=TranslateUI",
+                    "--app=data:text/html,<html></html>", // Run as app mode to hide from dock
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox"
+                }).ToArray();
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                launchOptions.Args = launchOptions.Args.Concat(new[]
+                {
+                    "--disable-background-mode",
+                    "--no-startup-window"
                 }).ToArray();
             }
 
@@ -527,7 +588,7 @@ namespace AkademiTrack.Services
                 Debug.WriteLine("[ChromeManager] Attempting runtime recovery...");
                 
                 // Force refresh - don't use cached paths
-                var fallbackPath = await GetChromeExecutablePathAsync(forceRefresh: true);
+                var fallbackPath = await GetChromeExecutablePathAsync(forceRefresh: true, preferChromiumForAutomation: preferChromiumForAutomation);
                 
                 if (!string.IsNullOrEmpty(fallbackPath) && fallbackPath != executablePath)
                 {
