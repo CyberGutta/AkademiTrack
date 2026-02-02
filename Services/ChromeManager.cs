@@ -70,6 +70,20 @@ namespace AkademiTrack.Services
                 Debug.WriteLine("[ChromeManager] TEST MODE: Forcing Chrome installation");
                 return await InstallChromePrivatelyAsync();
             }
+            if (args.Contains("--test-private-chrome"))
+            {
+                Debug.WriteLine("[ChromeManager] TEST MODE: Testing private Chrome path");
+                var privateChrome = GetPrivateChromeInstallPath();
+                if (File.Exists(privateChrome))
+                {
+                    return privateChrome;
+                }
+                else
+                {
+                    Debug.WriteLine("[ChromeManager] TEST MODE: Private Chrome not found, installing...");
+                    return await InstallChromePrivatelyAsync();
+                }
+            }
 
             // If preferring Chromium for automation (to avoid dock issues), skip system Chrome
             if (preferChromiumForAutomation)
@@ -153,31 +167,46 @@ namespace AkademiTrack.Services
         {
             var currentPlatform = GetCurrentPlatform();
             if (!SystemChromePaths.ContainsKey(currentPlatform))
+            {
+                Debug.WriteLine($"[ChromeManager] No Chrome paths defined for platform: {currentPlatform}");
                 return null;
+            }
 
             var paths = SystemChromePaths[currentPlatform];
+            Debug.WriteLine($"[ChromeManager] Checking {paths.Length} system Chrome paths for {currentPlatform}:");
             
             foreach (var path in paths)
             {
                 try
                 {
                     var expandedPath = Environment.ExpandEnvironmentVariables(path);
+                    Debug.WriteLine($"[ChromeManager]   Checking: {expandedPath}");
+                    
                     if (File.Exists(expandedPath))
                     {
                         // Verify it's actually executable
                         if (IsExecutableValid(expandedPath))
                         {
-                            Debug.WriteLine($"[ChromeManager] System browser found: {expandedPath}");
+                            Debug.WriteLine($"[ChromeManager] ✅ System browser found: {expandedPath}");
                             return expandedPath;
                         }
+                        else
+                        {
+                            Debug.WriteLine($"[ChromeManager] ❌ File exists but invalid: {expandedPath}");
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[ChromeManager] ❌ Not found: {expandedPath}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[ChromeManager] Error checking path {path}: {ex.Message}");
+                    Debug.WriteLine($"[ChromeManager] ❌ Error checking path {path}: {ex.Message}");
                 }
             }
 
+            Debug.WriteLine("[ChromeManager] No system Chrome found");
             return null;
         }
 
