@@ -140,43 +140,31 @@ namespace AkademiTrack.Services
                 Environment.SetEnvironmentVariable("CHROME_KEYCHAIN", "0");
                 Environment.SetEnvironmentVariable("CHROME_PASSWORD_STORE", "basic");
                 
-                // Use bundled Chromium or fallback to download
+                // Ensure Chromium is downloaded and working with consistent cache directory
                 var chromiumCacheDir = GetChromiumCacheDirectory();
                 var chromiumBrowserFetcher = new BrowserFetcher(new BrowserFetcherOptions
                 {
                     Path = chromiumCacheDir
                 });
                 
-                // Check if we have bundled Chromium first
-                var installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
-                var bundledChromiumPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "chromium-cache");
-                bool usingBundledChromium = Directory.Exists(bundledChromiumPath);
-                
-                if (!installedBrowsers.Any() && !usingBundledChromium)
+                try
                 {
-                    try
-                    {
-                        Debug.WriteLine("[PUPPETEER] No bundled Chromium found, downloading...");
-                        var downloadedBrowser = await chromiumBrowserFetcher.DownloadAsync();
-                        Debug.WriteLine($"[PUPPETEER] Chromium downloaded at: {downloadedBrowser?.GetExecutablePath()}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[PUPPETEER] Failed to download Chromium: {ex.Message}");
-                        return new AuthenticationResult 
-                        { 
-                            Success = false, 
-                            ErrorMessage = $"Kunne ikke laste ned nødvendige komponenter for automatisering. Vennligst start appen på nytt eller kontakt support. Feil: {ex.Message}" 
-                        };
-                    }
+                    Debug.WriteLine("[PUPPETEER] Downloading/verifying Chromium...");
+                    var downloadedBrowser = await chromiumBrowserFetcher.DownloadAsync();
+                    Debug.WriteLine($"[PUPPETEER] Chromium ready at: {downloadedBrowser?.GetExecutablePath()}");
                 }
-                else if (usingBundledChromium)
+                catch (Exception ex)
                 {
-                    Debug.WriteLine("[PUPPETEER] Using bundled Chromium");
+                    Debug.WriteLine($"[PUPPETEER] Failed to download Chromium: {ex.Message}");
+                    return new AuthenticationResult 
+                    { 
+                        Success = false, 
+                        ErrorMessage = $"Kunne ikke laste ned nødvendige komponenter for automatisering. Vennligst start appen på nytt eller kontakt support. Feil: {ex.Message}" 
+                    };
                 }
                 
                 // Launch browser with explicit cache directory
-                installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
+                var installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
                 var firstInstalledBrowser = installedBrowsers.FirstOrDefault();
                 
                 string? executablePath = null;
@@ -675,41 +663,7 @@ namespace AkademiTrack.Services
         
         private static string GetChromiumCacheDirectory()
         {
-            // EXTERNAL CHROMIUM APPROACH: Check for external signed Chromium first
-            var externalChromiumPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AkademiTrack-Chromium");
-            
-            if (Directory.Exists(externalChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using external signed Chromium at: {externalChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(externalChromiumPath);
-                }
-                
-                return externalChromiumPath;
-            }
-            
-            // Fallback: Check for bundled Chromium (legacy)
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var bundledChromiumPath = Path.Combine(appDirectory, "Assets", "chromium-cache");
-            
-            if (Directory.Exists(bundledChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using bundled Chromium at: {bundledChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(bundledChromiumPath);
-                }
-                
-                return bundledChromiumPath;
-            }
-            
-            // Final fallback: AppData directory for download
-            Debug.WriteLine("[CHROMIUM] No external or bundled Chromium found, falling back to AppData directory");
+            // Use a consistent cache directory regardless of how the app is launched
             var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
             
@@ -717,41 +671,6 @@ namespace AkademiTrack.Services
             Directory.CreateDirectory(cacheDir);
             
             return cacheDir;
-        }
-        
-        private static void EnsureExecutablePermissions(string chromiumPath)
-        {
-            try
-            {
-                // Find Chrome executable in the bundled path
-                var chromeExecutables = Directory.GetFiles(chromiumPath, "*Chrome*", SearchOption.AllDirectories)
-                    .Where(f => Path.GetFileName(f).Contains("Chrome") && !Path.GetExtension(f).Equals(".app", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                
-                foreach (var executable in chromeExecutables)
-                {
-                    if (File.Exists(executable))
-                    {
-                        Debug.WriteLine($"[CHROMIUM] Setting executable permissions for: {executable}");
-                        var process = new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "chmod",
-                                Arguments = $"+x \"{executable}\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CHROMIUM] Failed to set executable permissions: {ex.Message}");
-            }
         }
         
         private static string GetChromiumUserDataDirectory()

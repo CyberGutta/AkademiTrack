@@ -275,9 +275,6 @@ namespace AkademiTrack.Services
                 
                 // Check if browser is already installed first
                 var installedBrowsers = browserFetcher.GetInstalledBrowsers();
-                var bundledChromiumPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "chromium-cache");
-                bool usingBundledChromium = Directory.Exists(bundledChromiumPath);
-                
                 if (installedBrowsers.Any())
                 {
                     var browser = installedBrowsers.First();
@@ -286,50 +283,31 @@ namespace AkademiTrack.Services
                     if (!string.IsNullOrEmpty(executablePath) && File.Exists(executablePath))
                     {
                         stopwatch.Stop();
-                        string details = usingBundledChromium ? 
-                            $"Bundled Chromium klar på {stopwatch.ElapsedMilliseconds}ms" :
-                            $"Chromium installert og klar på {stopwatch.ElapsedMilliseconds}ms";
-                        
                         return new HealthCheckResult
                         {
                             ComponentName = "Browser Driver",
                             Status = HealthStatus.Healthy,
                             Message = "Tilgjengelig",
                             ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                            Details = details
+                            Details = $"Chromium installert og klar på {stopwatch.ElapsedMilliseconds}ms"
                         };
                     }
                 }
                 
-                // If not installed and no bundled version, try to download
-                if (!usingBundledChromium)
+                // If not installed, try to download
+                var revisionInfo = await browserFetcher.DownloadAsync();
+                
+                if (revisionInfo != null)
                 {
-                    var revisionInfo = await browserFetcher.DownloadAsync();
-                    
-                    if (revisionInfo != null)
+                    stopwatch.Stop();
+                    return new HealthCheckResult
                     {
-                        stopwatch.Stop();
-                        return new HealthCheckResult
-                        {
-                            ComponentName = "Browser Driver",
-                            Status = HealthStatus.Healthy,
-                            Message = "Tilgjengelig",
-                            ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                            Details = $"Chromium lastet ned og klar på {stopwatch.ElapsedMilliseconds}ms"
-                        };
-                    }
-                    else
-                    {
-                        stopwatch.Stop();
-                        return new HealthCheckResult
-                        {
-                            ComponentName = "Browser Driver",
-                            Status = HealthStatus.Error,
-                            Message = "Browser feil",
-                            ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                            Details = "Chromium kunne ikke lastes ned"
-                        };
-                    }
+                        ComponentName = "Browser Driver",
+                        Status = HealthStatus.Healthy,
+                        Message = "Tilgjengelig",
+                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                        Details = $"Chromium lastet ned og klar på {stopwatch.ElapsedMilliseconds}ms"
+                    };
                 }
                 else
                 {
@@ -340,7 +318,7 @@ namespace AkademiTrack.Services
                         Status = HealthStatus.Error,
                         Message = "Browser feil",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = "Bundled Chromium ikke funnet eller skadet"
+                        Details = "Chromium kunne ikke lastes ned"
                     };
                 }
             }
@@ -373,41 +351,7 @@ namespace AkademiTrack.Services
         
         private static string GetChromiumCacheDirectory()
         {
-            // EXTERNAL CHROMIUM APPROACH: Check for external signed Chromium first
-            var externalChromiumPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AkademiTrack-Chromium");
-            
-            if (Directory.Exists(externalChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using external signed Chromium at: {externalChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(externalChromiumPath);
-                }
-                
-                return externalChromiumPath;
-            }
-            
-            // Fallback: Check for bundled Chromium (legacy)
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var bundledChromiumPath = Path.Combine(appDirectory, "Assets", "chromium-cache");
-            
-            if (Directory.Exists(bundledChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using bundled Chromium at: {bundledChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(bundledChromiumPath);
-                }
-                
-                return bundledChromiumPath;
-            }
-            
-            // Final fallback: AppData directory for download
-            Debug.WriteLine("[CHROMIUM] No external or bundled Chromium found, falling back to AppData directory");
+            // Use a consistent cache directory regardless of how the app is launched
             var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
             
@@ -415,41 +359,6 @@ namespace AkademiTrack.Services
             Directory.CreateDirectory(cacheDir);
             
             return cacheDir;
-        }
-        
-        private static void EnsureExecutablePermissions(string chromiumPath)
-        {
-            try
-            {
-                // Find Chrome executable in the bundled path
-                var chromeExecutables = Directory.GetFiles(chromiumPath, "*Chrome*", SearchOption.AllDirectories)
-                    .Where(f => Path.GetFileName(f).Contains("Chrome") && !Path.GetExtension(f).Equals(".app", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                
-                foreach (var executable in chromeExecutables)
-                {
-                    if (File.Exists(executable))
-                    {
-                        Debug.WriteLine($"[CHROMIUM] Setting executable permissions for: {executable}");
-                        var process = new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "chmod",
-                                Arguments = $"+x \"{executable}\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CHROMIUM] Failed to set executable permissions: {ex.Message}");
-            }
         }
     }
 }
