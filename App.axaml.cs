@@ -136,10 +136,34 @@ namespace AkademiTrack
         {
             try
             {
+                Debug.WriteLine("[App] Starting app initialization...");
+                
+                // STEP 1: Perform one-time migration cleanup (must be first!)
+                Debug.WriteLine("[App] Checking for one-time migration...");
+                var migrationPerformed = await MigrationService.PerformOneTimeMigrationAsync();
+                
+                if (migrationPerformed)
+                {
+                    Debug.WriteLine("[App] ✅ One-time migration completed - old credentials cleared to prevent login loops");
+                }
+                else
+                {
+                    Debug.WriteLine("[App] ✅ No migration needed - user already migrated or is new");
+                }
+                
+                // STEP 2: Check WebKit dependencies
                 Debug.WriteLine("[App] Checking if WebKit dependencies need to be downloaded...");
                 
                 // Check for test mode argument or force dependency window
                 var args = Environment.GetCommandLineArgs();
+                
+                // Handle migration reset for testing
+                if (args.Contains("--reset-migration"))
+                {
+                    Debug.WriteLine("[App] Resetting migration for testing...");
+                    MigrationService.ResetMigrationForTesting();
+                }
+                
                 bool forceShowDependencyWindow = args.Contains("--test-dependency-window") || 
                                                args.Contains("--force-dependency-download") ||
                                                args.Contains("--reinstall-webkit");
