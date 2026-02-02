@@ -41,12 +41,20 @@
 		<None Include="Assets/Helpers/AkademiTrack.app\**\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<!-- Bundle Chromium for macOS -->
+		<None Include="Assets/chromium-cache\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 	<ItemGroup Condition="'$(OS)' == 'Windows_NT'">
 		<Content Include="Assets/Helpers/WinHelloAuth.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
+		<!-- Bundle Chromium for Windows -->
+		<None Include="Assets/chromium-cache\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 	
 	<ItemGroup>
