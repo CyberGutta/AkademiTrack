@@ -524,47 +524,31 @@ namespace AkademiTrack.Services
                     "--no-default-browser-check",
                     "--disable-default-apps",
                     "--disable-extensions",
-                    "--disable-background-timer-throttling",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-renderer-backgrounding",
+                    "--disable-web-security", // Speed up by disabling security checks
                     "--disable-features=VizDisplayCompositor",
+                    "--blink-settings=imagesEnabled=false", // Disable images for speed
+                    "--disable-background-networking",
+                    "--disable-sync",
+                    "--disable-translate",
                     "--disable-ipc-flooding-protection",
                     "--disable-renderer-backgrounding",
                     "--disable-backgrounding-occluded-windows",
                     "--disable-features=TranslateUI,BlinkGenPropertyTrees",
-                    "--disable-background-networking",
-                    "--disable-sync",
-                    "--disable-translate",
                     "--aggressive-cache-discard",
                     "--disable-plugins",
-                    "--incognito", // Use incognito mode
-                    "--silent-launch", // Prevent Chrome from showing in dock/taskbar
-                    "--no-startup-window", // Don't show startup window
-                    "--disable-background-mode", // Disable background mode
-                    "--disable-component-update", // Disable component updates
-                    "--disable-domain-reliability", // Disable domain reliability
-                    "--disable-features=MediaRouter", // Disable media router
-                    "--disable-print-preview", // Disable print preview
-                    "--disable-speech-api", // Disable speech API
-                    "--hide-scrollbars", // Hide scrollbars
-                    "--mute-audio", // Mute audio
-                    "--no-pings", // Disable pings
-                    "--no-zygote", // Disable zygote process
-                    "--single-process" // Use single process (helps with dock visibility)
+                    "--incognito"
                 }
             };
 
-            // Add platform-specific args
+            // Add platform-specific args for dock hiding and speed
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 launchOptions.Args = launchOptions.Args.Concat(new[]
                 {
                     "--disable-background-mode",
-                    "--disable-features=TranslateUI",
-                    "--app=data:text/html,<html></html>", // Run as app mode to hide from dock
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox"
+                    "--app=data:text/html,<html></html>", // Hide from dock
+                    "--use-mock-keychain", // Prevent keychain popup
+                    "--password-store=basic" // Use basic password store
                 }).ToArray();
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))

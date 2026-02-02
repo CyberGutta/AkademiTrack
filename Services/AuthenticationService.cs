@@ -221,7 +221,7 @@ namespace AkademiTrack.Services
 
                 Debug.WriteLine("[PUPPETEER] Navigating to login page");
                 await page.GoToAsync("https://iskole.net/elev/?ojr=login");
-                await Task.Delay(2000);
+                await Task.Delay(800); // Reduced from 2000ms to 800ms
 
                 // Click FEIDE button
                 Debug.WriteLine("[PUPPETEER] Clicking FEIDE button");
@@ -281,7 +281,7 @@ namespace AkademiTrack.Services
                         // Last resort: use search method
                         await page.ClickAsync("#org_selector_filter");
                         await page.TypeAsync("#org_selector_filter", _schoolName);
-                        await Task.Delay(1000);
+                        await Task.Delay(300); // Reduced from 1000ms to 300ms
                         await page.WaitForSelectorAsync("li.orglist_item.match", new WaitForSelectorOptions { Timeout = 5000 });
                         await page.ClickAsync("li.orglist_item.match");
                         schoolFound = true;
@@ -291,7 +291,7 @@ namespace AkademiTrack.Services
                 if (schoolFound)
                 {
                     // Small delay to ensure school selection is registered
-                    await Task.Delay(500);
+                    await Task.Delay(200); // Reduced from 500ms to 200ms
                     Debug.WriteLine("➡️ [PUPPETEER] Clicking Continue button to proceed with selected school");
                     await page.ClickAsync("#selectorg_button");
                 }
