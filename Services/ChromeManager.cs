@@ -77,23 +77,23 @@ namespace AkademiTrack.Services
                 Debug.WriteLine("[ChromeManager] Preferring Chromium for automation to avoid dock visibility");
                 
                 // Check for app-private Chrome first
-                var privateChrome = GetPrivateChromeInstallPath();
-                if (File.Exists(privateChrome))
+                var privateChromeForAutomation = GetPrivateChromeInstallPath();
+                if (File.Exists(privateChromeForAutomation))
                 {
-                    Debug.WriteLine($"[ChromeManager] ✅ Found private Chrome: {privateChrome}");
-                    _cachedChromePath = privateChrome;
+                    Debug.WriteLine($"[ChromeManager] ✅ Found private Chrome: {privateChromeForAutomation}");
+                    _cachedChromePath = privateChromeForAutomation;
                     _lastCacheTime = DateTime.Now;
-                    return privateChrome;
+                    return privateChromeForAutomation;
                 }
                 
                 // Fall back to Chromium
-                var chromiumPath = await FallbackToChromiumAsync();
-                if (!string.IsNullOrEmpty(chromiumPath))
+                var chromiumPathForAutomation = await FallbackToChromiumAsync();
+                if (!string.IsNullOrEmpty(chromiumPathForAutomation))
                 {
-                    _cachedChromePath = chromiumPath;
+                    _cachedChromePath = chromiumPathForAutomation;
                     _lastCacheTime = DateTime.Now;
                 }
-                return chromiumPath;
+                return chromiumPathForAutomation;
             }
 
             // Use cache unless forced refresh or cache expired
