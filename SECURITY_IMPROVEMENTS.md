@@ -72,7 +72,7 @@
 
 4. **AuthenticationService oppdatert**
    - Validerer alle inputs før bruk
-   - Sanitiserer data før Puppeteer
+   - Sanitiserer data før Playwright
    - Sikker håndtering av credentials
 
 ## 💾 Memory Management (FULLFØRT)

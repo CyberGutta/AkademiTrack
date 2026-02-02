@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using PuppeteerSharp;
+using Microsoft.Playwright;
 using System.Security;
 using System.Text.Json;
 using System.Runtime.InteropServices;
@@ -55,9 +55,9 @@ namespace AkademiTrack.Services
                     }
                 }
 
-                // Need fresh login with PuppeteerSharp
-                Debug.WriteLine("[AUTH] Performing fresh login with PuppeteerSharp");
-                return await PerformPuppeteerLoginAsync();
+                // Need fresh login with Playwright
+                Debug.WriteLine("[AUTH] Performing fresh login with Playwright");
+                return await PerformPlaywrightLoginAsync();
             }
             catch (Exception ex)
             {
@@ -127,136 +127,88 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<AuthenticationResult> PerformPuppeteerLoginAsync()
+        private async Task<AuthenticationResult> PerformPlaywrightLoginAsync()
         {
             IBrowser? browser = null;
             IPage? page = null;
 
             try
             {
-                Debug.WriteLine("[PUPPETEER] Starting browser");
+                Debug.WriteLine("[PLAYWRIGHT] Starting WebKit browser");
                 
-                // Set environment variables to disable keychain access
-                Environment.SetEnvironmentVariable("CHROME_KEYCHAIN", "0");
-                Environment.SetEnvironmentVariable("CHROME_PASSWORD_STORE", "basic");
-                
-                // Use bundled Chromium or fallback to download
-                var chromiumCacheDir = GetChromiumCacheDirectory();
-                var chromiumBrowserFetcher = new BrowserFetcher(new BrowserFetcherOptions
+                // Ensure WebKit is installed
+                var webkitInstalled = await WebKitManager.EnsureWebKitInstalledAsync();
+                if (!webkitInstalled)
                 {
-                    Path = chromiumCacheDir
-                });
-                
-                // Check if we have bundled Chromium first
-                var installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
-                var bundledChromiumPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "chromium-cache");
-                bool usingBundledChromium = Directory.Exists(bundledChromiumPath);
-                
-                if (!installedBrowsers.Any() && !usingBundledChromium)
-                {
-                    try
-                    {
-                        Debug.WriteLine("[PUPPETEER] No bundled Chromium found, downloading...");
-                        var downloadedBrowser = await chromiumBrowserFetcher.DownloadAsync();
-                        Debug.WriteLine($"[PUPPETEER] Chromium downloaded at: {downloadedBrowser?.GetExecutablePath()}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[PUPPETEER] Failed to download Chromium: {ex.Message}");
-                        return new AuthenticationResult 
-                        { 
-                            Success = false, 
-                            ErrorMessage = $"Kunne ikke laste ned nødvendige komponenter for automatisering. Vennligst start appen på nytt eller kontakt support. Feil: {ex.Message}" 
-                        };
-                    }
+                    return new AuthenticationResult 
+                    { 
+                        Success = false, 
+                        ErrorMessage = "Kunne ikke installere WebKit-nettleser. Vennligst start appen på nytt eller kontakt support." 
+                    };
                 }
-                else if (usingBundledChromium)
-                {
-                    Debug.WriteLine("[PUPPETEER] Using bundled Chromium");
-                }
-                
-                // Launch browser with explicit cache directory
-                installedBrowsers = chromiumBrowserFetcher.GetInstalledBrowsers();
-                var firstInstalledBrowser = installedBrowsers.FirstOrDefault();
-                
-                string? executablePath = null;
-                if (firstInstalledBrowser != null)
-                {
-                    executablePath = firstInstalledBrowser.GetExecutablePath();
-                    Debug.WriteLine($"[PUPPETEER] Using Chromium at: {executablePath}");
-                }
-                
-                // Use the new ChromeManager for cross-platform Chrome detection/installation
-                // Prefer Chromium for automation to avoid dock visibility issues
-                browser = await ChromeManager.LaunchBrowserAsync(headless: true, preferChromiumForAutomation: true);
 
+                // Launch WebKit browser (headless)
+                browser = await WebKitManager.LaunchBrowserAsync(headless: true);
                 page = await browser.NewPageAsync();
-                await page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 });
+                
+                // Set viewport
+                await page.SetViewportSizeAsync(1920, 1080);
 
                 // Block CSS and other resources for faster loading
-                await page.SetRequestInterceptionAsync(true);
-                page.Request += async (sender, e) =>
+                await page.RouteAsync("**/*", async route =>
                 {
-                    try
+                    var request = route.Request;
+                    // Block CSS, fonts, and images to speed up loading
+                    if (request.ResourceType == "stylesheet" || 
+                        request.ResourceType == "font" ||
+                        request.ResourceType == "image")
                     {
-                        var request = e.Request;
-                        // Block CSS, fonts, and images to speed up loading
-                        if (request.ResourceType == ResourceType.StyleSheet || 
-                            request.ResourceType == ResourceType.Font ||
-                            request.ResourceType == ResourceType.Image)
-                        {
-                            await request.AbortAsync();
-                        }
-                        else
-                        {
-                            await request.ContinueAsync();
-                        }
+                        await route.AbortAsync();
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        // Silently handle request interception errors to prevent notifications
-                        Debug.WriteLine($"Request interception error (ignored): {ex.Message}");
+                        await route.ContinueAsync();
                     }
-                };
+                });
 
-                Debug.WriteLine("[PUPPETEER] Navigating to login page");
-                await page.GoToAsync("https://iskole.net/elev/?ojr=login");
+                Debug.WriteLine("[PLAYWRIGHT] Navigating to login page");
+                await page.GotoAsync("https://iskole.net/elev/?ojr=login");
                 await Task.Delay(800); // Reduced from 2000ms to 800ms
 
                 // Click FEIDE button
-                Debug.WriteLine("[PUPPETEER] Clicking FEIDE button");
-                await page.WaitForSelectorAsync("button:has(span.feide_icon)", new WaitForSelectorOptions { Timeout = 10000 });
+                Debug.WriteLine("[PLAYWRIGHT] Clicking FEIDE button");
+                await page.WaitForSelectorAsync("button:has(span.feide_icon)", new PageWaitForSelectorOptions { Timeout = 10000 });
                 await page.ClickAsync("button:has(span.feide_icon)");
-                await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 15000 });
 
                 // Handle organization selection - directly click on school from list without using search
-                Debug.WriteLine("[PUPPETEER] Selecting organization directly from list");
+                Debug.WriteLine("[PLAYWRIGHT] Selecting organization directly from list");
                 
                 // Wait for the organization list to be present in DOM
-                await page.WaitForSelectorAsync("#orglist", new WaitForSelectorOptions { Timeout = 10000 });
+                await page.WaitForSelectorAsync("#orglist", new PageWaitForSelectorOptions { Timeout = 10000 });
                 
                 // Find and click the school by matching org_name attribute (case-insensitive)
                 var schoolNameLower = _schoolName.ToLowerInvariant();
-                Debug.WriteLine($"[PUPPETEER] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
+                Debug.WriteLine($"[PLAYWRIGHT] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
                 
                 // Use a more specific selector to find all school items
                 var schoolSelector = "li.orglist_item[org_name]";
-                await page.WaitForSelectorAsync(schoolSelector, new WaitForSelectorOptions { Timeout = 5000 });
+                await page.WaitForSelectorAsync(schoolSelector, new PageWaitForSelectorOptions { Timeout = 5000 });
                 
                 // Get all school elements and find the matching one
                 var schoolElements = await page.QuerySelectorAllAsync(schoolSelector);
                 bool schoolFound = false;
                 
-                Debug.WriteLine($"[PUPPETEER] Found {schoolElements.Length} schools in the list");
+                Debug.WriteLine($"[PLAYWRIGHT] Found {schoolElements.Count} schools in the list");
                 
                 foreach (var element in schoolElements)
                 {
-                    var orgName = await page.EvaluateFunctionAsync<string>("el => el.getAttribute('org_name')", element);
-                    Debug.WriteLine($"[PUPPETEER] Checking school: '{orgName}'");
+                    var orgName = await element.GetAttributeAsync("org_name");
+                    Debug.WriteLine($"[PLAYWRIGHT] Checking school: '{orgName}'");
                     
                     if (!string.IsNullOrEmpty(orgName) && orgName.ToLowerInvariant().Contains(schoolNameLower))
                     {
-                        Debug.WriteLine($"✅ [PUPPETEER] Found matching school: '{orgName}' - clicking it");
+                        Debug.WriteLine($"✅ [PLAYWRIGHT] Found matching school: '{orgName}' - clicking it");
                         await element.ClickAsync();
                         schoolFound = true;
                         break;
@@ -265,24 +217,24 @@ namespace AkademiTrack.Services
                 
                 if (!schoolFound)
                 {
-                    Debug.WriteLine($"[PUPPETEER] School '{_schoolName}' not found in list, trying alternative approach");
+                    Debug.WriteLine($"[PLAYWRIGHT] School '{_schoolName}' not found in list, trying alternative approach");
                     
                     // Try to find by text content instead of attribute
-                    var schoolByText = await page.QuerySelectorAsync($"li.orglist_item:has(.orglist_name:contains('{_schoolName}'))");
+                    var schoolByText = await page.QuerySelectorAsync($"li.orglist_item:has-text('{_schoolName}')");
                     if (schoolByText != null)
                     {
-                        Debug.WriteLine($"✅ [PUPPETEER] Found school by text content - clicking it");
+                        Debug.WriteLine($"✅ [PLAYWRIGHT] Found school by text content - clicking it");
                         await schoolByText.ClickAsync();
                         schoolFound = true;
                     }
                     else
                     {
-                        Debug.WriteLine($"[PUPPETEER] School not found by any method, falling back to search");
+                        Debug.WriteLine($"[PLAYWRIGHT] School not found by any method, falling back to search");
                         // Last resort: use search method
                         await page.ClickAsync("#org_selector_filter");
-                        await page.TypeAsync("#org_selector_filter", _schoolName);
+                        await page.FillAsync("#org_selector_filter", _schoolName);
                         await Task.Delay(300); // Reduced from 1000ms to 300ms
-                        await page.WaitForSelectorAsync("li.orglist_item.match", new WaitForSelectorOptions { Timeout = 5000 });
+                        await page.WaitForSelectorAsync("li.orglist_item.match", new PageWaitForSelectorOptions { Timeout = 5000 });
                         await page.ClickAsync("li.orglist_item.match");
                         schoolFound = true;
                     }
@@ -292,25 +244,25 @@ namespace AkademiTrack.Services
                 {
                     // Small delay to ensure school selection is registered
                     await Task.Delay(200); // Reduced from 500ms to 200ms
-                    Debug.WriteLine("➡️ [PUPPETEER] Clicking Continue button to proceed with selected school");
+                    Debug.WriteLine("➡️ [PLAYWRIGHT] Clicking Continue button to proceed with selected school");
                     await page.ClickAsync("#selectorg_button");
                 }
-                await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 15000 });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 15000 });
 
                 // Fill login form
-                Debug.WriteLine("[PUPPETEER] Filling login form");
-                await page.WaitForSelectorAsync("#username", new WaitForSelectorOptions { Timeout = 10000 });
-                await page.TypeAsync("#username", _loginEmail);
-                await page.TypeAsync("#password", SecureStringToString(_loginPasswordSecure));
+                Debug.WriteLine("[PLAYWRIGHT] Filling login form");
+                await page.WaitForSelectorAsync("#username", new PageWaitForSelectorOptions { Timeout = 10000 });
+                await page.FillAsync("#username", _loginEmail);
+                await page.FillAsync("#password", SecureStringToString(_loginPasswordSecure));
                 await page.ClickAsync("button[type='submit']");
 
                 // Wait for success
-                await page.WaitForNavigationAsync(new NavigationOptions { Timeout = 30000 });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
                 
                 var currentUrl = page.Url;
                 if (currentUrl.Contains("isFeideinnlogget=true"))
                 {
-                    Debug.WriteLine("[PUPPETEER] Login successful");
+                    Debug.WriteLine("[PLAYWRIGHT] Login successful");
                     
                     // Extract cookies and parameters
                     var cookies = await ExtractCookiesAsync(page);
@@ -327,7 +279,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[PUPPETEER] Error: {ex.Message}");
+                Debug.WriteLine($"[PLAYWRIGHT] Error: {ex.Message}");
                 return AuthenticationResult.CreateFailed($"Browser login error: {ex.Message}");
             }
             finally
@@ -341,7 +293,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var cookies = await page.GetCookiesAsync();
+                var cookies = await page.Context.CookiesAsync();
                 return cookies
                     .Where(c => c.Domain.Contains("iskole.net"))
                     .ToDictionary(c => c.Name, c => c.Value);
@@ -360,7 +312,7 @@ namespace AkademiTrack.Services
                 Debug.WriteLine("[PARAMS] Starting parameter extraction from VoUserData API");
                 
                 // Get cookies from the page first
-                var cookies = await page.GetCookiesAsync();
+                var cookies = await page.Context.CookiesAsync();
                 var cookieDict = cookies.Where(c => c.Domain.Contains("iskole.net"))
                                        .ToDictionary(c => c.Name, c => c.Value);
                 
@@ -643,125 +595,6 @@ namespace AkademiTrack.Services
             return secureString;
         }
         
-        private static string GetChromiumCacheDirectory()
-        {
-            // EXTERNAL CHROMIUM APPROACH: Check for external signed Chromium first
-            var externalChromiumPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AkademiTrack-Chromium");
-            
-            if (Directory.Exists(externalChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using external signed Chromium at: {externalChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(externalChromiumPath);
-                }
-                
-                return externalChromiumPath;
-            }
-            
-            // Fallback: Check for bundled Chromium (legacy)
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var bundledChromiumPath = Path.Combine(appDirectory, "Assets", "chromium-cache");
-            
-            if (Directory.Exists(bundledChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using bundled Chromium at: {bundledChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(bundledChromiumPath);
-                }
-                
-                return bundledChromiumPath;
-            }
-            
-            // Final fallback: AppData directory for download
-            Debug.WriteLine("[CHROMIUM] No external or bundled Chromium found, falling back to AppData directory");
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
-            
-            // Ensure directory exists
-            Directory.CreateDirectory(cacheDir);
-            
-            return cacheDir;
-        }
-        
-        private static void EnsureExecutablePermissions(string chromiumPath)
-        {
-            try
-            {
-                // Find Chrome executable in the bundled path
-                var chromeExecutables = Directory.GetFiles(chromiumPath, "*Chrome*", SearchOption.AllDirectories)
-                    .Where(f => Path.GetFileName(f).Contains("Chrome") && !Path.GetExtension(f).Equals(".app", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                
-                foreach (var executable in chromeExecutables)
-                {
-                    if (File.Exists(executable))
-                    {
-                        Debug.WriteLine($"[CHROMIUM] Setting executable permissions for: {executable}");
-                        var process = new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "chmod",
-                                Arguments = $"+x \"{executable}\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CHROMIUM] Failed to set executable permissions: {ex.Message}");
-            }
-        }
-        
-        private static string GetChromiumUserDataDirectory()
-        {
-            // Create isolated user data directory to prevent keychain access
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var userDataDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-userdata");
-            
-            // Ensure directory exists
-            Directory.CreateDirectory(userDataDir);
-            
-            // Create preferences file to disable keychain access
-            var defaultDir = Path.Combine(userDataDir, "Default");
-            Directory.CreateDirectory(defaultDir);
-            
-            var preferencesPath = Path.Combine(defaultDir, "Preferences");
-            if (!File.Exists(preferencesPath))
-            {
-                var preferences = new
-                {
-                    profile = new
-                    {
-                        password_manager_enabled = false,
-                        password_manager_leak_detection_enabled = false
-                    },
-                    credentials_enable_service = false,
-                    credentials_enable_autosignin = false,
-                    password_manager = new
-                    {
-                        os_password_store = "basic"
-                    }
-                };
-                
-                var json = System.Text.Json.JsonSerializer.Serialize(preferences, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(preferencesPath, json);
-            }
-            
-            return userDataDir;
-        }
-
         public void Dispose()
         {
             if (_disposed) return;

@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using PuppeteerSharp;
+using Microsoft.Playwright;
 using AkademiTrack.Services;
 
 namespace AkademiTrack.ViewModels
@@ -102,23 +102,49 @@ namespace AkademiTrack.ViewModels
                 var args = Environment.GetCommandLineArgs();
                 bool isTestMode = args.Contains("--test-dependency-window");
 
-                StatusMessage = "Sjekker Chrome/Chromium-status...";
+                StatusMessage = "Sjekker WebKit-status...";
                 
                 if (!isTestMode)
                 {
-                    // Use ChromeManager to handle all Chrome detection/installation
-                    StatusMessage = "Forbereder Chrome/Chromium...";
+                    // Use WebKitManager to handle all WebKit detection/installation
+                    StatusMessage = "Forbereder WebKit...";
                     ProgressDetails = "Sjekker installerte nettlesere...";
                     ShowProgressDetails = true;
                     
-                    var chromePath = await ChromeManager.GetChromeExecutablePathAsync();
-                    
-                    if (!string.IsNullOrEmpty(chromePath))
+                    // Create progress reporter to update UI
+                    var progress = new Progress<string>(message =>
                     {
-                        StatusMessage = "Chrome/Chromium klar!";
+                        ProgressDetails = message;
+                        
+                        // Extract percentage if available
+                        if (message.Contains("%"))
+                        {
+                            var parts = message.Split(':');
+                            if (parts.Length > 1 && parts[1].Trim().EndsWith("%"))
+                            {
+                                var percentStr = parts[1].Trim().Replace("%", "");
+                                if (int.TryParse(percentStr, out var percent))
+                                {
+                                    ProgressPercentage = percent;
+                                    IsIndeterminate = false;
+                                }
+                            }
+                        }
+                        else if (message.Contains("successfully"))
+                        {
+                            ProgressPercentage = 100;
+                            IsIndeterminate = false;
+                        }
+                    });
+                    
+                    var webkitInstalled = await WebKitManager.EnsureWebKitInstalledAsync(progress);
+                    
+                    if (webkitInstalled)
+                    {
+                        StatusMessage = "WebKit klar!";
                         ProgressPercentage = 100;
                         IsIndeterminate = false;
-                        ProgressDetails = $"Bruker: {Path.GetFileName(chromePath)}";
+                        ProgressDetails = "Bruker: WebKit";
                         
                         await Task.Delay(800, _cancellationTokenSource.Token);
                         await CompleteSuccessfully();
@@ -126,30 +152,29 @@ namespace AkademiTrack.ViewModels
                     }
                     else
                     {
-                        // This should rarely happen with ChromeManager's fallbacks
-                        StatusMessage = "Kunne ikke installere Chrome/Chromium";
+                        StatusMessage = "Kunne ikke installere WebKit";
                         HasError = true;
-                        ErrorMessage = "AkademiTrack kunne ikke finne eller installere en kompatibel nettleser.\n\n" +
-                                     "Vennligst installer Google Chrome manuelt og start AkademiTrack på nytt.";
+                        ErrorMessage = "AkademiTrack kunne ikke installere WebKit-nettleser.\n\n" +
+                                     "Vennligst sjekk internettforbindelsen og start AkademiTrack på nytt.";
                         DownloadFailed?.Invoke(this, ErrorMessage);
                         return;
                     }
                 }
                 else
                 {
-                    StatusMessage = "TEST MODE: Simulerer Chrome-sjekk...";
+                    StatusMessage = "TEST MODE: Simulerer WebKit-sjekk...";
                     ShowProgressDetails = true;
                     ProgressDetails = "TEST: Starter simulert sjekk...";
                     
                     await SimulateProgressAsync(_cancellationTokenSource.Token);
                     
-                    StatusMessage = "TEST: Chrome klar (simulert)";
-                    ProgressDetails = "TEST: Chrome klar (simulert)";
+                    StatusMessage = "TEST: WebKit klar (simulert)";
+                    ProgressDetails = "TEST: WebKit klar (simulert)";
                     ProgressPercentage = 95;
                     IsIndeterminate = false;
                     
                     await Task.Delay(1000, _cancellationTokenSource.Token);
-                    ProgressDetails = "TEST: Chrome klar (simulert)";
+                    ProgressDetails = "TEST: WebKit klar (simulert)";
                     
                     await CompleteSuccessfully();
                 }
@@ -164,7 +189,7 @@ namespace AkademiTrack.ViewModels
             {
                 StatusMessage = "Nettverksfeil";
                 HasError = true;
-                ErrorMessage = $"Kunne ikke laste ned Chrome: {ex.Message}";
+                ErrorMessage = $"Kunne ikke laste ned WebKit: {ex.Message}";
                 DownloadFailed?.Invoke(this, ErrorMessage);
             }
             catch (Exception ex)
@@ -183,7 +208,7 @@ namespace AkademiTrack.ViewModels
                 IsIndeterminate = false;
                 var random = new Random();
                 
-                // Simulate realistic Chrome detection/installation
+                // Simulate realistic WebKit detection/installation
                 var totalSteps = 100.0;
                 var currentStep = 0.0;
                 var startTime = DateTime.Now;
@@ -191,9 +216,9 @@ namespace AkademiTrack.ViewModels
                 
                 var phases = new[]
                 {
-                    ("Sjekker system Chrome...", 20),
-                    ("Laster ned Chrome installer...", 40),
-                    ("Installerer Chrome...", 30),
+                    ("Sjekker system WebKit...", 20),
+                    ("Laster ned WebKit installer...", 40),
+                    ("Installerer WebKit...", 30),
                     ("Verifiserer installasjon...", 10)
                 };
                 

@@ -136,13 +136,13 @@ namespace AkademiTrack
         {
             try
             {
-                Debug.WriteLine("[App] Checking if Chromium dependencies need to be downloaded...");
+                Debug.WriteLine("[App] Checking if WebKit dependencies need to be downloaded...");
                 
                 // Check for test mode argument or force dependency window
                 var args = Environment.GetCommandLineArgs();
                 bool forceShowDependencyWindow = args.Contains("--test-dependency-window") || 
                                                args.Contains("--force-dependency-download") ||
-                                               args.Contains("--reinstall-chromium");
+                                               args.Contains("--reinstall-webkit");
                 
                 Debug.WriteLine($"[App] Command line args: {string.Join(" ", args)}");
                 Debug.WriteLine($"[App] Force show dependency window: {forceShowDependencyWindow}");
@@ -150,21 +150,21 @@ namespace AkademiTrack
                 if (!forceShowDependencyWindow)
                 {
                     // Give it a moment to check properly - as requested by user
-                    Debug.WriteLine("[App] Taking a moment to verify Chromium installation...");
+                    Debug.WriteLine("[App] Taking a moment to verify WebKit installation...");
                     await Task.Delay(1000); // 1 second delay as requested
                     
-                    // More thorough check if Chromium is actually working
-                    bool chromiumWorking = await IsChromiumWorkingAsync();
+                    // More thorough check if WebKit is actually working
+                    bool webkitWorking = await IsWebKitWorkingAsync();
                     
-                    if (chromiumWorking)
+                    if (webkitWorking)
                     {
-                        Debug.WriteLine("[App] Chromium is working properly, continuing with normal flow");
+                        Debug.WriteLine("[App] WebKit is working properly, continuing with normal flow");
                         await Dispatcher.UIThread.InvokeAsync(() => ContinueNormalFlow(desktop));
                         return;
                     }
                     else
                     {
-                        Debug.WriteLine("[App] Chromium not working properly, need to download");
+                        Debug.WriteLine("[App] WebKit not working properly, need to install");
                     }
                 }
                 else
@@ -207,7 +207,7 @@ namespace AkademiTrack
                         if (!dependencyViewModel.IsCompleted)
                         {
                             Debug.WriteLine("[App] Dependency window closed before completion - user cancelled");
-                            // Exit the app since Chromium is required
+                            // Exit the app since WebKit is required
                             desktop.Shutdown();
                             return;
                         }
@@ -227,88 +227,38 @@ namespace AkademiTrack
             }
         }
         
-        private async Task<bool> IsChromiumWorkingAsync()
+        private async Task<bool> IsWebKitWorkingAsync()
         {
             try
             {
-                Debug.WriteLine("[App] Testing if Chromium is working...");
+                Debug.WriteLine("[App] Testing if WebKit is working...");
                 
-                // Create BrowserFetcher with explicit cache directory for consistency
-                var cacheDir = GetChromiumCacheDirectory();
-                Debug.WriteLine($"[App] Using Chromium cache directory: {cacheDir}");
+                // Check if WebKit is installed
+                var webkitPath = await WebKitManager.GetWebKitExecutablePathAsync();
+                Debug.WriteLine($"[App] WebKit path: {webkitPath}");
                 
-                var browserFetcher = new PuppeteerSharp.BrowserFetcher(new PuppeteerSharp.BrowserFetcherOptions
+                if (string.IsNullOrEmpty(webkitPath))
                 {
-                    Path = cacheDir
-                });
-                
-                var installedBrowsers = browserFetcher.GetInstalledBrowsers();
-                Debug.WriteLine($"[App] Found {installedBrowsers.Count()} installed browsers");
-                
-                foreach (var browser in installedBrowsers)
-                {
-                    Debug.WriteLine($"[App] - Browser: {browser.Browser} {browser.BuildId} at {browser.GetExecutablePath()}");
+                    Debug.WriteLine("[App] No WebKit installation found, will need to install");
+                    return false;
                 }
                 
-                // Check if we're using bundled Chromium
-                var bundledChromiumPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "chromium-cache");
-                bool usingBundledChromium = Directory.Exists(bundledChromiumPath);
-                
-                if (!installedBrowsers.Any())
-                {
-                    if (usingBundledChromium)
-                    {
-                        Debug.WriteLine("[App] No browsers found in bundled Chromium - this might be a structure issue");
-                        return false;
-                    }
-                    else
-                    {
-                        Debug.WriteLine("[App] No Chromium installations found, will need to download");
-                        return false;
-                    }
-                }
-                
-                // Quick check - verify executable exists and is accessible
-                Debug.WriteLine("[App] Found Chromium installation, doing quick verification...");
+                // Quick check - verify WebKit directory exists and is accessible
+                Debug.WriteLine("[App] Found WebKit installation, doing quick verification...");
                 
                 try
                 {
-                    string? executablePath = null;
-                    
-                    if (usingBundledChromium)
+                    if (!Directory.Exists(webkitPath))
                     {
-                        // For bundled Chromium, just verify the executable exists
-                        var firstBrowser = installedBrowsers.First();
-                        executablePath = firstBrowser.GetExecutablePath();
-                        Debug.WriteLine($"[App] Using bundled Chromium at: {executablePath}");
-                    }
-                    else
-                    {
-                        // For downloaded Chromium, try to download if needed
-                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
-                        var downloadedBrowser = await browserFetcher.DownloadAsync();
-                        executablePath = downloadedBrowser?.GetExecutablePath();
-                        Debug.WriteLine($"[App] Download check complete. Executable at: {executablePath}");
-                    }
-                    
-                    // Verify the executable actually exists and is accessible
-                    if (string.IsNullOrEmpty(executablePath) || !File.Exists(executablePath))
-                    {
-                        Debug.WriteLine($"[App] Executable not found at expected path: {executablePath}");
+                        Debug.WriteLine($"[App] WebKit directory not found at expected path: {webkitPath}");
                         return false;
                     }
                     
-                    // Check if we can read the file (basic accessibility test)
-                    var fileInfo = new System.IO.FileInfo(executablePath);
-                    if (fileInfo.Length == 0)
-                    {
-                        Debug.WriteLine($"[App] Executable file is empty: {executablePath}");
-                        return false;
-                    }
+                    // Check if we can read the directory (basic accessibility test)
+                    var files = Directory.GetFiles(webkitPath, "*", SearchOption.TopDirectoryOnly);
+                    Debug.WriteLine($"[App] WebKit directory verified: {webkitPath} ({files.Length} files)");
                     
-                    Debug.WriteLine($"[App] Chromium executable verified: {executablePath} ({fileInfo.Length / (1024 * 1024)} MB)");
-                    
-                    // For packaged apps, do a quick launch test to ensure it actually works
+                    // For packaged apps, skip launch test to prevent browser window
                     var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
                     bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
                                        currentExecutable.Contains("Program Files") ||
@@ -316,115 +266,32 @@ namespace AkademiTrack
                     
                     Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
                     
-                    // Skip launch test to prevent Chrome from briefly appearing
                     if (isPackagedApp)
                     {
-                        string chromiumType = usingBundledChromium ? "bundled" : "downloaded";
-                        Debug.WriteLine($"[App] Packaged app detected - skipping launch test to prevent Chrome window ({chromiumType} Chromium)");
-                        Debug.WriteLine("[App] Chromium will be tested during first actual use");
+                        Debug.WriteLine("[App] Packaged app detected - skipping launch test to prevent browser window");
+                        Debug.WriteLine("[App] WebKit will be tested during first actual use");
                         return true;
                     }
                     else
                     {
-                        // For development builds, just check if the file exists and is accessible
+                        // For development builds, just check if the directory exists and is accessible
                         Debug.WriteLine("[App] Development build - skipping launch test");
                         return true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[App] Chromium verification failed: {ex.Message}");
+                    Debug.WriteLine($"[App] WebKit verification failed: {ex.Message}");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[App] Error testing Chromium: {ex.Message}");
+                Debug.WriteLine($"[App] Error testing WebKit: {ex.Message}");
                 return false;
             }
         }
         
-        private static string GetChromiumCacheDirectory()
-        {
-            // EXTERNAL CHROMIUM APPROACH: Check for external signed Chromium first
-            var externalChromiumPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AkademiTrack-Chromium");
-            
-            if (Directory.Exists(externalChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using external signed Chromium at: {externalChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(externalChromiumPath);
-                }
-                
-                return externalChromiumPath;
-            }
-            
-            // Fallback: Check for bundled Chromium (legacy)
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var bundledChromiumPath = Path.Combine(appDirectory, "Assets", "chromium-cache");
-            
-            if (Directory.Exists(bundledChromiumPath))
-            {
-                Debug.WriteLine($"[CHROMIUM] Using bundled Chromium at: {bundledChromiumPath}");
-                
-                // Ensure executable permissions on macOS/Linux
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    EnsureExecutablePermissions(bundledChromiumPath);
-                }
-                
-                return bundledChromiumPath;
-            }
-            
-            // Final fallback: AppData directory for download
-            Debug.WriteLine("[CHROMIUM] No external or bundled Chromium found, falling back to AppData directory");
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var cacheDir = Path.Combine(appDataDir, "AkademiTrack", "chromium-cache");
-            
-            // Ensure directory exists
-            Directory.CreateDirectory(cacheDir);
-            
-            return cacheDir;
-        }
-        
-        private static void EnsureExecutablePermissions(string chromiumPath)
-        {
-            try
-            {
-                // Find Chrome executable in the bundled path
-                var chromeExecutables = Directory.GetFiles(chromiumPath, "*Chrome*", SearchOption.AllDirectories)
-                    .Where(f => Path.GetFileName(f).Contains("Chrome") && !Path.GetExtension(f).Equals(".app", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                
-                foreach (var executable in chromeExecutables)
-                {
-                    if (File.Exists(executable))
-                    {
-                        Debug.WriteLine($"[CHROMIUM] Setting executable permissions for: {executable}");
-                        var process = new System.Diagnostics.Process
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = "chmod",
-                                Arguments = $"+x \"{executable}\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                        process.WaitForExit();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CHROMIUM] Failed to set executable permissions: {ex.Message}");
-            }
-        }
-
         private async void ContinueNormalFlow(IClassicDesktopStyleApplicationLifetime desktop)
         {
             if (_isShuttingDown) return;

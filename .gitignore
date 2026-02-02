@@ -382,4 +382,3 @@ AkademiTrack-1.1.0-osx-Setup.pkg
 complete-build-sign.sh
 /pkg_root
 /.vscode
-/Assets/chromium-cache

@@ -41,20 +41,12 @@
 		<None Include="Assets/Helpers/AkademiTrack.app\**\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<!-- Bundle Chromium for macOS -->
-		<None Include="Assets/chromium-cache\**\*">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
 	<ItemGroup Condition="'$(OS)' == 'Windows_NT'">
 		<Content Include="Assets/Helpers/WinHelloAuth.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
-		<!-- Bundle Chromium for Windows -->
-		<None Include="Assets/chromium-cache\**\*">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
 	
 	<ItemGroup>
@@ -68,7 +60,7 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
 		<PackageReference Include="OsNotifications" Version="1.1.3" />
-		<PackageReference Include="PuppeteerSharp" Version="20.2.5" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.48.0" />
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.1" />
 		<PackageReference Include="Velopack" Version="0.0.1298" />
 		<PackageReference Include="System.Text.Json" Version="10.0.1" />
