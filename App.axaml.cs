@@ -138,13 +138,13 @@ namespace AkademiTrack
             {
                 Debug.WriteLine("[App] Starting app initialization...");
                 
-                // STEP 1: Perform one-time migration cleanup (must be first!)
-                Debug.WriteLine("[App] Checking for one-time migration...");
-                var migrationPerformed = await MigrationService.PerformOneTimeMigrationAsync();
+                // STEP 1: Check if migration is needed (but don't perform it yet)
+                Debug.WriteLine("[App] Checking if migration will be needed...");
+                bool migrationNeeded = await MigrationService.ForceFreshMigrationCheckAsync();
                 
-                if (migrationPerformed)
+                if (migrationNeeded)
                 {
-                    Debug.WriteLine("[App] ✅ One-time migration completed - old credentials cleared to prevent login loops");
+                    Debug.WriteLine("[App] ✅ Migration will be needed - user is upgrading from old app or different version");
                 }
                 else
                 {
@@ -162,14 +162,17 @@ namespace AkademiTrack
                 {
                     Debug.WriteLine("[App] Resetting migration for testing...");
                     MigrationService.ResetMigrationForTesting();
+                    migrationNeeded = true; // Force migration after reset
                 }
                 
                 bool forceShowDependencyWindow = args.Contains("--test-dependency-window") || 
                                                args.Contains("--force-dependency-download") ||
-                                               args.Contains("--reinstall-webkit");
+                                               args.Contains("--reinstall-webkit") ||
+                                               migrationNeeded; // Always show dependency window if migration needed
                 
                 Debug.WriteLine($"[App] Command line args: {string.Join(" ", args)}");
                 Debug.WriteLine($"[App] Force show dependency window: {forceShowDependencyWindow}");
+                Debug.WriteLine($"[App] Migration needed: {migrationNeeded}");
                 
                 if (!forceShowDependencyWindow)
                 {
@@ -193,7 +196,7 @@ namespace AkademiTrack
                 }
                 else
                 {
-                    Debug.WriteLine("[App] Force showing dependency window for testing");
+                    Debug.WriteLine("[App] Showing dependency window (WebKit install needed or migration required)");
                 }
                 
                 Debug.WriteLine("[App] Showing dependency download window");
@@ -204,14 +207,34 @@ namespace AkademiTrack
                     var dependencyViewModel = new ViewModels.DependencyDownloadViewModel();
                     var dependencyWindow = new Views.DependencyDownloadWindow(dependencyViewModel);
                     
+                    // Pass migration info to the dependency window
+                    dependencyViewModel.SetMigrationNeeded(migrationNeeded);
+                    
                     // Set as main window temporarily
                     desktop.MainWindow = dependencyWindow;
                     
                     // Handle completion
-                    dependencyViewModel.DownloadCompleted += (sender, e) =>
+                    dependencyViewModel.DownloadCompleted += async (sender, e) =>
                     {
-                        Debug.WriteLine("[App] Dependency download completed, transitioning to main app");
-                        // Don't close the window, just hide it and continue with normal flow
+                        Debug.WriteLine("[App] Dependency download completed");
+                        
+                        // STEP 3: Perform migration AFTER WebKit is installed (if needed)
+                        if (migrationNeeded)
+                        {
+                            Debug.WriteLine("[App] Performing migration cleanup after WebKit installation...");
+                            try
+                            {
+                                await MigrationService.PerformOneTimeMigrationAsync();
+                                Debug.WriteLine("[App] ✅ Migration completed - user data cleared");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[App] ⚠️ Migration failed: {ex.Message}");
+                                // Continue anyway - not critical
+                            }
+                        }
+                        
+                        Debug.WriteLine("[App] Transitioning to main app");
                         dependencyWindow.Hide();
                         ContinueNormalFlow(desktop);
                     };

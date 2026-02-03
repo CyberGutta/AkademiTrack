@@ -24,6 +24,7 @@ namespace AkademiTrack.ViewModels
         private bool _isCompleted = false;
         private string _errorMessage = "";
         private CancellationTokenSource? _cancellationTokenSource;
+        private bool _migrationNeeded = false;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? DownloadCompleted;
@@ -84,6 +85,12 @@ namespace AkademiTrack.ViewModels
             RetryCommand = new SimpleAsyncCommand(StartDownloadAsync);
         }
 
+        public void SetMigrationNeeded(bool migrationNeeded)
+        {
+            _migrationNeeded = migrationNeeded;
+            Debug.WriteLine($"[DependencyDownload] Migration needed: {migrationNeeded}");
+        }
+
         public async Task StartDownloadAsync()
         {
             try
@@ -102,12 +109,12 @@ namespace AkademiTrack.ViewModels
                 var args = Environment.GetCommandLineArgs();
                 bool isTestMode = args.Contains("--test-dependency-window");
 
-                StatusMessage = "Sjekker WebKit-status...";
+                StatusMessage = _migrationNeeded ? "Forbereder app-oppdatering..." : "Sjekker WebKit-status...";
                 
                 if (!isTestMode)
                 {
                     // Use WebKitManager to handle all WebKit detection/installation
-                    StatusMessage = "Forbereder WebKit...";
+                    StatusMessage = _migrationNeeded ? "Installerer WebKit for oppdatert app..." : "Forbereder WebKit...";
                     ProgressDetails = "Sjekker installerte nettlesere...";
                     ShowProgressDetails = true;
                     
@@ -141,7 +148,7 @@ namespace AkademiTrack.ViewModels
                     
                     if (webkitInstalled)
                     {
-                        StatusMessage = "WebKit klar!";
+                        StatusMessage = _migrationNeeded ? "WebKit klar! Fullfører app-oppdatering..." : "WebKit klar!";
                         ProgressPercentage = 100;
                         IsIndeterminate = false;
                         ProgressDetails = "Bruker: WebKit";
