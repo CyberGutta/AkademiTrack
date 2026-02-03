@@ -257,57 +257,17 @@ namespace AkademiTrack
             {
                 Debug.WriteLine("[App] Testing if WebKit is working...");
                 
-                // Check if WebKit is installed
-                var webkitPath = await WebKitManager.GetWebKitExecutablePathAsync();
-                Debug.WriteLine($"[App] WebKit path: {webkitPath}");
+                // Use the WebKitManager's check-only method (no download)
+                bool webkitInstalled = await WebKitManager.IsWebKitInstalledAsync();
                 
-                if (string.IsNullOrEmpty(webkitPath))
+                if (!webkitInstalled)
                 {
-                    Debug.WriteLine("[App] No WebKit installation found, will need to install");
+                    Debug.WriteLine("[App] WebKit installation check failed - not installed");
                     return false;
                 }
                 
-                // Quick check - verify WebKit directory exists and is accessible
-                Debug.WriteLine("[App] Found WebKit installation, doing quick verification...");
-                
-                try
-                {
-                    if (!Directory.Exists(webkitPath))
-                    {
-                        Debug.WriteLine($"[App] WebKit directory not found at expected path: {webkitPath}");
-                        return false;
-                    }
-                    
-                    // Check if we can read the directory (basic accessibility test)
-                    var files = Directory.GetFiles(webkitPath, "*", SearchOption.TopDirectoryOnly);
-                    Debug.WriteLine($"[App] WebKit directory verified: {webkitPath} ({files.Length} files)");
-                    
-                    // For packaged apps, skip launch test to prevent browser window
-                    var currentExecutable = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-                    bool isPackagedApp = currentExecutable.Contains(".app/Contents/MacOS/") || 
-                                       currentExecutable.Contains("Program Files") ||
-                                       (!currentExecutable.Contains("bin/Debug") && !currentExecutable.Contains("bin/Release"));
-                    
-                    Debug.WriteLine($"[App] Is packaged app: {isPackagedApp}");
-                    
-                    if (isPackagedApp)
-                    {
-                        Debug.WriteLine("[App] Packaged app detected - skipping launch test to prevent browser window");
-                        Debug.WriteLine("[App] WebKit will be tested during first actual use");
-                        return true;
-                    }
-                    else
-                    {
-                        // For development builds, just check if the directory exists and is accessible
-                        Debug.WriteLine("[App] Development build - skipping launch test");
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[App] WebKit verification failed: {ex.Message}");
-                    return false;
-                }
+                Debug.WriteLine("[App] ✅ WebKit is properly installed and ready");
+                return true;
             }
             catch (Exception ex)
             {
