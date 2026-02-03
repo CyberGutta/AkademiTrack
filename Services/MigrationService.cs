@@ -21,7 +21,7 @@ namespace AkademiTrack.Services
         );
 
         // Update this version when you want to trigger migration for all users
-        private static readonly string CurrentMigrationVersion = "2.1.0";
+        private static readonly string CurrentMigrationVersion = "1.1.1";
 
         // Add a unique identifier to prevent caching issues
         private static readonly string MigrationSessionId = Guid.NewGuid().ToString("N")[..8];

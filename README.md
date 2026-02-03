@@ -7,7 +7,7 @@
 **Automated attendance registration for STU sessions at Akademiet schools**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/CyberGutta/AkademiTrack/releases)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/CyberGutta/AkademiTrack/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/CyberGutta/AkademiTrack/releases)
 
 [Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Support](#support)
@@ -25,7 +25,7 @@ AkademiTrack is a desktop automation tool designed for students at Akademiet sch
 
 ---
 
-## ✨ What's New in v1.1.0
+## ✨ What's New in v1.1.1
 
 ### 🚀 Major Improvements
 
