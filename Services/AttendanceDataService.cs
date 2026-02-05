@@ -377,16 +377,44 @@ namespace AkademiTrack.Services
                               !string.IsNullOrEmpty(item.SluttKl))
                 .ToList();
 
-            // Count STU sessions for today
+            // Get all STU sessions for today
             var todayStuSessions = validDailyItems
                 .Where(item => item.Fag != null && item.Fag.Contains("STU"))
                 .ToList();
             
-            // For STU counting, we need to check monthly data for registration status
-            var registeredStuCount = 0;
-            var totalStuCount = todayStuSessions.Count;
-
+            // Get all regular (non-STU) classes for today
+            var regularClasses = validDailyItems
+                .Where(item => item.Fag != null && !item.Fag.Contains("STU"))
+                .ToList();
+            
+            // Filter out STU sessions that overlap with regular classes
+            var validStuSessions = new List<DailyScheduleItem>();
             foreach (var stuSession in todayStuSessions)
+            {
+                bool hasConflict = false;
+                
+                // Check if this STU session overlaps with any regular class
+                foreach (var regularClass in regularClasses)
+                {
+                    if (DoDailyItemsOverlap(stuSession, regularClass))
+                    {
+                        hasConflict = true;
+                        _loggingService?.LogDebug($"[TODAY OVERLAP] STU '{stuSession.Fag}' ({stuSession.StartKl}-{stuSession.SluttKl}) overlaps with '{regularClass.Fag}' ({regularClass.StartKl}-{regularClass.SluttKl}) - excluding from count");
+                        break;
+                    }
+                }
+                
+                if (!hasConflict)
+                {
+                    validStuSessions.Add(stuSession);
+                }
+            }
+            
+            // Count only valid (non-overlapping) STU sessions
+            var registeredStuCount = 0;
+            var totalStuCount = validStuSessions.Count;
+
+            foreach (var stuSession in validStuSessions)
             {
                 var matchingMonthly = monthlyItems.FirstOrDefault(m => m.Timenr == stuSession.Timenr);
                 if (matchingMonthly?.Fravaer == "M")
@@ -429,6 +457,27 @@ namespace AkademiTrack.Services
                 CurrentClass = currentClass,
                 AllTodayItems = new List<ScheduleItem>() // Not needed for next class display
             };
+        }
+        
+        private bool DoDailyItemsOverlap(DailyScheduleItem session1, DailyScheduleItem session2)
+        {
+            try
+            {
+                // Parse time strings (format: "HH:mm" or "HHmm")
+                if (TimeSpan.TryParse(session1.StartKl, out var start1) &&
+                    TimeSpan.TryParse(session1.SluttKl, out var end1) &&
+                    TimeSpan.TryParse(session2.StartKl, out var start2) &&
+                    TimeSpan.TryParse(session2.SluttKl, out var end2))
+                {
+                    return start1 < end2 && start2 < end1;
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private ScheduleItem CombineScheduleItemSimple(DailyScheduleItem dailyItem, MonthlyScheduleItem? monthlyItem)
