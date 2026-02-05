@@ -494,7 +494,7 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
                 shutil.copy2(item, dest)
 
     # Copy icon
-    icon_filename = "AppIcon.icns"
+    icon_filename = "AppIcon.icns"  # Use consistent name
     icon_dest = resources_dir / icon_filename
     shutil.copy2(ICON_PATH, icon_dest)
 
@@ -527,7 +527,7 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleIconFile</key>
-    <string>AT-1024.icns</string>
+    <string>AppIcon.icns</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>
@@ -617,6 +617,70 @@ def create_portable_zip(bundle_dir, version, sign=True, notarize=True):
             return None
     except Exception as e:
         print(f"❌ Failed to create zip: {e}")
+        return None
+
+def create_velopack_release(bundle_dir, version, sign=True):
+    """Create Velopack release package"""
+    print("\n📦 Creating Velopack release package...")
+    print("=" * 50)
+    
+    # Create releases directory
+    releases_dir = Path("./Releases")
+    releases_dir.mkdir(exist_ok=True)
+    
+    try:
+        # Use absolute path for icon
+        icon_abs_path = Path(ICON_PATH).absolute()
+        
+        # Also try the transparent version as backup
+        icon_transparent = Path("./Assets/AT-Transparrent.icns").absolute()
+        icon_to_use = icon_abs_path if icon_abs_path.exists() else icon_transparent
+        
+        # Use vpk to pack the app
+        cmd = [
+            "vpk", "pack",
+            "--packId", "AkademiTrack",
+            "--packVersion", version,
+            "--packDir", str(bundle_dir),
+            "--outputDir", str(releases_dir),
+            "--runtime", "osx-arm64",
+            "--mainExe", "AkademiTrack",
+            "--icon", str(icon_to_use),
+            "--packTitle", "AkademiTrack",
+            "--packAuthors", "CyberBrothers",
+            "--bundleId", BUNDLE_IDENTIFIER
+        ]
+        
+        if sign:
+            cmd.extend([
+                "--signAppIdentity", DEVELOPER_ID_APP
+            ])
+        
+        print(f"Using icon: {icon_to_use}")
+        print(f"Icon exists: {icon_to_use.exists()}")
+        print(f"Icon size: {icon_to_use.stat().st_size if icon_to_use.exists() else 'N/A'} bytes")
+        
+        result = run_command(cmd, "Creating Velopack release", check=False)
+        
+        if result and result.returncode == 0:
+            # Find the created release file
+            release_files = list(releases_dir.glob(f"AkademiTrack-{version}-*.nupkg"))
+            if release_files:
+                release_file = release_files[0]
+                print(f"✅ Velopack release created: {release_file.name} ({release_file.stat().st_size / 1024 / 1024:.1f} MB)")
+                return release_file
+            else:
+                print("❌ Velopack release file not found")
+                return None
+        else:
+            print("❌ Failed to create Velopack release")
+            if result and result.stderr:
+                print(f"Error: {result.stderr}")
+            if result and result.stdout:
+                print(f"Output: {result.stdout}")
+            return None
+    except Exception as e:
+        print(f"❌ Failed to create Velopack release: {e}")
         return None
 
 def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
@@ -782,25 +846,32 @@ def main():
     print("\n📦 Distribution Options:")
     print("1. Portable ZIP")
     print("2. Installer PKG (includes LaunchAgent)")
-    print("3. All of the above")
+    print("3. Velopack Release Package")
+    print("4. All of the above")
     
-    dist_choice = input("\nSelect option (1/2/3) [3]: ").strip()
+    dist_choice = input("\nSelect option (1/2/3/4) [4]: ").strip()
     if not dist_choice:
-        dist_choice = "3"
+        dist_choice = "4"
     
     created_files = []
     
     # Option 1: ZIP only
-    if dist_choice in ["1", "3"]:
+    if dist_choice in ["1", "4"]:
         zip_file = create_portable_zip(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if zip_file:
             created_files.append(("Portable ZIP", zip_file))
     
     # Option 2: PKG with LaunchAgent
-    if dist_choice in ["2", "3"]:
+    if dist_choice in ["2", "4"]:
         pkg_file = create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if pkg_file:
             created_files.append(("Installer PKG", pkg_file))
+    
+    # Option 3: Velopack Release
+    if dist_choice in ["3", "4"]:
+        velopack_file = create_velopack_release(bundle_dir, version, sign=do_sign)
+        if velopack_file:
+            created_files.append(("Velopack Release", velopack_file))
     
     # Final summary
     print("\n" + "=" * 50)

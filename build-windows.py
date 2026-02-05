@@ -205,9 +205,59 @@ def build_windows_release(version):
     portable_size = portable_zip.stat().st_size / 1024 / 1024
     print(f"✅ Portable ZIP created: {portable_zip.name} ({portable_size:.1f} MB)")
     
-    # Step 4: Create VPK package
-    # Step 4: Copy the standalone single-file EXE to release folder
-    print(f"\n📦 Step 4: Adding standalone single-file EXE...")
+    # Step 4: Create Velopack release package
+    print(f"\n📦 Step 4: Creating Velopack release package...")
+    try:
+        # Create releases directory
+        releases_dir = Path("./Releases")
+        releases_dir.mkdir(exist_ok=True)
+        
+        # Use vpk to pack the app
+        vpk_cmd = [
+            "vpk", "pack",
+            "--packId", "AkademiTrack",
+            "--packVersion", version,
+            "--packDir", str(publish_dir),
+            "--outputDir", str(releases_dir),
+            "--runtime", "win-x64",
+            "--mainExe", "AkademiTrack.exe"
+        ]
+        
+        # Add icon if it exists
+        if icon_path and icon_path.exists():
+            vpk_cmd.extend(["--icon", str(icon_path)])
+        
+        print(f"Running: {' '.join(vpk_cmd)}")
+        result = subprocess.run(vpk_cmd, capture_output=True, text=True,
+                               encoding='utf-8', errors='replace')
+        
+        if result.returncode == 0:
+            # Find the created release file
+            release_files = list(releases_dir.glob(f"AkademiTrack-{version}-*.nupkg"))
+            if release_files:
+                release_file = release_files[0]
+                velopack_size = release_file.stat().st_size / 1024 / 1024
+                print(f"✅ Velopack release created: {release_file.name} ({velopack_size:.1f} MB)")
+                
+                # Copy to release folder
+                shutil.copy2(release_file, release_folder / release_file.name)
+                
+                # Also copy RELEASES file if it exists
+                releases_file = releases_dir / "RELEASES"
+                if releases_file.exists():
+                    shutil.copy2(releases_file, release_folder / "RELEASES")
+                    print(f"✅ RELEASES file copied")
+            else:
+                print("⚠️  Velopack release file not found")
+        else:
+            print(f"⚠️  Velopack packaging failed: {result.stderr}")
+            print("💡 Make sure 'vpk' tool is installed: dotnet tool install -g vpk")
+    except Exception as e:
+        print(f"⚠️  Velopack packaging failed: {e}")
+        print("💡 Make sure 'vpk' tool is installed: dotnet tool install -g vpk")
+    
+    # Step 5: Copy the standalone single-file EXE to release folder
+    print(f"\n📦 Step 5: Adding standalone single-file EXE...")
     standalone_exe = release_folder / "AkademiTrack.exe"
     shutil.copy2(exe_single, standalone_exe)
     standalone_size = standalone_exe.stat().st_size / 1024 / 1024
@@ -320,12 +370,13 @@ def main():
         print("\n📋 Files created:")
         print(f"  • AkademiTrack.exe - Standalone single-file executable (RUN THIS ONE!)")
         print(f"  • AkademiTrack-win-Portable.zip - Portable ZIP package")
-        print(f"  • AkademiTrack-win-Setup.exe - Installer")
+        print(f"  • AkademiTrack-{version}-*.nupkg - Velopack release package (for auto-updates)")
+        print(f"  • RELEASES - Velopack releases index file")
         
         print("\n💡 Next steps:")
         print(f"  • Test AkademiTrack.exe from {release_folder}/")
         print(f"  • Distribute the portable ZIP for manual installs")
-        print(f"  • Use the .nupkg + RELEASES for auto-updates")
+        print(f"  • Use the .nupkg + RELEASES for Velopack auto-updates")
         print(f"  • Upload to your release server/CDN")
         
         print("\n🎨 Customization tips:")

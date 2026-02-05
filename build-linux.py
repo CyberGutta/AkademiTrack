@@ -206,16 +206,67 @@ def build_linux_release(version):
     portable_size = portable_tar.stat().st_size / 1024 / 1024
     print(f"✅ Portable tarball created: {portable_tar.name} ({portable_size:.1f} MB)")
     
-    # Step 4: Copy the standalone single-file binary to release folder
-    print(f"\n📦 Step 4: Adding standalone single-file binary...")
+    # Step 4: Create Velopack release package
+    print(f"\n📦 Step 4: Creating Velopack release package...")
+    try:
+        # Create releases directory
+        releases_dir = Path("./Releases")
+        releases_dir.mkdir(exist_ok=True)
+        
+        # Use vpk to pack the app
+        vpk_cmd = [
+            "vpk", "pack",
+            "--packId", "AkademiTrack",
+            "--packVersion", version,
+            "--packDir", str(publish_dir),
+            "--outputDir", str(releases_dir),
+            "--runtime", "linux-x64",
+            "--mainExe", "AkademiTrack"
+        ]
+        
+        # Add icon if it exists (look for PNG version for Linux)
+        icon_png = Path("./Assets/AT-1024.png")
+        if icon_png.exists():
+            vpk_cmd.extend(["--icon", str(icon_png)])
+        
+        print(f"Running: {' '.join(vpk_cmd)}")
+        result = subprocess.run(vpk_cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            # Find the created release file
+            release_files = list(releases_dir.glob(f"AkademiTrack-{version}-*.nupkg"))
+            if release_files:
+                release_file = release_files[0]
+                velopack_size = release_file.stat().st_size / 1024 / 1024
+                print(f"✅ Velopack release created: {release_file.name} ({velopack_size:.1f} MB)")
+                
+                # Copy to release folder
+                shutil.copy2(release_file, release_folder / release_file.name)
+                
+                # Also copy RELEASES file if it exists
+                releases_file = releases_dir / "RELEASES"
+                if releases_file.exists():
+                    shutil.copy2(releases_file, release_folder / "RELEASES")
+                    print(f"✅ RELEASES file copied")
+            else:
+                print("⚠️  Velopack release file not found")
+        else:
+            print(f"⚠️  Velopack packaging failed: {result.stderr}")
+            print("💡 Make sure 'vpk' tool is installed: dotnet tool install -g vpk")
+    except Exception as e:
+        print(f"⚠️  Velopack packaging failed: {e}")
+        print("💡 Make sure 'vpk' tool is installed: dotnet tool install -g vpk")
+    
+    # Step 5: Copy the standalone single-file binary to release folder
+    print(f"\n📦 Step 5: Adding standalone single-file binary...")
     standalone_binary = release_folder / "AkademiTrack"
     shutil.copy2(binary_single, standalone_binary)
     os.chmod(standalone_binary, 0o755)
     standalone_size = standalone_binary.stat().st_size / 1024 / 1024
     print(f"✅ Standalone single-file binary: {standalone_binary.name} ({standalone_size:.1f} MB)")
     
-    # Step 5: Create install script
-    print(f"\n📦 Step 5: Creating install script...")
+    # Step 6: Create install script
+    print(f"\n📦 Step 6: Creating install script...")
     install_script = release_folder / "install.sh"
     install_content = f"""#!/bin/bash
 # AkademiTrack Linux Installation Script
@@ -327,13 +378,15 @@ def main():
         print("\n📋 Files created:")
         print(f"  • AkademiTrack - Standalone single-file binary (RUN THIS ONE!)")
         print(f"  • AkademiTrack-linux-Portable.tar.gz - Portable tarball package")
+        print(f"  • AkademiTrack-{version}-*.nupkg - Velopack release package (for auto-updates)")
+        print(f"  • RELEASES - Velopack releases index file")
         print(f"  • install.sh - Installation script (sudo ./install.sh)")
         
         print("\n💡 Next steps:")
         print(f"  • Test standalone binary: ./{release_folder}/AkademiTrack")
         print(f"  • Or install system-wide: cd {release_folder} && sudo ./install.sh")
         print(f"  • Distribute the tarball for manual installs")
-        print(f"  • Use the .nupkg + RELEASES for auto-updates")
+        print(f"  • Use the .nupkg + RELEASES for Velopack auto-updates")
         
         print("\n🔧 Installation options:")
         print("  1. Standalone: Just run ./AkademiTrack")
