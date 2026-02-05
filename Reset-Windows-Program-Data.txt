@@ -1,0 +1,20 @@
+Commands to Clean Everything:
+# 1. Delete all build artifacts
+Remove-Item -Recurse -Force bin, obj
+
+# 2. Delete user data (settings, logs, credentials)
+Remove-Item -Recurse -Force "$env:APPDATA\AkademiTrack"
+
+# 3. Delete WebKit/ChromeDriver cache
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\AkademiTrack"
+
+# 4. Clean and rebuild
+dotnet clean
+dotnet restore
+dotnet build
+
+
+#Or run them all at once:
+
+
+Remove-Item -Recurse -Force bin, obj, "$env:APPDATA\AkademiTrack", "$env:LOCALAPPDATA\AkademiTrack" -ErrorAction SilentlyContinue; dotnet clean; dotnet restore; dotnet build
