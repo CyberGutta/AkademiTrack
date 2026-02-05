@@ -598,44 +598,7 @@ github.com/CyberGutta/AkademiTrack";
             });
         }
 
-        private void CheckForUpdates(object? sender, EventArgs e)
-        {
-            Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    desktop.MainWindow?.Show();
-                    desktop.MainWindow?.Activate();
-                    
-                    if (OperatingSystem.IsMacOS() && desktop.MainWindow != null)
-                    {
-                        desktop.MainWindow.BringIntoView();
-                    }
 
-                    if (desktop.MainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
-                    {
-                        await viewModel.SettingsViewModel.CheckForUpdatesAsync();
-
-                        if (viewModel.SettingsViewModel.UpdateAvailable)
-                        {
-                            NativeNotificationService.Show(
-                                "Oppdatering tilgjengelig",
-                                $"Versjon {viewModel.SettingsViewModel.AvailableVersion} er klar for nedlasting!",
-                                "SUCCESS"
-                            );
-                        }
-                        else
-                        {
-                            NativeNotificationService.Show(
-                                "Ingen oppdateringer",
-                                "Du har allerede den nyeste versjonen.",
-                                "INFO"
-                            );
-                        }
-                    }
-                }
-            });
-        }
 
         private async void QuitApp(object? sender, EventArgs e)
         {

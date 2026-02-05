@@ -13,7 +13,6 @@ namespace AkademiTrack.Services
     {
         private readonly INotificationService _notificationService;
         private readonly SystemHealthNotificationService _healthNotificationService;
-        private readonly UpdateCheckerService _updateCheckerService;
         private bool _disposed;
 
         public EnhancedNotificationManager(
@@ -22,7 +21,6 @@ namespace AkademiTrack.Services
         {
             _notificationService = notificationService;
             _healthNotificationService = new SystemHealthNotificationService(notificationService);
-            _updateCheckerService = new UpdateCheckerService(settingsViewModel);
         }
 
         /// <summary>
@@ -31,7 +29,6 @@ namespace AkademiTrack.Services
         public void StartAllServices()
         {
             _healthNotificationService.StartMonitoring();
-            _updateCheckerService.StartPeriodicChecks();
             
             // Send welcome notification
             _ = Task.Run(async () =>
@@ -64,7 +61,6 @@ namespace AkademiTrack.Services
         public void StopAllServices()
         {
             _healthNotificationService.StopMonitoring();
-            _updateCheckerService.StopPeriodicChecks();
         }
 
         /// <summary>
@@ -173,7 +169,6 @@ namespace AkademiTrack.Services
 
             StopAllServices();
             _healthNotificationService?.Dispose();
-            _updateCheckerService?.Dispose();
             _disposed = true;
         }
     }

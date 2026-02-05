@@ -524,10 +524,6 @@ Terminal=false
 
         public ObservableCollection<string> Schools { get; }
 
-        private string _updateStatus = "Klikk for å sjekke etter oppdateringer";
-        private bool _isCheckingForUpdates = false;
-        private bool _updateAvailable = false;
-        private string _availableVersion = "";
         private bool _isDeleting = false;
         private bool _startMinimized = false;
 
@@ -837,8 +833,6 @@ Terminal=false
         public ICommand ToggleAutoStartAutomationCommand { get; }
         public ICommand OpenWebsiteCommand { get; }
         public ICommand OpenEmailCommand { get; }
-        public ICommand CheckForUpdatesCommand { get; }
-        public ICommand DownloadAndInstallUpdateCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
         public ICommand DeleteAccountCompletelyCommand { get; }
         public ICommand ClearSecureStorageCommand { get; }
@@ -850,40 +844,6 @@ Terminal=false
 
         public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
-
-
-        public string UpdateStatus
-        {
-            get => _updateStatus;
-            set { if (_updateStatus != value) { _updateStatus = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsCheckingForUpdates
-        {
-            get => _isCheckingForUpdates;
-            set { if (_isCheckingForUpdates != value) { _isCheckingForUpdates = value; OnPropertyChanged(); } }
-        }
-
-        public bool UpdateAvailable
-        {
-            get => _updateAvailable;
-            set
-            {
-                if (_updateAvailable != value)
-                {
-                    _updateAvailable = value;
-                    OnPropertyChanged();
-
-                    (DownloadAndInstallUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                }
-            }
-        }
-
-        public string AvailableVersion
-        {
-            get => _availableVersion;
-            set { if (_availableVersion != value) { _availableVersion = value; OnPropertyChanged(); } }
-        }
 
         public bool AutoStartAutomation
         {
@@ -1198,8 +1158,6 @@ Terminal=false
             ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
             OpenWebsiteCommand = new RelayCommand(OpenWebsite);
             OpenEmailCommand = new RelayCommand(OpenEmail);
-            CheckForUpdatesCommand = new RelayCommand(async () => await CheckForUpdatesAsync());
-            DownloadAndInstallUpdateCommand = new RelayCommand(async () => await DownloadAndInstallUpdateAsync(), () => UpdateAvailable);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
             DeleteAccountCompletelyCommand = new RelayCommand(async () => await DeleteAccountCompletelyAsync());
             ClearSecureStorageCommand = new RelayCommand(async () => await ClearSecureStorageAsync());
@@ -2151,45 +2109,10 @@ Terminal=false
             return null;
         }
 
-        public async Task CheckForUpdatesAsync()
-        {
-            // Update functionality has been removed
-            UpdateStatus = "Vi har fjernet denne funksjonen på grunn av kompatibilitetsproblemer. Vi vil senere prøve å legge noe sånt tilbake eller legge appen på app store så vær forberedt på å slette appen manuelt når vi sier ifra!";
-            UpdateAvailable = false;
-            IsCheckingForUpdates = false;
-            await Task.CompletedTask;
-        }
-
-        private bool IsNewerVersion(string currentVersion, string latestVersion)
-        {
-            try
-            {
-                var current = new Version(currentVersion);
-                var latest = new Version(latestVersion);
-                return latest > current;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        private void LogInfo(string message)
-        {
-            Debug.WriteLine($"[UPDATE] {message}");
-        }
-
-        private async Task DownloadAndInstallUpdateAsync()
-        {
-            // This functionality has been removed
-            UpdateStatus = "Vi har fjernet denne funksjonen på grunn av kompatibilitetsproblemer. Vi vil senere prøve å legge noe sånt tilbake eller legge appen på app store så vær forberedt på å slette appen manuelt når vi sier ifra!";
-            UpdateAvailable = false;
-            await Task.CompletedTask;
-        }
-
         public async Task CheckForUpdatesOnStartupAsync()
         {
-            await Task.Delay(3000);
-            await CheckForUpdatesAsync();
+            // Update functionality has been removed
+            await Task.CompletedTask;
         }
 
         public void UseCredentialsSecurely(Action<string, string, string> action)

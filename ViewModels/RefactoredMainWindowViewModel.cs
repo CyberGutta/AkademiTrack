@@ -36,7 +36,6 @@ namespace AkademiTrack.ViewModels
         private readonly HttpClient _httpClient;
         private AuthenticationService? _authService;
         private UserParameters? _userParameters;
-        private UpdateCheckerService? _updateChecker;
         private bool _isLoading = true;
         private bool _isAuthenticated = false;
         private string _statusMessage = "Ready";
@@ -243,7 +242,6 @@ namespace AkademiTrack.ViewModels
             
             // Initialize ViewModels
             SettingsViewModel = new SettingsViewModel();
-            _updateChecker = new UpdateCheckerService(SettingsViewModel);
             Dashboard = new DashboardViewModel();
             FeideViewModel = new FeideWindowViewModel();
 
@@ -372,9 +370,6 @@ namespace AkademiTrack.ViewModels
                     // Start services with error handling
                     try
                     {
-                        _updateChecker?.StartPeriodicChecks();
-                        _loggingService.LogInfo("Update checker ready");
-
                         await CheckAutoStartAutomationAsync();
 
                         StartDashboardRefreshTimer();
@@ -1557,10 +1552,6 @@ namespace AkademiTrack.ViewModels
                 // Dispose semaphores
                 _refreshSemaphore?.Dispose();
                 _initializationSemaphore?.Dispose();
-
-                // Dispose update checker
-                _updateChecker?.Dispose();
-                _updateChecker = null;
 
                 // Note: _httpClient is readonly and shared, so we don't dispose or nullify it
 

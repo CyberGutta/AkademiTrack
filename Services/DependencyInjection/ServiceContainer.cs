@@ -131,7 +131,6 @@ namespace AkademiTrack.Services.DependencyInjection
                 return new AttendanceDataService(cacheService);
             });
             services.AddSingleton<AuthenticationService>();
-            services.AddSingleton<UpdateCheckerService>();
             services.AddSingleton<SystemHealthCheck>();
             services.AddSingleton<EnhancedNotificationManager>();
             services.AddSingleton<OfflineService>();
