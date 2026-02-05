@@ -94,7 +94,7 @@ StartupWMClass=AkademiTrack
     return desktop_content
 
 def build_linux_release(version):
-    """Build Linux release - creates portable tarball, AppImage (if possible), and VPK package"""
+    """Build Linux release - creates portable tarball and standalone binary"""
     
     print(f"\n🏗️  Building AkademiTrack for Linux (x64)...")
     print("=" * 50)
@@ -119,8 +119,8 @@ def build_linux_release(version):
     
     release_folder.mkdir(parents=True, exist_ok=True)
     
-    # Step 1: Publish for VPK (multi-file)
-    print(f"\n📦 Step 1: Publishing for VPK (multi-file)...")
+    # Step 1: Publish for distribution (multi-file)
+    print(f"\n📦 Step 1: Publishing for distribution (multi-file)...")
     publish_cmd = [
         "dotnet", "publish",
         "-c", "Release",
@@ -136,7 +136,7 @@ def build_linux_release(version):
         print(f"❌ Publish failed: {result.stderr}")
         return False
     
-    print("✅ Published for VPK successfully")
+    print("✅ Published for distribution successfully")
     
     # Step 2: Publish single file binary (for standalone distribution)
     print(f"\n📦 Step 2: Publishing standalone single-file binary...")
@@ -206,96 +206,16 @@ def build_linux_release(version):
     portable_size = portable_tar.stat().st_size / 1024 / 1024
     print(f"✅ Portable tarball created: {portable_tar.name} ({portable_size:.1f} MB)")
     
-    # Step 4: Create VPK package
-    print(f"\n📦 Step 4: Creating VPK package...")
-    
-    # Check if vpk is installed
-    try:
-        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True)
-        print(f"✅ Velopack found: {result.stdout.strip()}")
-    except FileNotFoundError:
-        print("❌ Velopack (vpk) not found!")
-        print("Install it with: dotnet tool install -g vpk")
-        return False
-    
-    # Get absolute paths for VPK
-    publish_dir_abs = publish_dir.absolute()
-    
-    vpk_cmd = [
-        "vpk", "pack",
-        "--packId", "AkademiTrack",
-        "--packVersion", version,
-        "--packDir", str(publish_dir_abs),
-        "--mainExe", "AkademiTrack"
-    ]
-    
-    print(f"Running: {' '.join(vpk_cmd)}")
-    result = subprocess.run(vpk_cmd, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        print(f"❌ VPK pack failed:")
-        print(f"STDERR: {result.stderr}")
-        print(f"STDOUT: {result.stdout}")
-        return False
-    
-    print("✅ VPK package created successfully")
-    if result.stdout:
-        print(result.stdout)
-    
-    # Step 5: Move VPK output to release folder
-    print(f"\n📦 Step 5: Organizing VPK release files...")
-    
-    import time
-    time.sleep(1)
-    
-    vpk_releases_path = Path("./Releases")
-    
-    if vpk_releases_path.exists():
-        print(f"✅ Found VPK Releases folder")
-        
-        for item in vpk_releases_path.iterdir():
-            if item.is_file():
-                dest = release_folder / item.name
-                if dest.exists():
-                    print(f"  ⏭️  Already exists: {item.name}")
-                    continue
-                
-                try:
-                    max_retries = 3
-                    for retry in range(max_retries):
-                        try:
-                            shutil.copy2(item, dest)
-                            print(f"  ✅ Copied: {item.name}")
-                            break
-                        except PermissionError:
-                            if retry < max_retries - 1:
-                                time.sleep(0.5)
-                            else:
-                                raise
-                except Exception as e:
-                    print(f"  ⚠️  Skipped {item.name}: {e}")
-        
-        for item in vpk_releases_path.iterdir():
-            if item.is_file() and item.parent == vpk_releases_path:
-                try:
-                    item.unlink()
-                except:
-                    pass
-        
-        print(f"✅ Organized VPK files into {release_folder}")
-    else:
-        print(f"⚠️  VPK Releases folder not found")
-    
-    # Step 6: Copy the standalone single-file binary to release folder
-    print(f"\n📦 Step 6: Adding standalone single-file binary...")
+    # Step 4: Copy the standalone single-file binary to release folder
+    print(f"\n📦 Step 4: Adding standalone single-file binary...")
     standalone_binary = release_folder / "AkademiTrack"
     shutil.copy2(binary_single, standalone_binary)
     os.chmod(standalone_binary, 0o755)
     standalone_size = standalone_binary.stat().st_size / 1024 / 1024
     print(f"✅ Standalone single-file binary: {standalone_binary.name} ({standalone_size:.1f} MB)")
     
-    # Step 7: Create install script
-    print(f"\n📦 Step 7: Creating install script...")
+    # Step 5: Create install script
+    print(f"\n📦 Step 5: Creating install script...")
     install_script = release_folder / "install.sh"
     install_content = f"""#!/bin/bash
 # AkademiTrack Linux Installation Script
@@ -408,8 +328,6 @@ def main():
         print(f"  • AkademiTrack - Standalone single-file binary (RUN THIS ONE!)")
         print(f"  • AkademiTrack-linux-Portable.tar.gz - Portable tarball package")
         print(f"  • install.sh - Installation script (sudo ./install.sh)")
-        print(f"  • *.nupkg - VPK/NuGet package for auto-updates")
-        print(f"  • RELEASES - VPK release manifest")
         
         print("\n💡 Next steps:")
         print(f"  • Test standalone binary: ./{release_folder}/AkademiTrack")

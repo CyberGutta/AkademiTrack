@@ -18,8 +18,18 @@ namespace AkademiTrack.Services
         // WebKit installation paths
         private static string GetWebKitInstallPath()
         {
-            var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appDataDir, "AkademiTrack", "webkit-browsers");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // Use ~/Library/Application Support/AkademiTrack for macOS
+                var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                return Path.Combine(homeDir, "Library", "Application Support", "AkademiTrack", "webkit-browsers");
+            }
+            else
+            {
+                // Use standard AppData for Windows/Linux
+                var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                return Path.Combine(appDataDir, "AkademiTrack", "webkit-browsers");
+            }
         }
 
         public static async Task<bool> EnsureWebKitInstalledAsync(IProgress<string>? progress = null)
@@ -122,7 +132,7 @@ namespace AkademiTrack.Services
                 {
                     var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                     possiblePaths.Add(Path.Combine(homeDir, "Library", "Caches", "ms-playwright"));
-                    possiblePaths.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AkademiTrack", "webkit-browsers"));
+                    possiblePaths.Add(Path.Combine(homeDir, "Library", "Application Support", "AkademiTrack", "webkit-browsers"));
                 }
                 else // Linux
                 {
@@ -195,9 +205,15 @@ namespace AkademiTrack.Services
                     {
                         try
                         {
-                            // Set environment variables for better Windows compatibility
-                            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", GetWebKitInstallPath());
+                            // Set environment variables for better compatibility
+                            var customPath = GetWebKitInstallPath();
+                            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", customPath);
                             Environment.SetEnvironmentVariable("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "0");
+                            
+                            // Ensure the directory exists
+                            Directory.CreateDirectory(customPath);
+                            
+                            Debug.WriteLine($"[WebKitManager] Set PLAYWRIGHT_BROWSERS_PATH to: {customPath}");
                             
                             return Microsoft.Playwright.Program.Main(new[] { "install", "webkit", "--with-deps" });
                         }
@@ -241,6 +257,13 @@ namespace AkademiTrack.Services
                     if (exitCode == 0)
                     {
                         Debug.WriteLine("[WebKitManager] WebKit installed successfully on Windows");
+                        
+                        // Remove quarantine attributes on macOS to prevent Gatekeeper issues
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                        {
+                            await RemoveQuarantineAttributesAsync();
+                        }
+                        
                         progress?.Report("WebKit installed successfully!");
                         return true;
                     }
@@ -272,6 +295,17 @@ namespace AkademiTrack.Services
 
         private static async Task<bool> InstallWebKitDefaultAsync(IProgress<string>? progress)
         {
+            // Set custom installation path for macOS
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                var customPath = GetWebKitInstallPath();
+                Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", customPath);
+                Debug.WriteLine($"[WebKitManager] Set PLAYWRIGHT_BROWSERS_PATH to: {customPath}");
+                
+                // Ensure the directory exists
+                Directory.CreateDirectory(customPath);
+            }
+            
             // Simulate progress updates while installation runs
             var installTask = Task.Run(() =>
             {
@@ -310,6 +344,13 @@ namespace AkademiTrack.Services
             if (exitCode == 0)
             {
                 Debug.WriteLine("[WebKitManager] WebKit installed successfully");
+                
+                // Remove quarantine attributes on macOS to prevent Gatekeeper issues
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    await RemoveQuarantineAttributesAsync();
+                }
+                
                 progress?.Report("WebKit installed successfully!");
                 return true;
             }
@@ -326,6 +367,12 @@ namespace AkademiTrack.Services
             if (_playwright == null)
             {
                 Debug.WriteLine("[WebKitManager] Initializing Playwright...");
+                
+                // Set custom browser path for consistent behavior
+                var customPath = GetWebKitInstallPath();
+                Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", customPath);
+                Debug.WriteLine($"[WebKitManager] Set PLAYWRIGHT_BROWSERS_PATH to: {customPath}");
+                
                 _playwright = await Playwright.CreateAsync();
                 _webkit = _playwright.Webkit;
             }
@@ -422,6 +469,66 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine($"[WebKitManager] Error getting WebKit path: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Remove quarantine attributes from WebKit binaries to prevent Gatekeeper blocking
+        /// </summary>
+        private static async Task RemoveQuarantineAttributesAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[WebKitManager] Removing quarantine attributes from WebKit binaries...");
+                
+                var webkitPath = GetWebKitInstallPath();
+                if (!Directory.Exists(webkitPath))
+                {
+                    Debug.WriteLine("[WebKitManager] WebKit directory not found, skipping quarantine removal");
+                    return;
+                }
+
+                // Find all WebKit directories
+                var webkitDirs = Directory.GetDirectories(webkitPath, "*webkit*", SearchOption.AllDirectories);
+                
+                foreach (var webkitDir in webkitDirs)
+                {
+                    Debug.WriteLine($"[WebKitManager] Removing quarantine from: {webkitDir}");
+                    
+                    // Use xattr command to remove quarantine attributes recursively
+                    var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "xattr",
+                            Arguments = $"-dr com.apple.quarantine \"{webkitDir}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    process.Start();
+                    await process.WaitForExitAsync();
+                    
+                    if (process.ExitCode == 0)
+                    {
+                        Debug.WriteLine($"[WebKitManager] ✅ Successfully removed quarantine from {Path.GetFileName(webkitDir)}");
+                    }
+                    else
+                    {
+                        var error = await process.StandardError.ReadToEndAsync();
+                        Debug.WriteLine($"[WebKitManager] ⚠️ Failed to remove quarantine from {Path.GetFileName(webkitDir)}: {error}");
+                    }
+                }
+                
+                Debug.WriteLine("[WebKitManager] Quarantine removal completed");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[WebKitManager] Error removing quarantine attributes: {ex.Message}");
+                // Don't throw - this is not critical enough to stop the app
             }
         }
 

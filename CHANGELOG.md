@@ -29,7 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-Start Automation** - Optional automatic start of monitoring when app launches
 - **Start with System** - Optional launch at system startup (Windows/macOS)
 - **Automatic Update Checking** - Checks for new versions every 30 minutes
-- **One-Click Updates** - Easy update download and installation via Velopack
 - **Cross-Platform Support** - Windows, macOS, and Linux compatibility
 - **Modern UI** - Clean Avalonia-based user interface
 - **Tutorial System** - Built-in guidance for first-time users
@@ -38,7 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Built with C# and .NET
 - Avalonia UI framework for cross-platform desktop support
 - Selenium WebDriver for secure Feide authentication
-- Velopack for automatic updates
 - MVVM architecture pattern
 - Efficient API usage (one schedule fetch per day)
 - Encrypted local credential storage

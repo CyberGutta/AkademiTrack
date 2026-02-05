@@ -78,7 +78,7 @@ def update_csproj_version(version):
         return False
 
 def build_windows_release(version):
-    """Build Windows release - creates exe, portable zip, and VPK package"""
+    """Build Windows release - creates exe and portable zip"""
     
     print(f"\n🏗️  Building AkademiTrack for Windows (x64)...")
     print("=" * 50)
@@ -95,7 +95,7 @@ def build_windows_release(version):
         print("Checking for alternative formats...")
         png_icon = Path("./Assets/AT-1024.png")
         if png_icon.exists():
-            print(f"⚠️  Found PNG but VPK requires .ico format")
+            print(f"⚠️  Found PNG but .ico format is preferred")
             print("Please convert AT-1024.png to AT-1024.ico")
         icon_path = None
     else:
@@ -131,8 +131,8 @@ def build_windows_release(version):
     
     release_folder.mkdir(parents=True, exist_ok=True)
     
-    # Step 1: Publish for VPK (multi-file, needed for VPK)
-    print(f"\n📦 Step 1: Publishing for VPK (multi-file)...")
+    # Step 1: Publish for distribution (multi-file)
+    print(f"\n📦 Step 1: Publishing for distribution (multi-file)...")
     publish_cmd = [
         "dotnet", "publish",
         "-c", "Release",
@@ -149,7 +149,7 @@ def build_windows_release(version):
         print(f"❌ Publish failed: {result.stderr}")
         return False
     
-    print("✅ Published for VPK successfully")
+    print("✅ Published for distribution successfully")
     
     # Step 2: Publish single file exe (for standalone distribution)
     print(f"\n📦 Step 2: Publishing standalone single-file exe...")
@@ -206,109 +206,8 @@ def build_windows_release(version):
     print(f"✅ Portable ZIP created: {portable_zip.name} ({portable_size:.1f} MB)")
     
     # Step 4: Create VPK package
-    print(f"\n📦 Step 4: Creating VPK package...")
-    
-    # Check if vpk is installed
-    try:
-        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True,
-                               encoding='utf-8', errors='replace')
-        print(f"✅ Velopack found: {result.stdout.strip()}")
-    except FileNotFoundError:
-        print("❌ Velopack (vpk) not found!")
-        print("Install it with: dotnet tool install -g vpk")
-        return False
-    
-    # Get absolute paths for VPK
-    publish_dir_abs = publish_dir.absolute()
-    
-    # Build VPK command with all customizations
-    vpk_cmd = [
-        "vpk", "pack",
-        "--packId", "AkademiTrack",
-        "--packVersion", version,
-        "--packTitle", "AkademiTrack",
-        "--packDir", str(publish_dir_abs),
-        "--mainExe", "AkademiTrack.exe"
-    ]
-    
-    # Add icon parameter if icon exists
-    if icon_path and icon_path.exists():
-        vpk_cmd.extend(["--icon", str(icon_path.absolute())])
-        print(f"🎨 Using icon: {icon_path}")
-    else:
-        print(f"⚠️  Building without custom icon (will use default)")
-    
-    # Add splash image parameter if exists
-    if splash_path and splash_path.exists():
-        vpk_cmd.extend(["--splashImage", str(splash_path.absolute())])
-        print(f"🖼️  Using splash image: {splash_path}")
-    else:
-        print(f"⚠️  Building without splash image")
-    
-    print(f"Running: {' '.join(vpk_cmd)}")
-    result = subprocess.run(vpk_cmd, capture_output=True, text=True,
-                           encoding='utf-8', errors='replace')
-    
-    if result.returncode != 0:
-        print(f"❌ VPK pack failed:")
-        print(f"STDERR: {result.stderr}")
-        print(f"STDOUT: {result.stdout}")
-        return False
-    
-    print("✅ VPK package created successfully")
-    if result.stdout:
-        print(result.stdout)
-    
-    # Step 5: Move VPK output to release folder
-    print(f"\n📦 Step 5: Organizing VPK release files...")
-    
-    # Give VPK a moment to release file handles
-    import time
-    time.sleep(1)
-    
-    # VPK creates files directly in the Releases folder
-    vpk_releases_path = Path("./Releases")
-    
-    if vpk_releases_path.exists():
-        print(f"✅ Found VPK Releases folder")
-        
-        # Copy VPK files from Releases root to our version folder
-        for item in vpk_releases_path.iterdir():
-            if item.is_file():
-                dest = release_folder / item.name
-                if dest.exists():
-                    print(f"  ⏭️  Already exists: {item.name}")
-                    continue
-                
-                try:
-                    max_retries = 3
-                    for retry in range(max_retries):
-                        try:
-                            shutil.copy2(item, dest)
-                            print(f"  ✅ Copied: {item.name}")
-                            break
-                        except PermissionError:
-                            if retry < max_retries - 1:
-                                time.sleep(0.5)
-                            else:
-                                raise
-                except Exception as e:
-                    print(f"  ⚠️  Skipped {item.name}: {e}")
-        
-        # Clean up VPK files from root Releases folder
-        for item in vpk_releases_path.iterdir():
-            if item.is_file() and item.parent == vpk_releases_path:
-                try:
-                    item.unlink()
-                except:
-                    pass
-        
-        print(f"✅ Organized VPK files into {release_folder}")
-    else:
-        print(f"⚠️  VPK Releases folder not found")
-    
-    # Step 6: Copy the standalone single-file EXE to release folder
-    print(f"\n📦 Step 6: Adding standalone single-file EXE...")
+    # Step 4: Copy the standalone single-file EXE to release folder
+    print(f"\n📦 Step 4: Adding standalone single-file EXE...")
     standalone_exe = release_folder / "AkademiTrack.exe"
     shutil.copy2(exe_single, standalone_exe)
     standalone_size = standalone_exe.stat().st_size / 1024 / 1024
@@ -421,9 +320,7 @@ def main():
         print("\n📋 Files created:")
         print(f"  • AkademiTrack.exe - Standalone single-file executable (RUN THIS ONE!)")
         print(f"  • AkademiTrack-win-Portable.zip - Portable ZIP package")
-        print(f"  • *.nupkg - VPK/NuGet package for auto-updates")
-        print(f"  • RELEASES - VPK release manifest")
-        print(f"  • AkademiTrack-win-Setup.exe - Installer with auto-update support")
+        print(f"  • AkademiTrack-win-Setup.exe - Installer")
         
         print("\n💡 Next steps:")
         print(f"  • Test AkademiTrack.exe from {release_folder}/")

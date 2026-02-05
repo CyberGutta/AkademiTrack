@@ -683,133 +683,6 @@ def create_installer_pkg(bundle_dir, version, sign=True, notarize=True):
     
     return pkg_path
 
-def create_velopack_package(bundle_dir, version):
-    """Create VPK package using Velopack from the existing .app bundle"""
-    print("\n📦 Creating VPK Package (NuGet)")
-    print("=" * 50)
-
-    try:
-        result = subprocess.run(["vpk", "--version"], capture_output=True, text=True)
-        print(f"✅ Velopack found: {result.stdout.strip()}")
-    except FileNotFoundError:
-        print("❌ Velopack (vpk) not found!")
-        print("Install it with: dotnet tool install -g vpk")
-        return None
-
-    # Create a temporary directory for Velopack with LOOSE FILES (not .app bundle)
-    publish_dir = Path("./publish-mac-arm")
-    
-    if publish_dir.exists():
-        shutil.rmtree(publish_dir)
-    publish_dir.mkdir(parents=True)
-
-    print(f"📂 Copying application files for Velopack...")
-    
-    macos_source = bundle_dir / "Contents" / "MacOS"
-    
-    if not macos_source.exists():
-        print(f"❌ MacOS directory not found in bundle")
-        return None
-    
-    # Copy all files from MacOS to publish dir (Velopack will create the .app structure)
-    for item in macos_source.iterdir():
-        dest = publish_dir / item.name
-        if item.is_dir():
-            shutil.copytree(item, dest, dirs_exist_ok=True)
-        else:
-            shutil.copy2(item, dest)
-    
-    print("✅ Copied all files from .app bundle")
-
-    print(f"📦 Creating VPK package (version {version})...")
-
-    icon_path = Path(ICON_PATH).absolute()
-    
-    # Verify icon exists
-    if not icon_path.exists():
-        print(f"⚠️  Icon not found at {icon_path}, continuing without icon")
-        icon_path = None
-
-    # Pass the folder with loose files, NOT a .app bundle
-    # Velopack will create the .app structure itself
-    vpk_cmd = [
-        "vpk", "pack",
-        "--packId", "AkademiTrack",
-        "--packVersion", version,
-        "--packDir", str(publish_dir),
-        "--mainExe", APP_NAME,
-        "--bundleId", BUNDLE_IDENTIFIER,
-        "--noInst",  # <-- CORRECT FLAG: Skip .pkg creation (we make our own)
-        "--verbose"
-    ]
-    
-    if icon_path:
-        vpk_cmd.extend(["--icon", str(icon_path)])
-
-    print(f"Running command: {' '.join(vpk_cmd)}")
-    result = subprocess.run(vpk_cmd, capture_output=True, text=True)
-
-    # Show output for debugging
-    if result.stdout:
-        print("STDOUT:", result.stdout)
-    if result.stderr:
-        print("STDERR:", result.stderr)
-
-    if result.returncode != 0:
-        print(f"❌ VPK pack failed with code {result.returncode}")
-        print("\n💡 Try running manually to see full output:")
-        print(f"   {' '.join(vpk_cmd)}")
-        return None
-
-    print("✅ VPK package created successfully")
-    
-    # Clean up temporary directory
-    if publish_dir.exists():
-        shutil.rmtree(publish_dir)
-    
-    # Rename to match convention
-    nupkg_file = list(Path(".").glob("AkademiTrack.*.nupkg"))
-    if nupkg_file:
-        new_name = f"AkademiTrack-{version}-osx-full.nupkg"
-        shutil.move(str(nupkg_file[0]), new_name)
-        print(f"✅ Renamed to: {new_name}")
-        
-        # Fix Releases folder .app
-        print("\n🔧 Fixing Releases folder .app...")
-        releases_app = Path("./Releases/AkademiTrack.app")
-        
-        if releases_app.exists():
-            releases_resources = releases_app / "Contents" / "Resources"
-            original_resources = bundle_dir / "Contents" / "Resources"
-            
-            if original_resources.exists():
-                # Ensure Resources directory exists
-                releases_resources.mkdir(parents=True, exist_ok=True)
-                
-                entitlements_src = original_resources / "entitlements.plist"
-                if entitlements_src.exists():
-                    shutil.copy2(entitlements_src, releases_resources / "entitlements.plist")
-                    print("  ✅ Copied entitlements.plist to Releases app")
-                
-                # Copy helper app if it exists
-                helper_src = original_resources / "AkademiTrack.app"
-                if helper_src.exists():
-                    helper_dest = releases_resources / "AkademiTrack.app"
-                    if helper_dest.exists():
-                        shutil.rmtree(helper_dest)
-                    shutil.copytree(helper_src, helper_dest, dirs_exist_ok=True)
-                    print("  ✅ Copied helper AkademiTrack.app to Releases app")
-                
-                print("✅ Releases folder .app now matches portable version!")
-            else:
-                print("  ⚠️  Original Resources folder not found")
-        else:
-            print("  ℹ️  Releases folder .app not found (will be created when downloaded)")
-        
-        return Path(new_name)
-    
-    return None
-
 # ============================================================================
 # VERIFICATION FUNCTIONS
 # ============================================================================
@@ -907,38 +780,27 @@ def main():
 
     # Ask what distributions to create
     print("\n📦 Distribution Options:")
-    print("1. Portable ZIP + VPK Package")
+    print("1. Portable ZIP")
     print("2. Installer PKG (includes LaunchAgent)")
-    print("3. VPK Package only")
-    print("4. All of the above")
+    print("3. All of the above")
     
-    dist_choice = input("\nSelect option (1/2/3/4) [4]: ").strip()
+    dist_choice = input("\nSelect option (1/2/3) [3]: ").strip()
     if not dist_choice:
-        dist_choice = "4"
+        dist_choice = "3"
     
     created_files = []
     
-    # Option 1: ZIP + VPK
-    if dist_choice in ["1", "4"]:
+    # Option 1: ZIP only
+    if dist_choice in ["1", "3"]:
         zip_file = create_portable_zip(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if zip_file:
             created_files.append(("Portable ZIP", zip_file))
-        
-        vpk_file = create_velopack_package(bundle_dir, version)
-        if vpk_file:
-            created_files.append(("VPK Package", vpk_file))
     
     # Option 2: PKG with LaunchAgent
-    if dist_choice in ["2", "4"]:
+    if dist_choice in ["2", "3"]:
         pkg_file = create_installer_pkg(bundle_dir, version, sign=do_sign, notarize=do_notarize)
         if pkg_file:
             created_files.append(("Installer PKG", pkg_file))
-    
-    # Option 3: VPK only
-    if dist_choice == "3":
-        vpk_file = create_velopack_package(bundle_dir, version)
-        if vpk_file:
-            created_files.append(("VPK Package", vpk_file))
     
     # Final summary
     print("\n" + "=" * 50)

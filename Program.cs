@@ -1,6 +1,5 @@
 ﻿using System;
 using Avalonia;
-using Velopack;
 
 namespace AkademiTrack
 {
@@ -9,10 +8,7 @@ namespace AkademiTrack
         [STAThread]
         public static void Main(string[] args)
         {
-            // MUST be first - Velopack initialization
-            VelopackApp.Build().Run();
-
-            // Then start Avalonia app
+            // Start Avalonia app
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
 

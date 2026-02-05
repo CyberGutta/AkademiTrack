@@ -213,7 +213,6 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 | **Language** | C# (.NET 9.0) |
 | **UI Framework** | Avalonia UI |
 | **Authentication** | Playwright (WebKit-based) |
-| **Updates** | Velopack |
 | **Architecture** | MVVM pattern |
 | **Security** | System.Security.Cryptography.ProtectedData |
 

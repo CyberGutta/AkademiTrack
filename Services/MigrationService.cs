@@ -71,24 +71,24 @@ namespace AkademiTrack.Services
                     Directory.CreateDirectory(appDataDir);
                 }
 
-                // Check if there's any old data to clean up
-                bool hadOldData = CheckForOldData();
+                // Check if there's any truly old data to clean up
+                bool hadTrulyOldData = CheckForTrulyOldData();
                 
-                if (hadOldData)
+                if (hadTrulyOldData)
                 {
-                    Debug.WriteLine("[Migration] Found old app data - clearing potentially invalid credentials");
-                    await ClearOldCredentialsAsync();
+                    Debug.WriteLine("[Migration] Found truly old/incompatible app data - clearing it");
+                    await ClearTrulyOldDataAsync();
                 }
                 else
                 {
-                    Debug.WriteLine("[Migration] No old data found - this appears to be a new user");
+                    Debug.WriteLine("[Migration] No truly old data found - just updating version tracking");
                 }
 
-                // Update version tracking
+                // Update version tracking (this is safe and doesn't clear user data)
                 await UpdateVersionTrackingAsync();
                 
                 Debug.WriteLine("[Migration] Migration completed successfully");
-                return hadOldData; // Return true if we actually cleaned up data
+                return hadTrulyOldData; // Return true if we actually cleaned up data
             }
             catch (Exception ex)
             {
@@ -121,18 +121,18 @@ namespace AkademiTrack.Services
                     
                     if (!versionFileExists)
                     {
-                        // Check if there's any old app data (settings, credentials, etc.)
-                        bool hasOldAppData = CheckForOldData();
+                        // Check if there's any TRULY old app data that needs migration
+                        bool hasOldAppData = CheckForTrulyOldData();
                         
                         if (hasOldAppData)
                         {
-                            Debug.WriteLine("[Migration] ✅ Found old app data - this is an upgrade from old version");
+                            Debug.WriteLine("[Migration] ✅ Found truly old app data - this is an upgrade from old version");
                             return true; // Upgrade from old app - needs migration
                         }
                         else
                         {
-                            Debug.WriteLine("[Migration] ✅ No old app data - this is a fresh install");
-                            // Fresh install - create version file but no migration needed
+                            Debug.WriteLine("[Migration] ✅ No old app data - this is a fresh install or current version");
+                            // Fresh install or current version - create version file but no migration needed
                             await UpdateVersionTrackingAsync();
                             return false;
                         }
@@ -144,7 +144,7 @@ namespace AkademiTrack.Services
                 try
                 {
                     lastVersion = await File.ReadAllTextAsync(LastVersionPath);
-                    lastVersion = lastVersion.Trim();
+                    lastVersion = lastVersion.Trim().Split('\n')[0]; // Take only the first line (version number)
                 }
                 catch (Exception ex)
                 {
@@ -243,7 +243,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        private static bool CheckForOldData()
+        private static bool CheckForTrulyOldData()
         {
             try
             {
@@ -256,120 +256,116 @@ namespace AkademiTrack.Services
                     return false;
                 }
 
-                // Check for any files that indicate old app usage
-                var indicatorFiles = new[]
+                // Only check for TRULY old files that indicate an incompatible old version
+                // DO NOT include current version files like settings.json, last_version.txt, etc.
+                var trulyOldFiles = new[]
                 {
-                    // Credential and session files
-                    Path.Combine(akademiTrackDir, "credentials.json"),
-                    Path.Combine(akademiTrackDir, "cookies.json"),
-                    Path.Combine(akademiTrackDir, "user_parameters.json"),
-                    Path.Combine(akademiTrackDir, "settings.json"),
+                    // These are files from very old versions that are incompatible
+                    Path.Combine(akademiTrackDir, "old_credentials.json"), // Example old file
+                    Path.Combine(akademiTrackDir, "legacy_settings.json"), // Example old file
+                    Path.Combine(akademiTrackDir, "v1_data.json"), // Example old file
                     
-                    // Old migration marker (from previous version)
-                    Path.Combine(akademiTrackDir, "v2_migration_complete.marker"),
-                    
-                    // Any other files that might exist from old versions
-                    Path.Combine(akademiTrackDir, "app_settings.json"),
-                    Path.Combine(akademiTrackDir, "user_data.json")
+                    // Add other truly old/incompatible files here if they exist
+                    // DO NOT add current files like settings.json, last_version.txt, etc.
                 };
 
-                bool hasOldData = false;
-                foreach (var file in indicatorFiles)
+                bool hasTrulyOldData = false;
+                foreach (var file in trulyOldFiles)
                 {
                     if (File.Exists(file))
                     {
-                        Debug.WriteLine($"[Migration] Found old app file: {Path.GetFileName(file)}");
-                        hasOldData = true;
+                        Debug.WriteLine($"[Migration] Found truly old app file: {Path.GetFileName(file)}");
+                        hasTrulyOldData = true;
                     }
                 }
 
-                // Also check for any subdirectories that might contain old data
-                if (Directory.Exists(akademiTrackDir))
+                // Check if we have current files but no version tracking (this indicates a recent version without version tracking)
+                var currentFiles = new[]
                 {
-                    var subdirs = Directory.GetDirectories(akademiTrackDir);
-                    if (subdirs.Length > 0)
-                    {
-                        Debug.WriteLine($"[Migration] Found {subdirs.Length} subdirectories from old app");
-                        hasOldData = true;
-                    }
+                    Path.Combine(akademiTrackDir, "settings.json"),
+                    Path.Combine(akademiTrackDir, "v2_migration_complete.marker")
+                };
+
+                bool hasCurrentFiles = currentFiles.Any(File.Exists);
+                bool hasVersionFile = File.Exists(LastVersionPath);
+
+                if (hasCurrentFiles && !hasVersionFile)
+                {
+                    Debug.WriteLine("[Migration] Found current files without version tracking - this is a recent version, not old data");
+                    // This is NOT old data - it's just a recent version without version tracking
+                    // We should create version tracking but NOT clear the data
+                    return false;
                 }
 
-                if (hasOldData)
+                if (hasTrulyOldData)
                 {
-                    Debug.WriteLine("[Migration] ✅ Detected old app installation - migration needed");
+                    Debug.WriteLine("[Migration] ✅ Detected truly old/incompatible app installation - migration needed");
                 }
                 else
                 {
-                    Debug.WriteLine("[Migration] ✅ No old app data detected - fresh installation");
+                    Debug.WriteLine("[Migration] ✅ No truly old app data detected");
                 }
 
-                return hasOldData;
+                return hasTrulyOldData;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Migration] Error checking for old data: {ex.Message}");
-                return false;
+                Debug.WriteLine($"[Migration] Error checking for truly old data: {ex.Message}");
+                return false; // If we can't check, assume no old data to be safe
             }
         }
 
-        private static async Task ClearOldCredentialsAsync()
+        private static Task ClearTrulyOldDataAsync()
         {
             try
             {
-                Debug.WriteLine("[Migration] Clearing old credentials and app data to prevent login loops...");
+                Debug.WriteLine("[Migration] Clearing only truly old/incompatible data...");
                 
-                // STEP 1: Clear all stored credentials and cookies from keychain/secure storage
-                await SecureCredentialStorage.ClearAllDataAsync();
-                Debug.WriteLine("[Migration] ✓ Keychain/secure storage cleared");
-                
-                // STEP 2: Clear ALL Application Support files (except the migration marker)
                 var appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 var akademiTrackDir = Path.Combine(appDataDir, "AkademiTrack");
                 
-                if (Directory.Exists(akademiTrackDir))
+                if (!Directory.Exists(akademiTrackDir))
                 {
-                    Debug.WriteLine($"[Migration] Clearing Application Support directory: {akademiTrackDir}");
-                    
-                    // Get all files except the migration marker (which we'll create after)
-                    var filesToDelete = Directory.GetFiles(akademiTrackDir)
-                        .Where(f => !Path.GetFileName(f).Equals("v2_migration_complete.marker", StringComparison.OrdinalIgnoreCase))
-                        .ToArray();
-                    
-                    foreach (var file in filesToDelete)
+                    Debug.WriteLine("[Migration] No directory to clean");
+                    return Task.CompletedTask;
+                }
+
+                // Only delete files that are truly from old/incompatible versions
+                var trulyOldFiles = new[]
+                {
+                    Path.Combine(akademiTrackDir, "old_credentials.json"),
+                    Path.Combine(akademiTrackDir, "legacy_settings.json"),
+                    Path.Combine(akademiTrackDir, "v1_data.json"),
+                    // Add other truly old files here if they exist
+                };
+
+                foreach (var file in trulyOldFiles)
+                {
+                    if (File.Exists(file))
                     {
                         try
                         {
                             File.Delete(file);
-                            Debug.WriteLine($"[Migration] ✓ Deleted: {Path.GetFileName(file)}");
+                            Debug.WriteLine($"[Migration] ✓ Deleted truly old file: {Path.GetFileName(file)}");
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine($"[Migration] ⚠️ Could not delete {Path.GetFileName(file)}: {ex.Message}");
                         }
                     }
-                    
-                    // Also clear any subdirectories (but keep the main directory)
-                    var dirsToDelete = Directory.GetDirectories(akademiTrackDir);
-                    foreach (var dir in dirsToDelete)
-                    {
-                        try
-                        {
-                            Directory.Delete(dir, true);
-                            Debug.WriteLine($"[Migration] ✓ Deleted directory: {Path.GetFileName(dir)}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[Migration] ⚠️ Could not delete directory {Path.GetFileName(dir)}: {ex.Message}");
-                        }
-                    }
                 }
+
+                // DO NOT clear current files like settings.json, credentials, etc.
+                // These are valid current data that should be preserved
                 
-                Debug.WriteLine("[Migration] Old credentials and app data cleared successfully");
+                Debug.WriteLine("[Migration] Truly old data cleanup completed - current user data preserved");
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Migration] Error clearing old credentials: {ex.Message}");
+                Debug.WriteLine($"[Migration] Error clearing truly old data: {ex.Message}");
                 // Don't throw - this is not critical enough to stop the app
+                return Task.CompletedTask;
             }
         }
 
