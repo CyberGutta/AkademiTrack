@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.Playwright;
 
 namespace AkademiTrack.Services
 {
@@ -268,10 +267,10 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine("[HealthCheck] Checking WebKit browser driver...");
                 
-                // Check if WebKit is installed
-                var webkitPath = await WebKitManager.GetWebKitExecutablePathAsync();
+                // Check if ChromeDriver is available
+                var chromeDriverReady = await ChromeDriverManager.IsChromeDriverAvailableAsync();
                 
-                if (!string.IsNullOrEmpty(webkitPath) && Directory.Exists(webkitPath))
+                if (chromeDriverReady)
                 {
                     stopwatch.Stop();
                     return new HealthCheckResult
@@ -280,13 +279,13 @@ namespace AkademiTrack.Services
                         Status = HealthStatus.Healthy,
                         Message = "Tilgjengelig",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = $"WebKit installert og klar på {stopwatch.ElapsedMilliseconds}ms"
+                        Details = $"ChromeDriver installert og klar på {stopwatch.ElapsedMilliseconds}ms"
                     };
                 }
                 
-                // Try to install WebKit if not found
-                Debug.WriteLine("[HealthCheck] WebKit not found, attempting installation...");
-                var installed = await WebKitManager.EnsureWebKitInstalledAsync();
+                // Try to install ChromeDriver if not found
+                Debug.WriteLine("[HealthCheck] ChromeDriver not found, attempting installation...");
+                var installed = await ChromeDriverManager.EnsureChromeDriverInstalledAsync();
                 
                 if (installed)
                 {

@@ -5,7 +5,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Playwright;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Support.UI;
+using SeleniumExtras.WaitHelpers;
 using System.Security;
 using System.Text.Json;
 using System.Runtime.InteropServices;
@@ -55,9 +58,9 @@ namespace AkademiTrack.Services
                     }
                 }
 
-                // Need fresh login with Playwright
-                Debug.WriteLine("[AUTH] Performing fresh login with Playwright");
-                return await PerformPlaywrightLoginAsync();
+                // Need fresh login with Selenium
+                Debug.WriteLine("[AUTH] Performing fresh login with Selenium");
+                return await PerformSeleniumLoginAsync();
             }
             catch (Exception ex)
             {
@@ -127,173 +130,333 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<AuthenticationResult> PerformPlaywrightLoginAsync()
+        private async Task<AuthenticationResult> PerformSeleniumLoginAsync()
         {
-            IBrowser? browser = null;
-            IPage? page = null;
-
-            try
+            // Run the entire Selenium automation on a background thread to avoid UI freezing
+            return await Task.Run(async () =>
             {
-                Debug.WriteLine("[PLAYWRIGHT] Starting WebKit browser");
-                
-                // Ensure WebKit is installed
-                var webkitInstalled = await WebKitManager.EnsureWebKitInstalledAsync();
-                if (!webkitInstalled)
-                {
-                    return new AuthenticationResult 
-                    { 
-                        Success = false, 
-                        ErrorMessage = "Kunne ikke installere WebKit-nettleser. Vennligst start appen på nytt eller kontakt support." 
-                    };
-                }
+                ChromeDriver? driver = null;
 
-                // Launch WebKit browser (headless)
-                browser = await WebKitManager.LaunchBrowserAsync(headless: true);
-                page = await browser.NewPageAsync();
-                
-                // Set viewport
-                await page.SetViewportSizeAsync(1920, 1080);
-
-                // Block CSS and other resources for faster loading
-                await page.RouteAsync("**/*", async route =>
+                try
                 {
-                    var request = route.Request;
-                    // Block CSS, fonts, and images to speed up loading
-                    if (request.ResourceType == "stylesheet" || 
-                        request.ResourceType == "font" ||
-                        request.ResourceType == "image")
+                    Debug.WriteLine("[SELENIUM] Starting Chrome browser on background thread");
+                    
+                    // Ensure ChromeDriver is available
+                    var chromeDriverReady = await ChromeDriverManager.EnsureChromeDriverInstalledAsync();
+                    if (!chromeDriverReady)
                     {
-                        await route.AbortAsync();
+                        return new AuthenticationResult 
+                        { 
+                            Success = false, 
+                            ErrorMessage = "Kunne ikke sette opp ChromeDriver. Vennligst start appen på nytt eller kontakt support." 
+                        };
+                    }
+
+                    // Create Chrome driver (headless for production speed)
+                    driver = ChromeDriverManager.CreateChromeDriver(headless: true);
+                    
+                    // Set timeouts
+                    driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+                    driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(30);
+
+                    Debug.WriteLine("[SELENIUM] Navigating to login page");
+                    driver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
+                    Debug.WriteLine($"[SELENIUM] Current URL after navigation: {driver.Url}");
+                    Debug.WriteLine($"[SELENIUM] Page title: {driver.Title}");
+                    await Task.Delay(800); // Wait for page to load
+
+                    // Click FEIDE button
+                    Debug.WriteLine("[SELENIUM] Clicking FEIDE button");
+                    var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(15));
+                    
+                    // Wait for page to be fully loaded
+                    wait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").Equals("complete"));
+                    
+                    // Try multiple selectors for the FEIDE button
+                    IWebElement? feideButton = null;
+                    try
+                    {
+                        Debug.WriteLine("[SELENIUM] Trying XPath selector for FEIDE button...");
+                        // Try XPath first
+                        feideButton = wait.Until(d => d.FindElement(By.XPath("//button[.//span[contains(@class, 'feide_icon')]]")));
+                        Debug.WriteLine("[SELENIUM] Found FEIDE button with XPath selector");
+                    }
+                    catch (Exception ex1)
+                    {
+                        Debug.WriteLine($"[SELENIUM] XPath selector failed: {ex1.Message}");
+                        try
+                        {
+                            Debug.WriteLine("[SELENIUM] Trying text-based selector for FEIDE button...");
+                            // Try alternative selector
+                            feideButton = wait.Until(d => d.FindElement(By.XPath("//button[contains(text(), 'Feide') or contains(text(), 'FEIDE')]")));
+                            Debug.WriteLine("[SELENIUM] Found FEIDE button with text selector");
+                        }
+                        catch (Exception ex2)
+                        {
+                            Debug.WriteLine($"[SELENIUM] Text selector failed: {ex2.Message}");
+                            try
+                            {
+                                Debug.WriteLine("[SELENIUM] Trying CSS selector for FEIDE button...");
+                                // Try CSS selector as last resort
+                                feideButton = wait.Until(d => d.FindElement(By.CssSelector("button[class*='feide'], button[id*='feide']")));
+                                Debug.WriteLine("[SELENIUM] Found FEIDE button with CSS selector");
+                            }
+                            catch (Exception ex3)
+                            {
+                                Debug.WriteLine($"[SELENIUM] CSS selector failed: {ex3.Message}");
+                                // List all buttons on the page for debugging
+                                var allButtons = driver.FindElements(By.TagName("button"));
+                                Debug.WriteLine($"[SELENIUM] Found {allButtons.Count} buttons on the page:");
+                                for (int i = 0; i < Math.Min(allButtons.Count, 10); i++)
+                                {
+                                    var btn = allButtons[i];
+                                    Debug.WriteLine($"[SELENIUM] Button {i}: text='{btn.Text}', class='{btn.GetAttribute("class")}', id='{btn.GetAttribute("id")}'");
+                                }
+                                throw new Exception("Could not find FEIDE button with any selector");
+                            }
+                        }
+                    }
+                    
+                    // Scroll to element and ensure it's visible
+                    Debug.WriteLine("[SELENIUM] Scrolling to FEIDE button...");
+                    ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", feideButton);
+                    await Task.Delay(500); // Wait for scroll to complete
+                    
+                    // Check if element is displayed and enabled
+                    Debug.WriteLine($"[SELENIUM] FEIDE button - Displayed: {feideButton.Displayed}, Enabled: {feideButton.Enabled}");
+                    
+                    // Wait for element to be clickable
+                    Debug.WriteLine("[SELENIUM] Waiting for FEIDE button to be clickable...");
+                    wait.Until(ExpectedConditions.ElementToBeClickable(feideButton));
+                    
+                    Debug.WriteLine("[SELENIUM] Clicking FEIDE button...");
+                    feideButton.Click();
+                    Debug.WriteLine($"[SELENIUM] Clicked FEIDE button, current URL: {driver.Url}");
+                    
+                    // Wait for navigation to complete
+                    wait.Until(d => d.Url.Contains("feide.no") || d.Url.Contains("dataporten") || d.FindElements(By.Id("orglist")).Count > 0);
+
+                    // Handle organization selection - click search input first to activate the list
+                    Debug.WriteLine("[SELENIUM] Selecting organization from list");
+                    
+                    // Wait for the organization page to be fully loaded
+                    wait.Until(d => d.FindElements(By.Id("org_selector_filter")).Count > 0);
+                    await Task.Delay(500); // Reduced from 2000ms to 500ms
+                    
+                    // CLICK THE INPUT FIELD TO ACTIVATE THE SCHOOL LIST (same method as username/password)
+                    Debug.WriteLine("[SELENIUM] Clicking search input to activate school list");
+                    var searchInput = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("org_selector_filter")));
+                    searchInput.Click();
+                    Debug.WriteLine("[SELENIUM] ✅ Clicked search input");
+                    await Task.Delay(300); // Reduced from 1000ms to 300ms
+                    
+                    // Find and click the school by matching org_name attribute (case-insensitive)
+                    var schoolNameLower = _schoolName.ToLowerInvariant();
+                    Debug.WriteLine($"[SELENIUM] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
+                    
+                    // Get all school elements and find the matching one
+                    var schoolElements = driver.FindElements(By.CssSelector("li.orglist_item[org_name]"));
+                    Debug.WriteLine($"[SELENIUM] After clicking search input, found {schoolElements.Count} schools in the list");
+                    
+                    // If no schools found, try alternative selectors
+                    if (schoolElements.Count == 0)
+                    {
+                        Debug.WriteLine("[SELENIUM] No schools found with org_name attribute, trying alternative selectors");
+                        schoolElements = driver.FindElements(By.CssSelector("li.orglist_item"));
+                        Debug.WriteLine($"[SELENIUM] Found {schoolElements.Count} schools with basic selector");
+                        
+                        if (schoolElements.Count == 0)
+                        {
+                            schoolElements = driver.FindElements(By.CssSelector("li[class*='org']"));
+                            Debug.WriteLine($"[SELENIUM] Found {schoolElements.Count} schools with wildcard selector");
+                        }
+                    }
+                    
+                    bool schoolFound = false;
+                    
+                    Debug.WriteLine($"[SELENIUM] Found {schoolElements.Count} schools in the list");
+                    
+                    foreach (var element in schoolElements)
+                    {
+                        try
+                        {
+                            var orgName = element.GetAttribute("org_name");
+                            Debug.WriteLine($"[SELENIUM] Checking school: '{orgName}'");
+                            
+                            if (!string.IsNullOrEmpty(orgName) && orgName.ToLowerInvariant().Contains(schoolNameLower))
+                            {
+                                Debug.WriteLine($"✅ [SELENIUM] Found matching school: '{orgName}' - clicking it");
+                                
+                                // Scroll to element and ensure it's visible
+                                ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", element);
+                                await Task.Delay(100); // Reduced from 300ms to 100ms
+                                
+                                // Wait for element to be clickable
+                                wait.Until(ExpectedConditions.ElementToBeClickable(element));
+                                element.Click();
+                                schoolFound = true;
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[SELENIUM] Error checking school element: {ex.Message}");
+                            continue;
+                        }
+                    }
+                    
+                    if (!schoolFound)
+                    {
+                        Debug.WriteLine($"[SELENIUM] School '{_schoolName}' not found in list, trying alternative approach");
+                        
+                        // Try to find by text content instead of attribute
+                        try
+                        {
+                            var schoolByText = driver.FindElement(By.XPath($"//li[@class='orglist_item' and contains(text(), '{_schoolName}')]"));
+                            Debug.WriteLine($"✅ [SELENIUM] Found school by text content - clicking it");
+                            
+                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", schoolByText);
+                            await Task.Delay(100); // Reduced from 300ms to 100ms
+                            wait.Until(ExpectedConditions.ElementToBeClickable(schoolByText));
+                            schoolByText.Click();
+                            schoolFound = true;
+                        }
+                        catch
+                        {
+                            Debug.WriteLine($"[SELENIUM] School not found by any method, falling back to search with typing");
+                            // Last resort: type in search box
+                            var searchBox = driver.FindElement(By.Id("org_selector_filter"));
+                            searchBox.Clear();
+                            searchBox.SendKeys(_schoolName);
+                            await Task.Delay(200); // Reduced from 500ms to 200ms
+                            
+                            var matchingSchool = wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("li.orglist_item.match")));
+                            matchingSchool.Click();
+                            schoolFound = true;
+                        }
+                    }
+                    
+                    if (schoolFound)
+                    {
+                        // Small delay to ensure school selection is registered
+                        await Task.Delay(200); // Reduced from 500ms to 200ms
+                        Debug.WriteLine("➡️ [SELENIUM] Clicking Continue button to proceed with selected school");
+                        var continueButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("selectorg_button")));
+                        continueButton.Click();
+                    }
+                    
+                    // Wait for navigation to login form
+                    wait.Until(ExpectedConditions.ElementIsVisible(By.Id("username")));
+                    await Task.Delay(300); // Reduced from 1000ms to 300ms
+
+                    // Fill login form
+                    Debug.WriteLine("[SELENIUM] Filling login form");
+                    var usernameField = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("username")));
+                    var passwordField = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("password")));
+                    var submitButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("button[type='submit']")));
+                    
+                    // Clear and fill username
+                    usernameField.Clear();
+                    usernameField.SendKeys(_loginEmail);
+                    await Task.Delay(100); // Reduced from 200ms to 100ms
+                    
+                    // Clear and fill password
+                    passwordField.Clear();
+                    passwordField.SendKeys(SecureStringToString(_loginPasswordSecure));
+                    await Task.Delay(100); // Reduced from 200ms to 100ms
+                    
+                    // Submit the form
+                    submitButton.Click();
+
+                    // Wait for success - check for successful login redirect
+                    Debug.WriteLine("[SELENIUM] Waiting for login success...");
+                    var loginWait = new WebDriverWait(driver, TimeSpan.FromSeconds(45));
+                    
+                    try
+                    {
+                        // Wait for either success URL or error condition
+                        loginWait.Until(d => 
+                            d.Url.Contains("isFeideinnlogget=true") || 
+                            d.Url.Contains("error") ||
+                            d.FindElements(By.CssSelector(".error, .alert-danger, [class*='error']")).Count > 0
+                        );
+                    }
+                    catch (WebDriverTimeoutException)
+                    {
+                        Debug.WriteLine("[SELENIUM] Login timeout - checking current state");
+                        Debug.WriteLine($"[SELENIUM] Current URL: {driver.Url}");
+                        Debug.WriteLine($"[SELENIUM] Page title: {driver.Title}");
+                    }
+                    
+                    var currentUrl = driver.Url;
+                    Debug.WriteLine($"[SELENIUM] Final URL: {currentUrl}");
+                    
+                    if (currentUrl.Contains("isFeideinnlogget=true"))
+                    {
+                        Debug.WriteLine("[SELENIUM] Login successful");
+                        
+                        // Wait a bit for the page to fully load
+                        await Task.Delay(500); // Reduced from 2000ms to 500ms
+                        
+                        // Extract cookies and parameters
+                        var cookies = ExtractCookies(driver);
+                        var parameters = await ExtractUserParametersAsync(driver);
+
+                        if (cookies != null && parameters != null)
+                        {
+                            await SaveCookiesAndParametersAsync(cookies, parameters);
+                            return AuthenticationResult.CreateSuccess(cookies, parameters);
+                        }
                     }
                     else
                     {
-                        await route.ContinueAsync();
+                        // Check for error messages
+                        var errorElements = driver.FindElements(By.CssSelector(".error, .alert-danger, [class*='error']"));
+                        if (errorElements.Count > 0)
+                        {
+                            var errorText = errorElements.First().Text;
+                            Debug.WriteLine($"[SELENIUM] Login error detected: {errorText}");
+                            return AuthenticationResult.CreateFailed($"Login feilet: {errorText}");
+                        }
                     }
-                });
-
-                Debug.WriteLine("[PLAYWRIGHT] Navigating to login page");
-                await page.GotoAsync("https://iskole.net/elev/?ojr=login");
-                await Task.Delay(800); // Reduced from 2000ms to 800ms
-
-                // Click FEIDE button
-                Debug.WriteLine("[PLAYWRIGHT] Clicking FEIDE button");
-                await page.WaitForSelectorAsync("button:has(span.feide_icon)", new PageWaitForSelectorOptions { Timeout = 10000 });
-                await page.ClickAsync("button:has(span.feide_icon)");
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 15000 });
-
-                // Handle organization selection - directly click on school from list without using search
-                Debug.WriteLine("[PLAYWRIGHT] Selecting organization directly from list");
-                
-                // Wait for the organization list to be present in DOM
-                await page.WaitForSelectorAsync("#orglist", new PageWaitForSelectorOptions { Timeout = 10000 });
-                
-                // Find and click the school by matching org_name attribute (case-insensitive)
-                var schoolNameLower = _schoolName.ToLowerInvariant();
-                Debug.WriteLine($"[PLAYWRIGHT] Looking for school: '{_schoolName}' (normalized: '{schoolNameLower}')");
-                
-                // Use a more specific selector to find all school items
-                var schoolSelector = "li.orglist_item[org_name]";
-                await page.WaitForSelectorAsync(schoolSelector, new PageWaitForSelectorOptions { Timeout = 5000 });
-                
-                // Get all school elements and find the matching one
-                var schoolElements = await page.QuerySelectorAllAsync(schoolSelector);
-                bool schoolFound = false;
-                
-                Debug.WriteLine($"[PLAYWRIGHT] Found {schoolElements.Count} schools in the list");
-                
-                foreach (var element in schoolElements)
-                {
-                    var orgName = await element.GetAttributeAsync("org_name");
-                    Debug.WriteLine($"[PLAYWRIGHT] Checking school: '{orgName}'");
                     
-                    if (!string.IsNullOrEmpty(orgName) && orgName.ToLowerInvariant().Contains(schoolNameLower))
-                    {
-                        Debug.WriteLine($"✅ [PLAYWRIGHT] Found matching school: '{orgName}' - clicking it");
-                        await element.ClickAsync();
-                        schoolFound = true;
-                        break;
-                    }
+                    return AuthenticationResult.CreateFailed("Login feilet - kanskje feil passord eller brukernavn");
                 }
-                
-                if (!schoolFound)
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"[PLAYWRIGHT] School '{_schoolName}' not found in list, trying alternative approach");
+                    Debug.WriteLine($"[SELENIUM] Error: {ex.Message}");
                     
-                    // Try to find by text content instead of attribute
-                    var schoolByText = await page.QuerySelectorAsync($"li.orglist_item:has-text('{_schoolName}')");
-                    if (schoolByText != null)
+                    // Take a screenshot for debugging
+                    try
                     {
-                        Debug.WriteLine($"✅ [PLAYWRIGHT] Found school by text content - clicking it");
-                        await schoolByText.ClickAsync();
-                        schoolFound = true;
+                        if (driver != null)
+                        {
+                            var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+                            var screenshotPath = Path.Combine(Path.GetTempPath(), $"selenium_error_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+                            screenshot.SaveAsFile(screenshotPath);
+                            Debug.WriteLine($"[SELENIUM] Screenshot saved to: {screenshotPath}");
+                        }
                     }
-                    else
+                    catch (Exception screenshotEx)
                     {
-                        Debug.WriteLine($"[PLAYWRIGHT] School not found by any method, falling back to search");
-                        // Last resort: use search method
-                        await page.ClickAsync("#org_selector_filter");
-                        await page.FillAsync("#org_selector_filter", _schoolName);
-                        await Task.Delay(300); // Reduced from 1000ms to 300ms
-                        await page.WaitForSelectorAsync("li.orglist_item.match", new PageWaitForSelectorOptions { Timeout = 5000 });
-                        await page.ClickAsync("li.orglist_item.match");
-                        schoolFound = true;
+                        Debug.WriteLine($"[SELENIUM] Failed to take screenshot: {screenshotEx.Message}");
                     }
-                }
-                
-                if (schoolFound)
-                {
-                    // Small delay to ensure school selection is registered
-                    await Task.Delay(200); // Reduced from 500ms to 200ms
-                    Debug.WriteLine("➡️ [PLAYWRIGHT] Clicking Continue button to proceed with selected school");
-                    await page.ClickAsync("#selectorg_button");
-                }
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 15000 });
-
-                // Fill login form
-                Debug.WriteLine("[PLAYWRIGHT] Filling login form");
-                await page.WaitForSelectorAsync("#username", new PageWaitForSelectorOptions { Timeout = 10000 });
-                await page.FillAsync("#username", _loginEmail);
-                await page.FillAsync("#password", SecureStringToString(_loginPasswordSecure));
-                await page.ClickAsync("button[type='submit']");
-
-                // Wait for success
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
-                
-                var currentUrl = page.Url;
-                if (currentUrl.Contains("isFeideinnlogget=true"))
-                {
-                    Debug.WriteLine("[PLAYWRIGHT] Login successful");
                     
-                    // Extract cookies and parameters
-                    var cookies = await ExtractCookiesAsync(page);
-                    var parameters = await ExtractUserParametersAsync(page);
-
-                    if (cookies != null && parameters != null)
-                    {
-                        await SaveCookiesAndParametersAsync(cookies, parameters);
-                        return AuthenticationResult.CreateSuccess(cookies, parameters);
-                    }
+                    return AuthenticationResult.CreateFailed($"Browser login error: {ex.Message}");
                 }
-                
-                return AuthenticationResult.CreateFailed("Login feilet - kanskje feil passord eller brukernavn");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[PLAYWRIGHT] Error: {ex.Message}");
-                return AuthenticationResult.CreateFailed($"Browser login error: {ex.Message}");
-            }
-            finally
-            {
-                if (page != null) await page.CloseAsync();
-                if (browser != null) await browser.CloseAsync();
-            }
+                finally
+                {
+                    driver?.Quit();
+                    driver?.Dispose();
+                }
+            });
         }
 
-        private async Task<Dictionary<string, string>?> ExtractCookiesAsync(IPage page)
+        private Dictionary<string, string>? ExtractCookies(ChromeDriver driver)
         {
             try
             {
-                var cookies = await page.Context.CookiesAsync();
+                var cookies = driver.Manage().Cookies.AllCookies;
                 return cookies
                     .Where(c => c.Domain.Contains("iskole.net"))
                     .ToDictionary(c => c.Name, c => c.Value);
@@ -305,14 +468,14 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<UserParameters?> ExtractUserParametersAsync(IPage page)
+        private async Task<UserParameters?> ExtractUserParametersAsync(ChromeDriver driver)
         {
             try
             {
                 Debug.WriteLine("[PARAMS] Starting parameter extraction from VoUserData API");
                 
-                // Get cookies from the page first
-                var cookies = await page.Context.CookiesAsync();
+                // Get cookies from the driver
+                var cookies = driver.Manage().Cookies.AllCookies;
                 var cookieDict = cookies.Where(c => c.Domain.Contains("iskole.net"))
                                        .ToDictionary(c => c.Name, c => c.Value);
                 
@@ -320,7 +483,7 @@ namespace AkademiTrack.Services
                 if (string.IsNullOrEmpty(jsessionId))
                 {
                     Debug.WriteLine("[PARAMS] No JSESSIONID found");
-                    return await FallbackParameterExtraction(page);
+                    return FallbackParameterExtraction();
                 }
                 
                 Debug.WriteLine($"[PARAMS] Using JSESSIONID: {jsessionId.Substring(0, Math.Min(10, jsessionId.Length))}");
@@ -352,7 +515,7 @@ namespace AkademiTrack.Services
                 {
                     Debug.WriteLine($"[PARAMS] VoUserData API failed: {response.StatusCode}");
                     Debug.WriteLine($"[PARAMS] Response content: {content}");
-                    return await FallbackParameterExtraction(page);
+                    return FallbackParameterExtraction();
                 }
                 
                 // Parse the user data response to extract parameters
@@ -365,13 +528,13 @@ namespace AkademiTrack.Services
                 }
                 
                 Debug.WriteLine("[PARAMS] VoUserData didn't provide complete parameters, trying fallback");
-                return await FallbackParameterExtraction(page);
+                return FallbackParameterExtraction();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[PARAMS] VoUserData extraction failed: {ex.Message}");
                 Debug.WriteLine($"[PARAMS] Stack trace: {ex.StackTrace}");
-                return await FallbackParameterExtraction(page);
+                return FallbackParameterExtraction();
             }
         }
 
@@ -469,24 +632,24 @@ namespace AkademiTrack.Services
             }
         }
 
-        private Task<UserParameters?> FallbackParameterExtraction(IPage page)
+        private UserParameters? FallbackParameterExtraction()
         {
             try
             {
                 Debug.WriteLine("[PARAMS] Starting fallback parameter extraction");
                 
                 Debug.WriteLine("[PARAMS] All extraction methods failed, using CORRECT hardcoded parameters");
-                return Task.FromResult<UserParameters?>(new UserParameters 
+                return new UserParameters 
                 { 
                     FylkeId = "00", 
                     SkoleId = "312", 
                     PlanPeri = "2025-26" 
-                });
+                };
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[PARAMS] Fallback extraction failed: {ex.Message}");
-                return Task.FromResult<UserParameters?>(new UserParameters { FylkeId = "00", SkoleId = "312", PlanPeri = "2025-26" });
+                return new UserParameters { FylkeId = "00", SkoleId = "312", PlanPeri = "2025-26" };
             }
         }
 

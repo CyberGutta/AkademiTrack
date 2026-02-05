@@ -29,7 +29,7 @@ AkademiTrack is a desktop automation tool designed for students at Akademiet sch
 
 ### 🚀 Major Improvements
 
-- **Enhanced Browser Engine** - Upgraded from Selenium to Playwright for faster, more reliable authentication
+- **Enhanced Browser Engine** - Upgraded to Selenium with ChromeDriver for faster, more reliable authentication
 - **Improved Performance** - Better resource management and reduced memory footprint
 - **Enhanced Stability** - More robust error handling and recovery mechanisms
 - **Faster Updates** - Streamlined update checking process
@@ -212,7 +212,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 |-----------|-----------|
 | **Language** | C# (.NET 9.0) |
 | **UI Framework** | Avalonia UI |
-| **Authentication** | Playwright (WebKit-based) |
+| **Authentication** | Selenium (ChromeDriver-based) |
 | **Architecture** | MVVM pattern |
 | **Security** | System.Security.Cryptography.ProtectedData |
 

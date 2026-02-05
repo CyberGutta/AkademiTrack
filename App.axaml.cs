@@ -280,10 +280,10 @@ namespace AkademiTrack
             {
                 Debug.WriteLine("[App] Testing if WebKit is working...");
                 
-                // Use the WebKitManager's check-only method (no download)
-                bool webkitInstalled = await WebKitManager.IsWebKitInstalledAsync();
+                // Use the ChromeDriverManager's check-only method (no download)
+                bool chromeDriverReady = await ChromeDriverManager.IsChromeDriverAvailableAsync();
                 
-                if (!webkitInstalled)
+                if (!chromeDriverReady)
                 {
                     Debug.WriteLine("[App] WebKit installation check failed - not installed");
                     return false;

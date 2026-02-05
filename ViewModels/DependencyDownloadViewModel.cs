@@ -8,7 +8,6 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Microsoft.Playwright;
 using AkademiTrack.Services;
 
 namespace AkademiTrack.ViewModels
@@ -144,14 +143,14 @@ namespace AkademiTrack.ViewModels
                         }
                     });
                     
-                    var webkitInstalled = await WebKitManager.EnsureWebKitInstalledAsync(progress);
+                    var chromeDriverInstalled = await ChromeDriverManager.EnsureChromeDriverInstalledAsync(progress);
                     
-                    if (webkitInstalled)
+                    if (chromeDriverInstalled)
                     {
-                        StatusMessage = _migrationNeeded ? "WebKit klar! Fullfører app-oppdatering..." : "WebKit klar!";
+                        StatusMessage = _migrationNeeded ? "ChromeDriver klar! Fullfører app-oppdatering..." : "ChromeDriver klar!";
                         ProgressPercentage = 100;
                         IsIndeterminate = false;
-                        ProgressDetails = "Bruker: WebKit";
+                        ProgressDetails = "Bruker: ChromeDriver";
                         
                         await Task.Delay(800, _cancellationTokenSource.Token);
                         await CompleteSuccessfully();
