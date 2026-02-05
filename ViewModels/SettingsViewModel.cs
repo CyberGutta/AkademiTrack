@@ -1274,13 +1274,21 @@ Terminal=false
 
             try
             {
-                var healthCheck = new SystemHealthCheck();
-                var results = await healthCheck.RunFullHealthCheckAsync();
-
-                foreach (var result in results)
+                // Run health check on background thread to avoid blocking UI
+                var results = await Task.Run(async () =>
                 {
-                    HealthCheckResults.Add(result);
-                }
+                    var healthCheck = new SystemHealthCheck();
+                    return await healthCheck.RunFullHealthCheckAsync();
+                });
+
+                // Update UI on UI thread
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    foreach (var result in results)
+                    {
+                        HealthCheckResults.Add(result);
+                    }
+                });
 
                 DiagnosticsCompleted = true;
                 //Debug.WriteLine("✓ Diagnostics completed successfully");
@@ -1289,12 +1297,15 @@ Terminal=false
             {
                 //Debug.WriteLine($"Diagnostics error: {ex.Message}");
 
-                HealthCheckResults.Add(new HealthCheckResult
+                await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    ComponentName = "Diagnose",
-                    Status = HealthStatus.Error,
-                    Message = "Feil under diagnose",
-                    Details = ex.Message
+                    HealthCheckResults.Add(new HealthCheckResult
+                    {
+                        ComponentName = "Diagnose",
+                        Status = HealthStatus.Error,
+                        Message = "Feil under diagnose",
+                        Details = ex.Message
+                    });
                 });
 
                 DiagnosticsCompleted = true;

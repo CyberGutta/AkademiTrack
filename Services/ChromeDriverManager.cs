@@ -55,44 +55,47 @@ namespace AkademiTrack.Services
         /// </summary>
         private static async Task<bool> TestChromeDriverAsync()
         {
-            try
+            return await Task.Run(() =>
             {
-                var options = new ChromeOptions();
-                options.AddArgument("--headless=new"); // Use new headless mode
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-dev-shm-usage");
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--disable-web-security");
-                options.AddArgument("--disable-features=VizDisplayCompositor");
-                options.AddArgument("--disable-extensions");
-                options.AddArgument("--disable-plugins");
-                options.AddArgument("--disable-images");
-                options.AddArgument("--disable-javascript");
-                options.AddArgument("--disable-default-apps");
-                options.AddArgument("--disable-background-timer-throttling");
-                options.AddArgument("--disable-backgrounding-occluded-windows");
-                options.AddArgument("--disable-renderer-backgrounding");
-                options.AddArgument("--disable-background-networking");
-                options.AddArgument("--no-first-run");
-                options.AddArgument("--no-default-browser-check");
-                
-                // Set a very short timeout for testing
-                var service = ChromeDriverService.CreateDefaultService();
-                service.HideCommandPromptWindow = true;
-                service.SuppressInitialDiagnosticInformation = true;
-                
-                using (var driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10)))
+                try
                 {
-                    // Quick test - just navigate to a simple page
-                    await Task.Run(() => driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>"));
-                    return true;
+                    var options = new ChromeOptions();
+                    options.AddArgument("--headless=new"); // Use new headless mode
+                    options.AddArgument("--no-sandbox");
+                    options.AddArgument("--disable-dev-shm-usage");
+                    options.AddArgument("--disable-gpu");
+                    options.AddArgument("--disable-web-security");
+                    options.AddArgument("--disable-features=VizDisplayCompositor");
+                    options.AddArgument("--disable-extensions");
+                    options.AddArgument("--disable-plugins");
+                    options.AddArgument("--disable-images");
+                    options.AddArgument("--disable-javascript");
+                    options.AddArgument("--disable-default-apps");
+                    options.AddArgument("--disable-background-timer-throttling");
+                    options.AddArgument("--disable-backgrounding-occluded-windows");
+                    options.AddArgument("--disable-renderer-backgrounding");
+                    options.AddArgument("--disable-background-networking");
+                    options.AddArgument("--no-first-run");
+                    options.AddArgument("--no-default-browser-check");
+                    
+                    // Set a very short timeout for testing
+                    var service = ChromeDriverService.CreateDefaultService();
+                    service.HideCommandPromptWindow = true;
+                    service.SuppressInitialDiagnosticInformation = true;
+                    
+                    using (var driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10)))
+                    {
+                        // Quick test - just navigate to a simple page
+                        driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>");
+                        return true;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ChromeDriverManager] Test failed: {ex.Message}");
-                return false;
-            }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ChromeDriverManager] Test failed: {ex.Message}");
+                    return false;
+                }
+            });
         }
 
         /// <summary>
