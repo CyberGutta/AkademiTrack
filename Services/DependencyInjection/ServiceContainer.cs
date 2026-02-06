@@ -256,12 +256,26 @@ namespace AkademiTrack.Services.DependencyInjection
 
             try
             {
-                // Create uninstall detector before shutting down
-                await CreateUninstallDetectorAsync();
+                // Create uninstall detector before shutting down (with timeout)
+                var uninstallTask = CreateUninstallDetectorAsync();
+                if (await Task.WhenAny(uninstallTask, Task.Delay(1000)) != uninstallTask)
+                {
+                    Debug.WriteLine("[ServiceContainer] Uninstall detector timed out");
+                }
 
                 if (_host != null)
                 {
-                    await _host.StopAsync();
+                    // Give host 1 second to stop gracefully, then force
+                    var stopTask = _host.StopAsync();
+                    if (await Task.WhenAny(stopTask, Task.Delay(1000)) == stopTask)
+                    {
+                        Debug.WriteLine("[ServiceContainer] Host stopped gracefully");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[ServiceContainer] Host stop timed out - forcing");
+                    }
+                    
                     _host.Dispose();
                     _host = null;
                 }

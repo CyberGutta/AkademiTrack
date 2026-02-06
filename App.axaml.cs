@@ -605,23 +605,45 @@ github.com/CyberGutta/AkademiTrack";
             Debug.WriteLine("[App] Quit requested from menu");
             _isShuttingDown = true;
             
-            try
-            {
-                // Cleanup global exception handler
-                Services.Utilities.GlobalExceptionHandler.Cleanup();
-                Debug.WriteLine("[App] Global exception handler cleaned up");
-
-                // Shutdown service container
-                await ServiceContainer.ShutdownAsync();
-                Debug.WriteLine("[App] Service container shut down");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[App] Error during cleanup: {ex.Message}");
-            }
-            
+            // Force immediate shutdown - don't wait for cleanup
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                // Fire and forget cleanup - don't wait for it
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Give cleanup 2 seconds max, then force quit
+                        var cleanupTask = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                Services.Utilities.GlobalExceptionHandler.Cleanup();
+                                await ServiceContainer.ShutdownAsync();
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[App] Cleanup error: {ex.Message}");
+                            }
+                        });
+
+                        // Wait max 2 seconds for cleanup
+                        if (await Task.WhenAny(cleanupTask, Task.Delay(2000)) == cleanupTask)
+                        {
+                            Debug.WriteLine("[App] Cleanup completed");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[App] Cleanup timed out - forcing quit");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[App] Error during cleanup: {ex.Message}");
+                    }
+                });
+
+                // Shutdown immediately - don't wait for cleanup
                 desktop.Shutdown();
             }
         }

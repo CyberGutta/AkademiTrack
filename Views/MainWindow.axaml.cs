@@ -105,17 +105,18 @@ namespace AkademiTrack.Views
                 // FIRST: Check if app is shutting down (from menu quit, etc)
                 if (App.IsShuttingDown)
                 {
-                    Debug.WriteLine("[MainWindow] App is shutting down - allowing close");
+                    Debug.WriteLine("[MainWindow] App is shutting down - allowing close immediately");
                     _isReallyClosing = true;
-                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    // Don't wait for dispose - just close
+                    _ = Task.Run(() => AkademiTrack.Services.TrayIconManager.Dispose());
                     return;
                 }
 
                 // SECOND: Check if this is marked as a real close (from ReallyClose())
                 if (_isReallyClosing)
                 {
-                    Debug.WriteLine("[MainWindow] ReallyClosing flag set - allowing close");
-                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    Debug.WriteLine("[MainWindow] ReallyClosing flag set - allowing close immediately");
+                    _ = Task.Run(() => AkademiTrack.Services.TrayIconManager.Dispose());
                     return;
                 }
 
@@ -142,14 +143,14 @@ namespace AkademiTrack.Views
                 }
                 else
                 {
-                    // Really close
-                    AkademiTrack.Services.TrayIconManager.Dispose();
+                    // Really close - don't wait for dispose
+                    _ = Task.Run(() => AkademiTrack.Services.TrayIconManager.Dispose());
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error in MainWindow_Closing: {ex.Message}");
-                AkademiTrack.Services.TrayIconManager.Dispose();
+                _ = Task.Run(() => AkademiTrack.Services.TrayIconManager.Dispose());
             }
         }
 
