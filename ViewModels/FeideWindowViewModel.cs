@@ -86,6 +86,12 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanSave));
                 (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                
+                // Clear error when user starts typing
+                if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    ErrorMessage = string.Empty;
+                }
             }
         }
 
@@ -99,6 +105,12 @@ namespace AkademiTrack.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanSave));
                 (SaveCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                
+                // Clear error when user starts typing
+                if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    ErrorMessage = string.Empty;
+                }
             }
         }
 
@@ -264,7 +276,39 @@ namespace AkademiTrack.ViewModels
                     string errorMsg;
                     if (!string.IsNullOrEmpty(testResult.ErrorMessage))
                     {
-                        errorMsg = testResult.ErrorMessage;
+                        // Check if error message contains tracking/reference numbers and clean it up
+                        var rawError = testResult.ErrorMessage;
+                        
+                        // Remove tracking numbers (Sporingsnummer), reference IDs, and technical details
+                        if (rawError.Contains("Sporingsnummer", StringComparison.OrdinalIgnoreCase) ||
+                            rawError.Contains("tracking", StringComparison.OrdinalIgnoreCase) ||
+                            rawError.Contains("reference", StringComparison.OrdinalIgnoreCase) ||
+                            rawError.Contains("ID:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Extract only the user-friendly part before the tracking number
+                            var lines = rawError.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                            var cleanLines = new System.Collections.Generic.List<string>();
+                            
+                            foreach (var line in lines)
+                            {
+                                // Skip lines with tracking numbers
+                                if (line.Contains("Sporingsnummer", StringComparison.OrdinalIgnoreCase) ||
+                                    line.Contains("tracking", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
+                                cleanLines.Add(line.Trim());
+                            }
+                            
+                            // Use cleaned message or fallback
+                            errorMsg = cleanLines.Count > 0 
+                                ? string.Join(" ", cleanLines)
+                                : "Feil brukernavn eller passord. Vennligst sjekk dine Feide-innloggingsdata og prøv igjen.";
+                        }
+                        else
+                        {
+                            errorMsg = rawError;
+                        }
                     }
                     else
                     {
