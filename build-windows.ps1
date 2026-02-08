@@ -193,9 +193,44 @@ function Build-WindowsRelease {
     $portableSizeRounded = [math]::Round($portableSize, 1)
     Write-Host "Portable ZIP created: AkademiTrack-win-Portable.zip ($portableSizeRounded MB)" -ForegroundColor Green
     
-    # Step 4: Try to create VPK package (optional)
+    # Step 4: Create VPK package with Velopack
     Write-Host ""
-    Write-Host "Step 4: Creating VPK package..." -ForegroundColor Cyan
+    Write-Host "Step 4: Creating VPK package with Velopack..." -ForegroundColor Cyan
+    
+    $vpkExe = "$env:USERPROFILE\.dotnet\tools\vpk.exe"
+    if (-not (Test-Path $vpkExe)) {
+        Write-Host "Velopack CLI not found. Install with: dotnet tool install -g vpk" -ForegroundColor Yellow
+        Write-Host "Skipping VPK package creation..." -ForegroundColor Yellow
+    }
+    else {
+        $vpkArgs = @(
+            "pack"
+            "--packId", "AkademiTrack"
+            "--packVersion", $Version
+            "--packDir", $publishDir
+            "--mainExe", "AkademiTrack.exe"
+            "--outputDir", $releaseFolder
+        )
+        
+        Write-Host "Running: vpk $($vpkArgs -join ' ')"
+        $vpkOutput = & $vpkExe @vpkArgs 2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "VPK package created successfully" -ForegroundColor Green
+            
+            # Check for Setup.exe
+            $setupExe = Join-Path $releaseFolder "AkademiTrack-Setup.exe"
+            if (Test-Path $setupExe) {
+                $setupSize = (Get-Item $setupExe).Length / 1MB
+                $setupSizeRounded = [math]::Round($setupSize, 1)
+                Write-Host "Windows Setup created: AkademiTrack-Setup.exe ($setupSizeRounded MB)" -ForegroundColor Green
+            }
+        }
+        else {
+            Write-Host "VPK package creation failed:" -ForegroundColor Yellow
+            Write-Host $vpkOutput -ForegroundColor Yellow
+        }
+    }
     
     # Step 5: Copy standalone exe
     Write-Host ""
@@ -304,8 +339,11 @@ if ($releaseFolder -and (Test-Path $releaseFolder)) {
     
     Write-Host ""
     Write-Host "Files created:"
-    Write-Host "  • AkademiTrack.exe - Standalone single-file executable (RUN THIS ONE!)"
+    Write-Host "  • AkademiTrack.exe - Standalone single-file executable"
     Write-Host "  • AkademiTrack-win-Portable.zip - Portable ZIP package"
+    if (Get-ChildItem "$releaseFolder\*Setup.exe" -ErrorAction SilentlyContinue) {
+        Write-Host "  • AkademiTrack-Setup.exe - Windows installer (RECOMMENDED!)"
+    }
     if (Get-ChildItem "$releaseFolder\*.nupkg" -ErrorAction SilentlyContinue) {
         Write-Host "  • *.nupkg - VPK/NuGet package for auto-updates"
         Write-Host "  • RELEASES - VPK release manifest"
