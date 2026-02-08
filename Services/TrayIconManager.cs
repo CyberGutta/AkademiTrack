@@ -83,7 +83,20 @@ namespace AkademiTrack.Services
         {
             if (_trayIcon != null)
             {
-                _trayIcon.IsVisible = true;
+                try
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.IsVisible = true;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error showing tray icon: {ex.Message}");
+                }
             }
         }
 
@@ -91,7 +104,20 @@ namespace AkademiTrack.Services
         {
             if (_trayIcon != null)
             {
-               
+                try
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_trayIcon != null)
+                        {
+                            _trayIcon.IsVisible = false;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error hiding tray icon: {ex.Message}");
+                }
             }
         }
 
@@ -151,9 +177,37 @@ namespace AkademiTrack.Services
         {
             if (_trayIcon != null)
             {
-                _trayIcon.IsVisible = false;
-                _trayIcon.Dispose();
-                _trayIcon = null;
+                try
+                {
+                    // Ensure UI operations run on the UI thread
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        try
+                        {
+                            if (_trayIcon != null)
+                            {
+                                _trayIcon.IsVisible = false;
+                                _trayIcon.Dispose();
+                                _trayIcon = null;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error disposing tray icon: {ex.Message}");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error posting tray icon disposal: {ex.Message}");
+                    // Fallback: try to dispose without setting visibility
+                    try
+                    {
+                        _trayIcon?.Dispose();
+                        _trayIcon = null;
+                    }
+                    catch { }
+                }
             }
         }
     }
