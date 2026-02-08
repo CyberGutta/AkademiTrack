@@ -142,7 +142,7 @@ namespace AkademiTrack.Views
                 {
                     var box = MessageBoxManager.GetMessageBoxStandard(
                         "Sikkerhet",
-                        "Autentisering mislyktes",
+                        "Autentisering avbrutt eller mislyktes.\n\nPassordet kan ikke vises uten bekreftelse.",
                         ButtonEnum.Ok);
 
                     await box.ShowAsync();
