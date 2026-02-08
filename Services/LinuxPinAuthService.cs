@@ -98,11 +98,25 @@ namespace AkademiTrack.Services
                 string error = await process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
+                // Exit code 1 means user clicked Cancel - return empty string instead of throwing
+                if (process.ExitCode == 1)
+                {
+                    Console.WriteLine("ℹ️ Bruker avbrøt PIN-dialog");
+                    return string.Empty;
+                }
+
                 if (process.ExitCode != 0)
-                    throw new Exception($"Zenity exited with code {process.ExitCode}: {error}");
+                {
+                    Console.WriteLine($"⚠️ Zenity feilet med kode {process.ExitCode}: {error}");
+                    Console.WriteLine("💡 Bruker terminal i stedet.");
+                    return PromptInTerminal(message);
+                }
 
                 if (string.IsNullOrWhiteSpace(output))
-                    throw new Exception("Zenity returned empty input.");
+                {
+                    Console.WriteLine("ℹ️ Tom PIN mottatt");
+                    return string.Empty;
+                }
 
                 return output.Trim();
             }
