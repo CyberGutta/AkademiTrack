@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -83,6 +84,19 @@ namespace AkademiTrack
                 {
                     Debug.WriteLine($"Failed to initialize global exception handler: {ex.Message}");
                     // Continue without global exception handler - not critical
+                }
+                
+                // macOS: Clean up duplicate launch agents from old versions
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    try
+                    {
+                        CleanupDuplicateLaunchAgents();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[App] Failed to cleanup launch agents: {ex.Message}");
+                    }
                 }
                 
                 Debug.WriteLine("[App] Initialize() completed successfully");
@@ -681,6 +695,66 @@ github.com/CyberGutta/AkademiTrack";
             catch (Exception ex)
             {
                 Debug.WriteLine($"[App] Failed to open URL: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Clean up duplicate or old launch agents on macOS
+        /// </summary>
+        private void CleanupDuplicateLaunchAgents()
+        {
+            var launchAgentsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "LaunchAgents"
+            );
+
+            if (!Directory.Exists(launchAgentsPath))
+            {
+                return;
+            }
+
+            // The official launch agent identifier (kept for reference)
+            // var officialAgent = "com.CyberBrothers.akademitrack.plist";
+            
+            // Old/duplicate agents to remove
+            var duplicateAgents = new[]
+            {
+                "com.akademitrack.app.plist",
+                "com.akademitrack.plist"
+            };
+
+            foreach (var duplicate in duplicateAgents)
+            {
+                var duplicatePath = Path.Combine(launchAgentsPath, duplicate);
+                
+                if (File.Exists(duplicatePath))
+                {
+                    try
+                    {
+                        Debug.WriteLine($"[App] Found duplicate launch agent: {duplicate}");
+                        
+                        // Unload the launch agent first
+                        var unloadProcess = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "launchctl",
+                            Arguments = $"unload \"{duplicatePath}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        });
+                        
+                        unloadProcess?.WaitForExit(5000);
+                        
+                        // Delete the plist file
+                        File.Delete(duplicatePath);
+                        Debug.WriteLine($"[App] Removed duplicate launch agent: {duplicate}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[App] Failed to remove duplicate launch agent {duplicate}: {ex.Message}");
+                    }
+                }
             }
         }
     }
