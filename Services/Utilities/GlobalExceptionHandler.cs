@@ -134,7 +134,9 @@ namespace AkademiTrack.Services.Utilities
                     }, TaskContinuationOptions.OnlyOnFaulted);
                 }
 
-                // Show user notification (if not terminating)
+                // Show user notification (if not terminating) - DISABLED
+                // Removed annoying "Kritisk feil" popup that appears for non-critical errors
+                /*
                 if (_isInitialized && _notificationService != null && !isTerminating)
                 {
                     _ = Task.Run(async () =>
@@ -160,7 +162,7 @@ namespace AkademiTrack.Services.Utilities
                         }
                     }, TaskContinuationOptions.OnlyOnFaulted);
                 }
-
+                */
                 // If terminating, try to save critical state
                 if (isTerminating)
                 {
