@@ -55,9 +55,11 @@
         <Style Selector="TextBlock.progress">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,5,0,0"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="20,10,20,0"/>
             <Setter Property="Foreground" Value="#666666"/>
             <Setter Property="FontFamily" Value="Consolas, Monaco, monospace"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
     </Window.Styles>
 

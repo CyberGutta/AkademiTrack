@@ -336,44 +336,19 @@ namespace AkademiTrack.ViewModels
 
                     if (sudoCheckProcess.ExitCode != 0)
                     {
-                        // No sudo access - need to prompt user
-                        Debug.WriteLine("[DependencyDownload] No sudo access - prompting user to run with sudo");
-                        StatusMessage = "Krever sudo-tilgang for å installere secret-tool";
-                        ProgressDetails = "AkademiTrack trenger sudo-tilgang for å installere libsecret-tools.\n\n" +
-                                        "Vennligst kjør AkademiTrack med sudo:\n" +
-                                        "sudo ./AkademiTrack\n\n" +
-                                        "Appen vil lukke om 10 sekunder...";
+                        // No sudo access - show installation instructions
+                        Debug.WriteLine("[DependencyDownload] No sudo access - showing installation instructions");
+                        StatusMessage = "secret-tool ikke installert";
+                        ProgressDetails = "For å installere secret-tool for sikker lagring,\nåpne en terminal og kjør:\n\n" +
+                                        "sudo apt-get install libsecret-tools\n\n" +
+                                        "Appen vil fortsette med fallback-lagring.";
                         ShowProgressDetails = true;
-                        NeedsSudo = true;
-
-                        // Wait 10 seconds then exit
-                        await Task.Delay(10000);
-                        
-                        // Try to restart with sudo
-                        try
-                        {
-                            var restartProcess = new Process
-                            {
-                                StartInfo = new ProcessStartInfo
-                                {
-                                    FileName = "pkexec",
-                                    Arguments = $"{Environment.ProcessPath}",
-                                    UseShellExecute = false
-                                }
-                            };
-                            restartProcess.Start();
-                        }
-                        catch
-                        {
-                            Debug.WriteLine("[DependencyDownload] Could not restart with pkexec");
-                        }
-
-                        Environment.Exit(1);
+                        await Task.Delay(5000);
                         return;
                     }
                 }
 
-                // We have sudo access, install secret-tool
+                // We have sudo access (cached), install secret-tool
                 ProgressDetails = "Installerer libsecret-tools...";
                 
                 var installProcess = new Process
@@ -399,15 +374,15 @@ namespace AkademiTrack.ViewModels
                     Debug.WriteLine("[DependencyDownload] ✓ secret-tool installed successfully");
                     StatusMessage = "secret-tool installert!";
                     ProgressDetails = "Sikker lagring er nå tilgjengelig";
+                    await Task.Delay(1500);
                 }
                 else
                 {
                     Debug.WriteLine($"[DependencyDownload] ⚠️ secret-tool installation failed: {error}");
                     StatusMessage = "Kunne ikke installere secret-tool";
                     ProgressDetails = "Appen vil bruke fallback-lagring i stedet";
+                    await Task.Delay(1500);
                 }
-
-                await Task.Delay(1500);
             }
             catch (Exception ex)
             {
