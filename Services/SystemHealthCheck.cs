@@ -265,50 +265,103 @@ namespace AkademiTrack.Services
 
             try
             {
-                Debug.WriteLine("[HealthCheck] Checking WebKit browser driver...");
+                Debug.WriteLine("[HealthCheck] Checking browser driver availability...");
                 
-                // Check if ChromeDriver is available
-                var chromeDriverReady = await ChromeDriverManager.IsChromeDriverAvailableAsync();
+                await Task.CompletedTask; // Make it async
                 
-                if (chromeDriverReady)
+                try
                 {
-                    stopwatch.Stop();
-                    return new HealthCheckResult
+                    // Check multiple possible ChromeDriver locations
+                    var possiblePaths = new[]
                     {
-                        ComponentName = "Browser Driver",
-                        Status = HealthStatus.Healthy,
-                        Message = "Tilgjengelig",
-                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = $"ChromeDriver installert og klar på {stopwatch.ElapsedMilliseconds}ms"
+                        // Selenium Manager cache
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "selenium"),
+                        // WebDriverManager cache
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".wdm", "drivers", "chromedriver"),
+                        // NuGet packages
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages", "selenium.webdriver.chromedriver"),
+                        // Current directory
+                        Directory.GetCurrentDirectory()
                     };
+                    
+                    bool foundDriver = false;
+                    string foundLocation = "";
+                    
+                    foreach (var basePath in possiblePaths)
+                    {
+                        if (Directory.Exists(basePath))
+                        {
+                            var drivers = Directory.GetFiles(basePath, "chromedriver", SearchOption.AllDirectories)
+                                .Concat(Directory.GetFiles(basePath, "chromedriver.exe", SearchOption.AllDirectories))
+                                .ToArray();
+                            
+                            if (drivers.Length > 0)
+                            {
+                                foundDriver = true;
+                                foundLocation = Path.GetDirectoryName(drivers[0]) ?? basePath;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Also try the default service path
+                    if (!foundDriver)
+                    {
+                        try
+                        {
+                            var service = OpenQA.Selenium.Chrome.ChromeDriverService.CreateDefaultService();
+                            var driverPath = service.DriverServicePath;
+                            
+                            if (!string.IsNullOrEmpty(driverPath))
+                            {
+                                var chromeDriverExists = File.Exists(Path.Combine(driverPath, "chromedriver")) || 
+                                                        File.Exists(Path.Combine(driverPath, "chromedriver.exe"));
+                                
+                                if (chromeDriverExists)
+                                {
+                                    foundDriver = true;
+                                    foundLocation = driverPath;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                    
+                    stopwatch.Stop();
+                    
+                    if (foundDriver)
+                    {
+                        return new HealthCheckResult
+                        {
+                            ComponentName = "Browser Driver",
+                            Status = HealthStatus.Healthy,
+                            Message = "Tilgjengelig",
+                            ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                            Details = $"ChromeDriver funnet"
+                        };
+                    }
+                    else
+                    {
+                        return new HealthCheckResult
+                        {
+                            ComponentName = "Browser Driver",
+                            Status = HealthStatus.Warning,
+                            Message = "Ikke funnet",
+                            ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                            Details = "ChromeDriver må lastes ned ved første kjøring av automatisering"
+                        };
+                    }
                 }
-                
-                // Try to install ChromeDriver if not found
-                Debug.WriteLine("[HealthCheck] ChromeDriver not found, attempting installation...");
-                var installed = await ChromeDriverManager.EnsureChromeDriverInstalledAsync();
-                
-                if (installed)
+                catch (Exception ex)
                 {
                     stopwatch.Stop();
                     return new HealthCheckResult
                     {
                         ComponentName = "Browser Driver",
-                        Status = HealthStatus.Healthy,
-                        Message = "Tilgjengelig",
+                        Status = HealthStatus.Warning,
+                        Message = "Kunne ikke verifisere",
                         ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = $"WebKit lastet ned og klar på {stopwatch.ElapsedMilliseconds}ms"
-                    };
-                }
-                else
-                {
-                    stopwatch.Stop();
-                    return new HealthCheckResult
-                    {
-                        ComponentName = "Browser Driver",
-                        Status = HealthStatus.Error,
-                        Message = "Browser feil",
-                        ResponseTimeMs = stopwatch.ElapsedMilliseconds,
-                        Details = "WebKit kunne ikke installeres"
+                        Details = $"Vil lastes ned automatisk ved behov: {ex.Message}"
                     };
                 }
             }
