@@ -193,14 +193,6 @@ Read our [Security Policy](SECURITY.md) for vulnerability reporting.
 
 ---
 
-## ⚠️ Known Issues
-
-- 🐧 **Linux Auto-Start Bug** - "Start with system" feature currently doesn't work on Linux (fix planned)
-
-See [Issues](https://github.com/CyberGutta/AkademiTrack/issues) for current bugs and feature requests.
-
----
-
 ## 🛠️ Development
 
 ### Setup
