@@ -600,7 +600,7 @@ github.com/CyberGutta/AkademiTrack";
 
 
 
-        private async void QuitApp(object? sender, EventArgs e)
+        private void QuitApp(object? sender, EventArgs e)
         {
             Debug.WriteLine("[App] Quit requested from menu");
             _isShuttingDown = true;
