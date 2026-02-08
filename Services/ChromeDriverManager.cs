@@ -163,6 +163,14 @@ namespace AkademiTrack.Services
                 options.AddArgument("--headless=new"); // Use new headless mode
             }
             
+            // macOS: Prevent Chrome from appearing in Dock
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // These arguments help prevent Dock icon on macOS
+                options.AddArgument("--disable-features=TranslateUI");
+                options.AddArgument("--disable-features=Translate");
+            }
+            
             // Security and performance options
             options.AddArgument("--no-sandbox");
             options.AddArgument("--disable-dev-shm-usage");
