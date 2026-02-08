@@ -8,6 +8,8 @@ using AkademiTrack.Services;
 using AkademiTrack.Services.DependencyInjection;
 using Avalonia.Threading;
 using AkademiTrack.Services.Interfaces;
+using AkademiTrack.Services.Caching;
+using System.Text.Json;
 
 namespace AkademiTrack.ViewModels
 {
@@ -15,6 +17,7 @@ namespace AkademiTrack.ViewModels
     {
         private readonly AttendanceDataService _attendanceService;
         private ILoggingService? _loggingService;
+        private readonly ICacheService _persistentCache;
 
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
@@ -118,6 +121,13 @@ namespace AkademiTrack.ViewModels
             // Connect logging service for auto-retry functionality
             _loggingService = ServiceContainer.GetService<ILoggingService>();
             _attendanceService.SetLoggingService(_loggingService);
+            
+            // Initialize persistent cache with 24-hour TTL for dashboard data
+            _persistentCache = new CacheService(
+                defaultTtl: TimeSpan.FromHours(24),
+                maxEntries: 100,
+                cleanupInterval: TimeSpan.FromHours(1)
+            );
             
             _weeklyDays = InitializeEmptyWeek();
             
@@ -255,6 +265,73 @@ namespace AkademiTrack.ViewModels
             return false;
         }
 
+        /// <summary>
+        /// Load cached data immediately to show something to the user, then refresh in background
+        /// </summary>
+        public async Task LoadCachedDataAsync()
+        {
+            try
+            {
+                _loggingService?.LogInfo("[DASHBOARD] 🚀 Loading cached data for instant display...");
+
+                // Load all cached data in parallel
+                var todayCache = _persistentCache.Get<TodayScheduleData>("dashboard_today");
+                var summaryCache = _persistentCache.Get<AttendanceSummary>("dashboard_summary");
+                var monthlyCache = _persistentCache.Get<MonthlyAttendanceData>("dashboard_monthly");
+                var weeklyCache = _persistentCache.Get<WeeklyAttendanceData>("dashboard_weekly");
+
+                bool hasAnyCache = false;
+
+                // Display cached data immediately
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (todayCache != null)
+                    {
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Showing cached today's schedule");
+                        CacheTodaySchedule(todayCache);
+                        UpdateTodayDisplay(todayCache);
+                        UpdateNextClassDisplay(todayCache);
+                        ScheduleNextClassUpdate(todayCache);
+                        hasAnyCache = true;
+                    }
+
+                    if (summaryCache != null)
+                    {
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Showing cached overtime data");
+                        UpdateOvertimeDisplay(summaryCache);
+                        hasAnyCache = true;
+                    }
+
+                    if (monthlyCache != null)
+                    {
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Showing cached monthly data");
+                        UpdateMonthlyDisplay(monthlyCache);
+                        hasAnyCache = true;
+                    }
+
+                    if (weeklyCache != null)
+                    {
+                        _loggingService?.LogDebug("[DASHBOARD] ✓ Showing cached weekly data");
+                        UpdateWeeklyDisplay(weeklyCache);
+                        hasAnyCache = true;
+                    }
+                });
+
+                if (hasAnyCache)
+                {
+                    _loggingService?.LogSuccess("[DASHBOARD] ✓ Cached data displayed - UI ready!");
+                }
+                else
+                {
+                    _loggingService?.LogDebug("[DASHBOARD] No cached data available - will load fresh");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"[DASHBOARD] Error loading cached data: {ex.Message}");
+            }
+        }
+
         public async Task RefreshDataAsync()
         {
             // Prevent concurrent refreshes
@@ -269,99 +346,123 @@ namespace AkademiTrack.ViewModels
                 _isRefreshing = true;
                 _loggingService?.LogDebug("[DASHBOARD] Starting data refresh...");
 
-                // Add timeout to each service call
+                // Load all data in parallel for faster loading
                 var summaryTask = _attendanceService.GetAttendanceSummaryAsync();
-                var summaryTimeout = Task.Delay(TimeSpan.FromSeconds(15));
-                var summaryCompleted = await Task.WhenAny(summaryTask, summaryTimeout);
-                
-                if (summaryCompleted == summaryTask)
-                {
-                    var summary = await summaryTask;
-                    if (summary != null)
-                    {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            UpdateOvertimeDisplay(summary);
-                        });
-                        _loggingService?.LogDebug("[DASHBOARD] Overtime data loaded");
-                    }
-                }
-                else
-                {
-                    _loggingService?.LogWarning("[DASHBOARD] Overtime data fetch timed out after 15 seconds");
-                }
-
-                // Today's schedule with timeout
                 var todayTask = _attendanceService.GetTodayScheduleAsync();
-                var todayTimeout = Task.Delay(TimeSpan.FromSeconds(15));
-                var todayCompleted = await Task.WhenAny(todayTask, todayTimeout);
-                
-                if (todayCompleted == todayTask)
-                {
-                    var todayData = await todayTask;
-                    if (todayData != null)
-                    {
-                        CacheTodaySchedule(todayData);
-                        
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            UpdateTodayDisplay(todayData);
-                            UpdateNextClassDisplay(todayData);
-                            ScheduleNextClassUpdate(todayData);
-                        });
-                        _loggingService?.LogDebug("[DASHBOARD] Today's schedule loaded");
-                    }
-                }
-                else
-                {
-                    _loggingService?.LogWarning("[DASHBOARD] Today's schedule fetch timed out after 15 seconds");
-                }
-
-                // Monthly attendance with timeout
                 var monthlyTask = _attendanceService.GetMonthlyAttendanceAsync();
-                var monthlyTimeout = Task.Delay(TimeSpan.FromSeconds(15));
-                var monthlyCompleted = await Task.WhenAny(monthlyTask, monthlyTimeout);
-                
-                if (monthlyCompleted == monthlyTask)
-                {
-                    var monthlyData = await monthlyTask;
-                    if (monthlyData != null)
-                    {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            UpdateMonthlyDisplay(monthlyData);
-                        });
-                        _loggingService?.LogDebug("[DASHBOARD] Monthly data loaded");
-                    }
-                }
-                else
-                {
-                    _loggingService?.LogWarning("[DASHBOARD] Monthly data fetch timed out after 15 seconds");
-                }
-
-                // Weekly attendance with timeout
                 var weeklyTask = _attendanceService.GetWeeklyAttendanceAsync();
-                var weeklyTimeout = Task.Delay(TimeSpan.FromSeconds(15));
-                var weeklyCompleted = await Task.WhenAny(weeklyTask, weeklyTimeout);
-                
-                if (weeklyCompleted == weeklyTask)
-                {
-                    var weeklyData = await weeklyTask;
-                    if (weeklyData != null)
-                    {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            UpdateWeeklyDisplay(weeklyData);
-                        });
-                        _loggingService?.LogDebug("[DASHBOARD] Weekly data loaded");
-                    }
-                }
-                else
-                {
-                    _loggingService?.LogWarning("[DASHBOARD] Weekly data fetch timed out after 15 seconds");
-                }
 
-                _loggingService?.LogSuccess("[DASHBOARD] Data refresh complete");
+                // Wait for all tasks with individual timeouts
+                var allTasks = new[]
+                {
+                    Task.Run(async () => 
+                    {
+                        var timeout = Task.Delay(TimeSpan.FromSeconds(15));
+                        var completed = await Task.WhenAny(summaryTask, timeout);
+                        if (completed == summaryTask)
+                        {
+                            var summary = await summaryTask;
+                            if (summary != null)
+                            {
+                                // Cache the data
+                                _persistentCache.Set("dashboard_summary", summary, TimeSpan.FromHours(24));
+                                
+                                await Dispatcher.UIThread.InvokeAsync(() =>
+                                {
+                                    UpdateOvertimeDisplay(summary);
+                                });
+                                _loggingService?.LogDebug("[DASHBOARD] ✓ Overtime data loaded & cached");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService?.LogWarning("[DASHBOARD] Overtime data fetch timed out");
+                        }
+                    }),
+                    
+                    Task.Run(async () => 
+                    {
+                        var timeout = Task.Delay(TimeSpan.FromSeconds(15));
+                        var completed = await Task.WhenAny(todayTask, timeout);
+                        if (completed == todayTask)
+                        {
+                            var todayData = await todayTask;
+                            if (todayData != null)
+                            {
+                                // Cache the data
+                                _persistentCache.Set("dashboard_today", todayData, TimeSpan.FromHours(24));
+                                
+                                CacheTodaySchedule(todayData);
+                                await Dispatcher.UIThread.InvokeAsync(() =>
+                                {
+                                    UpdateTodayDisplay(todayData);
+                                    UpdateNextClassDisplay(todayData);
+                                    ScheduleNextClassUpdate(todayData);
+                                });
+                                _loggingService?.LogDebug("[DASHBOARD] ✓ Today's schedule loaded & cached");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService?.LogWarning("[DASHBOARD] Today's schedule fetch timed out");
+                        }
+                    }),
+                    
+                    Task.Run(async () => 
+                    {
+                        var timeout = Task.Delay(TimeSpan.FromSeconds(15));
+                        var completed = await Task.WhenAny(monthlyTask, timeout);
+                        if (completed == monthlyTask)
+                        {
+                            var monthlyData = await monthlyTask;
+                            if (monthlyData != null)
+                            {
+                                // Cache the data
+                                _persistentCache.Set("dashboard_monthly", monthlyData, TimeSpan.FromHours(24));
+                                
+                                await Dispatcher.UIThread.InvokeAsync(() =>
+                                {
+                                    UpdateMonthlyDisplay(monthlyData);
+                                });
+                                _loggingService?.LogDebug("[DASHBOARD] ✓ Monthly data loaded & cached");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService?.LogWarning("[DASHBOARD] Monthly data fetch timed out");
+                        }
+                    }),
+                    
+                    Task.Run(async () => 
+                    {
+                        var timeout = Task.Delay(TimeSpan.FromSeconds(15));
+                        var completed = await Task.WhenAny(weeklyTask, timeout);
+                        if (completed == weeklyTask)
+                        {
+                            var weeklyData = await weeklyTask;
+                            if (weeklyData != null)
+                            {
+                                // Cache the data
+                                _persistentCache.Set("dashboard_weekly", weeklyData, TimeSpan.FromHours(24));
+                                
+                                await Dispatcher.UIThread.InvokeAsync(() =>
+                                {
+                                    UpdateWeeklyDisplay(weeklyData);
+                                });
+                                _loggingService?.LogDebug("[DASHBOARD] ✓ Weekly data loaded & cached");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService?.LogWarning("[DASHBOARD] Weekly data fetch timed out");
+                        }
+                    })
+                };
+
+                // Wait for all tasks to complete (or timeout)
+                await Task.WhenAll(allTasks);
+
+                _loggingService?.LogSuccess("[DASHBOARD] ✓ Data refresh complete");
             }
             catch (Exception ex)
             {
@@ -915,13 +1016,18 @@ namespace AkademiTrack.ViewModels
         {
             _cachedTodaySchedule = null;
             _cacheDate = DateTime.MinValue;
-            _loggingService?.LogDebug("[CACHE] Cache cleared");
+            
+            // Clear persistent cache as well
+            _persistentCache.RemoveByPattern("dashboard_");
+            
+            _loggingService?.LogDebug("[CACHE] Cache cleared (memory + persistent)");
         }
 
         public void Dispose()
         {
             _nextClassUpdateTimer?.Dispose();
             _attendanceService?.Dispose();
+            _persistentCache?.Dispose();
         }
 
         private static List<DailyAttendance> InitializeEmptyWeek()

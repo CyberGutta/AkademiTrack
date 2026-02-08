@@ -336,9 +336,6 @@ namespace AkademiTrack.ViewModels
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
 
-                    IsLoading = false;
-                    _loggingService.LogSuccess("Autentisering fullført - UI er klar");
-
                     // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
                     {
@@ -349,20 +346,38 @@ namespace AkademiTrack.ViewModels
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
 
-                    _loggingService.LogInfo("Laster dashboard data");
-
-                    // Dashboard refresh with error handling
+                    // PROGRESSIVE LOADING: Load cached data first for instant UI
+                    _loggingService.LogInfo("🚀 Laster cached data for rask visning...");
                     try
                     {
-                        await Dashboard.RefreshDataAsync();
-                        Dashboard.UpdateNextClassFromCache();
-                        _loggingService.LogSuccess("✓ Dashboard data lastet!");
+                        await Dashboard.LoadCachedDataAsync();
+                        _loggingService.LogSuccess("✓ Cached data vist - UI er klar!");
                     }
-                    catch (Exception dashboardEx)
+                    catch (Exception cacheEx)
                     {
-                        _loggingService.LogError($"Dashboard refresh failed: {dashboardEx.Message}");
-                        // Continue initialization even if dashboard fails
+                        _loggingService.LogWarning($"Could not load cached data: {cacheEx.Message}");
                     }
+
+                    // Hide loading overlay - UI is ready with cached data
+                    IsLoading = false;
+                    _loggingService.LogSuccess("Autentisering fullført - UI er klar");
+
+                    // Refresh data in background (non-blocking)
+                    _loggingService.LogInfo("Oppdaterer data i bakgrunnen...");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Dashboard.RefreshDataAsync();
+                            Dashboard.UpdateNextClassFromCache();
+                            _loggingService.LogSuccess("✓ Dashboard data oppdatert!");
+                        }
+                        catch (Exception dashboardEx)
+                        {
+                            _loggingService.LogError($"Dashboard refresh failed: {dashboardEx.Message}");
+                            // Continue - we already have cached data showing
+                        }
+                    });
 
                     _loggingService.LogSuccess("Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
