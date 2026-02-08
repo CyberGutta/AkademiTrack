@@ -16,6 +16,30 @@ namespace AkademiTrack.Services
     public static class SecureCredentialStorage
     {
         private const string ServiceName = "AkademiTrack";
+        
+        // Cache the secret-tool availability check to prevent spam
+        private static bool? _secretToolAvailable = null;
+        private static readonly object _secretToolCheckLock = new object();
+
+        private static bool IsSecretToolAvailable()
+        {
+            lock (_secretToolCheckLock)
+            {
+                if (_secretToolAvailable.HasValue)
+                    return _secretToolAvailable.Value;
+
+                _secretToolAvailable = File.Exists("/usr/bin/secret-tool");
+                
+                if (!_secretToolAvailable.Value)
+                {
+                    // Only log once
+                    Debug.WriteLine("⚠️ secret-tool not found. Using fallback file storage.");
+                    Debug.WriteLine("   Install with: sudo apt install libsecret-tools");
+                }
+                
+                return _secretToolAvailable.Value;
+            }
+        }
 
         public static async Task<bool> SaveCredentialAsync(string key, string value)
         {
@@ -240,9 +264,8 @@ namespace AkademiTrack.Services
 
         private static async Task<bool> SaveToLinuxSecretServiceAsync(string key, string value)
         {
-            if (!File.Exists("/usr/bin/secret-tool"))
+            if (!IsSecretToolAvailable())
             {
-                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
                 return SaveToFallbackFile(key, value);
             }
 
@@ -268,7 +291,7 @@ namespace AkademiTrack.Services
 
                 if (process.ExitCode != 0)
                 {
-                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
+                    Debug.WriteLine("⚠️ secret-tool failed. Using fallback.");
                     return SaveToFallbackFile(key, value);
                 }
 
@@ -276,16 +299,15 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                Debug.WriteLine($"❌ secret-tool error: {ex.Message}");
                 return SaveToFallbackFile(key, value);
             }
         }
 
         private static async Task<string?> GetFromLinuxSecretServiceAsync(string key)
         {
-            if (!File.Exists("/usr/bin/secret-tool"))
+            if (!IsSecretToolAvailable())
             {
-                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
                 return GetFromFallbackFile(key);
             }
 
@@ -310,7 +332,6 @@ namespace AkademiTrack.Services
 
                 if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
                 {
-                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
                     return GetFromFallbackFile(key);
                 }
 
@@ -318,16 +339,15 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                Debug.WriteLine($"❌ secret-tool error: {ex.Message}");
                 return GetFromFallbackFile(key);
             }
         }
 
         private static async Task<bool> DeleteFromLinuxSecretServiceAsync(string key)
         {
-            if (!File.Exists("/usr/bin/secret-tool"))
+            if (!IsSecretToolAvailable())
             {
-                Console.WriteLine("⚠️ secret-tool not found. Using fallback.");
                 return DeleteFromFallbackFile(key);
             }
 
@@ -350,7 +370,6 @@ namespace AkademiTrack.Services
 
                 if (process.ExitCode != 0)
                 {
-                    Console.WriteLine("⚠️ secret-tool failed. Using fallback.");
                     return DeleteFromFallbackFile(key);
                 }
 
@@ -358,7 +377,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ secret-tool error: {ex.Message}");
+                Debug.WriteLine($"❌ secret-tool error: {ex.Message}");
                 return DeleteFromFallbackFile(key);
             }
         }

@@ -24,6 +24,7 @@ namespace AkademiTrack.ViewModels
         private string _errorMessage = "";
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _migrationNeeded = false;
+        private bool _needsSudo = false;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? DownloadCompleted;
@@ -77,6 +78,12 @@ namespace AkademiTrack.ViewModels
             set => SetProperty(ref _errorMessage, value);
         }
 
+        public bool NeedsSudo
+        {
+            get => _needsSudo;
+            set => SetProperty(ref _needsSudo, value);
+        }
+
         public ICommand RetryCommand { get; }
 
         public DependencyDownloadViewModel()
@@ -109,6 +116,12 @@ namespace AkademiTrack.ViewModels
                 bool isTestMode = args.Contains("--test-dependency-window");
 
                 StatusMessage = _migrationNeeded ? "Forbereder app-oppdatering..." : "Sjekker WebKit-status...";
+                
+                // Check for Linux and install secret-tool if needed
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+                {
+                    await EnsureSecretToolInstalledAsync();
+                }
                 
                 if (!isTestMode)
                 {
@@ -267,6 +280,142 @@ namespace AkademiTrack.ViewModels
             await Task.Delay(800);
             
             DownloadCompleted?.Invoke(this, EventArgs.Empty);
+        }
+
+        private async Task EnsureSecretToolInstalledAsync()
+        {
+            try
+            {
+                // Check if secret-tool is already installed
+                if (File.Exists("/usr/bin/secret-tool"))
+                {
+                    Debug.WriteLine("[DependencyDownload] secret-tool already installed");
+                    return;
+                }
+
+                Debug.WriteLine("[DependencyDownload] secret-tool not found, attempting installation...");
+                StatusMessage = "Installerer secret-tool for sikker lagring...";
+                ProgressDetails = "Sjekker om sudo er tilgjengelig...";
+                ShowProgressDetails = true;
+
+                // Check if we're running as root or have sudo access
+                var whoamiProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "whoami",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                whoamiProcess.Start();
+                var currentUser = (await whoamiProcess.StandardOutput.ReadToEndAsync()).Trim();
+                await whoamiProcess.WaitForExitAsync();
+
+                bool isRoot = currentUser == "root";
+
+                if (!isRoot)
+                {
+                    // Check if user has sudo access
+                    var sudoCheckProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "sudo",
+                            Arguments = "-n true",
+                            UseShellExecute = false,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    sudoCheckProcess.Start();
+                    await sudoCheckProcess.WaitForExitAsync();
+
+                    if (sudoCheckProcess.ExitCode != 0)
+                    {
+                        // No sudo access - need to prompt user
+                        Debug.WriteLine("[DependencyDownload] No sudo access - prompting user to run with sudo");
+                        StatusMessage = "Krever sudo-tilgang for å installere secret-tool";
+                        ProgressDetails = "AkademiTrack trenger sudo-tilgang for å installere libsecret-tools.\n\n" +
+                                        "Vennligst kjør AkademiTrack med sudo:\n" +
+                                        "sudo ./AkademiTrack\n\n" +
+                                        "Appen vil lukke om 10 sekunder...";
+                        ShowProgressDetails = true;
+                        NeedsSudo = true;
+
+                        // Wait 10 seconds then exit
+                        await Task.Delay(10000);
+                        
+                        // Try to restart with sudo
+                        try
+                        {
+                            var restartProcess = new Process
+                            {
+                                StartInfo = new ProcessStartInfo
+                                {
+                                    FileName = "pkexec",
+                                    Arguments = $"{Environment.ProcessPath}",
+                                    UseShellExecute = false
+                                }
+                            };
+                            restartProcess.Start();
+                        }
+                        catch
+                        {
+                            Debug.WriteLine("[DependencyDownload] Could not restart with pkexec");
+                        }
+
+                        Environment.Exit(1);
+                        return;
+                    }
+                }
+
+                // We have sudo access, install secret-tool
+                ProgressDetails = "Installerer libsecret-tools...";
+                
+                var installProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "sudo",
+                        Arguments = "apt-get install -y libsecret-tools",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                installProcess.Start();
+                var output = await installProcess.StandardOutput.ReadToEndAsync();
+                var error = await installProcess.StandardError.ReadToEndAsync();
+                await installProcess.WaitForExitAsync();
+
+                if (installProcess.ExitCode == 0)
+                {
+                    Debug.WriteLine("[DependencyDownload] ✓ secret-tool installed successfully");
+                    StatusMessage = "secret-tool installert!";
+                    ProgressDetails = "Sikker lagring er nå tilgjengelig";
+                }
+                else
+                {
+                    Debug.WriteLine($"[DependencyDownload] ⚠️ secret-tool installation failed: {error}");
+                    StatusMessage = "Kunne ikke installere secret-tool";
+                    ProgressDetails = "Appen vil bruke fallback-lagring i stedet";
+                }
+
+                await Task.Delay(1500);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DependencyDownload] Error installing secret-tool: {ex.Message}");
+                StatusMessage = "Kunne ikke installere secret-tool";
+                ProgressDetails = "Appen vil bruke fallback-lagring";
+                await Task.Delay(1500);
+            }
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
