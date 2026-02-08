@@ -276,6 +276,71 @@ function Build-WindowsRelease {
     return $releaseFolder
 }
 
+function Clear-IconCache {
+    Write-Host ""
+    Write-Host "Clearing Windows icon cache..." -ForegroundColor Cyan
+    Write-Host "=" * 50
+    
+    try {
+        # Kill Explorer to release icon cache files
+        Write-Host "Stopping Explorer..."
+        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+        
+        # Delete icon cache files
+        $localAppData = $env:LOCALAPPDATA
+        $deletedCount = 0
+        
+        # Delete main IconCache.db
+        $iconCacheDb = Join-Path $localAppData "IconCache.db"
+        if (Test-Path $iconCacheDb) {
+            try {
+                Remove-Item $iconCacheDb -Force
+                $deletedCount++
+                Write-Host "Deleted: IconCache.db"
+            }
+            catch {
+                Write-Host "Could not delete IconCache.db: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
+        
+        # Delete Explorer icon cache files
+        $explorerCachePath = Join-Path $localAppData "Microsoft\Windows\Explorer"
+        if (Test-Path $explorerCachePath) {
+            $cacheFiles = Get-ChildItem $explorerCachePath -Filter "iconcache*.db" -ErrorAction SilentlyContinue
+            foreach ($file in $cacheFiles) {
+                try {
+                    Remove-Item $file.FullName -Force
+                    $deletedCount++
+                    Write-Host "Deleted: $($file.Name)"
+                }
+                catch {
+                    Write-Host "Could not delete $($file.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+        }
+        
+        if ($deletedCount -gt 0) {
+            Write-Host "Deleted $deletedCount icon cache file(s)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "No icon cache files found to delete" -ForegroundColor Gray
+        }
+        
+        # Restart Explorer
+        Write-Host "Restarting Explorer..."
+        Start-Process explorer.exe
+        Start-Sleep -Seconds 1
+        
+        Write-Host "Icon cache cleared - new icons should display correctly!" -ForegroundColor Green
+        Write-Host "If icons still look blurry, try restarting your PC" -ForegroundColor Gray
+    }
+    catch {
+        Write-Host "Failed to clear icon cache: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "You can manually restart Explorer or reboot to see new icons" -ForegroundColor Gray
+    }
+}
+
 # Main execution
 if ($Help) {
     Show-Help
@@ -373,6 +438,9 @@ if ($releaseFolder -and (Test-Path $releaseFolder)) {
     Write-Host ""
     Write-Host "Built with love by CyberGutta" -ForegroundColor Magenta
     Write-Host "Andreas Nilsen and Mathias Hansen"
+    
+    # Clear icon cache so the new installer icon displays correctly
+    Clear-IconCache
 }
 else {
     Write-Host ""

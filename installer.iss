@@ -22,7 +22,10 @@ AllowNoIcons=yes
 LicenseFile=LICENSE
 OutputDir=Releases\v{#MyAppVersion}
 OutputBaseFilename=AkademiTrack-Setup
-SetupIconFile=Assets\AT-1024-HighRes.ico
+SetupIconFile=Assets\AT-1024.ico
+; Enable high-DPI icon support
+DisableWelcomePage=no
+WizardResizable=yes
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
