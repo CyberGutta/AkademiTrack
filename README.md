@@ -238,10 +238,10 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 | Component | Technology |
 |-----------|-----------|
 | **Language** | C# (.NET 9.0) |
-| **UI Framework** | Avalonia UI 11.3.9 |
-| **Authentication** | Selenium WebDriver 4.28.0 with ChromeDriver |
+| **UI Framework** | Avalonia UI 11.3.11 |
+| **Authentication** | Selenium WebDriver 4.40.0 with ChromeDriver |
 | **Architecture** | MVVM pattern with Dependency Injection |
-| **Security** | System.Security.Cryptography.ProtectedData (Windows), Keychain (macOS) |
+| **Security** | System.Security.Cryptography.ProtectedData 10.0.2 (Windows), Keychain (macOS) |
 | **Caching** | Custom TTL-based cache service with automatic cleanup |
 | **Notifications** | OsNotifications 1.1.3 for native system notifications |
 | **HTTP Client** | System.Net.Http with retry logic |
