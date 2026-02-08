@@ -170,7 +170,7 @@ namespace AkademiTrack.Services
                     var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(15));
                     
                     // Wait for page to be fully loaded
-                    wait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").Equals("complete"));
+                    wait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState")?.Equals("complete") == true);
                     
                     // Try multiple selectors for the FEIDE button
                     IWebElement? feideButton = null;
@@ -215,6 +215,12 @@ namespace AkademiTrack.Services
                                 throw new Exception("Could not find FEIDE button with any selector");
                             }
                         }
+                    }
+                    
+                    // Ensure feideButton was found
+                    if (feideButton == null)
+                    {
+                        throw new Exception("Could not find FEIDE button with any selector");
                     }
                     
                     // Scroll to element and ensure it's visible
@@ -458,7 +464,7 @@ namespace AkademiTrack.Services
             {
                 var cookies = driver.Manage().Cookies.AllCookies;
                 return cookies
-                    .Where(c => c.Domain.Contains("iskole.net"))
+                    .Where(c => c.Domain?.Contains("iskole.net") == true)
                     .ToDictionary(c => c.Name, c => c.Value);
             }
             catch (Exception ex)
@@ -476,7 +482,7 @@ namespace AkademiTrack.Services
                 
                 // Get cookies from the driver
                 var cookies = driver.Manage().Cookies.AllCookies;
-                var cookieDict = cookies.Where(c => c.Domain.Contains("iskole.net"))
+                var cookieDict = cookies.Where(c => c.Domain?.Contains("iskole.net") == true)
                                        .ToDictionary(c => c.Name, c => c.Value);
                 
                 var jsessionId = cookieDict.GetValueOrDefault("JSESSIONID", "");
