@@ -721,12 +721,26 @@ namespace AkademiTrack.ViewModels
 
         private void OnAutomationStatusChanged(object? sender, AutomationStatusChangedEventArgs e)
         {
-            Dispatcher.UIThread.Post(() =>
+            Dispatcher.UIThread.Post(async () =>
             {
                 StatusMessage = e.Status;
                 OnPropertyChanged(nameof(IsAutomationRunning));
                 ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
+                
+                // Track automation stop when it completes naturally (not just manual stop)
+                if (!e.IsRunning)
+                {
+                    try
+                    {
+                        await _analyticsService.TrackAutomationStopAsync();
+                        Debug.WriteLine("[Analytics] Automation stopped - analytics updated");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to track automation stop: {ex.Message}");
+                    }
+                }
             });
         }
 
@@ -934,16 +948,8 @@ namespace AkademiTrack.ViewModels
             // Mark manual stop FIRST
             await SchoolTimeChecker.MarkManualStopAsync();
             
-            // Track automation stop
+            // Note: TrackAutomationStopAsync is now called automatically by OnAutomationStatusChanged event
             Debug.WriteLine("[MainWindow] Automation stopped");
-            try
-            {
-                await _analyticsService.TrackAutomationStopAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Analytics] Failed to track automation stop: {ex.Message}");
-            }
 
             var result = await _automationService.StopAsync();
             

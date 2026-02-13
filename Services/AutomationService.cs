@@ -411,6 +411,19 @@ namespace AkademiTrack.Services
                     var currentTime = DateTime.Now.ToString("HH:mm");
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
 
+                    // Check if we're still within school hours - auto-stop if outside
+                    if (!await SchoolTimeChecker.IsWithinSchoolHoursAsync())
+                    {
+                        _loggingService.LogInfo("Utenfor skoletid - stopper automatisering automatisk");
+                        await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        await _notificationService.ShowNotificationAsync(
+                            "Automatisering stoppet",
+                            "Skoletiden er over. Automatiseringen har stoppet.",
+                            NotificationLevel.Info
+                        );
+                        return MonitoringLoopResult.AllComplete;
+                    }
+
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
                         "Sjekker registreringsvinduer", cycleCount));
 
