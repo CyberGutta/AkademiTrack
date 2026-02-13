@@ -115,4 +115,46 @@ namespace AkademiTrack.ViewModels
             throw new NotImplementedException();
         }
     }
+
+    // Converter to check if int is greater than zero (for showing button after first failure)
+    public class IntGreaterThanZeroConverter : IValueConverter
+    {
+        public static readonly IntGreaterThanZeroConverter Instance = new();
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is int intValue)
+            {
+                return intValue > 0;
+            }
+            return false;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Converter for dynamic loading container height based on retry count
+    public class IntGreaterThanZeroToHeightConverter : IMultiValueConverter
+    {
+        public static readonly IntGreaterThanZeroToHeightConverter Instance = new();
+
+        public object Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (values.Count > 0 && values[0] is int retryCount)
+            {
+                // If retry count > 0, show button and warning (taller)
+                // Otherwise, just show loading spinner and text (shorter)
+                return retryCount > 0 ? 320.0 : 240.0;
+            }
+            return 240.0; // Default to smaller size
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

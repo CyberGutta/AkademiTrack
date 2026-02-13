@@ -650,11 +650,16 @@
         </MultiBinding>
     </Border.IsVisible>
     <Grid>
+        <!-- Dynamic height based on whether button is visible -->
         <Border Classes="loading-container"
-                Width="300"
-                Height="200"
+                Width="320"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
+            <Border.Height>
+                <MultiBinding Converter="{x:Static vm:IntGreaterThanZeroToHeightConverter.Instance}">
+                    <Binding Path="InitializationRetryCount"/>
+                </MultiBinding>
+            </Border.Height>
             <StackPanel Spacing="24" HorizontalAlignment="Center">
 
                 <Grid Width="60" Height="60">
@@ -784,16 +789,68 @@
 
                 <!-- Loading Text -->
 
-                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
                     <TextBlock Text="Autentiserer..."
                               FontSize="18"
                               FontWeight="SemiBold"
                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
                               HorizontalAlignment="Center"/>
+                    
                     <TextBlock Text="Logger inn på iskole"
                               FontSize="13"
                               Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
                               HorizontalAlignment="Center"/>
+                    
+                    <TextBlock Text="Dette kan ta 10-30 sekunder"
+                              FontSize="11"
+                              Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                              Opacity="0.6"
+                              Margin="0,2,0,0"
+                              HorizontalAlignment="Center"/>
+                    
+                    <!-- Password warning - Only show after first failure -->
+                    <TextBlock Text="Tar det for lang tid? Det kan skyldes feil brukernavn, passord, eller nettverksproblemer"
+                              FontSize="11"
+                              Foreground="#FFA500"
+                              Opacity="0.8"
+                              Margin="0,4,0,0"
+                              HorizontalAlignment="Center"
+                              TextWrapping="Wrap"
+                              TextAlignment="Center"
+                              MaxWidth="280"
+                              IsVisible="{Binding InitializationRetryCount, Converter={x:Static vm:IntGreaterThanZeroConverter.Instance}}"/>
+                    
+                    <!-- Settings Button - Only show after first failure -->
+                    <Button Command="{Binding OpenSettingsCommand}"
+                            Background="Transparent"
+                            BorderBrush="#5B9BFF"
+                            BorderThickness="1.5"
+                            CornerRadius="8"
+                            Padding="16,10"
+                            Margin="0,10,0,0"
+                            HorizontalAlignment="Center"
+                            Cursor="Hand"
+                            IsVisible="{Binding InitializationRetryCount, Converter={x:Static vm:IntGreaterThanZeroConverter.Instance}}">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#1A5B9BFF"/>
+                            </Style>
+                            <Style Selector="Button:pressed">
+                                <Setter Property="Background" Value="#335B9BFF"/>
+                            </Style>
+                        </Button.Styles>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <materialIcons:MaterialIcon Kind="Settings" 
+                                                       Width="18" 
+                                                       Height="18"
+                                                       Foreground="#5B9BFF"/>
+                            <TextBlock Text="Åpne innstillinger"
+                                      FontSize="13"
+                                      FontWeight="Medium"
+                                      Foreground="#5B9BFF"
+                                      VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>

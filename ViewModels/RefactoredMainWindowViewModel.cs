@@ -284,9 +284,28 @@ namespace AkademiTrack.ViewModels
         #region Initialization
         private int _initializationRetryCount = 0;
         private const int MAX_RETRY_ATTEMPTS = Constants.Network.MAX_RETRY_ATTEMPTS;
+        private bool _userCancelledAuth = false;
+
+        public int InitializationRetryCount
+        {
+            get => _initializationRetryCount;
+            private set
+            {
+                _initializationRetryCount = value;
+                OnPropertyChanged(nameof(InitializationRetryCount));
+            }
+        }
 
         private async Task InitializeAsync()
         {
+            // Check if user cancelled authentication
+            if (_userCancelledAuth)
+            {
+                _loggingService.LogInfo("User cancelled authentication - stopping retry loop");
+                IsLoading = false;
+                return;
+            }
+
             // Prevent concurrent initialization
             if (_isInitializing)
             {
@@ -356,13 +375,25 @@ namespace AkademiTrack.ViewModels
                     catch (Exception cacheEx)
                     {
                         _loggingService.LogWarning($"Could not load cached data: {cacheEx.Message}");
+                        // If no cached data, do a quick initial load before showing UI
+                        _loggingService.LogInfo("Ingen cached data - henter fersk data...");
+                        try
+                        {
+                            await Dashboard.RefreshDataAsync();
+                            Dashboard.UpdateNextClassFromCache();
+                            _loggingService.LogSuccess("✓ Initial data hentet!");
+                        }
+                        catch (Exception initialEx)
+                        {
+                            _loggingService.LogError($"Initial data fetch failed: {initialEx.Message}");
+                        }
                     }
 
-                    // Hide loading overlay - UI is ready with cached data
+                    // Hide loading overlay - UI is ready
                     IsLoading = false;
                     _loggingService.LogSuccess("Autentisering fullført - UI er klar");
 
-                    // Refresh data in background (non-blocking)
+                    // If we had cached data, refresh in background
                     _loggingService.LogInfo("Oppdaterer data i bakgrunnen...");
                     _ = Task.Run(async () =>
                     {
@@ -375,7 +406,6 @@ namespace AkademiTrack.ViewModels
                         catch (Exception dashboardEx)
                         {
                             _loggingService.LogError($"Dashboard refresh failed: {dashboardEx.Message}");
-                            // Continue - we already have cached data showing
                         }
                     });
 
@@ -396,7 +426,7 @@ namespace AkademiTrack.ViewModels
                         // Continue initialization even if services fail
                     }
 
-                    _initializationRetryCount = 0;
+                    InitializationRetryCount = 0;
                 }
                 else
                 {
@@ -422,13 +452,24 @@ namespace AkademiTrack.ViewModels
 
         private async Task HandleInitializationFailure(string? errorMessage)
         {
-            _initializationRetryCount++;
+            InitializationRetryCount++;
 
             Debug.WriteLine("[MainWindow] App initialization failed");
 
             string finalErrorMessage = !string.IsNullOrEmpty(errorMessage)
                 ? errorMessage
                 : "Kunne ikke autentisere med iskole.net. Sjekk innloggingsdata i innstillinger.";
+
+            // After 2 failed attempts, suggest opening settings
+            if (_initializationRetryCount == 2)
+            {
+                _loggingService.LogWarning("Flere mislykkede innloggingsforsøk");
+                await _notificationService.ShowNotificationAsync(
+                    "Innlogging mislyktes",
+                    "Klikk på innstillinger-knappen for å sjekke innloggingsdata.",
+                    NotificationLevel.Warning
+                );
+            }
 
             if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
             {
@@ -446,13 +487,14 @@ namespace AkademiTrack.ViewModels
 
                 _loggingService.LogError($"Autentisering mislyktes etter {MAX_RETRY_ATTEMPTS} forsøk - stopper automatiske forsøk");
                 _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
+                _loggingService.LogError("Dette kan skyldes feil brukernavn eller passord, at brukerkontoen er låst, eller nettverksproblemer.");
                 await _notificationService.ShowNotificationAsync(
-                    "Autentisering mislyktes",
-                    $"Etter {MAX_RETRY_ATTEMPTS} forsøk: {finalErrorMessage}",
+                    "Innlogging mislyktes",
+                    $"Etter {MAX_RETRY_ATTEMPTS} forsøk. Sjekk innloggingsdata i innstillinger.",
                     NotificationLevel.Error
                 );
 
-                StatusMessage = "Autentisering mislyktes - sjekk innstillinger eller nettverk";
+                StatusMessage = "Innlogging mislyktes - klikk innstillinger";
                 IsLoading = false;
                 return;
             }
@@ -460,8 +502,8 @@ namespace AkademiTrack.ViewModels
             _loggingService.LogError($"Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
             _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
             await _notificationService.ShowNotificationAsync(
-                "Autentisering mislyktes",
-                $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS} mislyktes. Prøver igjen...",
+                "Innlogging mislyktes",
+                $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}. Prøver igjen...",
                 NotificationLevel.Warning
             );
 
@@ -471,7 +513,7 @@ namespace AkademiTrack.ViewModels
 
         private async Task HandleInitializationException(Exception ex)
         {
-            _initializationRetryCount++;
+            InitializationRetryCount++;
 
             try
             {
@@ -942,6 +984,9 @@ namespace AkademiTrack.ViewModels
             // Track settings navigation - removed events tracking
             Debug.WriteLine("[MainWindow] Navigating to settings");
 
+            // DON'T cancel ongoing authentication - let it continue in background
+            // Only the CredentialsSaved event should trigger a new authentication attempt
+
             // Connect SettingsViewModel to logging service
             SettingsViewModel.ConnectToMainViewModel(this);
 
@@ -957,6 +1002,10 @@ namespace AkademiTrack.ViewModels
             // Subscribe to school hours changes
             SettingsViewModel.SchoolHoursChanged -= OnSchoolHoursChanged;
             SettingsViewModel.SchoolHoursChanged += OnSchoolHoursChanged;
+
+            // Subscribe to credentials saved event
+            SettingsViewModel.CredentialsSaved -= OnCredentialsSaved;
+            SettingsViewModel.CredentialsSaved += OnCredentialsSaved;
 
             return Task.CompletedTask;
         }
@@ -1142,9 +1191,42 @@ namespace AkademiTrack.ViewModels
         #endregion
 
         #region Event Handlers
-        private void OnSettingsCloseRequested(object? sender, EventArgs e)
+        private async void OnSettingsCloseRequested(object? sender, EventArgs e)
         {
+            // Only go back to dashboard - don't retry authentication
+            // Authentication retry is handled by OnCredentialsSaved when user clicks "Lagre"
             _ = BackToDashboardAsync();
+        }
+
+        private async void OnCredentialsSaved(object? sender, EventArgs e)
+        {
+            _loggingService.LogInfo("Innloggingsdata lagret - starter re-autentisering");
+            
+            // Delete cached cookies to force fresh login
+            try
+            {
+                await SecureCredentialStorage.DeleteCookiesAsync();
+                _loggingService.LogInfo("Cached cookies deleted - will perform fresh login");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogWarning($"Failed to delete cookies: {ex.Message}");
+            }
+            
+            // Reset authentication state
+            _userCancelledAuth = false;
+            InitializationRetryCount = 0;
+            IsAuthenticated = false;
+            
+            // Close settings and show dashboard so loading overlay is visible
+            ShowSettings = false;
+            ShowDashboard = true;
+            
+            // Small delay to ensure UI updates
+            await Task.Delay(200);
+            
+            // Trigger re-authentication
+            _ = InitializeAsync();
         }
 
         private void OnFeideSetupCompleted(object? sender, FeideSetupCompletedEventArgs e)
@@ -1154,7 +1236,7 @@ namespace AkademiTrack.ViewModels
                 _loggingService.LogSuccess($"Feide-oppsett fullført for {e.UserEmail}");
                 
                 // Reset retry count
-                _initializationRetryCount = 0;
+                InitializationRetryCount = 0;
                 // Note: Navigation and StartInitializationAsync() is handled by App.axaml.cs
             }
             else

@@ -818,6 +818,7 @@ Terminal=false
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
         public event EventHandler? SchoolHoursChanged;
+        public event EventHandler? CredentialsSaved;
 
         public ApplicationInfo ApplicationInfo { get; }
         public ObservableCollection<LogEntry> LogEntries => _displayedLogEntries;
@@ -2619,6 +2620,9 @@ Terminal=false
                 HasUnsavedLoginChanges = false;
 
                 Debug.WriteLine("[Settings] Login credentials saved successfully");
+                
+                // Notify that credentials were saved - trigger re-authentication
+                CredentialsSaved?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
