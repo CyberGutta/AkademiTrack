@@ -652,7 +652,7 @@
     <Grid>
         <!-- Dynamic height based on whether button is visible -->
         <Border Classes="loading-container"
-                Width="320"
+                Width="340"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
             <Border.Height>
@@ -809,7 +809,7 @@
                               HorizontalAlignment="Center"/>
                     
                     <!-- Password warning - Only show after first failure -->
-                    <TextBlock Text="Tar det for lang tid? Det kan skyldes feil brukernavn, passord, eller nettverksproblemer"
+                    <TextBlock Text="Tar det for lang tid? Sjekk brukernavn/passord i innstillinger, eller slett lokal data under Avansert"
                               FontSize="11"
                               Foreground="#FFA500"
                               Opacity="0.8"
@@ -817,7 +817,7 @@
                               HorizontalAlignment="Center"
                               TextWrapping="Wrap"
                               TextAlignment="Center"
-                              MaxWidth="280"
+                              MaxWidth="300"
                               IsVisible="{Binding InitializationRetryCount, Converter={x:Static vm:IntGreaterThanZeroConverter.Instance}}"/>
                     
                     <!-- Settings Button - Only show after first failure -->
