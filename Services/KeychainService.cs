@@ -65,16 +65,26 @@ namespace AkademiTrack.Services
             {
                 var trimmed = output.Trim();
                 
-                if (key == "cookies" && IsHexString(trimmed))
+                // Check if the output is a hex string and convert it back to normal text
+                // This happens when passwords contain special characters
+                if (IsHexString(trimmed))
                 {
                     try
                     {
-                        return HexToString(trimmed);
+                        var decoded = HexToString(trimmed);
+                        Debug.WriteLine($"[Keychain] Decoded hex string for key '{key}': length {trimmed.Length} -> {decoded.Length}");
+                        return decoded;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        // If hex conversion fails, return as-is
+                        Debug.WriteLine($"[Keychain] Failed to decode hex for key '{key}': {ex.Message}");
                         return trimmed;
                     }
+                }
+                else
+                {
+                    Debug.WriteLine($"[Keychain] Retrieved plain text for key '{key}': length {trimmed.Length}");
                 }
                 
                 return trimmed;
@@ -119,9 +129,11 @@ namespace AkademiTrack.Services
 
         private static bool IsHexString(string input)
         {
-            if (string.IsNullOrEmpty(input) || input.Length < 10)
+            // Must be non-empty, have even length (hex pairs), and minimum length
+            if (string.IsNullOrEmpty(input) || input.Length < 10 || input.Length % 2 != 0)
                 return false;
 
+            // All characters must be valid hex digits (0-9, a-f, A-F)
             foreach (char c in input)
             {
                 if (!Uri.IsHexDigit(c))
