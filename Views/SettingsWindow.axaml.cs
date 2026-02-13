@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
@@ -166,6 +167,16 @@ namespace AkademiTrack.Views
             }
         }
 
-        
+        private void OnPasswordKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && DataContext is SettingsViewModel viewModel)
+            {
+                // Trigger save if there are unsaved changes
+                if (viewModel.HasUnsavedLoginChanges && viewModel.SaveLoginCredentialsCommand.CanExecute(null))
+                {
+                    viewModel.SaveLoginCredentialsCommand.Execute(null);
+                }
+            }
+        }
     }
 }

@@ -900,7 +900,8 @@
 											 Classes="credential-input"
 											 PasswordChar="•"
 											 Watermark="Ditt passord"
-											 Padding="14,12,48,12"/>
+											 Padding="14,12,48,12"
+											 KeyDown="OnPasswordKeyDown"/>
 
 									<Button Name="TogglePasswordButton"
 											Classes="passwordToggle"
