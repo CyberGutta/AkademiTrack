@@ -132,14 +132,9 @@ namespace AkademiTrack.Services.DependencyInjection
             });
             services.AddSingleton<AuthenticationService>();
             services.AddSingleton<SystemHealthCheck>();
-            services.AddSingleton<EnhancedNotificationManager>();
-            services.AddSingleton<OfflineService>();
-            services.AddSingleton<TelemetryService>();
 
             // Utility services
             services.AddSingleton<LogRetentionManager>();
-            services.AddTransient<Services.Utilities.CircuitBreaker>();
-            services.AddTransient<Services.Utilities.RateLimiter>();
 
             // Platform-specific services
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
@@ -387,33 +382,6 @@ rm ""$0"" 2>/dev/null";
             {
                 Debug.WriteLine($"[ServiceContainer] Error creating uninstall detector: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Legacy compatibility method for ServiceLocator migration
-        /// </summary>
-        [Obsolete("Use ServiceContainer.GetService<T>() instead. This method is for migration compatibility only.")]
-        public static T GetLegacyService<T>() where T : notnull
-        {
-            return GetService<T>();
-        }
-
-        /// <summary>
-        /// Legacy ServiceLocator compatibility - Instance property
-        /// </summary>
-        [Obsolete("Use ServiceContainer directly instead of Instance property")]
-        public static ServiceLocatorCompat Instance => new ServiceLocatorCompat();
-    }
-
-    /// <summary>
-    /// Compatibility wrapper for legacy ServiceLocator usage
-    /// </summary>
-    [Obsolete("Use ServiceContainer directly instead")]
-    public class ServiceLocatorCompat
-    {
-        public T GetService<T>() where T : notnull
-        {
-            return ServiceContainer.GetService<T>();
         }
     }
 }
