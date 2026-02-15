@@ -367,6 +367,13 @@ namespace AkademiTrack
             AkademiTrack.Services.MacOSDockHandler.Initialize(mainWindow);
             Debug.WriteLine("[App] MacOSDockHandler initialized");
 
+            // On macOS, always show tray icon regardless of start minimized setting
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && !showFeideSetup)
+            {
+                AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+                Debug.WriteLine("[App] Tray icon shown (macOS)");
+            }
+
             // Check if we should start minimized (regardless of showFeideSetup for this check)
             if (startMinimized && !showFeideSetup)
             {
@@ -375,7 +382,12 @@ namespace AkademiTrack
                 mainWindow.Show();
                 await Task.Delay(50);
                 mainWindow.Hide();
-                AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+                
+                // Show tray icon for non-macOS platforms when starting minimized
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    AkademiTrack.Services.TrayIconManager.ShowTrayIcon();
+                }
             }
             else
             {
