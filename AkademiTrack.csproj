@@ -10,9 +10,9 @@
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<ApplicationIcon>Assets\AT-1024.ico</ApplicationIcon>
-		<Version>1.2.0</Version>
-		<AssemblyVersion>1.2.0</AssemblyVersion>
-		<FileVersion>1.2.0</FileVersion>
+		<Version>1.2.1</Version>
+		<AssemblyVersion>1.2.1</AssemblyVersion>
+		<FileVersion>1.2.1</FileVersion>
 		<AssemblyName>AkademiTrack</AssemblyName>
 		<Product>AkademiTrack</Product>
 		<Company>CyberBrothersHQ</Company>
@@ -21,8 +21,8 @@
 		<CFBundleName>AkademiTrack</CFBundleName>
 		<CFBundleDisplayName>AkademiTrack</CFBundleDisplayName>
 		<CFBundleIdentifier>com.CyberBrothers.akademitrack</CFBundleIdentifier>
-		<CFBundleVersion>1.2.0</CFBundleVersion>
-		<CFBundleShortVersionString>1.2.0</CFBundleShortVersionString>
+		<CFBundleVersion>1.2.1</CFBundleVersion>
+		<CFBundleShortVersionString>1.2.1</CFBundleShortVersionString>
 		<CFBundleIconFile>AT-1024.icns</CFBundleIconFile>
 		<NSPrincipalClass>NSApplication</NSPrincipalClass>
 		<NSHighResolutionCapable>true</NSHighResolutionCapable>
