@@ -217,6 +217,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 _loggingService?.LogError($"[ATTENDANCE] Exception in FetchAttendanceSummaryAsync: {ex.Message}");
+                
+                // Track attendance summary fetch error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "attendance_summary_fetch_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log attendance summary error: {analyticsEx.Message}");
+                }
+                
                 return null;
             }
         }
@@ -270,6 +286,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 _loggingService?.LogError($"[TODAY] Exception in FetchTodayScheduleAsync: {ex.Message}");
+                
+                // Track today schedule fetch error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "attendance_today_schedule_fetch_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log today schedule error: {analyticsEx.Message}");
+                }
+                
                 return null;
             }
         }
@@ -856,6 +888,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 _loggingService?.LogError($"Weekly attendance error: {ex.Message}");
+                
+                // Track weekly attendance fetch error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "attendance_weekly_fetch_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log weekly attendance error: {analyticsEx.Message}");
+                }
+                
                 return null;
             }
         }

@@ -1337,6 +1337,20 @@ Terminal=false
 
                 if (string.IsNullOrEmpty(userEmail))
                 {
+                    // Track export failure - no email
+                    try
+                    {
+                        var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                        await analyticsService.LogErrorAsync(
+                            "data_export_no_email",
+                            "Export failed - no user email found"
+                        );
+                    }
+                    catch (Exception analyticsEx)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to log export error: {analyticsEx.Message}");
+                    }
+                    
                     await ShowErrorDialog(
                         "Eksport feilet",
                         "Kunne ikke finne bruker-e-post. Vennligst logg inn på nytt."
@@ -1418,6 +1432,21 @@ Terminal=false
                 Debug.WriteLine($"Error: {ex.Message}");
                 Debug.WriteLine($"Stack trace: {ex.StackTrace}");
 
+                // Track export failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "data_export_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log export error: {analyticsEx.Message}");
+                }
+                
                 await ShowErrorDialog(
                     "Eksport feilet",
                     $"Kunne ikke eksportere lokal data:\n\n{ex.Message}\n\n" +
@@ -1521,6 +1550,22 @@ Terminal=false
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error: {ex.Message}");
+                
+                // Track delete data failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "delete_local_data_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log delete error: {analyticsEx.Message}");
+                }
+                
                 await ShowErrorDialog("Feil ved sletting", $"Kunne ikke slette all data: {ex.Message}");
             }
             finally
@@ -1565,6 +1610,22 @@ Terminal=false
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error clearing secure storage: {ex.Message}");
+                
+                // Track secure storage clear failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "clear_secure_storage_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log storage clear error: {analyticsEx.Message}");
+                }
+                
                 await ShowErrorDialog("Feil", $"Kunne ikke rense sikker lagring: {ex.Message}");
             }
             finally
@@ -1640,6 +1701,22 @@ Terminal=false
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error: {ex.Message}");
+                
+                // Track account deletion failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "delete_account_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log account deletion error: {analyticsEx.Message}");
+                }
+                
                 await ShowErrorDialog("Feil", $"Det oppstod en feil: {ex.Message}");
             }
             finally
@@ -1796,6 +1873,21 @@ Terminal=false
                 Debug.WriteLine($"=== UNINSTALL FAILED ===");
                 Debug.WriteLine($"Error: {ex.Message}");
                 Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                // Track uninstall failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "uninstall_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log uninstall error: {analyticsEx.Message}");
+                }
                 
                 await ShowErrorDialog(
                     "Avinstallasjon feilet",
@@ -2188,6 +2280,20 @@ Terminal=false
             {
                 if (_allLogEntries == null || _allLogEntries.Count == 0)
                 {
+                    // Track no logs to export
+                    try
+                    {
+                        var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                        await analyticsService.LogErrorAsync(
+                            "log_export_no_logs",
+                            "No logs available to export"
+                        );
+                    }
+                    catch (Exception analyticsEx)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to log no logs error: {analyticsEx.Message}");
+                    }
+                    
                     await ShowErrorDialog("Ingen logger", "Det finnes ingen logger å eksportere.");
                     return;
                 }
@@ -2337,6 +2443,22 @@ Terminal=false
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error exporting logs: {ex.Message}");
+                
+                // Track log export failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "log_export_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log export error: {analyticsEx.Message}");
+                }
+                
                 await ShowErrorDialog(
                     "Eksport feilet",
                     $"Kunne ikke eksportere logger:\n\n{ex.Message}"

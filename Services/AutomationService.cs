@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -165,6 +166,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"Automatisering feil: {ex.Message}");
+                
+                // Track automation error in analytics
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "automation_unexpected_error",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log automation error: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering Feilet",
                     $"En uventet feil oppstod: {ex.Message}",
@@ -368,6 +385,21 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogInfo("Ingen STUDIE-økter funnet for i dag - stopper automatisering");
                 await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                
+                // Track no sessions found
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "automation_no_stu_sessions_found",
+                        "No STU sessions found for today"
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log no sessions: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Ingen STUDIE-økter funnet for i dag",
                     "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.",
@@ -384,6 +416,21 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogInfo("Alle STU-økter har konflikter med andre timer - ingen å registrere");
                 await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                
+                // Track all sessions conflict
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "automation_all_sessions_conflict",
+                        $"All {validStuSessions.Count} STU sessions conflict with regular classes"
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log session conflicts: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Ingen gyldige STU-økter",
                     "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.",
@@ -483,6 +530,22 @@ namespace AkademiTrack.Services
                                 catch (Exception regEx)
                                 {
                                     _loggingService.LogError($"Registrering feilet: {regEx.Message}");
+                                    
+                                    // Track registration failure
+                                    try
+                                    {
+                                        var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                                        await analyticsService.LogErrorAsync(
+                                            "automation_registration_failed",
+                                            $"Failed to register STU {stuSession.StartKl}-{stuSession.SluttKl}: {regEx.Message}",
+                                            regEx
+                                        );
+                                    }
+                                    catch (Exception analyticsEx)
+                                    {
+                                        Debug.WriteLine($"[Analytics] Failed to log registration error: {analyticsEx.Message}");
+                                    }
+                                    
                                     await _notificationService.ShowNotificationAsync(
                                         "Registrering Feilet",
                                         $"Kunne ikke registrere STU {stuSession.StartKl}-{stuSession.SluttKl}: {regEx.Message}",
@@ -540,6 +603,21 @@ namespace AkademiTrack.Services
 
                     if (cycleCount % 10 == 0)
                     {
+                        // Track monitoring error (only every 10th to avoid spam)
+                        try
+                        {
+                            var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                            await analyticsService.LogErrorAsync(
+                                "automation_monitoring_error",
+                                $"Monitoring error (cycle {cycleCount}): {ex.Message}",
+                                ex
+                            );
+                        }
+                        catch (Exception analyticsEx)
+                        {
+                            Debug.WriteLine($"[Analytics] Failed to log monitoring error: {analyticsEx.Message}");
+                        }
+                        
                         await _notificationService.ShowNotificationAsync(
                             "Overvåkingsfeil",
                             $"Feil under overvåking: {ex.Message}. Prøver igjen",
@@ -757,6 +835,21 @@ namespace AkademiTrack.Services
             }
             
             _loggingService.LogError($"Failed to fetch schedule data after {MAX_RETRIES} attempts");
+            
+            // Track schedule fetch failure
+            try
+            {
+                var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                await analyticsService.LogErrorAsync(
+                    "automation_schedule_fetch_failed",
+                    $"Failed to fetch schedule after {MAX_RETRIES} attempts"
+                );
+            }
+            catch (Exception analyticsEx)
+            {
+                Debug.WriteLine($"[Analytics] Failed to log schedule fetch error: {analyticsEx.Message}");
+            }
+            
             await _notificationService.ShowNotificationAsync(
                 "Kunne ikke hente timeplan",
                 "Automatiseringen kunne ikke hente timeplandata etter flere forsøk. Sjekk nettverkstilkobling og prøv igjen.",
@@ -1031,6 +1124,21 @@ namespace AkademiTrack.Services
                     if (responseContent.Contains("Du må være koblet på skolens nettverk"))
                     {
                         _loggingService.LogError($"NETTVERKSFEIL: Må være tilkoblet skolens nettverk for å registrere STU-økt {stuTime.StartKl}-{stuTime.SluttKl}");
+                        
+                        // Track network requirement error
+                        try
+                        {
+                            var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                            await analyticsService.LogErrorAsync(
+                                "automation_school_network_required",
+                                $"School network required for STU {stuTime.StartKl}-{stuTime.SluttKl}"
+                            );
+                        }
+                        catch (Exception analyticsEx)
+                        {
+                            Debug.WriteLine($"[Analytics] Failed to log network error: {analyticsEx.Message}");
+                        }
+                        
                         await _notificationService.ShowNotificationAsync(
                             "Koble til Skolens Nettverk",
                             $"Du må være tilkoblet skolens WiFi for å registrere STU {stuTime.StartKl}-{stuTime.SluttKl}.",
@@ -1043,6 +1151,20 @@ namespace AkademiTrack.Services
                     { 
                         SessionTime = $"{stuTime.StartKl}-{stuTime.SluttKl}",
                         RegistrationTime = DateTime.Now
+                    });
+
+                    // Schedule delayed verification (20 seconds later)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(20));
+                            await VerifyRegistrationAsync(stuTime);
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogError($"Verification task failed: {ex.Message}");
+                        }
                     });
 
                     return true;
@@ -1070,6 +1192,133 @@ namespace AkademiTrack.Services
             catch
             {
                 return "127.0.0.1";
+            }
+        }
+
+        /// <summary>
+        /// Verify that a registration was actually saved in iSkole
+        /// Called 20 seconds after registration attempt
+        /// </summary>
+        private async Task VerifyRegistrationAsync(ScheduleItem stuTime)
+        {
+            try
+            {
+                _loggingService.LogDebug($"[VERIFY] Checking if {stuTime.StartKl}-{stuTime.SluttKl} was actually registered in iSkole...");
+
+                // Fetch fresh schedule data from iSkole
+                var scheduleData = await FetchScheduleDataAsync();
+                
+                if (scheduleData == null)
+                {
+                    _loggingService.LogWarning($"[VERIFY] Could not fetch schedule data to verify registration");
+                    return;
+                }
+
+                // Find the session we just registered
+                var registeredSession = scheduleData.FirstOrDefault(s => 
+                    s.Dato == stuTime.Dato &&
+                    s.StartKl == stuTime.StartKl &&
+                    s.SluttKl == stuTime.SluttKl &&
+                    s.Stkode == stuTime.Stkode
+                );
+
+                if (registeredSession == null)
+                {
+                    _loggingService.LogWarning($"[VERIFY] Could not find session {stuTime.StartKl}-{stuTime.SluttKl} in schedule data");
+                    return;
+                }
+
+                // Check if it's marked as attended (Typefravaer = "M" means "Møtt" / attended)
+                if (registeredSession.Typefravaer == "M")
+                {
+                    _loggingService.LogSuccess($"✅ [VERIFY] Confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is registered in iSkole!");
+                }
+                else
+                {
+                    // Registration didn't stick - try again
+                    _loggingService.LogWarning($"⚠️ [VERIFY] Registration not found in iSkole for {stuTime.StartKl}-{stuTime.SluttKl}. Typefravaer status: {registeredSession.Typefravaer ?? "null"}");
+                    _loggingService.LogInfo($"[VERIFY] Attempting to re-register...");
+
+                    var retryResult = await RegisterAttendanceAsync(stuTime);
+                    
+                    if (retryResult)
+                    {
+                        _loggingService.LogInfo($"[VERIFY] Re-registration sent successfully. Will verify again in 20 seconds.");
+                        
+                        // Verify the retry after another 20 seconds
+                        await Task.Delay(TimeSpan.FromSeconds(20));
+                        var reVerifyData = await FetchScheduleDataAsync();
+                        
+                        if (reVerifyData != null)
+                        {
+                            var reVerifySession = reVerifyData.FirstOrDefault(s => 
+                                s.Dato == stuTime.Dato &&
+                                s.StartKl == stuTime.StartKl &&
+                                s.SluttKl == stuTime.SluttKl &&
+                                s.Stkode == stuTime.Stkode
+                            );
+
+                            if (reVerifySession?.Typefravaer == "M")
+                            {
+                                _loggingService.LogSuccess($"✅ [VERIFY] Re-registration confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is now registered!");
+                            }
+                            else
+                            {
+                                _loggingService.LogError($"❌ [VERIFY] Re-registration also failed for {stuTime.StartKl}-{stuTime.SluttKl}");
+                                
+                                // Track verification failure
+                                try
+                                {
+                                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                                    await analyticsService.LogErrorAsync(
+                                        "automation_verification_failed",
+                                        $"Registration verification failed for STU {stuTime.StartKl}-{stuTime.SluttKl} after retry"
+                                    );
+                                }
+                                catch (Exception analyticsEx)
+                                {
+                                    Debug.WriteLine($"[Analytics] Failed to log verification error: {analyticsEx.Message}");
+                                }
+                                
+                                await _notificationService.ShowNotificationAsync(
+                                    "Registrering feilet",
+                                    $"Kunne ikke registrere STU-økt {stuTime.StartKl}-{stuTime.SluttKl}. Vennligst registrer manuelt.",
+                                    NotificationLevel.Error,
+                                    isHighPriority: true
+                                );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _loggingService.LogError($"[VERIFY] Re-registration attempt failed");
+                        
+                        // Track re-registration failure
+                        try
+                        {
+                            var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                            await analyticsService.LogErrorAsync(
+                                "automation_reregistration_failed",
+                                $"Re-registration attempt failed for STU {stuTime.StartKl}-{stuTime.SluttKl}"
+                            );
+                        }
+                        catch (Exception analyticsEx)
+                        {
+                            Debug.WriteLine($"[Analytics] Failed to log re-registration error: {analyticsEx.Message}");
+                        }
+                        
+                        await _notificationService.ShowNotificationAsync(
+                            "Registrering feilet",
+                            $"Kunne ikke registrere STU-økt {stuTime.StartKl}-{stuTime.SluttKl}. Vennligst registrer manuelt.",
+                            NotificationLevel.Error,
+                            isHighPriority: true
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[VERIFY] Verification failed: {ex.Message}");
             }
         }
 

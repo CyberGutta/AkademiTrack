@@ -464,6 +464,20 @@ namespace AkademiTrack.ViewModels
             if (_initializationRetryCount == 2)
             {
                 _loggingService.LogWarning("Flere mislykkede innloggingsforsøk");
+                
+                // Track multiple login failures
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "authentication_multiple_failures",
+                        $"Multiple login failures - user prompted to check settings"
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log multiple login failures: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Innlogging mislyktes",
                     "Klikk på innstillinger-knappen for å sjekke innloggingsdata.",
@@ -501,6 +515,20 @@ namespace AkademiTrack.ViewModels
 
             _loggingService.LogError($"Autentisering mislyktes (forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}) - prøver igjen om {3 * _initializationRetryCount} sekunder");
             _loggingService.LogError($"Feilmelding: {finalErrorMessage}");
+            
+            // Track retry attempt
+            try
+            {
+                await _analyticsService.LogErrorAsync(
+                    "authentication_retry_attempt",
+                    $"Login retry {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}: {finalErrorMessage}"
+                );
+            }
+            catch (Exception analyticsEx)
+            {
+                Debug.WriteLine($"[Analytics] Failed to log retry attempt: {analyticsEx.Message}");
+            }
+            
             await _notificationService.ShowNotificationAsync(
                 "Innlogging mislyktes",
                 $"Forsøk {_initializationRetryCount}/{MAX_RETRY_ATTEMPTS}. Prøver igjen...",
@@ -802,6 +830,20 @@ namespace AkademiTrack.ViewModels
             if (!IsAuthenticated || _userParameters == null || !_userParameters.IsComplete)
             {
                 _loggingService.LogError($"[START] Ikke autentisert - kan ikke starte automatisering. IsAuth={IsAuthenticated}, Params={_userParameters != null}, Complete={_userParameters?.IsComplete ?? false}");
+                
+                // Track authentication error on start
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "automation_start_not_authenticated",
+                        $"Cannot start automation - not authenticated. IsAuth={IsAuthenticated}, ParamsComplete={_userParameters?.IsComplete ?? false}"
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log auth error: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Autentiseringsfeil",
                     "Du må være innlogget for å starte automatisering",
@@ -824,6 +866,21 @@ namespace AkademiTrack.ViewModels
                 catch (Exception ex)
                 {
                     _loggingService.LogError($"Kunne ikke oppdatere dashboard: {ex.Message}");
+                    
+                    // Track dashboard refresh failure
+                    try
+                    {
+                        await _analyticsService.LogErrorAsync(
+                            "dashboard_refresh_failed_before_automation",
+                            ex.Message,
+                            ex
+                        );
+                    }
+                    catch (Exception analyticsEx)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to log dashboard error: {analyticsEx.Message}");
+                    }
+                    
                     await _notificationService.ShowNotificationAsync(
                         "Advarsel",
                         "Kunne ikke oppdatere dashboard data. Starter automatisering likevel...",
@@ -955,6 +1012,19 @@ namespace AkademiTrack.ViewModels
             
             if (!result.Success)
             {
+                // Track stop failure
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "automation_stop_failed",
+                        result.Message ?? "Failed to stop automation"
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log stop error: {analyticsEx.Message}");
+                }
+                
                 await _notificationService.ShowNotificationAsync(
                     "Stopp feilet",
                     result.Message ?? "Kunne ikke stoppe automatisering",
@@ -1122,6 +1192,20 @@ namespace AkademiTrack.ViewModels
             {
                 _loggingService.LogError($"Feil ved oppdatering: {ex.Message}");
                 StatusMessage = "Oppdatering mislyktes";
+                
+                // Track manual refresh failure
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "manual_data_refresh_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log refresh error: {analyticsEx.Message}");
+                }
                 
                 await _notificationService.ShowNotificationAsync(
                     "Oppdateringsfeil",

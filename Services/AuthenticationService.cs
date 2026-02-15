@@ -65,6 +65,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[AUTH] Authentication error: {ex.Message}");
+                
+                // Track authentication error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "authentication_main_error",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log authentication error: {analyticsEx.Message}");
+                }
+                
                 return AuthenticationResult.CreateFailed($"Authentication error: {ex.Message}");
             }
         }
@@ -97,6 +113,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[LOAD] Failed to load credentials: {ex.Message}");
+                
+                // Track credential loading failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "authentication_credential_load_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log credential load error: {analyticsEx.Message}");
+                }
+                
                 return AuthenticationResult.CreateFailed($"Failed to load credentials: {ex.Message}");
             }
         }
@@ -126,6 +158,22 @@ namespace AkademiTrack.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[TEST] Cookie test failed: {ex.Message}");
+                
+                // Track cookie test failure
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "authentication_cookie_test_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log cookie test error: {analyticsEx.Message}");
+                }
+                
                 return false;
             }
         }
@@ -431,6 +479,21 @@ namespace AkademiTrack.Services
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[SELENIUM] Error: {ex.Message}");
+                    
+                    // Track Selenium login failure
+                    try
+                    {
+                        var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                        await analyticsService.LogErrorAsync(
+                            "authentication_selenium_login_failed",
+                            ex.Message,
+                            ex
+                        );
+                    }
+                    catch (Exception analyticsEx)
+                    {
+                        Debug.WriteLine($"[Analytics] Failed to log Selenium error: {analyticsEx.Message}");
+                    }
                     
                     // Take a screenshot for debugging
                     try

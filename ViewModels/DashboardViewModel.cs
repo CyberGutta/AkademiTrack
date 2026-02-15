@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
@@ -329,6 +330,21 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 _loggingService?.LogError($"[DASHBOARD] Error loading cached data: {ex.Message}");
+                
+                // Track dashboard cache load error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "dashboard_cache_load_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log cache load error: {analyticsEx.Message}");
+                }
             }
         }
 
@@ -469,6 +485,21 @@ namespace AkademiTrack.ViewModels
                 _loggingService?.LogError($"[DASHBOARD] Error refreshing data: {ex.Message}");
                 _loggingService?.LogDebug($"[DASHBOARD] Stack trace: {ex.StackTrace}");
                 
+                // Track dashboard refresh error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "dashboard_refresh_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log dashboard refresh error: {analyticsEx.Message}");
+                }
+                
                 // Re-throw so the caller knows it failed
                 throw;
             }
@@ -517,7 +548,7 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        private void ScheduleNextClassUpdate(TodayScheduleData data)
+        private async void ScheduleNextClassUpdate(TodayScheduleData data)
         {
             try
             {
@@ -603,10 +634,25 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 _loggingService?.LogError($"[NEXT CLASS] Error scheduling update: {ex.Message}");
+                
+                // Track next class scheduling error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "dashboard_next_class_scheduling_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log next class scheduling error: {analyticsEx.Message}");
+                }
             }
         }
 
-        private void SetupSleepDetection()
+        private async void SetupSleepDetection()
         {
             try
             {
@@ -639,6 +685,21 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 _loggingService?.LogError($"[SLEEP DETECTION] Error setting up sleep detection: {ex.Message}");
+                
+                // Track sleep detection setup error
+                try
+                {
+                    var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
+                    await analyticsService.LogErrorAsync(
+                        "dashboard_sleep_detection_setup_failed",
+                        ex.Message,
+                        ex
+                    );
+                }
+                catch (Exception analyticsEx)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log sleep detection error: {analyticsEx.Message}");
+                }
             }
         }
 
