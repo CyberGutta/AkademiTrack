@@ -27,6 +27,52 @@ BUNDLE_IDENTIFIER = "com.CyberBrothers.akademitrack"
 ICON_PATH = "./Assets/AT-1024.icns"
 ENTITLEMENTS_PATH = Path("./entitlements.plist")
 HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
+XCODE_PROJECT_PATH = Path("./AkademiTrack/AkademiTrack.xcodeproj")
+WIDGET_ENTITLEMENTS_PATH = Path("./Widget/AkademiTrackWidget.entitlements")
+
+# ============================================================================
+# WIDGET BUILD FUNCTION
+# ============================================================================
+
+def build_widget_extension():
+    """Build the widget extension using xcodebuild"""
+    print("\n🔧 Building Widget Extension...")
+    print("=" * 50)
+    
+    if not XCODE_PROJECT_PATH.exists():
+        print("⚠️  Xcode project not found - skipping widget build")
+        return None
+    
+    # Build the widget extension
+    cmd = [
+        "xcodebuild",
+        "-project", str(XCODE_PROJECT_PATH),
+        "-scheme", "AkademiTrackWidgetExtension",
+        "-configuration", "Release",
+        "-arch", "arm64",
+        "build"
+    ]
+    
+    result = run_command(cmd, "Building widget extension", check=False, show_output=True)
+    
+    if not result or result.returncode != 0:
+        print("⚠️  Widget build failed - continuing without widget")
+        if result:
+            print(f"Error output: {result.stderr}")
+        return None
+    
+    # Find the built widget extension
+    build_dir = Path.home() / "Library/Developer/Xcode/DerivedData"
+    
+    # Search for the widget extension
+    for derived_data_dir in build_dir.glob("AkademiTrack-*"):
+        widget_path = derived_data_dir / "Build/Products/Release/AkademiTrackWidgetExtension.appex"
+        if widget_path.exists():
+            print(f"✅ Widget extension built: {widget_path.name}")
+            return widget_path
+    
+    print("⚠️  Widget extension not found in DerivedData")
+    return None
 
 # ============================================================================
 # NEW: LaunchAgent Creation Function
@@ -560,6 +606,27 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
 
     # Remove quarantine attributes
     subprocess.run(["xattr", "-cr", str(bundle_dir)], check=False)
+
+    # Build and bundle widget extension
+    widget_path = build_widget_extension()
+    if widget_path and widget_path.exists():
+        print("\n  Bundling widget extension...")
+        plugins_dir = contents_dir / "PlugIns"
+        plugins_dir.mkdir(exist_ok=True)
+        
+        widget_dest = plugins_dir / "AkademiTrackWidgetExtension.appex"
+        try:
+            shutil.copytree(widget_path, widget_dest, dirs_exist_ok=True)
+            print("✅ Widget extension bundled in PlugIns")
+            
+            if sign:
+                # Sign widget extension with its own entitlements
+                if WIDGET_ENTITLEMENTS_PATH.exists():
+                    sign_app(widget_dest, DEVELOPER_ID_APP, WIDGET_ENTITLEMENTS_PATH, deep=True)
+                else:
+                    sign_app(widget_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=True)
+        except Exception as e:
+            print(f"⚠️ Failed to bundle widget: {e}")
 
     # Handle helper app if it exists
     if HELPER_APP_SOURCE.exists():

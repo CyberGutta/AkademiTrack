@@ -1,0 +1,772 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A2A1C77B2F4B79680056E809 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2A1C77A2F4B79680056E809 /* WidgetKit.framework */; };
+		A2A1C77D2F4B79680056E809 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2A1C77C2F4B79680056E809 /* SwiftUI.framework */; };
+		A2A1C78A2F4B79690056E809 /* AkademiTrackWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A2A1C7782F4B79680056E809 /* AkademiTrackWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A2A1C7582F4B789B0056E809 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A2A1C73D2F4B789A0056E809 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A2A1C7442F4B789A0056E809;
+			remoteInfo = AkademiTrack;
+		};
+		A2A1C7622F4B789B0056E809 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A2A1C73D2F4B789A0056E809 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A2A1C7442F4B789A0056E809;
+			remoteInfo = AkademiTrack;
+		};
+		A2A1C7882F4B79690056E809 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A2A1C73D2F4B789A0056E809 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A2A1C7772F4B79680056E809;
+			remoteInfo = AkademiTrackWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A2A1C78F2F4B79690056E809 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A2A1C78A2F4B79690056E809 /* AkademiTrackWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A2A1C7452F4B789A0056E809 /* AkademiTrack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AkademiTrack.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A1C7572F4B789B0056E809 /* AkademiTrackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AkademiTrackTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A1C7612F4B789B0056E809 /* AkademiTrackUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AkademiTrackUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A1C7782F4B79680056E809 /* AkademiTrackWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AkademiTrackWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A1C77A2F4B79680056E809 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		A2A1C77C2F4B79680056E809 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		A2A87BCD2F4B7BCB0090DCB9 /* AkademiTrackWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AkademiTrackWidgetExtension.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A2A1C78B2F4B79690056E809 /* Exceptions for "AkademiTrackWidget" folder in "AkademiTrackWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A2A1C7772F4B79680056E809 /* AkademiTrackWidgetExtension */;
+		};
+		A2A87BCE2F4B7C870090DCB9 /* Exceptions for "AkademiTrack" folder in "AkademiTrack" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AkademiTrack.xcdatamodeld,
+				Persistence.swift,
+			);
+			target = A2A1C7442F4B789A0056E809 /* AkademiTrack */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A2A1C7472F4B789A0056E809 /* AkademiTrack */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A2A87BCE2F4B7C870090DCB9 /* Exceptions for "AkademiTrack" folder in "AkademiTrack" target */,
+			);
+			path = AkademiTrack;
+			sourceTree = "<group>";
+		};
+		A2A1C77E2F4B79680056E809 /* AkademiTrackWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A2A1C78B2F4B79690056E809 /* Exceptions for "AkademiTrackWidget" folder in "AkademiTrackWidgetExtension" target */,
+			);
+			path = AkademiTrackWidget;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A2A1C7422F4B789A0056E809 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7542F4B789B0056E809 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C75E2F4B789B0056E809 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7752F4B79680056E809 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2A1C77D2F4B79680056E809 /* SwiftUI.framework in Frameworks */,
+				A2A1C77B2F4B79680056E809 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A2A1C73C2F4B789A0056E809 = {
+			isa = PBXGroup;
+			children = (
+				A2A87BCD2F4B7BCB0090DCB9 /* AkademiTrackWidgetExtension.entitlements */,
+				A2A1C7472F4B789A0056E809 /* AkademiTrack */,
+				A2A1C77E2F4B79680056E809 /* AkademiTrackWidget */,
+				A2A1C7792F4B79680056E809 /* Frameworks */,
+				A2A1C7462F4B789A0056E809 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A2A1C7462F4B789A0056E809 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2A1C7452F4B789A0056E809 /* AkademiTrack.app */,
+				A2A1C7572F4B789B0056E809 /* AkademiTrackTests.xctest */,
+				A2A1C7612F4B789B0056E809 /* AkademiTrackUITests.xctest */,
+				A2A1C7782F4B79680056E809 /* AkademiTrackWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A2A1C7792F4B79680056E809 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A2A1C77A2F4B79680056E809 /* WidgetKit.framework */,
+				A2A1C77C2F4B79680056E809 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A2A1C7442F4B789A0056E809 /* AkademiTrack */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2A1C76B2F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrack" */;
+			buildPhases = (
+				A2A1C7412F4B789A0056E809 /* Sources */,
+				A2A1C7422F4B789A0056E809 /* Frameworks */,
+				A2A1C7432F4B789A0056E809 /* Resources */,
+				A2A1C78F2F4B79690056E809 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2A1C7892F4B79690056E809 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A2A1C7472F4B789A0056E809 /* AkademiTrack */,
+			);
+			name = AkademiTrack;
+			packageProductDependencies = (
+			);
+			productName = AkademiTrack;
+			productReference = A2A1C7452F4B789A0056E809 /* AkademiTrack.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A2A1C7562F4B789B0056E809 /* AkademiTrackTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2A1C76E2F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackTests" */;
+			buildPhases = (
+				A2A1C7532F4B789B0056E809 /* Sources */,
+				A2A1C7542F4B789B0056E809 /* Frameworks */,
+				A2A1C7552F4B789B0056E809 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2A1C7592F4B789B0056E809 /* PBXTargetDependency */,
+			);
+			name = AkademiTrackTests;
+			packageProductDependencies = (
+			);
+			productName = AkademiTrackTests;
+			productReference = A2A1C7572F4B789B0056E809 /* AkademiTrackTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A2A1C7602F4B789B0056E809 /* AkademiTrackUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2A1C7712F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackUITests" */;
+			buildPhases = (
+				A2A1C75D2F4B789B0056E809 /* Sources */,
+				A2A1C75E2F4B789B0056E809 /* Frameworks */,
+				A2A1C75F2F4B789B0056E809 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2A1C7632F4B789B0056E809 /* PBXTargetDependency */,
+			);
+			name = AkademiTrackUITests;
+			packageProductDependencies = (
+			);
+			productName = AkademiTrackUITests;
+			productReference = A2A1C7612F4B789B0056E809 /* AkademiTrackUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A2A1C7772F4B79680056E809 /* AkademiTrackWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2A1C78C2F4B79690056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackWidgetExtension" */;
+			buildPhases = (
+				A2A1C7742F4B79680056E809 /* Sources */,
+				A2A1C7752F4B79680056E809 /* Frameworks */,
+				A2A1C7762F4B79680056E809 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A2A1C77E2F4B79680056E809 /* AkademiTrackWidget */,
+			);
+			name = AkademiTrackWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = AkademiTrackWidgetExtension;
+			productReference = A2A1C7782F4B79680056E809 /* AkademiTrackWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A2A1C73D2F4B789A0056E809 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					A2A1C7442F4B789A0056E809 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					A2A1C7562F4B789B0056E809 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = A2A1C7442F4B789A0056E809;
+					};
+					A2A1C7602F4B789B0056E809 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = A2A1C7442F4B789A0056E809;
+					};
+					A2A1C7772F4B79680056E809 = {
+						CreatedOnToolsVersion = 26.2;
+						LastSwiftMigration = 2620;
+					};
+				};
+			};
+			buildConfigurationList = A2A1C7402F4B789A0056E809 /* Build configuration list for PBXProject "AkademiTrack" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A2A1C73C2F4B789A0056E809;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A2A1C7462F4B789A0056E809 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A2A1C7442F4B789A0056E809 /* AkademiTrack */,
+				A2A1C7562F4B789B0056E809 /* AkademiTrackTests */,
+				A2A1C7602F4B789B0056E809 /* AkademiTrackUITests */,
+				A2A1C7772F4B79680056E809 /* AkademiTrackWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A2A1C7432F4B789A0056E809 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7552F4B789B0056E809 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C75F2F4B789B0056E809 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7762F4B79680056E809 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A2A1C7412F4B789A0056E809 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7532F4B789B0056E809 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C75D2F4B789B0056E809 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A2A1C7742F4B79680056E809 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A2A1C7592F4B789B0056E809 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A2A1C7442F4B789A0056E809 /* AkademiTrack */;
+			targetProxy = A2A1C7582F4B789B0056E809 /* PBXContainerItemProxy */;
+		};
+		A2A1C7632F4B789B0056E809 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A2A1C7442F4B789A0056E809 /* AkademiTrack */;
+			targetProxy = A2A1C7622F4B789B0056E809 /* PBXContainerItemProxy */;
+		};
+		A2A1C7892F4B79690056E809 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A2A1C7772F4B79680056E809 /* AkademiTrackWidgetExtension */;
+			targetProxy = A2A1C7882F4B79690056E809 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A2A1C7692F4B789B0056E809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A2A1C76A2F4B789B0056E809 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A2A1C76C2F4B789B0056E809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AkademiTrack/AkademiTrack.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.akademitrack;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A2A1C76D2F4B789B0056E809 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = AkademiTrack/AkademiTrack.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.akademitrack;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A2A1C76F2F4B789B0056E809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.AkademiTrackTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AkademiTrack.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AkademiTrack";
+			};
+			name = Debug;
+		};
+		A2A1C7702F4B789B0056E809 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.AkademiTrackTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AkademiTrack.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AkademiTrack";
+			};
+			name = Release;
+		};
+		A2A1C7722F4B789B0056E809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.AkademiTrackUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = AkademiTrack;
+			};
+			name = Debug;
+		};
+		A2A1C7732F4B789B0056E809 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.AkademiTrackUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = AkademiTrack;
+			};
+			name = Release;
+		};
+		A2A1C78D2F4B79690056E809 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AkademiTrackWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AkademiTrackWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AkademiTrackWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.akademitrack.AkademiTrackWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A2A1C78E2F4B79690056E809 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = AkademiTrackWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6SF4T9DUN4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AkademiTrackWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AkademiTrackWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.CyberBrothers.akademitrack.AkademiTrackWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A2A1C7402F4B789A0056E809 /* Build configuration list for PBXProject "AkademiTrack" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A1C7692F4B789B0056E809 /* Debug */,
+				A2A1C76A2F4B789B0056E809 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2A1C76B2F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrack" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A1C76C2F4B789B0056E809 /* Debug */,
+				A2A1C76D2F4B789B0056E809 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2A1C76E2F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A1C76F2F4B789B0056E809 /* Debug */,
+				A2A1C7702F4B789B0056E809 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2A1C7712F4B789B0056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A1C7722F4B789B0056E809 /* Debug */,
+				A2A1C7732F4B789B0056E809 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2A1C78C2F4B79690056E809 /* Build configuration list for PBXNativeTarget "AkademiTrackWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A1C78D2F4B79690056E809 /* Debug */,
+				A2A1C78E2F4B79690056E809 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A2A1C73D2F4B789A0056E809 /* Project object */;
+}

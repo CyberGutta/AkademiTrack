@@ -19,6 +19,7 @@ namespace AkademiTrack.ViewModels
         private readonly AttendanceDataService _attendanceService;
         private ILoggingService? _loggingService;
         private readonly ICacheService _persistentCache;
+        private readonly WidgetDataService _widgetDataService;
 
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
@@ -122,6 +123,7 @@ namespace AkademiTrack.ViewModels
             // Connect logging service for auto-retry functionality
             _loggingService = ServiceContainer.GetService<ILoggingService>();
             _attendanceService.SetLoggingService(_loggingService);
+            _widgetDataService = new WidgetDataService(_loggingService);
             
             // Initialize persistent cache with 24-hour TTL for dashboard data
             _persistentCache = new CacheService(
@@ -477,6 +479,21 @@ namespace AkademiTrack.ViewModels
 
                 // Wait for all tasks to complete (or timeout)
                 await Task.WhenAll(allTasks);
+
+                // Update widget data after all data is loaded
+                try
+                {
+                    var summary = await summaryTask;
+                    var weekly = await weeklyTask;
+                    var monthly = await monthlyTask;
+                    var today = await todayTask;
+                    await _widgetDataService.UpdateWidgetDataAsync(summary, weekly, monthly, today);
+                    _loggingService?.LogDebug("[DASHBOARD] ✓ Widget data updated");
+                }
+                catch (Exception widgetEx)
+                {
+                    _loggingService?.LogWarning($"[DASHBOARD] Failed to update widget: {widgetEx.Message}");
+                }
 
                 _loggingService?.LogSuccess("[DASHBOARD] ✓ Data refresh complete");
             }

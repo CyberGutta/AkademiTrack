@@ -382,3 +382,8 @@ AkademiTrack-1.1.0-osx-Setup.pkg
 complete-build-sign.sh
 /pkg_root
 /.vscode
+*.pkg
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+AkademiTrack/AkademiTrack.xcodeproj/project.xcworkspace/xcuserdata/06niland.xcuserdatad/UserInterfaceState.xcuserstate
+AkademiTrack/AkademiTrack.xcodeproj/xcuserdata/06niland.xcuserdatad/xcschemes/xcschememanagement.plist
