@@ -581,7 +581,7 @@ namespace AkademiTrack
 
         private void ShowAbout(object? sender, EventArgs e)
         {
-            var aboutText = $@"AkademiTrack v1.2.1
+            var aboutText = $@"AkademiTrack v1.3.0
 
 Automatisk oppmøteregistrering for STU-økter på Akademiet
 
