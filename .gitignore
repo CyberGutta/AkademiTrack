@@ -387,3 +387,5 @@ complete-build-sign.sh
 *.xcodeproj/xcuserdata/
 AkademiTrack/AkademiTrack.xcodeproj/project.xcworkspace/xcuserdata/06niland.xcuserdatad/UserInterfaceState.xcuserstate
 AkademiTrack/AkademiTrack.xcodeproj/xcuserdata/06niland.xcuserdatad/xcschemes/xcschememanagement.plist
+/.build-temp
+build-sign-package-mac.sh
