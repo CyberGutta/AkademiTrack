@@ -174,64 +174,81 @@ struct SmallWidgetView: View {
     let data: WidgetData
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             Text("AkademiTrack")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
             
-            Spacer()
+            // Status message
+            Text(getBalanceText(data.dailyBalance))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(getColor(for: data.dailyBalance))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.bottom, 1)
             
-            VStack(alignment: .leading, spacing: 8) {
-                // Daily balance - most prominent
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("I DAG")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("\(data.dailyRegistered)/\(data.dailyTotal)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                        Text(formatBalance(data.dailyBalance))
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(getColor(for: data.dailyBalance))
-                    }
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            VStack(alignment: .leading, spacing: 3) {
+                // Daily
+                HStack(spacing: 2) {
+                    Text("I dag")
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.6))
+                        .frame(width: 30, alignment: .leading)
+                    Text("\(data.dailyRegistered)/\(data.dailyTotal)")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 28, alignment: .leading)
+                    Spacer()
+                    Text(formatBalance(data.dailyBalance))
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(getColor(for: data.dailyBalance))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 
-                Divider()
-                    .background(Color.white.opacity(0.2))
-                
                 // Weekly
-                HStack {
+                HStack(spacing: 2) {
                     Text("Uke")
-                        .font(.system(size: 11))
+                        .font(.system(size: 9))
                         .foregroundColor(.white.opacity(0.6))
-                    Spacer()
+                        .frame(width: 30, alignment: .leading)
                     Text("\(data.weeklyRegistered)/\(data.weeklyTotal)")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 28, alignment: .leading)
+                    Spacer()
                     Text(formatBalance(data.weeklyBalance))
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(getColor(for: data.weeklyBalance))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 
                 // Monthly
-                HStack {
-                    Text("Måned")
-                        .font(.system(size: 11))
+                HStack(spacing: 2) {
+                    Text("Mnd")
+                        .font(.system(size: 9))
                         .foregroundColor(.white.opacity(0.6))
-                    Spacer()
+                        .frame(width: 30, alignment: .leading)
                     Text("\(data.monthlyRegistered)/\(data.monthlyTotal)")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 28, alignment: .leading)
+                    Spacer()
                     Text(formatBalance(data.monthlyBalance))
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(getColor(for: data.monthlyBalance))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
             
             Spacer()
         }
-        .padding(16)
+        .padding(12)
         .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
     }
     
@@ -247,6 +264,16 @@ struct SmallWidgetView: View {
         }
         
         return value >= 0 ? "+\(formatted)" : "-\(formatted)"
+    }
+    
+    private func getBalanceText(_ value: Double) -> String {
+        if value > 0 {
+            return "Du ligger i overtid"
+        } else if value < 0 {
+            return "Du ligger under"
+        } else {
+            return "Du ligger på målet"
+        }
     }
     
     private func getColor(for value: Double) -> Color {
@@ -285,80 +312,90 @@ struct LargeWidgetView: View {
     let data: WidgetData
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             // Header
             Text("AkademiTrack")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.white)
             
-            // Current Class Section (if available)
-            if let currentName = data.currentClassName, currentName != "Ingen time" {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("NÅVÆRENDE TIME")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.6))
-                        Spacer()
-                        Text("📚")
-                            .font(.system(size: 16))
-                    }
-                    
+            // Current Class Section (always show)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("NÅVÆRENDE TIME")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text("📚")
+                        .font(.system(size: 12))
+                }
+                
+                if let currentName = data.currentClassName, currentName != "Ingen time" {
                     Text(currentName)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
-                        .lineLimit(2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     
                     Text(data.currentClassTime ?? "--:-- - --:--")
-                        .font(.system(size: 13))
+                        .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.8))
                     
                     if let room = data.currentClassRoom, !room.isEmpty {
                         Text(room)
-                            .font(.system(size: 12))
+                            .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.6))
                     }
+                } else {
+                    Text("Ingen time")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text("--:-- - --:--")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.8))
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.green.opacity(0.15))
-                .cornerRadius(12)
             }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(data.currentClassName != nil && data.currentClassName != "Ingen time" ? Color.green.opacity(0.15) : Color.white.opacity(0.08))
+            .cornerRadius(10)
             
             // Next Class Section
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("NESTE TIME")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
                     Spacer()
                     Text("⏰")
-                        .font(.system(size: 16))
+                        .font(.system(size: 12))
                 }
                 
                 Text(data.nextClassName ?? "Ingen time")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 Text(data.nextClassTime ?? "--:-- - --:--")
-                    .font(.system(size: 13))
+                    .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.8))
                 
                 if let room = data.nextClassRoom, !room.isEmpty {
                     Text(room)
-                        .font(.system(size: 12))
+                        .font(.system(size: 10))
                         .foregroundColor(.white.opacity(0.6))
                 }
             }
-            .padding(12)
+            .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.white.opacity(0.08))
-            .cornerRadius(12)
+            .cornerRadius(10)
             
             // Attendance Section
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("FREMMØTE")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.white.opacity(0.6))
                 
                 AttendanceRow(label: "I dag", registered: data.dailyRegistered, total: data.dailyTotal, balance: data.dailyBalance)
@@ -368,7 +405,7 @@ struct LargeWidgetView: View {
             
             Spacer()
         }
-        .padding(16)
+        .padding(14)
         .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
     }
 }
@@ -380,22 +417,25 @@ struct AttendanceRow: View {
     let balance: Double
     
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.6))
+                .frame(width: 45, alignment: .leading)
             
             Spacer()
             
             // Show session count
             Text("\(registered)/\(total)")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white.opacity(0.9))
+                .frame(minWidth: 40, alignment: .trailing)
             
             // Show balance
             Text(formatBalance(balance))
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundColor(getColor(for: balance))
+                .frame(minWidth: 45, alignment: .trailing)
         }
     }
     
