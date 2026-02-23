@@ -45,40 +45,41 @@ namespace AkademiTrack.Services
         {
             _loggingService = loggingService;
             
-            // Use App Group container - macOS will automatically create this when app has proper entitlements
-            // The path is deterministic based on the group identifier
+            // Try App Group first (for sandboxed scenarios)
             var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var groupContainersDir = Path.Combine(homeDir, "Library", "Group Containers");
             var widgetDir = Path.Combine(groupContainersDir, "group.com.akademitrack.widget");
             
-            // Only try to create if the Group Containers directory exists (means we have entitlements)
             if (Directory.Exists(groupContainersDir))
             {
-                if (!Directory.Exists(widgetDir))
+                try
                 {
-                    try
+                    if (!Directory.Exists(widgetDir))
                     {
                         Directory.CreateDirectory(widgetDir);
-                        _loggingService?.LogInfo($"Created widget directory: {widgetDir}");
                     }
-                    catch (Exception ex)
-                    {
-                        _loggingService?.LogError($"Failed to create widget directory: {ex.Message}");
-                    }
+                    _widgetDataPath = Path.Combine(widgetDir, "widget-data.json");
+                    _loggingService?.LogInfo($"Using App Group path: {_widgetDataPath}");
                 }
-                
-                _widgetDataPath = Path.Combine(widgetDir, "widget-data.json");
-                _loggingService?.LogInfo($"Widget data path: {_widgetDataPath}");
+                catch (Exception ex)
+                {
+                    _loggingService?.LogError($"Failed to use App Group: {ex.Message}");
+                    _widgetDataPath = GetFallbackPath(homeDir);
+                }
             }
             else
             {
-                // Fallback for development/unsigned builds
-                _loggingService?.LogWarning("Group Containers not available - app may not be properly signed");
-                var fallbackDir = Path.Combine(homeDir, ".akademitrack");
-                Directory.CreateDirectory(fallbackDir);
-                _widgetDataPath = Path.Combine(fallbackDir, "widget-data.json");
-                _loggingService?.LogInfo($"Using fallback widget data path: {_widgetDataPath}");
+                _widgetDataPath = GetFallbackPath(homeDir);
             }
+        }
+        
+        private string GetFallbackPath(string homeDir)
+        {
+            var fallbackDir = Path.Combine(homeDir, ".akademitrack");
+            Directory.CreateDirectory(fallbackDir);
+            var path = Path.Combine(fallbackDir, "widget-data.json");
+            _loggingService?.LogInfo($"Using fallback path: {path}");
+            return path;
         }
 
         public async Task UpdateWidgetDataAsync(AttendanceSummary? summary, WeeklyAttendanceData? weeklyData, MonthlyAttendanceData? monthlyData, TodayScheduleData? todaySchedule = null)

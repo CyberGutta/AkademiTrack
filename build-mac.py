@@ -28,7 +28,6 @@ ICON_PATH = "./Assets/AT-1024.icns"
 ENTITLEMENTS_PATH = Path("./entitlements.plist")
 HELPER_APP_SOURCE = Path("./Assets/Helpers/AkademiTrack.app")
 XCODE_PROJECT_PATH = Path("./AkademiTrack/AkademiTrack.xcodeproj")
-WIDGET_ENTITLEMENTS_PATH = Path("./Widget/AkademiTrackWidget.entitlements")
 
 # ============================================================================
 # WIDGET BUILD FUNCTION
@@ -615,16 +614,36 @@ def create_avalonia_macos_bundle(version, sign=True, notarize=True):
         plugins_dir.mkdir(exist_ok=True)
         
         widget_dest = plugins_dir / "AkademiTrackWidgetExtension.appex"
+        widget_entitlements = Path("./AkademiTrack/AkademiTrackWidgetExtension.entitlements")
+        
         try:
             shutil.copytree(widget_path, widget_dest, dirs_exist_ok=True)
             print("✅ Widget extension bundled in PlugIns")
             
             if sign:
-                # Sign widget extension with its own entitlements
-                if WIDGET_ENTITLEMENTS_PATH.exists():
-                    sign_app(widget_dest, DEVELOPER_ID_APP, WIDGET_ENTITLEMENTS_PATH, deep=True)
+                # Sign widget extension WITHOUT deep flag and with correct entitlements
+                print("  🔏 Signing widget extension...")
+                if widget_entitlements.exists():
+                    print(f"    Using widget entitlements: {widget_entitlements}")
+                    # Sign any executables inside widget first
+                    for widget_file in widget_dest.rglob("*"):
+                        if widget_file.is_file() and os.access(widget_file, os.X_OK):
+                            sign_file(widget_file, DEVELOPER_ID_APP, widget_entitlements)
+                    
+                    # Sign the widget extension bundle itself (NO --deep!)
+                    cmd = [
+                        "codesign", "--force", "--sign", DEVELOPER_ID_APP,
+                        "--timestamp", "--options", "runtime",
+                        "--entitlements", str(widget_entitlements),
+                        str(widget_dest)
+                    ]
+                    result = run_command(cmd, "Signing widget extension", check=False)
+                    if result and result.returncode == 0:
+                        print("  ✅ Widget extension signed successfully")
+                    else:
+                        print("  ⚠️ Widget signing failed")
                 else:
-                    sign_app(widget_dest, DEVELOPER_ID_APP, ENTITLEMENTS_PATH, deep=True)
+                    print(f"  ⚠️ Widget entitlements not found at: {widget_entitlements}")
         except Exception as e:
             print(f"⚠️ Failed to bundle widget: {e}")
 
