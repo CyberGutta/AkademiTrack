@@ -4,13 +4,9 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
-	<array>
-		<string>/</string>
-	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.akademitrack.widget</string>
+		<string>6SF4T9DUN4.com.CyberBrothers.akademitrack</string>
 	</array>
 </dict>
 </plist>

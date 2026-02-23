@@ -81,7 +81,7 @@ struct Provider: TimelineProvider {
     private func loadWidgetData() -> WidgetData {
         // Use App Group container - this is the ONLY way widgets can access shared data
         let fileManager = FileManager.default
-        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.com.akademitrack.widget") else {
+        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "6SF4T9DUN4.com.CyberBrothers.akademitrack") else {
             print("❌ Widget: Failed to get App Group container")
             return WidgetData(
                 dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,

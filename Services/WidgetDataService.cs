@@ -48,7 +48,7 @@ namespace AkademiTrack.Services
             // Try App Group first (for sandboxed scenarios)
             var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var groupContainersDir = Path.Combine(homeDir, "Library", "Group Containers");
-            var widgetDir = Path.Combine(groupContainersDir, "group.com.akademitrack.widget");
+            var widgetDir = Path.Combine(groupContainersDir, "6SF4T9DUN4.com.CyberBrothers.akademitrack");
             
             if (Directory.Exists(groupContainersDir))
             {

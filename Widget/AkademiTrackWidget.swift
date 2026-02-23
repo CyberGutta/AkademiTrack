@@ -44,7 +44,7 @@ struct Provider: TimelineProvider {
     
     private func loadWidgetData() -> WidgetData {
         let fileManager = FileManager.default
-        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.com.akademitrack.widget") else {
+        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "6SF4T9DUN4.com.CyberBrothers.akademitrack") else {
             return WidgetData(dailySaldo: 0, weeklySaldo: 0, monthlySaldo: 0, lastUpdated: Date())
         }
         
