@@ -389,3 +389,4 @@ AkademiTrack/AkademiTrack.xcodeproj/project.xcworkspace/xcuserdata/06niland.xcus
 AkademiTrack/AkademiTrack.xcodeproj/xcuserdata/06niland.xcuserdatad/xcschemes/xcschememanagement.plist
 /.build-temp
 build-sign-package-mac.sh
+/dist
