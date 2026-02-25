@@ -760,6 +760,80 @@ namespace AkademiTrack.Services
             
             return await FetchWithRetryAsync(FetchWeeklyAttendanceAsync);
         }
+        /// <summary>
+        /// Get schedule for a specific date range (for calendar views)
+        /// </summary>
+        /// <summary>
+        /// Get schedule for a specific date range (for calendar views)
+        /// </summary>
+        public async Task<List<ScheduleItem>?> GetScheduleRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            try
+            {
+                var jsessionId = _cookies?.GetValueOrDefault("JSESSIONID", "") ?? "";
+                var startDateStr = startDate.ToString("yyyyMMdd");
+                var endDateStr = endDate.ToString("yyyyMMdd");
+
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters?.FylkeId},planperi={_userParameters?.PlanPeri},skoleid={_userParameters?.SkoleId},startDate={startDateStr},endDate={endDateStr}&onlyData=true&limit=1000&totalResults=true";
+
+                _loggingService?.LogDebug($"🌐 [SCHEDULE RANGE] Fetching schedule from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
+                _loggingService?.LogDebug($"🌐 [SCHEDULE RANGE] URL: {url.Replace(jsessionId, "***")}");
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Accept-Language", "no-NB");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+
+                var cookieString = string.Join("; ", _cookies?.Select(c => $"{c.Key}={c.Value}") ?? Enumerable.Empty<string>());
+                request.Headers.Add("Cookie", cookieString);
+
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) 
+                {
+                    _loggingService?.LogError($"[SCHEDULE RANGE] HTTP error {response.StatusCode}");
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                _loggingService?.LogDebug($"🌐 [SCHEDULE RANGE] Response length: {json.Length} characters");
+
+                // The API returns MonthlyScheduleItem format, not ScheduleItem
+                var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (scheduleResponse?.Items == null)
+                {
+                    _loggingService?.LogWarning("⚠️ [SCHEDULE RANGE] Response was null or had no items");
+                    return new List<ScheduleItem>();
+                }
+
+                _loggingService?.LogSuccess($"[SCHEDULE RANGE] Successfully fetched {scheduleResponse.Items.Count} items");
+
+                // Convert MonthlyScheduleItem to ScheduleItem
+                var scheduleItems = scheduleResponse.Items
+                    .Select(item => ConvertToScheduleItem(item))
+                    .Where(item => item != null)
+                    .Cast<ScheduleItem>()
+                    .ToList();
+
+                _loggingService?.LogSuccess($"[SCHEDULE RANGE] Converted to {scheduleItems.Count} schedule items");
+                return scheduleItems;
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"[SCHEDULE RANGE] Exception: {ex.Message}");
+                _loggingService?.LogError($"[SCHEDULE RANGE] Stack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+
+
 
         private async Task<WeeklyAttendanceData?> FetchWeeklyAttendanceAsync()
         {
@@ -1168,6 +1242,9 @@ namespace AkademiTrack.Services
         public int ElevForerTilstedevaerelse { get; set; }
         public int Kollisjon { get; set; }
         public string? TidsromTilstedevaerelse { get; set; }
+        
+        // Helper property to check if this is a STU session
+        public bool IsStu => Fag?.Contains("STU", StringComparison.OrdinalIgnoreCase) ?? false;
     }
 
     public class ScheduleResponse

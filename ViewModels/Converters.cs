@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using Avalonia.Media;
+using AkademiTrack.Services;
 
 namespace AkademiTrack.ViewModels
 {
@@ -155,6 +157,197 @@ namespace AkademiTrack.ViewModels
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    // Tab button converters
+    public class BoolToBackgroundConverter : IValueConverter
+    {
+        public static readonly BoolToBackgroundConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isActive && isActive)
+            {
+                return new SolidColorBrush(Color.Parse("#1A5B9BFF")); // Light blue background
+            }
+            return new SolidColorBrush(Colors.Transparent);
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BoolToForegroundConverter : IValueConverter
+    {
+        public static readonly BoolToForegroundConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isActive && isActive)
+            {
+                return new SolidColorBrush(Color.Parse("#5B9BFF")); // Blue text
+            }
+            return ThemeManager.Instance.TextSecondary;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BoolToBorderConverter : IValueConverter
+    {
+        public static readonly BoolToBorderConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isActive && isActive)
+            {
+                return new SolidColorBrush(Color.Parse("#5B9BFF")); // Blue border
+            }
+            return new SolidColorBrush(Colors.Transparent);
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Time-based positioning converters for calendar
+    public class TimeToPositionConverter : IValueConverter
+    {
+        public static readonly TimeToPositionConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is string timeStr && !string.IsNullOrEmpty(timeStr))
+            {
+                // Parse time like "08:15" or "0815"
+                TimeSpan time;
+                if (timeStr.Contains(':'))
+                {
+                    if (TimeSpan.TryParse(timeStr, out time))
+                    {
+                        // Calculate position: 08:00 = 0, each hour = 60 pixels
+                        var startOfDay = new TimeSpan(8, 0, 0); // 08:00
+                        var minutesFromStart = (time - startOfDay).TotalMinutes;
+                        return minutesFromStart; // 1 minute = 1 pixel
+                    }
+                }
+                else if (timeStr.Length == 4)
+                {
+                    // Format "0815"
+                    if (int.TryParse(timeStr.Substring(0, 2), out var hours) &&
+                        int.TryParse(timeStr.Substring(2, 2), out var minutes))
+                    {
+                        time = new TimeSpan(hours, minutes, 0);
+                        
+                        var startOfDay = new TimeSpan(8, 0, 0);
+                        var minutesFromStart = (time - startOfDay).TotalMinutes;
+                        return minutesFromStart;
+                    }
+                }
+            }
+            return 0.0;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class DurationToHeightConverter : IMultiValueConverter
+    {
+        public static readonly DurationToHeightConverter Instance = new();
+
+        public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (values.Count >= 2 && values[0] is string startStr && values[1] is string endStr)
+            {
+                TimeSpan start = TimeSpan.Zero, end = TimeSpan.Zero;
+                
+                // Parse start time
+                if (startStr.Contains(':'))
+                {
+                    TimeSpan.TryParse(startStr, out start);
+                }
+                else if (startStr.Length == 4)
+                {
+                    if (int.TryParse(startStr.Substring(0, 2), out var hours) &&
+                        int.TryParse(startStr.Substring(2, 2), out var minutes))
+                    {
+                        start = new TimeSpan(hours, minutes, 0);
+                    }
+                }
+
+                // Parse end time
+                if (endStr.Contains(':'))
+                {
+                    TimeSpan.TryParse(endStr, out end);
+                }
+                else if (endStr.Length == 4)
+                {
+                    if (int.TryParse(endStr.Substring(0, 2), out var hours) &&
+                        int.TryParse(endStr.Substring(2, 2), out var minutes))
+                    {
+                        end = new TimeSpan(hours, minutes, 0);
+                    }
+                }
+
+                // Calculate duration in minutes, 1 minute = 1 pixel
+                var durationMinutes = (end - start).TotalMinutes;
+                return Math.Max(durationMinutes - 2, 20); // Minimum 20px height, -2 for margin
+            }
+            return 45.0;
+        }
+    }
+
+    // Converter to format time from "HHmm" to "HH:mm"
+    public class TimeFormatConverter : IValueConverter
+    {
+        public static readonly TimeFormatConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is string timeStr && !string.IsNullOrEmpty(timeStr))
+            {
+                if (timeStr.Contains(':'))
+                {
+                    return timeStr; // Already formatted
+                }
+                else if (timeStr.Length == 4)
+                {
+                    // Format "0815" to "08:15"
+                    return $"{timeStr.Substring(0, 2)}:{timeStr.Substring(2, 2)}";
+                }
+            }
+            return value;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Converter to convert time to Margin (for positioning)
+    public class TimeToMarginConverter : IMultiValueConverter
+    {
+        public static readonly TimeToMarginConverter Instance = new();
+
+        public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (values.Count >= 1 && values[0] is double topMargin)
+            {
+                return new Avalonia.Thickness(0, topMargin, 0, 0);
+            }
+            return new Avalonia.Thickness(0, 0, 0, 0);
         }
     }
 }

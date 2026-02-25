@@ -63,6 +63,9 @@ namespace AkademiTrack.ViewModels
         private bool _showTutorial = false;
         private bool _showFeide = false;
         
+        // Tab navigation for main content
+        private string _selectedTab = "Dashboard"; // Dashboard, Kalender, Fravær
+        
         // Current notification
         private NotificationEntry? _currentNotification;
         #endregion
@@ -180,6 +183,36 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        // Tab Navigation
+        public string SelectedTab
+        {
+            get => _selectedTab;
+            set
+            {
+                if (SetProperty(ref _selectedTab, value))
+                {
+                    OnPropertyChanged(nameof(IsDashboardTab));
+                    OnPropertyChanged(nameof(IsCalendarTab));
+                    OnPropertyChanged(nameof(IsAbsenceTab));
+                    
+                    // Load calendar data when switching to calendar tab
+                    if (value == "Kalender" && Calendar != null)
+                    {
+                        _loggingService.LogInfo("[TAB] Switching to Calendar - loading data");
+                        _ = Calendar.LoadCalendarDataAsync();
+                    }
+                    else if (value == "Kalender" && Calendar == null)
+                    {
+                        _loggingService.LogWarning("[TAB] Calendar not initialized yet - waiting for authentication");
+                    }
+                }
+            }
+        }
+
+        public bool IsDashboardTab => _selectedTab == "Dashboard";
+        public bool IsCalendarTab => _selectedTab == "Kalender";
+        public bool IsAbsenceTab => _selectedTab == "Fravær";
+
         // Automation
         public bool IsAutomationRunning => _automationService?.IsRunning ?? false;
         private Timer? _autoStartCheckTimer;
@@ -204,6 +237,7 @@ namespace AkademiTrack.ViewModels
         // ViewModels
         public SettingsViewModel SettingsViewModel { get; set; }
         public DashboardViewModel Dashboard { get; private set; }
+        public CalendarViewModel? Calendar { get; private set; }
         public FeideWindowViewModel FeideViewModel { get; set; }
 
         // Application Info
@@ -224,6 +258,7 @@ namespace AkademiTrack.ViewModels
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
         public ICommand ToggleClassViewCommand { get; }
+        public ICommand SelectTabCommand { get; }
         #endregion
 
         #region Constructor
@@ -258,6 +293,7 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
             ToggleClassViewCommand = new AsyncRelayCommand(ToggleClassViewAsync);
+            SelectTabCommand = new AsyncRelayCommand<string>(SelectTabAsync);
 
             // Subscribe to service events
             SubscribeToServiceEvents();
@@ -364,6 +400,19 @@ namespace AkademiTrack.ViewModels
                     };
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
+                    
+                    // Initialize Calendar ViewModel with credentials
+                    var attendanceService = new AttendanceDataService();
+                    attendanceService.SetCredentials(servicesUserParams, authResult.Cookies);
+                    Calendar = new CalendarViewModel(attendanceService, _loggingService);
+                    OnPropertyChanged(nameof(Calendar));
+                    _loggingService.LogInfo("[INIT] ✅ Calendar ViewModel initialized");
+                    
+                    // Load calendar data if we're on the calendar tab
+                    if (IsCalendarTab)
+                    {
+                        _ = Calendar.LoadCalendarDataAsync();
+                    }
 
                     // PROGRESSIVE LOADING: Load cached data first for instant UI
                     _loggingService.LogInfo("🚀 Laster cached data for rask visning...");
@@ -959,6 +1008,16 @@ namespace AkademiTrack.ViewModels
                     // Also update Dashboard with fresh credentials
                     Dashboard.SetCredentials(paramsToUse, cookies);
                     
+                    // Initialize Calendar if not already initialized
+                    if (Calendar == null)
+                    {
+                        var attendanceService = new AttendanceDataService();
+                        attendanceService.SetCredentials(paramsToUse, cookies);
+                        Calendar = new CalendarViewModel(attendanceService, _loggingService);
+                        OnPropertyChanged(nameof(Calendar));
+                        _loggingService.LogInfo("[MAIN] Calendar ViewModel initialized from cached credentials");
+                    }
+                    
                     _loggingService.LogSuccess($"[MAIN] Set credentials in automation service and dashboard: {cookies.Count} cookies, params complete: {paramsToUse.IsComplete}");
                 }
                 else
@@ -1251,6 +1310,16 @@ namespace AkademiTrack.ViewModels
         private Task ToggleClassViewAsync()
         {
             Dashboard.ToggleClassView();
+            return Task.CompletedTask;
+        }
+
+        private Task SelectTabAsync(string? tabName)
+        {
+            if (!string.IsNullOrEmpty(tabName))
+            {
+                SelectedTab = tabName;
+                _loggingService.LogInfo($"Switched to {tabName} tab");
+            }
             return Task.CompletedTask;
         }
 
@@ -1703,6 +1772,44 @@ namespace AkademiTrack.ViewModels
             try
             {
                 await _execute();
+            }
+            finally
+            {
+                _isExecuting = false;
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Generic version for commands with parameters
+    public class AsyncRelayCommand<T> : ICommand
+    {
+        private readonly Func<T?, Task> _execute;
+        private readonly Func<T?, bool>? _canExecute;
+        private bool _isExecuting;
+
+        public AsyncRelayCommand(Func<T?, Task> execute, Func<T?, bool>? canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler? CanExecuteChanged;
+
+        public bool CanExecute(object? parameter) => !_isExecuting && (_canExecute?.Invoke((T?)parameter) ?? true);
+
+        public async void Execute(object? parameter)
+        {
+            if (!CanExecute(parameter)) return;
+
+            _isExecuting = true;
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+
+            try
+            {
+                await _execute((T?)parameter);
             }
             finally
             {

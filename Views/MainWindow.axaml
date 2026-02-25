@@ -28,6 +28,9 @@
 		<vm:PercentageToHeightConverter x:Key="PercentageToHeightConverter"/>
 		<vm:DayOfWeekConverter x:Key="DayOfWeekConverter"/>
 		<vm:TextLengthToFontSizeConverter x:Key="TextLengthToFontSizeConverter"/>
+		<vm:BoolToBackgroundConverter x:Key="BoolToBackgroundConverter"/>
+		<vm:BoolToForegroundConverter x:Key="BoolToForegroundConverter"/>
+		<vm:BoolToBorderConverter x:Key="BoolToBorderConverter"/>
 	</Window.Resources>
 
 	<Window.Styles>
@@ -293,12 +296,13 @@
 			<Grid Margin="30,20,30,20" MinWidth="840">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
 					<RowDefinition Height="*"/>
 					<RowDefinition Height="Auto"/>
 				</Grid.RowDefinitions>
 
 				<!-- Header -->
-				<Grid Grid.Row="0" Margin="0,0,0,20">
+				<Grid Grid.Row="0" Margin="0,0,0,12">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*"/>
 						<ColumnDefinition Width="Auto"/>
@@ -364,8 +368,42 @@
 				</StackPanel>
 			</Grid>
 
+			<!-- Tab Navigation -->
+			<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="0" Margin="0,0,0,20">
+				<Button Content="🏠 Dashboard"
+						Background="{Binding IsDashboardTab, Converter={StaticResource BoolToBackgroundConverter}}"
+						Foreground="{Binding IsDashboardTab, Converter={StaticResource BoolToForegroundConverter}}"
+						BorderThickness="0,0,0,2"
+						BorderBrush="{Binding IsDashboardTab, Converter={StaticResource BoolToBorderConverter}}"
+						Padding="20,12"
+						FontWeight="Medium"
+						Cursor="Hand"
+						Command="{Binding SelectTabCommand}"
+						CommandParameter="Dashboard"/>
+				<Button Content="📅 Kalender"
+						Background="{Binding IsCalendarTab, Converter={StaticResource BoolToBackgroundConverter}}"
+						Foreground="{Binding IsCalendarTab, Converter={StaticResource BoolToForegroundConverter}}"
+						BorderThickness="0,0,0,2"
+						BorderBrush="{Binding IsCalendarTab, Converter={StaticResource BoolToBorderConverter}}"
+						Padding="20,12"
+						FontWeight="Medium"
+						Cursor="Hand"
+						Command="{Binding SelectTabCommand}"
+						CommandParameter="Kalender"/>
+				<Button Content="📋 Fravær"
+						Background="{Binding IsAbsenceTab, Converter={StaticResource BoolToBackgroundConverter}}"
+						Foreground="{Binding IsAbsenceTab, Converter={StaticResource BoolToForegroundConverter}}"
+						BorderThickness="0,0,0,2"
+						BorderBrush="{Binding IsAbsenceTab, Converter={StaticResource BoolToBorderConverter}}"
+						Padding="20,12"
+						FontWeight="Medium"
+						Cursor="Hand"
+						Command="{Binding SelectTabCommand}"
+						CommandParameter="Fravær"/>
+			</StackPanel>
+
 			<!-- Main Content Area -->
-			<Grid Grid.Row="1" Margin="0,0,0,15">
+			<Grid Grid.Row="2" Margin="0,0,0,15" IsVisible="{Binding IsDashboardTab}">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="3*" MinWidth="350"/>
 					<ColumnDefinition Width="5*" MinWidth="480"/>
@@ -520,7 +558,7 @@
 			</Grid>
 
 			<!-- Weekly Progress Bar - FULL WIDTH AT THE BOTTOM -->
-			<Border Grid.Row="2" Classes="dashboard-card">
+			<Border Grid.Row="3" Classes="dashboard-card" IsVisible="{Binding IsDashboardTab}">
 				<StackPanel Spacing="12">
 					<Grid>
 						<TextBlock Text="Ukens fremmøte (STU)" Classes="section-title"/>
@@ -611,6 +649,56 @@
 							HorizontalAlignment="Right"/>
 				</StackPanel>
 			</Border>
+
+			<!-- Calendar View -->
+			<Grid Grid.Row="2" Margin="0,0,0,15" IsVisible="{Binding IsCalendarTab}">
+				<!-- Show calendar if initialized -->
+				<Grid IsVisible="{Binding Calendar, Converter={x:Static ObjectConverters.IsNotNull}}">
+					<views:CalendarView DataContext="{Binding Calendar}"/>
+				</Grid>
+				
+				<!-- Show loading message if not initialized -->
+				<Border Classes="dashboard-card"
+						IsVisible="{Binding Calendar, Converter={x:Static ObjectConverters.IsNull}}"
+						Padding="40"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center">
+					<StackPanel Spacing="16" HorizontalAlignment="Center">
+						<TextBlock Text="📅"
+								   FontSize="48"
+								   HorizontalAlignment="Center"/>
+						<TextBlock Text="Kalender"
+								   FontSize="24"
+								   FontWeight="SemiBold"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+								   HorizontalAlignment="Center"/>
+						<TextBlock Text="Venter på autentisering..."
+								   FontSize="14"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+								   HorizontalAlignment="Center"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+
+			<!-- Absence View (Placeholder) -->
+			<Grid Grid.Row="2" Margin="0,0,0,15" IsVisible="{Binding IsAbsenceTab}">
+				<Border Classes="dashboard-card">
+					<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+						<TextBlock Text="📋"
+								   FontSize="48"
+								   HorizontalAlignment="Center"/>
+						<TextBlock Text="Fraværsoversikt"
+								   FontSize="24"
+								   FontWeight="SemiBold"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+								   HorizontalAlignment="Center"/>
+						<TextBlock Text="Kommer snart..."
+								   FontSize="14"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+								   HorizontalAlignment="Center"/>
+					</StackPanel>
+				</Border>
+			</Grid>
 		</Grid>
 		</Grid>
 		
