@@ -71,10 +71,23 @@ struct Provider: TimelineProvider {
         let widgetData = loadWidgetData()
         let entry = SimpleEntry(date: currentDate, widgetData: widgetData)
         
-        // Update every 1 minute for near real-time updates
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 1, to: currentDate)!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+        // Widget refresh policy - macOS will throttle these anyway
+        let nextUpdate: Date
         
+        // Check if we have error/no data
+        if widgetData.currentClassName == "Åpne appen" || 
+           widgetData.currentClassName == "Venter på data" || 
+           widgetData.currentClassName == "Ingen tilgang" || 
+           widgetData.currentClassName == "Kan ikke lese" || 
+           widgetData.currentClassName == "Ugyldig data" {
+            // Error state: check every 5 seconds (macOS may throttle to ~15s)
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 5, to: currentDate)!
+        } else {
+            // Normal state: update every 15 seconds
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 15, to: currentDate)!
+        }
+        
+        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }
     
@@ -83,45 +96,32 @@ struct Provider: TimelineProvider {
         let fileManager = FileManager.default
         guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "6SF4T9DUN4.com.CyberBrothers.akademitrack") else {
             print("❌ Widget: Failed to get App Group container")
-            return WidgetData(
-                dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
-                weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
-                monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-                currentClassName: nil, currentClassTime: nil, currentClassRoom: nil,
-                nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
-                lastUpdated: Date()
-            )
+            return createErrorData(message: "Ingen tilgang", detail: "Tillatelse nektet")
         }
         
         let widgetFile = containerURL.appendingPathComponent("widget-data.json")
         
         print("📂 Widget: Attempting to read from \(widgetFile.path)")
         
-        // Check if file exists
+        // Check if file exists - if not, show error immediately
         if !fileManager.fileExists(atPath: widgetFile.path) {
             print("❌ Widget: File does not exist at \(widgetFile.path)")
-            return WidgetData(
-                dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
-                weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
-                monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-                currentClassName: nil, currentClassTime: nil, currentClassRoom: nil,
-                nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
-                lastUpdated: Date()
-            )
+            
+            // Check if this is a permission issue by checking if the container exists
+            if fileManager.fileExists(atPath: containerURL.path) {
+                // Container exists but no file - app hasn't written data yet OR permission denied
+                return createErrorData(message: "Åpne appen", detail: "Lukk appen helt og åpne på nytt, klikk Tillat")
+            } else {
+                // Container doesn't exist - serious permission issue
+                return createErrorData(message: "Ingen tilgang", detail: "Lukk appen helt og åpne på nytt, klikk Tillat")
+            }
         }
         
         print("✅ Widget: File exists")
         
         guard let data = try? Data(contentsOf: widgetFile) else {
             print("❌ Widget: Failed to read file data")
-            return WidgetData(
-                dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
-                weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
-                monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-                currentClassName: nil, currentClassTime: nil, currentClassRoom: nil,
-                nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
-                lastUpdated: Date()
-            )
+            return createErrorData(message: "Kan ikke lese", detail: "Tillatelse nektet")
         }
         
         print("✅ Widget: Read \(data.count) bytes")
@@ -132,18 +132,30 @@ struct Provider: TimelineProvider {
         
         guard let widgetData = try? decoder.decode(WidgetData.self, from: data) else {
             print("❌ Widget: Failed to decode JSON")
-            return WidgetData(
-                dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
-                weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
-                monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-                currentClassName: nil, currentClassTime: nil, currentClassRoom: nil,
-                nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
-                lastUpdated: Date()
-            )
+            return createErrorData(message: "Ugyldig data", detail: "Prøv å åpne appen")
+        }
+        
+        // Check if data is stale (older than 20 seconds - app updates every 3 seconds)
+        // This helps detect when app is closed
+        let secondsSinceUpdate = Date().timeIntervalSince(widgetData.lastUpdated)
+        if secondsSinceUpdate > 20 {
+            print("⚠️ Widget: Data is stale (\(Int(secondsSinceUpdate)) seconds old)")
+            return createErrorData(message: "Åpne appen", detail: "Appen må være åpen")
         }
         
         print("✅ Widget: Successfully loaded - Daily: \(widgetData.dailyRegistered)/\(widgetData.dailyTotal), Next: \(widgetData.nextClassName ?? "None")")
         return widgetData
+    }
+    
+    private func createErrorData(message: String, detail: String) -> WidgetData {
+        return WidgetData(
+            dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
+            weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
+            monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
+            currentClassName: message, currentClassTime: detail, currentClassRoom: nil,
+            nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
+            lastUpdated: Date()
+        )
     }
 }
 
@@ -173,83 +185,135 @@ struct AkademiTrackWidgetEntryView : View {
 struct SmallWidgetView: View {
     let data: WidgetData
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("AkademiTrack")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white)
-            
-            // Status message
-            Text(getBalanceText(data.dailyBalance))
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(getColor(for: data.dailyBalance))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.bottom, 1)
-            
-            Divider()
-                .background(Color.white.opacity(0.2))
-            
-            VStack(alignment: .leading, spacing: 3) {
-                // Daily
-                HStack(spacing: 2) {
-                    Text("I dag")
-                        .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 30, alignment: .leading)
-                    Text("\(data.dailyRegistered)/\(data.dailyTotal)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .frame(width: 28, alignment: .leading)
-                    Spacer()
-                    Text(formatBalance(data.dailyBalance))
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(getColor(for: data.dailyBalance))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                
-                // Weekly
-                HStack(spacing: 2) {
-                    Text("Uke")
-                        .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 30, alignment: .leading)
-                    Text("\(data.weeklyRegistered)/\(data.weeklyTotal)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .frame(width: 28, alignment: .leading)
-                    Spacer()
-                    Text(formatBalance(data.weeklyBalance))
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(getColor(for: data.weeklyBalance))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                
-                // Monthly
-                HStack(spacing: 2) {
-                    Text("Mnd")
-                        .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 30, alignment: .leading)
-                    Text("\(data.monthlyRegistered)/\(data.monthlyTotal)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .frame(width: 28, alignment: .leading)
-                    Spacer()
-                    Text(formatBalance(data.monthlyBalance))
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(getColor(for: data.monthlyBalance))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-            }
-            
-            Spacer()
+    var isErrorState: Bool {
+        return data.currentClassName == "Åpne appen" || 
+               data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Ingen tilgang" || 
+               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ugyldig data"
+    }
+    
+    var errorIcon: String {
+        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+            return "lock.fill"
         }
-        .padding(12)
-        .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        return "exclamationmark.triangle.fill"
+    }
+    
+    var errorMessage: String {
+        return data.currentClassTime ?? "Hold appen åpen for å se data"
+    }
+    
+    var body: some View {
+        // Check if this is error data (no file or permission issue)
+        if isErrorState {
+            // Error state - full screen message
+            VStack(alignment: .center, spacing: 8) {
+                Spacer()
+                
+                Image(systemName: errorIcon)
+                    .font(.system(size: 28))
+                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                
+                Text("AkademiTrack")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text(data.currentClassName ?? "Feil")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                
+                Text(errorMessage)
+                    .font(.system(size: 8))
+                    .foregroundColor(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(12)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        } else {
+            // Normal state
+            VStack(alignment: .leading, spacing: 5) {
+                Text("AkademiTrack")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                // Status message
+                Text(getBalanceText(data.dailyBalance))
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(getColor(for: data.dailyBalance))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.bottom, 1)
+                
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    // Daily
+                    HStack(spacing: 2) {
+                        Text("I dag")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 30, alignment: .leading)
+                        Text("\(data.dailyRegistered)/\(data.dailyTotal)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 28, alignment: .leading)
+                        Spacer()
+                        Text(formatBalance(data.dailyBalance))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(getColor(for: data.dailyBalance))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    
+                    // Weekly
+                    HStack(spacing: 2) {
+                        Text("Uke")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 30, alignment: .leading)
+                        Text("\(data.weeklyRegistered)/\(data.weeklyTotal)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 28, alignment: .leading)
+                        Spacer()
+                        Text(formatBalance(data.weeklyBalance))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(getColor(for: data.weeklyBalance))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    
+                    // Monthly
+                    HStack(spacing: 2) {
+                        Text("Mnd")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 30, alignment: .leading)
+                        Text("\(data.monthlyRegistered)/\(data.monthlyTotal)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 28, alignment: .leading)
+                        Spacer()
+                        Text(formatBalance(data.monthlyBalance))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(getColor(for: data.monthlyBalance))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(12)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        }
     }
     
     private func formatBalance(_ value: Double) -> String {
@@ -290,123 +354,229 @@ struct SmallWidgetView: View {
 struct MediumWidgetView: View {
     let data: WidgetData
     
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("AkademiTrack")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
-            
-            HStack(spacing: 12) {
-                AttendanceCard(label: "I dag", registered: data.dailyRegistered, total: data.dailyTotal, balance: data.dailyBalance)
-                AttendanceCard(label: "Uke", registered: data.weeklyRegistered, total: data.weeklyTotal, balance: data.weeklyBalance)
-                AttendanceCard(label: "Måned", registered: data.monthlyRegistered, total: data.monthlyTotal, balance: data.monthlyBalance)
-            }
+    var isErrorState: Bool {
+        return data.currentClassName == "Åpne appen" || 
+               data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Ingen tilgang" || 
+               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ugyldig data"
+    }
+    
+    var errorIcon: String {
+        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+            return "lock.fill"
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(16)
-        .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        return "exclamationmark.triangle.fill"
+    }
+    
+    var errorMessage: String {
+        return data.currentClassTime ?? "Hold appen åpen for å se fremmøte og timeplan"
+    }
+    
+    var body: some View {
+        // Check if this is error data
+        if isErrorState {
+            // Error state - full screen message
+            VStack(spacing: 10) {
+                Spacer()
+                
+                Image(systemName: errorIcon)
+                    .font(.system(size: 36))
+                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                
+                Text("AkademiTrack")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text(data.currentClassName ?? "Feil")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                
+                Text(errorMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .padding(.horizontal, 20)
+                
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        } else {
+            // Normal state
+            VStack(spacing: 12) {
+                Text("AkademiTrack")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                
+                HStack(spacing: 12) {
+                    AttendanceCard(label: "I dag", registered: data.dailyRegistered, total: data.dailyTotal, balance: data.dailyBalance)
+                    AttendanceCard(label: "Uke", registered: data.weeklyRegistered, total: data.weeklyTotal, balance: data.weeklyBalance)
+                    AttendanceCard(label: "Måned", registered: data.monthlyRegistered, total: data.monthlyTotal, balance: data.monthlyBalance)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        }
     }
 }
 
 struct LargeWidgetView: View {
     let data: WidgetData
     
+    var isErrorState: Bool {
+        return data.currentClassName == "Åpne appen" || 
+               data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Ingen tilgang" || 
+               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ugyldig data"
+    }
+    
+    var errorIcon: String {
+        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+            return "lock.fill"
+        }
+        return "exclamationmark.triangle.fill"
+    }
+    
+    var errorMessage: String {
+        return data.currentClassTime ?? "Hold appen åpen for å se fremmøte, timeplan og neste time"
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header
-            Text("AkademiTrack")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(.white)
-            
-            // Current Class Section (always show)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("NÅVÆRENDE TIME")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.6))
-                    Spacer()
-                    Text("📚")
-                        .font(.system(size: 12))
-                }
+        // Check if this is error data
+        if isErrorState {
+            // Error state - full screen message
+            VStack(spacing: 14) {
+                Spacer()
                 
-                if let currentName = data.currentClassName, currentName != "Ingen time" {
-                    Text(currentName)
+                Image(systemName: errorIcon)
+                    .font(.system(size: 52))
+                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                
+                Text("AkademiTrack")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text(data.currentClassName ?? "Feil")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                
+                Text(errorMessage)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .padding(.horizontal, 30)
+                
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
+        } else {
+            // Normal state
+            VStack(alignment: .leading, spacing: 10) {
+                // Header
+                Text("AkademiTrack")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+                
+                // Current Class Section (always show)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("NÅVÆRENDE TIME")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
+                        Text("📚")
+                            .font(.system(size: 12))
+                    }
+                    
+                    if let currentName = data.currentClassName, currentName != "Ingen time" {
+                        Text(currentName)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        
+                        Text(data.currentClassTime ?? "--:-- - --:--")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        if let room = data.currentClassRoom, !room.isEmpty {
+                            Text(room)
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    } else {
+                        Text("Ingen time")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("--:-- - --:--")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(data.currentClassName != nil && data.currentClassName != "Ingen time" ? Color.green.opacity(0.15) : Color.white.opacity(0.08))
+                .cornerRadius(10)
+                
+                // Next Class Section
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("NESTE TIME")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
+                        Text("⏰")
+                            .font(.system(size: 12))
+                    }
+                    
+                    Text(data.nextClassName ?? "Ingen time")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     
-                    Text(data.currentClassTime ?? "--:-- - --:--")
+                    Text(data.nextClassTime ?? "--:-- - --:--")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.8))
                     
-                    if let room = data.currentClassRoom, !room.isEmpty {
+                    if let room = data.nextClassRoom, !room.isEmpty {
                         Text(room)
                             .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.6))
                     }
-                } else {
-                    Text("Ingen time")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("--:-- - --:--")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.8))
                 }
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(data.currentClassName != nil && data.currentClassName != "Ingen time" ? Color.green.opacity(0.15) : Color.white.opacity(0.08))
-            .cornerRadius(10)
-            
-            // Next Class Section
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("NESTE TIME")
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(10)
+                
+                // Attendance Section
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("FREMMØTE")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
-                    Spacer()
-                    Text("⏰")
-                        .font(.system(size: 12))
+                    
+                    AttendanceRow(label: "I dag", registered: data.dailyRegistered, total: data.dailyTotal, balance: data.dailyBalance)
+                    AttendanceRow(label: "Uke", registered: data.weeklyRegistered, total: data.weeklyTotal, balance: data.weeklyBalance)
+                    AttendanceRow(label: "Måned", registered: data.monthlyRegistered, total: data.monthlyTotal, balance: data.monthlyBalance)
                 }
                 
-                Text(data.nextClassName ?? "Ingen time")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                
-                Text(data.nextClassTime ?? "--:-- - --:--")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.8))
-                
-                if let room = data.nextClassRoom, !room.isEmpty {
-                    Text(room)
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.6))
-                }
+                Spacer()
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.08))
-            .cornerRadius(10)
-            
-            // Attendance Section
-            VStack(alignment: .leading, spacing: 6) {
-                Text("FREMMØTE")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-                
-                AttendanceRow(label: "I dag", registered: data.dailyRegistered, total: data.dailyTotal, balance: data.dailyBalance)
-                AttendanceRow(label: "Uke", registered: data.weeklyRegistered, total: data.weeklyTotal, balance: data.weeklyBalance)
-                AttendanceRow(label: "Måned", registered: data.monthlyRegistered, total: data.monthlyTotal, balance: data.monthlyBalance)
-            }
-            
-            Spacer()
+            .padding(14)
+            .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
         }
-        .padding(14)
-        .containerBackground(Color(red: 0.18, green: 0.18, blue: 0.20), for: .widget)
     }
 }
 

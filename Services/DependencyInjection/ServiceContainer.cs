@@ -132,6 +132,20 @@ namespace AkademiTrack.Services.DependencyInjection
             });
             services.AddSingleton<AuthenticationService>();
             services.AddSingleton<SystemHealthCheck>();
+            
+            // Widget services
+            services.AddSingleton<WidgetDataService>(provider =>
+            {
+                var loggingService = provider.GetService<ILoggingService>();
+                var notificationService = provider.GetService<INotificationService>();
+                return new WidgetDataService(loggingService, notificationService);
+            });
+            services.AddSingleton<WidgetHeartbeatService>(provider =>
+            {
+                var widgetDataService = provider.GetRequiredService<WidgetDataService>();
+                var loggingService = provider.GetService<ILoggingService>();
+                return new WidgetHeartbeatService(widgetDataService, loggingService);
+            });
 
             // Utility services
             services.AddSingleton<LogRetentionManager>();
@@ -177,6 +191,14 @@ namespace AkademiTrack.Services.DependencyInjection
                 var retentionManager = new LogRetentionManager(loggingService);
                 retentionManager.Start();
                 Debug.WriteLine("[ServiceContainer] Log retention manager started");
+
+                // Start widget heartbeat service (macOS only)
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+                {
+                    var heartbeatService = GetService<WidgetHeartbeatService>();
+                    heartbeatService.Start();
+                    Debug.WriteLine("[ServiceContainer] Widget heartbeat service started");
+                }
 
                 Debug.WriteLine("[ServiceContainer] All background services initialized successfully");
             }
@@ -251,6 +273,39 @@ namespace AkademiTrack.Services.DependencyInjection
 
             try
             {
+                // FIRST: Write widget closed state immediately (macOS only)
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+                {
+                    try
+                    {
+                        var widgetService = GetOptionalService<WidgetDataService>();
+                        if (widgetService != null)
+                        {
+                            Debug.WriteLine("[ServiceContainer] Writing widget closed state");
+                            await widgetService.WriteAppClosedStateAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ServiceContainer] Failed to write widget closed state: {ex.Message}");
+                    }
+                }
+
+                // Stop widget heartbeat service (macOS only)
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+                {
+                    try
+                    {
+                        var heartbeatService = GetOptionalService<WidgetHeartbeatService>();
+                        heartbeatService?.Stop();
+                        Debug.WriteLine("[ServiceContainer] Widget heartbeat service stopped");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ServiceContainer] Failed to stop widget heartbeat: {ex.Message}");
+                    }
+                }
+
                 // Create uninstall detector before shutting down (with timeout)
                 var uninstallTask = CreateUninstallDetectorAsync();
                 if (await Task.WhenAny(uninstallTask, Task.Delay(1000)) != uninstallTask)
