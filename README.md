@@ -185,7 +185,7 @@ AkademiTrack takes your security seriously:
 - 🏠 **Local Storage Only** - All data stored exclusively on your device
 - 🔐 **Encrypted Credentials** - Uses System.Security.Cryptography.ProtectedData for Windows, Keychain for macOS
 - 🔒 **Secure Authentication** - Selenium-based browser automation with official Feide SSO
-- 📊 **No Telemetry** - No usage tracking or data collection (optional analytics service exists but is not active)
+- 📊 **Minimal Telemetry** - Minimal  tracking and data collection (error logs, and how many are using, anonymized)
 - ✅ **Official APIs** - Only communicates with iSkole and Feide servers
 - 🔓 **Open Source** - Code available for community review and security audits
 
