@@ -1193,9 +1193,12 @@ namespace AkademiTrack.Services
 
             try
             {
-                if (DateTime.TryParse(dateTimeStr, out var dateTime))
+                // Parse as UTC explicitly to prevent automatic timezone conversion
+                if (DateTime.TryParse(dateTimeStr, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var dateTime))
                 {
-                    return dateTime.ToString("HHmm");
+                    // The API stores Norwegian local time as UTC, so we need to extract the time without conversion
+                    // Use the UTC time components directly
+                    return $"{dateTime.Hour:D2}{dateTime.Minute:D2}";
                 }
                 return "";
             }

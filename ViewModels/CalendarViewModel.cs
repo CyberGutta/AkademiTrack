@@ -212,6 +212,8 @@ namespace AkademiTrack.ViewModels
                         if (hourSlot < 0) hourSlot = 0;
                         if (hourSlot > 7) hourSlot = 7;
                         
+                        _loggingService?.LogDebug($"[CALENDAR] Session: {session.DisplayName}, StartKl: {session.StartKl}, ParsedTime: {startTime}, Hours: {startTime.Hours}, HourSlot: {hourSlot}");
+                        
                         sessionsWithSpacing.Add(new ScheduleItemWithSpacing
                         {
                             Item = session,
