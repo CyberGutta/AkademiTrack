@@ -458,8 +458,9 @@ namespace AkademiTrack.Services
                     var currentTime = DateTime.Now.ToString("HH:mm");
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
 
-                    // Check if we're still within school hours - auto-stop if outside
-                    if (!await SchoolTimeChecker.IsWithinSchoolHoursAsync())
+                    // Check if we're still within school hours - auto-stop if AFTER school ends
+                    var (isWithin, isAfter) = await SchoolTimeChecker.GetSchoolHoursStatusAsync();
+                    if (!isWithin && isAfter)
                     {
                         _loggingService.LogInfo("Utenfor skoletid - stopper automatisering automatisk");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();

@@ -133,6 +133,25 @@ namespace AkademiTrack.Services
 
             return isWithinHours;
         }
+        public static async Task<(bool isWithin, bool isAfter)> GetSchoolHoursStatusAsync()
+        {
+            var now = await GetTrustedCurrentTimeAsync().ConfigureAwait(false);
+            var schoolHours = await LoadSchoolHoursAsync().ConfigureAwait(false);
+
+            if (!schoolHours.IsDayEnabled(now.DayOfWeek))
+            {
+                return (false, true); // Disabled day = treat as "after"
+            }
+
+            var (startTime, endTime) = schoolHours.GetDayTimes(now.DayOfWeek);
+            var currentTime = now.TimeOfDay;
+
+            bool isWithin = currentTime >= startTime && currentTime <= endTime;
+            bool isAfter = currentTime > endTime;
+
+            return (isWithin, isAfter);
+        }
+
 
         private static DateTime _lastCheckTime = DateTime.MinValue;
         private const int WAKE_DETECTION_THRESHOLD_MINUTES = 5;
@@ -270,13 +289,15 @@ namespace AkademiTrack.Services
             var schoolHours = await LoadSchoolHoursAsync();
             var current = from.Date;
 
-            if (from.TimeOfDay < (await GetSchoolEndTimeAsync(from.DayOfWeek)))
+            // Check if today's school start time is still in the future
+            if (schoolHours.IsDayEnabled(from.DayOfWeek))
             {
                 var todayStart = await GetSchoolStartTimeAsync(current);
-                if (todayStart > from && schoolHours.IsDayEnabled(from.DayOfWeek))
+                if (todayStart > from)
                     return todayStart;
             }
 
+            // Otherwise, find the next enabled school day
             for (int i = 1; i <= 7; i++)
             {
                 var checkDate = current.AddDays(i);
