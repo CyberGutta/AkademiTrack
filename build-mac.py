@@ -1015,7 +1015,7 @@ def main():
     print("  • The app's auto-start toggle in Settings will manage this")
     
     print("\n🔍 Check notarization history:")
-    print(f"  xcrun notarytool history --apple-id {APPLE_ID} --team-id {TEAM_ID} --password {APP_SPECIFIC_PASSWORD}")
+    #print(f"  xcrun notarytool history --apple-id {APPLE_ID} --team-id {TEAM_ID} --password {APP_SPECIFIC_PASSWORD}")
 
 if __name__ == "__main__":
     try:
