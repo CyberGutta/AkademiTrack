@@ -1204,19 +1204,13 @@ namespace AkademiTrack.ViewModels
                     }
                     else if (IsAutomationRunning)
                     {
-                        await _notificationService.ShowNotificationAsync(
-                            "Tilstedeværelse bekreftet",
-                            "Automatisering kjører allerede",
-                            NotificationLevel.Info
-                        );
+                        // Automation already running - no need for notification
+                        _loggingService.LogInfo("Presence confirmed - automation already running");
                     }
                     else
                     {
-                        await _notificationService.ShowNotificationAsync(
-                            "Tilstedeværelse bekreftet",
-                            $"Bekreftet for i dag. {reason}",
-                            NotificationLevel.Success
-                        );
+                        // Presence confirmed but automation not running - log only
+                        _loggingService.LogSuccess($"Presence confirmed for today. {reason}");
                     }
                 }
             }

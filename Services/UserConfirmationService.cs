@@ -91,11 +91,7 @@ namespace AkademiTrack.Services
                         await SaveConfirmationAsync(today);
                         _loggingService.LogSuccess("Daily confirmation received - automation can proceed");
                         
-                        await _notificationService.ShowNotificationAsync(
-                            "Tilstedeværelse bekreftet",
-                            "Automatisering starter nå for i dag",
-                            NotificationLevel.Success
-                        );
+                        // Confirmation received - no need for notification since automation will show its own status
                         
                         return true;
                     }
