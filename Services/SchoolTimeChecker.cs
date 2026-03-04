@@ -261,6 +261,50 @@ namespace AkademiTrack.Services
             }
         }
 
+        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify, bool needsConfirmation)> ShouldAutoStartAutomationWithConfirmationAsync(bool silent = false)
+        {
+            try
+            {
+                // First check basic conditions
+                var (shouldStart, reason, nextStartTime, shouldNotify) = await ShouldAutoStartAutomationAsync(silent);
+                
+                if (!shouldStart)
+                {
+                    return (false, reason, nextStartTime, shouldNotify, false);
+                }
+
+                // Always require confirmation when automation should start
+                var confirmationService = Services.DependencyInjection.ServiceContainer.GetOptionalService<UserConfirmationService>();
+                if (confirmationService == null)
+                {
+                    if (!silent)
+                        Debug.WriteLine("[AUTO-START] No confirmation service available - proceeding without confirmation");
+                    return (true, reason, nextStartTime, shouldNotify, false);
+                }
+
+                var today = DateTime.Now.Date;
+                var isConfirmed = await confirmationService.IsConfirmedForDateAsync(today);
+                
+                if (isConfirmed)
+                {
+                    if (!silent)
+                        Debug.WriteLine("[AUTO-START] Daily confirmation already received - can start");
+                    return (true, reason, nextStartTime, shouldNotify, false);
+                }
+
+                if (!silent)
+                    Debug.WriteLine("[AUTO-START] Daily confirmation required before starting");
+                
+                return (false, "Venter på bekreftelse av tilstedeværelse", nextStartTime, true, true);
+            }
+            catch (Exception ex)
+            {
+                if (!silent)
+                    Debug.WriteLine($"[AUTO-START] Error checking confirmation: {ex.Message}");
+                return (false, $"Feil ved sjekk: {ex.Message}", null, false, false);
+            }
+        }
+
         private static bool ShouldShowNotification(string message)
         {
             if (message != _lastNotificationMessage)

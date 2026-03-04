@@ -30,6 +30,7 @@ namespace AkademiTrack.ViewModels
         private readonly ISettingsService _settingsService;
         private readonly IAutomationService _automationService;
         private readonly AnalyticsService _analyticsService;
+        private readonly UserConfirmationService _userConfirmationService;
         #endregion
 
         #region Private Fields
@@ -217,6 +218,27 @@ namespace AkademiTrack.ViewModels
         public bool IsAutomationRunning => _automationService?.IsRunning ?? false;
         private Timer? _autoStartCheckTimer;
 
+        // Daily confirmation
+        private bool _isConfirmationNeeded = false;
+        public bool IsConfirmationNeeded
+        {
+            get => _isConfirmationNeeded;
+            private set => SetProperty(ref _isConfirmationNeeded, value);
+        }
+
+        public async Task<bool> IsConfirmationNeededAsync()
+        {
+            try
+            {
+                var today = DateTime.Now.Date;
+                return !await _userConfirmationService.IsConfirmedForDateAsync(today);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // Logging
         public ObservableCollection<LogEntry> LogEntries => _loggingService.LogEntries;
         public bool ShowDetailedLogs
@@ -248,6 +270,7 @@ namespace AkademiTrack.ViewModels
         #region Commands
         public ICommand StartAutomationCommand { get; }
         public ICommand StopAutomationCommand { get; }
+        public ICommand ConfirmPresenceCommand { get; }
         public ICommand BackToDashboardCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand OpenFeideCommand { get; }
@@ -270,6 +293,7 @@ namespace AkademiTrack.ViewModels
             _settingsService = ServiceContainer.GetService<ISettingsService>();
             _automationService = ServiceContainer.GetService<IAutomationService>();
             _analyticsService = ServiceContainer.GetService<AnalyticsService>();
+            _userConfirmationService = ServiceContainer.GetService<UserConfirmationService>();
             
             // Initialize other services
             _httpClient = new HttpClient();
@@ -283,6 +307,7 @@ namespace AkademiTrack.ViewModels
             // Initialize Commands
             StartAutomationCommand = new AsyncRelayCommand(StartAutomationAsync, () => IsAuthenticated && !IsAutomationRunning);
             StopAutomationCommand = new AsyncRelayCommand(StopAutomationAsync, () => IsAutomationRunning);
+            ConfirmPresenceCommand = new AsyncRelayCommand(ConfirmPresenceAsync);
             BackToDashboardCommand = new AsyncRelayCommand(BackToDashboardAsync);
             OpenSettingsCommand = new AsyncRelayCommand(OpenSettings);
             OpenFeideCommand = new AsyncRelayCommand(OpenFeideAsync);
@@ -464,6 +489,7 @@ namespace AkademiTrack.ViewModels
                     // Start services with error handling
                     try
                     {
+                        await UpdateConfirmationStatusAsync();
                         await CheckAutoStartAutomationAsync();
 
                         StartDashboardRefreshTimer();
@@ -642,7 +668,22 @@ namespace AkademiTrack.ViewModels
                 {
                     try
                     {
-                        // Only auto-refresh if automation is not running
+                        // Always check confirmation status first
+                        await UpdateConfirmationStatusAsync();
+                        
+                        // If confirmation is needed and automation is running, stop it
+                        if (IsConfirmationNeeded && IsAutomationRunning)
+                        {
+                            _loggingService.LogWarning("Confirmation lost while automation running - stopping automation");
+                            
+                            await Dispatcher.UIThread.InvokeAsync(async () =>
+                            {
+                                await StopAutomationAsync(markAsManual: false);
+                                _loggingService.LogInfo("Automation stopped - confirmation overlay should appear");
+                            });
+                        }
+                        
+                        // Only auto-refresh dashboard if automation is not running
                         if (!IsAutomationRunning)
                         {
                             _loggingService.LogDebug("🔄 Auto-refreshing dashboard data...");
@@ -661,11 +702,11 @@ namespace AkademiTrack.ViewModels
                     }
                 },
                 null,
-                TimeSpan.FromMinutes(5), 
-                TimeSpan.FromMinutes(5)
+                TimeSpan.FromMinutes(1), // Check every minute instead of 5 for better responsiveness
+                TimeSpan.FromMinutes(1)
             );
 
-            _loggingService.LogInfo("Dashboard auto-refresh timer started (every 5 minutes)");
+            _loggingService.LogInfo("Dashboard auto-refresh timer started (every 1 minute)");
         }
 
         private void StartMidnightResetTimer()
@@ -711,6 +752,8 @@ namespace AkademiTrack.ViewModels
             _automationService.ProgressUpdated += OnAutomationProgressUpdated;
             _automationService.SessionRegistered += OnSessionRegistered;
 
+            // Subscribe to confirmation events
+            _userConfirmationService.ConfirmationLost += OnConfirmationLost;
         }
 
         private void OnLogEntryAdded(object? sender, LogEntryEventArgs e)
@@ -862,6 +905,24 @@ namespace AkademiTrack.ViewModels
                 catch (Exception ex)
                 {
                     _loggingService.LogError($"[DASHBOARD] Error updating display: {ex.Message}");
+                }
+            });
+        }
+
+        private async void OnConfirmationLost(object? sender, EventArgs e)
+        {
+            _loggingService.LogWarning("Confirmation lost - stopping automation and showing overlay");
+            
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                // Update confirmation status first
+                await UpdateConfirmationStatusAsync();
+                
+                // Stop automation if running (but don't mark as manual stop)
+                if (IsAutomationRunning)
+                {
+                    await StopAutomationAsync(markAsManual: false);
+                    _loggingService.LogInfo("Automation stopped due to lost confirmation - overlay will appear");
                 }
             });
         }
@@ -1061,8 +1122,16 @@ namespace AkademiTrack.ViewModels
 
         private async Task StopAutomationAsync()
         {
-            // Mark manual stop FIRST
-            await SchoolTimeChecker.MarkManualStopAsync();
+            await StopAutomationAsync(markAsManual: true);
+        }
+
+        private async Task StopAutomationAsync(bool markAsManual)
+        {
+            if (markAsManual)
+            {
+                // Mark manual stop FIRST
+                await SchoolTimeChecker.MarkManualStopAsync();
+            }
             
             // Note: TrackAutomationStopAsync is now called automatically by OnAutomationStatusChanged event
             Debug.WriteLine("[MainWindow] Automation stopped");
@@ -1098,6 +1167,62 @@ namespace AkademiTrack.ViewModels
                 ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
             });
+        }
+
+        private async Task ConfirmPresenceAsync()
+        {
+            try
+            {
+                _loggingService.LogInfo("User manually confirmed presence");
+                
+                var confirmed = await _userConfirmationService.ConfirmPresenceAsync();
+                
+                if (confirmed)
+                {
+                    // Update confirmation status
+                    await UpdateConfirmationStatusAsync();
+                    
+                    // Check if automation should start now that presence is confirmed
+                    var (shouldStart, reason, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: false);
+                    
+                    if (shouldStart && !IsAutomationRunning)
+                    {
+                        _loggingService.LogInfo("Starting automation after manual confirmation");
+                        
+                        // Mark as started
+                        await SchoolTimeChecker.MarkTodayAsStartedAsync();
+                        
+                        // Start automation
+                        await StartAutomationAsync();
+                    }
+                    else if (IsAutomationRunning)
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Tilstedeværelse bekreftet",
+                            "Automatisering kjører allerede",
+                            NotificationLevel.Info
+                        );
+                    }
+                    else
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Tilstedeværelse bekreftet",
+                            $"Bekreftet for i dag. {reason}",
+                            NotificationLevel.Success
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error confirming presence: {ex.Message}");
+                
+                await _notificationService.ShowNotificationAsync(
+                    "Bekreftelse feilet",
+                    "Kunne ikke bekrefte tilstedeværelse. Prøv igjen.",
+                    NotificationLevel.Error
+                );
+            }
         }
 
         private Task BackToDashboardAsync()
@@ -1338,12 +1463,37 @@ namespace AkademiTrack.ViewModels
                 Dashboard.ClearCache();
                 _loggingService.LogInfo("Dashboard cache cleared for new day");
                 
+                // Clear daily confirmation for new day
+                await _userConfirmationService.ClearConfirmationAsync();
+                await UpdateConfirmationStatusAsync();
+                _loggingService.LogInfo("Daily confirmation cleared for new day");
+                
                 if (_settingsService.AutoStartAutomation)
                 {
                     _loggingService.LogInfo("Checking if automation should auto-start for new day...");
                     await CheckAutoStartAutomationAsync();
                 }
                 
+            }
+        }
+
+        private async Task UpdateConfirmationStatusAsync()
+        {
+            try
+            {
+                var today = DateTime.Now.Date;
+                var needsConfirmation = !await _userConfirmationService.IsConfirmedForDateAsync(today);
+                
+                _loggingService.LogDebug($"Confirmation check: {needsConfirmation}");
+                
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    IsConfirmationNeeded = needsConfirmation;
+                });
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Confirmation status error: {ex.Message}");
             }
         }
 
@@ -1462,12 +1612,38 @@ namespace AkademiTrack.ViewModels
                 await SchoolTimeChecker.ClearManualStopAsync();
                 _loggingService.LogInfo("Manual stop flag cleared on app restart (auto-start enabled)");
                 
-                // Use the proper method that checks manual stops and completion
-                var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: false);
+                // Use the confirmation-aware method that checks manual stops, completion, and confirmation
+                var (shouldStart, reason, nextStartTime, shouldNotify, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: false);
                 
                 _loggingService.LogInfo($"Auto-start check result: {reason}");
                 
-                if (shouldStart && !IsAutomationRunning)
+                if (needsConfirmation)
+                {
+                    _loggingService.LogInfo("Daily confirmation required - requesting user confirmation");
+                    
+                    // Request confirmation with 10 minute timeout
+                    var confirmed = await _userConfirmationService.RequestDailyConfirmationAsync(timeoutMinutes: 10);
+                    
+                    if (confirmed)
+                    {
+                        _loggingService.LogInfo("User confirmed presence - starting automation");
+                        
+                        // Mark as started
+                        await SchoolTimeChecker.MarkTodayAsStartedAsync();
+                        
+                        // Must start automation on UI thread
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            await Task.Delay(500);
+                            await StartAutomationAsync();
+                        });
+                    }
+                    else
+                    {
+                        _loggingService.LogInfo("User did not confirm presence - automation will not start automatically");
+                    }
+                }
+                else if (shouldStart && !IsAutomationRunning)
                 {
                     _loggingService.LogInfo("Starting automation automatically...");
                     
@@ -1567,10 +1743,35 @@ namespace AkademiTrack.ViewModels
                     return;
                 }
 
-                // Use the proper method that checks manual stops and completion
-                var (shouldStart, reason, nextStartTime, shouldNotify) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+                // Use the confirmation-aware method that checks manual stops, completion, and confirmation
+                var (shouldStart, reason, nextStartTime, shouldNotify, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
                 
-                if (shouldStart && !IsAutomationRunning)
+                if (needsConfirmation)
+                {
+                    _loggingService.LogDebug("Daily confirmation required - requesting user confirmation");
+                    
+                    // Request confirmation with 10 minute timeout
+                    var confirmed = await _userConfirmationService.RequestDailyConfirmationAsync(timeoutMinutes: 10);
+                    
+                    if (confirmed)
+                    {
+                        _loggingService.LogInfo($"🚀 Auto-starting automation after confirmation: {reason}");
+                        
+                        // Mark as started
+                        await SchoolTimeChecker.MarkTodayAsStartedAsync();
+                        
+                        // Start automation on UI thread
+                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            await StartAutomationAsync();
+                        });
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug("User did not confirm presence - automation will not start");
+                    }
+                }
+                else if (shouldStart && !IsAutomationRunning)
                 {
                     _loggingService.LogInfo($"🚀 Auto-starting automation: {reason}");
                     

@@ -178,6 +178,41 @@
 			<Setter Property="Foreground" Value="#888888"/>
 		</Style>
 
+		<!-- Confirm Presence Button -->
+		<Style Selector="Button.confirm-button">
+			<Setter Property="Background" Value="#28A745"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.confirm-button:pointerover">
+			<Setter Property="Background" Value="#218838"/>
+		</Style>
+
+		<Style Selector="Button.confirm-button:disabled">
+			<Setter Property="Background" Value="#CCCCCC"/>
+			<Setter Property="Foreground" Value="#888888"/>
+		</Style>
+
 		<!-- Class Toggle Button -->
 		<Style Selector="Button.class-toggle-button">
 			<Setter Property="Background" Value="#5B9BFF"/>
@@ -946,6 +981,60 @@
         </Border>
     </Grid>
 </Border>
+
+		<!-- Confirmation Overlay (shown when confirmation is needed) -->
+		<Border Classes="loading-overlay" 
+				Grid.RowSpan="999"
+				Grid.ColumnSpan="999"
+				ZIndex="9999"
+				IsVisible="{Binding IsConfirmationNeeded}">
+			<Grid>
+				<Border Classes="loading-container"
+						Width="400"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center">
+					<StackPanel Spacing="24" HorizontalAlignment="Center">
+						<!-- Icon -->
+						<TextBlock Text="👋"
+								   FontSize="48"
+								   HorizontalAlignment="Center"/>
+						
+						<!-- Title -->
+						<TextBlock Text="Bekreft tilstedeværelse"
+								   FontSize="24"
+								   FontWeight="SemiBold"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+								   HorizontalAlignment="Center"/>
+						
+						<!-- Message -->
+						<TextBlock Text="Trykk 'Ja, jeg er her' for å starte automatisering i dag"
+								   FontSize="14"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+								   HorizontalAlignment="Center"
+								   TextWrapping="Wrap"
+								   TextAlignment="Center"
+								   MaxWidth="350"/>
+						
+						<!-- Confirmation Button -->
+						<Button Content="✓ Ja, jeg er her"
+								Classes="start-button"
+								Command="{Binding ConfirmPresenceCommand}"
+								HorizontalAlignment="Center"
+								MinWidth="200"
+								Height="50"
+								FontSize="16"
+								Cursor="Hand"/>
+						
+						<!-- Timeout info -->
+						<TextBlock Text="Automatisering starter ikke uten bekreftelse"
+								   FontSize="11"
+								   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+								   Opacity="0.7"
+								   HorizontalAlignment="Center"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</Border>
 	</Grid>
 	
 </Window>
