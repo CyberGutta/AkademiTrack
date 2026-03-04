@@ -11,6 +11,7 @@ namespace AkademiTrack.Services
     {
         private readonly INotificationService _notificationService;
         private readonly ILoggingService _loggingService;
+        private readonly ISettingsService _settingsService;
         private readonly string _confirmationStatusFile;
         private readonly string _appDataDir;
         private readonly SemaphoreSlim _confirmationSemaphore;
@@ -22,10 +23,11 @@ namespace AkademiTrack.Services
         public event EventHandler<UserConfirmationEventArgs>? ConfirmationReceived;
         public event EventHandler? ConfirmationLost;
 
-        public UserConfirmationService(INotificationService notificationService, ILoggingService loggingService)
+        public UserConfirmationService(INotificationService notificationService, ILoggingService loggingService, ISettingsService settingsService)
         {
             _notificationService = notificationService;
             _loggingService = loggingService;
+            _settingsService = settingsService;
             _confirmationSemaphore = new SemaphoreSlim(1, 1);
             
             _appDataDir = Path.Combine(
@@ -145,6 +147,33 @@ namespace AkademiTrack.Services
             
             return true;
         }
+        /// <summary>
+        /// Registers a Feide login as automatic presence confirmation for today
+        /// </summary>
+        public async Task RegisterFeideLoginConfirmationAsync()
+        {
+            try
+            {
+                var today = DateTime.Now.Date;
+                var confirmationData = new DailyConfirmationData
+                {
+                    Date = today,
+                    IsConfirmed = true,
+                    ConfirmedAt = DateTime.Now,
+                    ConfirmedViaFeide = true,
+                    FeideLoginTime = DateTime.Now
+                };
+
+                var json = JsonSerializer.Serialize(confirmationData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_confirmationStatusFile, json);
+
+                _loggingService.LogInfo("Presence automatically confirmed via Feide login");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error saving Feide confirmation: {ex.Message}");
+            }
+        }
 
         public async Task<bool> IsConfirmedForDateAsync(DateTime date)
         {
@@ -158,10 +187,34 @@ namespace AkademiTrack.Services
 
                 var json = await File.ReadAllTextAsync(_confirmationStatusFile);
                 var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
-                
-                var isConfirmed = confirmationData?.Date.Date == date.Date && confirmationData.IsConfirmed;
-                _loggingService.LogDebug($"Confirmed: {isConfirmed}");
-                
+
+                if (confirmationData?.Date.Date != date.Date)
+                {
+                    _loggingService.LogDebug("Confirmation date mismatch");
+                    return false;
+                }
+
+                // If confirmed via Feide, check if we're still within the grace period
+                if (confirmationData.ConfirmedViaFeide && confirmationData.FeideLoginTime.HasValue)
+                {
+                    var timeSinceFeideLogin = DateTime.Now - confirmationData.FeideLoginTime.Value;
+                    var gracePeriodHours = _settingsService.FeideGracePeriodHours; // Use configurable grace period
+
+                    if (timeSinceFeideLogin.TotalHours <= gracePeriodHours)
+                    {
+                        _loggingService.LogDebug($"Within Feide grace period ({timeSinceFeideLogin.TotalHours:F1} hours since login, grace period: {gracePeriodHours}h)");
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug($"Feide grace period expired ({timeSinceFeideLogin.TotalHours:F1} hours since login, grace period: {gracePeriodHours}h)");
+                        return false;
+                    }
+                }
+
+                var isConfirmed = confirmationData.IsConfirmed;
+                _loggingService.LogDebug($"Regular confirmation: {isConfirmed}");
+
                 return isConfirmed;
             }
             catch (Exception ex)
@@ -456,5 +509,7 @@ namespace AkademiTrack.Services
         public DateTime Date { get; set; }
         public bool IsConfirmed { get; set; }
         public DateTime ConfirmedAt { get; set; }
+        public bool ConfirmedViaFeide { get; set; }
+        public DateTime? FeideLoginTime { get; set; }
     }
 }

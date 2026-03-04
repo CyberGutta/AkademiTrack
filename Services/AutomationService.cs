@@ -182,12 +182,9 @@ namespace AkademiTrack.Services
                     Debug.WriteLine($"[Analytics] Failed to log automation error: {analyticsEx.Message}");
                 }
                 
-                await _notificationService.ShowNotificationAsync(
-                    "Automatisering Feilet",
-                    $"En uventet feil oppstod: {ex.Message}",
-                    NotificationLevel.Error,
-                    isHighPriority: true
-                );
+                // Log error but don't show notification to user
+                _loggingService.LogError($"Automation failed: {ex.Message}");
+                
                 finalStatus = "Automatisering feilet";
                 return AutomationResult.Failed($"Automation failed: {ex.Message}", ex);
             }

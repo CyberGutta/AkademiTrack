@@ -154,6 +154,22 @@ namespace AkademiTrack.Services
 
         public SchoolHoursSettings SchoolHours => _schoolHours;
 
+        public int FeideGracePeriodHours
+        {
+            get => _settings.FeideGracePeriodHours;
+            set
+            {
+                if (_settings.FeideGracePeriodHours != value)
+                {
+                    var oldValue = _settings.FeideGracePeriodHours;
+                    _settings.FeideGracePeriodHours = value;
+                    OnPropertyChanged();
+                    SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(FeideGracePeriodHours), oldValue, value));
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         #endregion
 
         #region Methods
@@ -276,6 +292,7 @@ namespace AkademiTrack.Services
             OnPropertyChanged(nameof(StartMinimized));
             OnPropertyChanged(nameof(EnableNotifications));
             OnPropertyChanged(nameof(InitialSetupCompleted));
+            OnPropertyChanged(nameof(FeideGracePeriodHours));
         }
 
         #endregion

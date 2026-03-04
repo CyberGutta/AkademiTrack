@@ -136,7 +136,8 @@ namespace AkademiTrack.Services.DependencyInjection
             {
                 var notificationService = provider.GetRequiredService<INotificationService>();
                 var loggingService = provider.GetRequiredService<ILoggingService>();
-                return new UserConfirmationService(notificationService, loggingService);
+                var settingsService = provider.GetRequiredService<ISettingsService>();
+                return new UserConfirmationService(notificationService, loggingService, settingsService);
             });
             
             // Widget services

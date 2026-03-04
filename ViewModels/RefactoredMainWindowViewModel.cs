@@ -412,6 +412,16 @@ namespace AkademiTrack.ViewModels
                     
                     _loggingService.LogDebug($"🔍 [INIT] Set state: IsAuthenticated={IsAuthenticated}, _userParameters complete={_userParameters.IsComplete}");
 
+                    // Register Feide login as automatic presence confirmation
+                    try
+                    {
+                        await _userConfirmationService.RegisterFeideLoginConfirmationAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Failed to register Feide confirmation: {ex.Message}");
+                    }
+
                     // Update command states after authentication
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
@@ -1079,7 +1089,7 @@ namespace AkademiTrack.ViewModels
                         _loggingService.LogInfo("[MAIN] Calendar ViewModel initialized from cached credentials");
                     }
                     
-                    _loggingService.LogSuccess($"[MAIN] Set credentials in automation service and dashboard: {cookies.Count} cookies, params complete: {paramsToUse.IsComplete}");
+                    // Credentials set successfully - no need for verbose logging
                 }
                 else
                 {
@@ -1105,11 +1115,8 @@ namespace AkademiTrack.ViewModels
                     Debug.WriteLine($"[Analytics] Failed to log automation start: {ex.Message}");
                 }
 
-                await _notificationService.ShowNotificationAsync(
-                    "Automatisering feilet",
-                    result.Message ?? "Nettverk eller autentiseringsfeil ved start av automatisering",
-                    NotificationLevel.Error
-                );
+                // Automation failed - log but don't show notification to user
+                _loggingService.LogError($"Automation start failed: {result.Message ?? "Network or authentication error"}");
 
                 Debug.WriteLine("[MainWindow] Automation start failed");
             }

@@ -41,6 +41,7 @@ namespace AkademiTrack.ViewModels
         public bool EnableNotifications { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public bool InitialSetupCompleted { get; set; } = false;
+        public int FeideGracePeriodHours { get; set; } = 4; // Grace period after Feide login
     }
 
     public static class AutoStartManager
