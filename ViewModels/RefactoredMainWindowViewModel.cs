@@ -237,6 +237,7 @@ namespace AkademiTrack.ViewModels
         // Track if we're waiting to show overlay after notifications are handled
         private bool _pendingOverlayShow = false;
         private DateTime _lastNotificationTime = DateTime.MinValue;
+        private bool _hasShownInitialConfirmationNotification = false;
 
         public async Task<bool> IsConfirmationNeededAsync()
         {
@@ -685,6 +686,19 @@ namespace AkademiTrack.ViewModels
                         // Always check confirmation status first
                         await UpdateConfirmationStatusAsync();
                         
+                        // Additional check: if confirmation is needed but overlay is not showing, 
+                        // and automation should be running, show overlay immediately
+                        if (IsConfirmationNeeded && !ShouldShowConfirmationOverlay)
+                        {
+                            var (shouldStart, _, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
+                            if (shouldStart && needsConfirmation)
+                            {
+                                _loggingService.LogInfo("Confirmation needed and automation should be running - showing overlay");
+                                _hasShownInitialConfirmationNotification = false;
+                                await RequestOverlayShowAsync();
+                            }
+                        }
+                        
                         // If confirmation is needed and automation is running, stop it
                         if (IsConfirmationNeeded && IsAutomationRunning)
                         {
@@ -693,7 +707,12 @@ namespace AkademiTrack.ViewModels
                             await Dispatcher.UIThread.InvokeAsync(async () =>
                             {
                                 await StopAutomationAsync(markAsManual: false);
-                                _loggingService.LogInfo("Automation stopped - confirmation overlay should appear");
+                                _loggingService.LogInfo("Automation stopped due to lost confirmation");
+                                
+                                // Reset notification flag and show overlay immediately
+                                _hasShownInitialConfirmationNotification = false;
+                                await RequestOverlayShowAsync();
+                                _loggingService.LogInfo("Confirmation overlay shown after stopping automation");
                             });
                         }
                         
@@ -784,12 +803,21 @@ namespace AkademiTrack.ViewModels
             _lastNotificationTime = DateTime.Now;
             _loggingService.LogDebug($"Notification added: {e.Notification.Title}");
 
-            // IMMEDIATELY hide overlay if a notification appears
-            if (ShouldShowConfirmationOverlay)
+            // Don't hide overlay for confirmation-related notifications
+            var isConfirmationNotification = e.Notification.Title?.Contains("Bekreftelse") == true || 
+                                           e.Notification.Title?.Contains("BEKREFT") == true ||
+                                           e.Notification.Message?.Contains("Trykk 'Ja, jeg er her'") == true;
+
+            // IMMEDIATELY hide overlay if a notification appears (except confirmation notifications)
+            if (ShouldShowConfirmationOverlay && !isConfirmationNotification)
             {
                 _loggingService.LogInfo("Notification appeared - IMMEDIATELY hiding confirmation overlay");
                 ShouldShowConfirmationOverlay = false;
                 _pendingOverlayShow = true; // Mark as pending so it can show later after notification is handled
+            }
+            else if (isConfirmationNotification)
+            {
+                _loggingService.LogDebug("Confirmation notification - keeping overlay visible");
             }
         }
 
@@ -798,23 +826,59 @@ namespace AkademiTrack.ViewModels
         /// </summary>
         private async Task RequestOverlayShowAsync()
         {
-            // ABSOLUTE RULE: Never show overlay if there are any active notifications
+            // Check if there are any active notifications
             var hasActiveNotifications = _notificationService.HasActiveNotifications;
 
             if (hasActiveNotifications)
             {
-                _loggingService.LogInfo("BLOCKING overlay - active notifications must be handled first. Overlay will NOT be shown.");
-                return; // HARD STOP - no overlay, no pending, no fallback timer
+                // Check if all active notifications are confirmation-related
+                var activeNotifications = _notificationService.GetActiveNotifications();
+                var hasNonConfirmationNotifications = activeNotifications.Any(n => 
+                    n.Title?.Contains("Bekreftelse") != true && 
+                    n.Title?.Contains("BEKREFT") != true && 
+                    n.Message?.Contains("Trykk 'Ja, jeg er her'") != true);
+
+                if (hasNonConfirmationNotifications)
+                {
+                    _loggingService.LogInfo("BLOCKING overlay - non-confirmation notifications must be handled first. Overlay will NOT be shown.");
+                    return; // HARD STOP - no overlay, no pending, no fallback timer
+                }
+                else
+                {
+                    _loggingService.LogDebug("Only confirmation notifications active - allowing overlay to show");
+                }
             }
 
-            // Only show overlay if absolutely no notifications are active
-            _loggingService.LogDebug("No active notifications - showing overlay immediately");
+            // Show overlay if no non-confirmation notifications are active
+            _loggingService.LogDebug("No blocking notifications - showing overlay immediately");
+            
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 ShouldShowConfirmationOverlay = true;
             });
+            
+            // Show initial notification if we haven't already for this session
+            if (!_hasShownInitialConfirmationNotification)
+            {
+                _hasShownInitialConfirmationNotification = true;
+                
+                // Show notification after a brief delay to ensure overlay is visible first
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(300); // Brief delay to ensure overlay is visible first
+                    await _notificationService.ShowNotificationAsync(
+                        "Bekreftelse Påkrevd",
+                        "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
+                        NotificationLevel.Warning,
+                        isHighPriority: true
+                    );
+                });
+            }
         }
 
+        /// <summary>
+        /// Checks if we should show the confirmation overlay after notifications are handled
+        /// </summary>
         /// <summary>
         /// Checks if we should show the confirmation overlay after notifications are handled
         /// </summary>
@@ -822,22 +886,32 @@ namespace AkademiTrack.ViewModels
         {
             if (!_pendingOverlayShow) return;
 
-            // ABSOLUTE RULE: Never show overlay if there are any active notifications
+            // Check if there are any active notifications
             var hasActiveNotifications = _notificationService.HasActiveNotifications;
 
             if (hasActiveNotifications)
             {
-                _loggingService.LogDebug("Still have active notifications - overlay remains BLOCKED");
-                return; // Keep waiting, don't show overlay
+                // Check if all active notifications are confirmation-related
+                var activeNotifications = _notificationService.GetActiveNotifications();
+                var hasNonConfirmationNotifications = activeNotifications.Any(n => 
+                    n.Title?.Contains("Bekreftelse") != true && 
+                    n.Title?.Contains("BEKREFT") != true && 
+                    n.Message?.Contains("Trykk 'Ja, jeg er her'") != true);
+
+                if (hasNonConfirmationNotifications)
+                {
+                    _loggingService.LogDebug("Still have non-confirmation notifications - overlay remains BLOCKED");
+                    return; // Keep waiting, don't show overlay
+                }
             }
 
-            // Wait at least 2 seconds after last notification before showing overlay
+            // Reduced wait time - only wait 0.5 seconds after last notification for quicker response
             var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
-            var enoughTimeHasPassed = timeSinceLastNotification.TotalSeconds >= 2;
+            var enoughTimeHasPassed = timeSinceLastNotification.TotalSeconds >= 0.5;
 
             if (enoughTimeHasPassed)
             {
-                _loggingService.LogDebug("No active notifications and enough time passed - showing pending overlay");
+                _loggingService.LogDebug("No blocking notifications and enough time passed - showing pending overlay");
                 _pendingOverlayShow = false;
                 ShouldShowConfirmationOverlay = true;
             }
@@ -990,20 +1064,152 @@ namespace AkademiTrack.ViewModels
 
         private async void OnConfirmationLost(object? sender, EventArgs e)
         {
-            _loggingService.LogWarning("Confirmation lost - stopping automation and showing overlay");
-            
+            _loggingService.LogWarning("Confirmation lost - stopping automation and showing overlay immediately");
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 // Update confirmation status first
                 await UpdateConfirmationStatusAsync();
-                
+
                 // Stop automation if running (but don't mark as manual stop)
                 if (IsAutomationRunning)
                 {
                     await StopAutomationAsync(markAsManual: false);
-                    _loggingService.LogInfo("Automation stopped due to lost confirmation - overlay will appear");
+                    _loggingService.LogInfo("Automation stopped due to lost confirmation");
                 }
+
+                // Reset the initial notification flag so it shows again
+                _hasShownInitialConfirmationNotification = false;
+
+                // Immediately show the overlay since confirmation is lost
+                await RequestOverlayShowAsync();
             });
+        }
+
+        /// <summary>
+        /// Checks if the overlay should be shown based on current conditions
+        /// </summary>
+        private async Task CheckIfOverlayShouldShowAsync()
+        {
+            try
+            {
+                // Check if automation should start but needs confirmation
+                var (shouldStart, reason, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
+
+                if (needsConfirmation)
+                {
+                    // Check if it's actually time to start automation (ignoring confirmation requirement)
+                    var (wouldStartWithoutConfirmation, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+
+                    if (wouldStartWithoutConfirmation)
+                    {
+                        _loggingService.LogInfo("Confirmation lost and it's time to start automation - requesting overlay");
+                        await RequestOverlayShowAsync();
+                        
+                        // Start aggressive checking since confirmation is urgently needed
+                        StartAggressiveOverlayChecking();
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug($"Confirmation lost but not time to start yet: {reason}");
+                        
+                        // Start aggressive checking for when it becomes time
+                        StartAggressiveOverlayChecking();
+                    }
+                }
+                else
+                {
+                    _loggingService.LogDebug("Confirmation lost but no confirmation needed or automation already confirmed");
+                    
+                    // Stop aggressive checking since no confirmation is needed
+                    StopAggressiveOverlayChecking();
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking if overlay should show: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// Forces a check of whether the overlay should be shown (useful for testing/debugging)
+        /// </summary>
+        public async Task ForceCheckOverlayStatusAsync()
+        {
+            _loggingService.LogInfo("Force checking overlay status...");
+            await CheckIfOverlayShouldShowAsync();
+        }
+        // Timer for frequent overlay checks when confirmation is needed
+        private Timer? _overlayCheckTimer;
+
+        /// <summary>
+        /// Starts aggressive overlay checking when confirmation is needed
+        /// </summary>
+        private void StartAggressiveOverlayChecking()
+        {
+            if (_overlayCheckTimer != null)
+                return;
+
+            _loggingService.LogDebug("Starting aggressive overlay checking (every 5 seconds)");
+
+            _overlayCheckTimer = new Timer(
+                async _ =>
+                {
+                    try
+                    {
+                        // First check if confirmation file still exists
+                        var today = DateTime.Now.Date;
+                        var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
+                        
+                        if (!isConfirmed && !ShouldShowConfirmationOverlay)
+                        {
+                            // File is missing and overlay is not showing - this means file was deleted
+                            _loggingService.LogWarning("Confirmation file missing during periodic check");
+                            
+                            // Stop automation if running
+                            if (IsAutomationRunning)
+                            {
+                                _loggingService.LogWarning("Stopping automation due to missing confirmation file");
+                                await Dispatcher.UIThread.InvokeAsync(async () =>
+                                {
+                                    await StopAutomationAsync(markAsManual: false);
+                                });
+                            }
+                            
+                            // Reset notification flag so it shows again
+                            _hasShownInitialConfirmationNotification = false;
+                            
+                            // Show overlay immediately
+                            await RequestOverlayShowAsync();
+                            _loggingService.LogInfo("Overlay shown due to missing confirmation file");
+                        }
+                        else if (!ShouldShowConfirmationOverlay)
+                        {
+                            // Only check if overlay should show if it's not already showing
+                            await CheckIfOverlayShouldShowAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error in aggressive overlay check: {ex.Message}");
+                    }
+                },
+                null,
+                TimeSpan.FromSeconds(5), // First check after 5 seconds
+                TimeSpan.FromSeconds(5)  // Then every 5 seconds
+            );
+        }
+
+        /// <summary>
+        /// Stops aggressive overlay checking
+        /// </summary>
+        private void StopAggressiveOverlayChecking()
+        {
+            if (_overlayCheckTimer != null)
+            {
+                _loggingService.LogDebug("Stopping aggressive overlay checking");
+                _overlayCheckTimer.Dispose();
+                _overlayCheckTimer = null;
+            }
         }
         #endregion
 
@@ -1260,6 +1466,12 @@ namespace AkademiTrack.ViewModels
                     {
                         ShouldShowConfirmationOverlay = false;
                     });
+
+                    // Stop aggressive overlay checking since confirmation is done
+                    StopAggressiveOverlayChecking();
+                    
+                    // Reset the initial notification flag for next time
+                    _hasShownInitialConfirmationNotification = false;
 
                     // Update confirmation status
                     await UpdateConfirmationStatusAsync();
@@ -1527,29 +1739,34 @@ namespace AkademiTrack.ViewModels
         private async Task CheckMidnightResetAsync()
         {
             var now = DateTime.Now.Date;
-            
+
             if (now > _currentDay)
             {
                 _loggingService.LogInfo($"NEW DAY DETECTED! Changing from {_currentDay:yyyy-MM-dd} to {now:yyyy-MM-dd}");
                 _currentDay = now;
-                
+
                 SchoolTimeChecker.ResetDailyCompletion();
                 _loggingService.LogInfo("Daily completion flags reset");
-                
+
                 Dashboard.ClearCache();
                 _loggingService.LogInfo("Dashboard cache cleared for new day");
-                
+
                 // Clear daily confirmation for new day
                 await _userConfirmationService.ClearConfirmationAsync();
                 await UpdateConfirmationStatusAsync();
                 _loggingService.LogInfo("Daily confirmation cleared for new day");
                 
+                // Reset initial notification flag for new day
+                _hasShownInitialConfirmationNotification = false;
+
                 if (_settingsService.AutoStartAutomation)
                 {
                     _loggingService.LogInfo("Checking if automation should auto-start for new day...");
                     await CheckAutoStartAutomationAsync();
+
+                    // Also check if overlay should show after new day reset
+                    await CheckIfOverlayShouldShowAsync();
                 }
-                
             }
         }
 
@@ -1571,6 +1788,19 @@ namespace AkademiTrack.ViewModels
                     if (!needsConfirmation)
                     {
                         ShouldShowConfirmationOverlay = false;
+                        StopAggressiveOverlayChecking(); // Stop checking since no confirmation needed
+                    }
+                    else
+                    {
+                        // Start aggressive checking since confirmation is needed
+                        StartAggressiveOverlayChecking();
+                        
+                        // Check if we should immediately show the overlay (e.g., if automation should be running)
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(1000); // Brief delay to let initialization complete
+                            await CheckIfOverlayShouldShowAsync();
+                        });
                     }
                     // Don't automatically show overlay here - let other logic decide when to show it
                 });
@@ -2114,6 +2344,9 @@ namespace AkademiTrack.ViewModels
 
                 _autoStartCheckTimer?.Dispose();
                 _autoStartCheckTimer = null;
+
+                _overlayCheckTimer?.Dispose();
+                _overlayCheckTimer = null;
 
                 // Dispose semaphores
                 _refreshSemaphore?.Dispose();

@@ -587,28 +587,41 @@ namespace AkademiTrack.Services
             try
             {
                 var today = DateTime.Now.Date;
-                
+
                 // Don't send reminders if already confirmed
                 if (await IsConfirmedForDateAsync(today))
                     return;
 
-                // Check if we're within school hours or approaching them
-                var shouldStart = await ShouldSendReminderAsync();
-                if (!shouldStart)
-                    return;
+                // Check if automation should start but needs confirmation
+                var (shouldStart, reason, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
 
-                // Check if enough time has passed since last reminder (5 minutes)
+                if (!needsConfirmation)
+                    return; // No confirmation needed
+
+                // Check if it's actually time to start automation (ignoring confirmation requirement)
+                var (wouldStartWithoutConfirmation, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+
+                if (!wouldStartWithoutConfirmation)
+                {
+                    // Not time to start yet, but check if we should send early reminder
+                    var shouldSendEarlyReminder = await ShouldSendReminderAsync();
+                    if (!shouldSendEarlyReminder)
+                        return;
+                }
+
+                // Check if enough time has passed since last reminder
                 var timeSinceLastReminder = DateTime.Now - _lastReminderSent;
-                if (timeSinceLastReminder.TotalMinutes < 5)
+                var reminderInterval = wouldStartWithoutConfirmation ? 2 : 5; // More frequent when automation should start
+
+                if (timeSinceLastReminder.TotalMinutes < reminderInterval)
                     return;
 
-                // Only send reminder if automation would actually start (i.e., not already completed, not manually stopped)
-                if (!await ShouldAutomationStartAsync())
-                    return;
-
-                // Send reminder
-                await SendConfirmationReminderAsync();
+                // Send reminder with urgency based on timing
+                var isUrgent = wouldStartWithoutConfirmation;
+                await SendConfirmationReminderAsync(isUrgent);
                 _lastReminderSent = DateTime.Now;
+
+                _loggingService.LogInfo($"Sent confirmation reminder (urgent: {isUrgent}, interval: {reminderInterval} min)");
             }
             catch (Exception ex)
             {
@@ -691,13 +704,15 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task SendConfirmationReminderAsync()
+        private async Task SendConfirmationReminderAsync(bool isUrgent = false)
         {
             try
             {
                 // Get today's STU times for more specific messaging
                 var stuTimes = await GetTodaysSTUTimesAsync();
                 string timeInfo = "i dag";
+                string title = "Bekreft Tilstedeværelse";
+                var level = NotificationLevel.Info;
 
                 if (stuTimes != null && stuTimes.Any())
                 {
@@ -713,16 +728,26 @@ namespace AkademiTrack.Services
                     {
                         // During or after STU hours
                         timeInfo = "nå";
+                        if (isUrgent)
+                        {
+                            title = "Bekreftelse Påkrevd Nå";
+                            level = NotificationLevel.Warning;
+                        }
                     }
                 }
 
+                var message = isUrgent 
+                    ? $"Trykk 'Ja, jeg er her' {timeInfo} for å starte automatisk registrering."
+                    : $"Husk å bekrefte at du er til stede {timeInfo} for automatisk registrering av studietimer.";
+
                 await _notificationService.ShowNotificationAsync(
-                    "Bekreft Tilstedeværelse",
-                    $"Husk å bekrefte at du er til stede {timeInfo} for automatisk registrering av studietimer.",
-                    NotificationLevel.Info
+                    title,
+                    message,
+                    level,
+                    isHighPriority: isUrgent
                 );
 
-                _loggingService.LogInfo($"Sent confirmation reminder for {timeInfo}");
+                _loggingService.LogInfo($"Sent confirmation reminder for {timeInfo} (urgent: {isUrgent})");
             }
             catch (Exception ex)
             {
