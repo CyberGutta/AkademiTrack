@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using Avalonia.Input;
 using System;
 using AkademiTrack.ViewModels;
+using System.Threading.Tasks;
 
 namespace AkademiTrack.Views
 {
@@ -17,6 +18,51 @@ namespace AkademiTrack.Views
             InitializeComponent();
             this.Loaded += FeideView_Loaded;
             this.DataContextChanged += FeideView_DataContextChanged;
+        }
+
+        private async void CopyErrorToClipboard(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            try
+            {
+                if (DataContext is FeideWindowViewModel viewModel && !string.IsNullOrEmpty(viewModel.ErrorMessage))
+                {
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard != null)
+                    {
+                        // Get full error report from ChromeDriverManager if available
+                        var fullReport = AkademiTrack.Services.ChromeDriverManager.GetFullErrorReport();
+                        
+                        // Check if we have a real ChromeDriver error (not just empty report)
+                        var hasRealError = !string.IsNullOrEmpty(fullReport) && 
+                                          fullReport.Contains("===") && 
+                                          !fullReport.Contains("Final Error Code: UNKNOWN");
+                        
+                        // If we have a detailed report, use it; otherwise just copy the displayed error message
+                        var textToCopy = hasRealError ? fullReport : viewModel.ErrorMessage;
+                        
+                        await clipboard.SetTextAsync(textToCopy);
+                        
+                        // Show feedback
+                        if (sender is Button button)
+                        {
+                            var originalContent = button.Content;
+                            button.Content = "✓ Kopiert!";
+                            button.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#22C55E"));
+                            button.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#DCFCE7"));
+                            
+                            await Task.Delay(2000);
+                            
+                            button.Content = originalContent;
+                            button.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#D70015"));
+                            button.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#FFE5E5"));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FeideView] Failed to copy to clipboard: {ex.Message}");
+            }
         }
 
         private void FeideView_Loaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

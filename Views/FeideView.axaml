@@ -300,34 +300,59 @@
 							   Classes="helper"/>
 				</StackPanel>
 
-				<!-- Error Message - Clean and simple -->
+				<!-- Error Message - Clean and simple with copy button -->
 				<Border Background="#FFF2F2"
 						BorderBrush="#FFB3B3"
 						BorderThickness="1"
 						CornerRadius="8"
 						Padding="12"
 						IsVisible="{Binding HasError}">
-					<StackPanel Orientation="Horizontal" Spacing="10">
-						<Border Background="#FF3B30" 
-								CornerRadius="10" 
-								Width="18" 
-								Height="18"
-								VerticalAlignment="Top"
-								Margin="0,1,0,0">
-							<TextBlock Text="!" 
-									   FontSize="11" 
-									   FontWeight="Bold"
-									   Foreground="White"
-									   HorizontalAlignment="Center" 
-									   VerticalAlignment="Center"/>
-						</Border>
-						<TextBlock Text="{Binding ErrorMessage}"
-								   Foreground="#D70015"
-								   TextWrapping="Wrap"
-								   FontSize="13"
-								   LineHeight="18"
-								   VerticalAlignment="Top"
-								   MaxWidth="300"/>
+					<StackPanel Spacing="2">
+						<StackPanel Orientation="Horizontal" Spacing="10">
+							<Border Background="#FF3B30" 
+									CornerRadius="10" 
+									Width="18" 
+									Height="18"
+									VerticalAlignment="Top"
+									Margin="0,1,0,0">
+								<TextBlock Text="!" 
+										   FontSize="11" 
+										   FontWeight="Bold"
+										   Foreground="White"
+										   HorizontalAlignment="Center" 
+										   VerticalAlignment="Center"/>
+							</Border>
+							<TextBlock Name="ErrorMessageText"
+									   Text="{Binding ErrorMessage}"
+									   Foreground="#D70015"
+									   TextWrapping="Wrap"
+									   FontSize="13"
+									   LineHeight="18"
+									   VerticalAlignment="Top"
+									   MaxWidth="300"/>
+						</StackPanel>
+						<Button Name="CopyErrorButton"
+								Content="📋 Kopier feilmelding"
+								Background="#FFE5E5"
+								Foreground="#D70015"
+								BorderBrush="#FFB3B3"
+								BorderThickness="1"
+								CornerRadius="6"
+								Padding="8,6"
+								FontSize="12"
+								FontWeight="SemiBold"
+								HorizontalAlignment="Left"
+								Cursor="Hand"
+								Click="CopyErrorToClipboard">
+							<Button.Styles>
+								<Style Selector="Button:pointerover /template/ ContentPresenter">
+									<Setter Property="Background" Value="#FFD5D5"/>
+								</Style>
+								<Style Selector="Button:pressed /template/ ContentPresenter">
+									<Setter Property="Background" Value="#FFC5C5"/>
+								</Style>
+							</Button.Styles>
+						</Button>
 					</StackPanel>
 				</Border>
 
@@ -335,7 +360,7 @@
 				<Button Name="LoadingButton"
 						Classes="primary"
 						HorizontalAlignment="Stretch"
-						Margin="0,4,0,0"
+						Margin="0,0,0,0"
 						Command="{Binding SaveCommand}"
 						IsEnabled="{Binding CanSave}">
 					<Button.Styles>

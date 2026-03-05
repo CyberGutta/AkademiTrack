@@ -15,6 +15,141 @@ namespace AkademiTrack.Services
     {
         private static readonly object _lock = new object();
         
+        // Hierarchical error codes for precise debugging
+        // Format: CD-[Stage].[Step].[SubStep]
+        
+        // Stage 1: Initial Setup
+        public const string ERROR_CODE_SETUP_START = "CD-1.0";
+        public const string ERROR_CODE_SETUP_EXCEPTION = "CD-1.1";
+        
+        // Stage 2: Test ChromeDriver
+        public const string ERROR_CODE_TEST_START = "CD-2.0";
+        public const string ERROR_CODE_TEST_OPTIONS_CREATION = "CD-2.1";
+        public const string ERROR_CODE_TEST_SERVICE_CREATION = "CD-2.2";
+        public const string ERROR_CODE_TEST_SERVICE_PATH_INVALID = "CD-2.2.1";
+        public const string ERROR_CODE_TEST_SERVICE_EXECUTABLE_MISSING = "CD-2.2.2";
+        public const string ERROR_CODE_TEST_DRIVER_CREATION = "CD-2.3";
+        public const string ERROR_CODE_TEST_DRIVER_TIMEOUT = "CD-2.3.1";
+        public const string ERROR_CODE_TEST_DRIVER_NOT_FOUND = "CD-2.3.2";
+        public const string ERROR_CODE_TEST_DRIVER_PERMISSION_DENIED = "CD-2.3.3";
+        public const string ERROR_CODE_TEST_DRIVER_INCOMPATIBLE = "CD-2.3.4";
+        public const string ERROR_CODE_TEST_NAVIGATION = "CD-2.4";
+        public const string ERROR_CODE_TEST_NAVIGATION_TIMEOUT = "CD-2.4.1";
+        public const string ERROR_CODE_TEST_UNEXPECTED = "CD-2.9";
+        
+        // Stage 3: Fallback Setup
+        public const string ERROR_CODE_FALLBACK_START = "CD-3.0";
+        public const string ERROR_CODE_FALLBACK_WEBDRIVER_MANAGER = "CD-3.1";
+        public const string ERROR_CODE_FALLBACK_RETEST_FAILED = "CD-3.2";
+        public const string ERROR_CODE_FALLBACK_EXCEPTION = "CD-3.9";
+        
+        // Stage 4: Complete Failure
+        public const string ERROR_CODE_COMPLETE_FAILURE = "CD-4.0";
+        
+        public static string? LastErrorCode { get; private set; }
+        public static string? LastErrorMessage { get; private set; }
+        public static string? LastErrorDetails { get; private set; }
+        public static Exception? LastException { get; private set; }
+        
+        // Track the FIRST error that occurred
+        private static string? FirstErrorCode { get; set; }
+        private static string? FirstErrorMessage { get; set; }
+        private static Exception? FirstException { get; set; }
+        
+        private static void SetError(string code, string message, Exception? ex = null, string? additionalDetails = null)
+        {
+            // Save the FIRST error that occurred
+            if (FirstErrorCode == null)
+            {
+                FirstErrorCode = code;
+                FirstErrorMessage = message;
+                FirstException = ex;
+            }
+            
+            LastErrorCode = code;
+            LastErrorMessage = message;
+            LastException = ex;
+            
+            var details = "";
+            if (ex != null)
+            {
+                details += $"Exception Type: {ex.GetType().FullName}\n";
+                details += $"Exception Message: {ex.Message}\n";
+                if (ex.InnerException != null)
+                {
+                    details += $"Inner Exception: {ex.InnerException.GetType().FullName}\n";
+                    details += $"Inner Message: {ex.InnerException.Message}\n";
+                }
+                details += $"Stack Trace:\n{ex.StackTrace}\n";
+            }
+            
+            if (!string.IsNullOrEmpty(additionalDetails))
+            {
+                details += $"\nAdditional Info:\n{additionalDetails}";
+            }
+            
+            LastErrorDetails = details;
+            
+            Debug.WriteLine($"[ChromeDriverManager] ❌ Error [{code}]: {message}");
+            if (!string.IsNullOrEmpty(details))
+            {
+                Debug.WriteLine($"[ChromeDriverManager] Details:\n{details}");
+            }
+        }
+        
+        public static string GetFullErrorReport()
+        {
+            var report = "=== ChromeDriver Error Report ===\n\n";
+            
+            // Show the FIRST error (root cause)
+            if (FirstErrorCode != null)
+            {
+                report += $"Root Cause Error Code: {FirstErrorCode}\n";
+                report += $"Root Cause Message: {FirstErrorMessage ?? "No message"}\n\n";
+            }
+            
+            // Show the LAST error (final state)
+            report += $"Final Error Code: {LastErrorCode ?? "UNKNOWN"}\n";
+            report += $"Final Error Message: {LastErrorMessage ?? "No error message"}\n\n";
+            
+            if (FirstException != null || LastException != null)
+            {
+                report += "=== Exception Details ===\n";
+                
+                var exToShow = FirstException ?? LastException;
+                report += $"Type: {exToShow!.GetType().FullName}\n";
+                report += $"Message: {exToShow.Message}\n";
+                
+                if (exToShow.InnerException != null)
+                {
+                    report += $"\nInner Exception Type: {exToShow.InnerException.GetType().FullName}\n";
+                    report += $"Inner Exception Message: {exToShow.InnerException.Message}\n";
+                }
+                
+                report += $"\nStack Trace:\n{exToShow.StackTrace}\n";
+            }
+            
+            if (!string.IsNullOrEmpty(LastErrorDetails))
+            {
+                report += "\n=== Technical Details ===\n";
+                report += LastErrorDetails;
+            }
+            
+            report += "\n=== System Information ===\n";
+            report += $"OS: {RuntimeInformation.OSDescription}\n";
+            report += $"Architecture: {RuntimeInformation.OSArchitecture}\n";
+            report += $"Framework: {RuntimeInformation.FrameworkDescription}\n";
+            report += $"Chrome Version: {GetChromeVersion() ?? "Not found"}\n";
+            
+            return report;
+        }
+        
+        // Allow AuthenticationService to set errors too
+        public static void SetAuthenticationError(string code, string message, Exception? ex = null)
+        {
+            SetError(code, message, ex);
+        }
+        
         /// <summary>
         /// Ensures ChromeDriver is available and returns the path to the driver executable.
         /// Uses Selenium Manager (built into Selenium 4.6+) for automatic driver management.
@@ -24,8 +159,17 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Debug.WriteLine("[ChromeDriverManager] Checking ChromeDriver availability...");
+                Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_SETUP_START}] Starting ChromeDriver setup...");
                 progress?.Report("Checking ChromeDriver availability...");
+                
+                // Clear previous errors
+                LastErrorCode = null;
+                LastErrorMessage = null;
+                LastErrorDetails = null;
+                LastException = null;
+                FirstErrorCode = null;
+                FirstErrorMessage = null;
+                FirstException = null;
                 
                 // First, try to create a ChromeDriver instance to test if everything works
                 // Selenium Manager (built into Selenium 4.6+) will automatically download the driver if needed
@@ -36,15 +180,29 @@ namespace AkademiTrack.Services
                     return true;
                 }
                 
-                Debug.WriteLine("[ChromeDriverManager] ChromeDriver not working, attempting setup...");
+                Debug.WriteLine($"[ChromeDriverManager] ChromeDriver test failed with error: {LastErrorCode}");
+                Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_FALLBACK_START}] Attempting fallback setup...");
                 progress?.Report("Setting up ChromeDriver...");
                 
                 // Fallback: Use WebDriverManager.Net for explicit driver management
-                return await SetupChromeDriverWithWebDriverManagerAsync(progress);
+                var setupResult = await SetupChromeDriverWithWebDriverManagerAsync(progress);
+                
+                if (!setupResult)
+                {
+                    // Don't overwrite the original error - just add context
+                    var originalError = FirstErrorCode ?? LastErrorCode;
+                    var originalMessage = FirstErrorMessage ?? LastErrorMessage;
+                    
+                    Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_COMPLETE_FAILURE}] All attempts failed. Root cause: {originalError}");
+                }
+                
+                return setupResult;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ChromeDriverManager] ChromeDriver setup error: {ex.Message}");
+                SetError(ERROR_CODE_SETUP_EXCEPTION, 
+                       "Unexpected exception during ChromeDriver setup",
+                       ex);
                 progress?.Report($"Setup error: {ex.Message}");
                 return false;
             }
@@ -57,43 +215,156 @@ namespace AkademiTrack.Services
         {
             return await Task.Run(() =>
             {
+                ChromeDriverService? service = null;
+                ChromeDriver? driver = null;
+                
                 try
                 {
-                    var options = new ChromeOptions();
-                    options.AddArgument("--headless=new"); // Use new headless mode
-                    options.AddArgument("--no-sandbox");
-                    options.AddArgument("--disable-dev-shm-usage");
-                    options.AddArgument("--disable-gpu");
-                    options.AddArgument("--disable-web-security");
-                    options.AddArgument("--disable-features=VizDisplayCompositor");
-                    options.AddArgument("--disable-extensions");
-                    options.AddArgument("--disable-plugins");
-                    options.AddArgument("--disable-images");
-                    options.AddArgument("--disable-javascript");
-                    options.AddArgument("--disable-default-apps");
-                    options.AddArgument("--disable-background-timer-throttling");
-                    options.AddArgument("--disable-backgrounding-occluded-windows");
-                    options.AddArgument("--disable-renderer-backgrounding");
-                    options.AddArgument("--disable-background-networking");
-                    options.AddArgument("--no-first-run");
-                    options.AddArgument("--no-default-browser-check");
+                    Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_START}] Starting ChromeDriver test...");
                     
-                    // Set a very short timeout for testing
-                    var service = ChromeDriverService.CreateDefaultService();
-                    service.HideCommandPromptWindow = true;
-                    service.SuppressInitialDiagnosticInformation = true;
-                    
-                    using (var driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10)))
+                    // Step 2.1: Create Chrome options
+                    ChromeOptions options;
+                    try
                     {
-                        // Quick test - just navigate to a simple page
-                        driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>");
-                        return true;
+                        options = new ChromeOptions();
+                        options.AddArgument("--headless=new");
+                        options.AddArgument("--no-sandbox");
+                        options.AddArgument("--disable-dev-shm-usage");
+                        options.AddArgument("--disable-gpu");
+                        options.AddArgument("--disable-web-security");
+                        options.AddArgument("--disable-features=VizDisplayCompositor");
+                        options.AddArgument("--disable-extensions");
+                        options.AddArgument("--disable-plugins");
+                        options.AddArgument("--disable-images");
+                        options.AddArgument("--disable-javascript");
+                        options.AddArgument("--disable-default-apps");
+                        options.AddArgument("--disable-background-timer-throttling");
+                        options.AddArgument("--disable-backgrounding-occluded-windows");
+                        options.AddArgument("--disable-renderer-backgrounding");
+                        options.AddArgument("--disable-background-networking");
+                        options.AddArgument("--no-first-run");
+                        options.AddArgument("--no-default-browser-check");
+                        Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_OPTIONS_CREATION}] ✓ Chrome options created");
                     }
+                    catch (Exception ex)
+                    {
+                        SetError(ERROR_CODE_TEST_OPTIONS_CREATION, 
+                               "Failed to create Chrome options",
+                               ex);
+                        return false;
+                    }
+                    
+                    // Step 2.2: Create ChromeDriverService
+                    Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_SERVICE_CREATION}] Creating ChromeDriverService...");
+                    try
+                    {
+                        service = ChromeDriverService.CreateDefaultService();
+                        service.HideCommandPromptWindow = true;
+                        service.SuppressInitialDiagnosticInformation = true;
+                        
+                        Debug.WriteLine($"[ChromeDriverManager] ✓ Service created successfully");
+                        Debug.WriteLine($"[ChromeDriverManager]   Path: {service.DriverServicePath ?? "(empty)"}");
+                        Debug.WriteLine($"[ChromeDriverManager]   Executable: {service.DriverServiceExecutableName ?? "(empty)"}");
+                    }
+                    catch (Exception ex)
+                    {
+                        SetError(ERROR_CODE_TEST_SERVICE_CREATION,
+                               "Failed to create ChromeDriverService",
+                               ex);
+                        return false;
+                    }
+                    
+                    // Step 2.3: Create ChromeDriver instance
+                    Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_DRIVER_CREATION}] Creating ChromeDriver instance...");
+                    try
+                    {
+                        driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10));
+                        Debug.WriteLine("[ChromeDriverManager] ✓ ChromeDriver instance created successfully");
+                    }
+                    catch (WebDriverTimeoutException ex)
+                    {
+                        SetError(ERROR_CODE_TEST_DRIVER_TIMEOUT,
+                               "ChromeDriver creation timed out after 10 seconds",
+                               ex,
+                               $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        return false;
+                    }
+                    catch (DriverServiceNotFoundException ex)
+                    {
+                        SetError(ERROR_CODE_TEST_DRIVER_NOT_FOUND,
+                               "ChromeDriver executable not found",
+                               ex,
+                               $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        return false;
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        SetError(ERROR_CODE_TEST_DRIVER_PERMISSION_DENIED,
+                               "Permission denied when trying to execute ChromeDriver",
+                               ex,
+                               $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}\n\nThis may be caused by:\n- macOS Gatekeeper blocking the executable\n- Insufficient file permissions\n- Security software blocking execution");
+                        return false;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        SetError(ERROR_CODE_TEST_DRIVER_INCOMPATIBLE,
+                               "ChromeDriver is incompatible with installed Chrome version",
+                               ex,
+                               $"Chrome Version: {GetChromeVersion() ?? "Unknown"}\nService Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        SetError(ERROR_CODE_TEST_DRIVER_CREATION,
+                               "Failed to create ChromeDriver instance",
+                               ex,
+                               $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        return false;
+                    }
+                    
+                    // Step 2.4: Test navigation
+                    Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_NAVIGATION}] Testing navigation...");
+                    try
+                    {
+                        driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>");
+                        Debug.WriteLine("[ChromeDriverManager] ✓ Navigation successful");
+                    }
+                    catch (WebDriverTimeoutException ex)
+                    {
+                        SetError(ERROR_CODE_TEST_NAVIGATION_TIMEOUT,
+                               "Navigation timed out",
+                               ex);
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        SetError(ERROR_CODE_TEST_NAVIGATION,
+                               "Failed to navigate to test page",
+                               ex);
+                        return false;
+                    }
+                    
+                    Debug.WriteLine("[ChromeDriverManager] ✅ All tests passed successfully!");
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[ChromeDriverManager] Test failed: {ex.Message}");
+                    SetError(ERROR_CODE_TEST_UNEXPECTED,
+                           "Unexpected error during ChromeDriver test",
+                           ex);
                     return false;
+                }
+                finally
+                {
+                    try
+                    {
+                        driver?.Quit();
+                        driver?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ChromeDriverManager] Warning: Error during cleanup: {ex.Message}");
+                    }
                 }
             });
         }
@@ -105,19 +376,20 @@ namespace AkademiTrack.Services
         {
             try
             {
+                Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_FALLBACK_START}] Starting fallback setup...");
                 progress?.Report("Setting up ChromeDriver...");
                 
                 await Task.Run(() =>
                 {
-                    // Use WebDriverManager.Net to download and setup ChromeDriver
-                    // Note: For Chrome 115+, this might fail, but Selenium Manager should handle it
                     try
                     {
+                        Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_FALLBACK_WEBDRIVER_MANAGER}] Using WebDriverManager.Net...");
                         new DriverManager().SetUpDriver(new ChromeConfig());
+                        Debug.WriteLine("[ChromeDriverManager] ✓ WebDriverManager.Net completed");
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[ChromeDriverManager] WebDriverManager failed: {ex.Message}");
+                        Debug.WriteLine($"[ChromeDriverManager] WebDriverManager.Net failed: {ex.Message}");
                         // This is expected for Chrome 115+, Selenium Manager will handle it
                     }
                 });
@@ -125,11 +397,24 @@ namespace AkademiTrack.Services
                 progress?.Report("ChromeDriver setup complete");
                 
                 // Test again after setup
-                return await TestChromeDriverAsync();
+                Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_FALLBACK_RETEST_FAILED}] Re-testing ChromeDriver...");
+                var retestResult = await TestChromeDriverAsync();
+                
+                if (!retestResult)
+                {
+                    SetError(ERROR_CODE_FALLBACK_RETEST_FAILED,
+                           "ChromeDriver still not working after fallback setup",
+                           LastException,
+                           $"Previous error: {LastErrorCode}");
+                }
+                
+                return retestResult;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ChromeDriverManager] WebDriverManager setup failed: {ex.Message}");
+                SetError(ERROR_CODE_FALLBACK_EXCEPTION,
+                       "Exception during fallback setup",
+                       ex);
                 progress?.Report($"Setup failed: {ex.Message}");
                 return false;
             }

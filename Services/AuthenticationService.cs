@@ -193,10 +193,19 @@ namespace AkademiTrack.Services
                     var chromeDriverReady = await ChromeDriverManager.EnsureChromeDriverInstalledAsync();
                     if (!chromeDriverReady)
                     {
+                        // Use the FIRST error (root cause) for display
+                        var errorCode = ChromeDriverManager.LastErrorCode ?? "UNKNOWN";
+                        var errorMsg = ChromeDriverManager.LastErrorMessage ?? "Unknown error";
+                        
+                        Debug.WriteLine($"[AUTH] ChromeDriver setup failed [{errorCode}]: {errorMsg}");
+                        
+                        // Minimal user-facing message with root cause
+                        var userMessage = $"Feilkode: {errorCode}\n{errorMsg}";
+                        
                         return new AuthenticationResult 
                         { 
                             Success = false, 
-                            ErrorMessage = "Kunne ikke sette opp ChromeDriver. Vennligst start appen på nytt eller kontakt support." 
+                            ErrorMessage = userMessage
                         };
                     }
 
@@ -479,6 +488,18 @@ namespace AkademiTrack.Services
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[SELENIUM] Error: {ex.Message}");
+                    Debug.WriteLine($"[SELENIUM] Exception type: {ex.GetType().FullName}");
+                    
+                    // Store error in ChromeDriverManager for consistent error reporting
+                    var errorCode = ex switch
+                    {
+                        WebDriverException => "AUTH-1.1",
+                        TimeoutException => "AUTH-1.2",
+                        InvalidOperationException => "AUTH-1.3",
+                        _ => "AUTH-1.0"
+                    };
+                    
+                    ChromeDriverManager.SetAuthenticationError(errorCode, $"Selenium automation error: {ex.Message}", ex);
                     
                     // Track Selenium login failure
                     try
