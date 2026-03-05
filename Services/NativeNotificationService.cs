@@ -25,11 +25,6 @@ namespace AkademiTrack.Services
                     "ERROR" => "",
                     "WARNING" => "",
                     _ => ""
-
-                    //"SUCCESS" => "✅",
-                    //"ERROR" => "❌",
-                    //"WARNING" => "⚠️",
-                    //_ => "ℹ️"
                 };
 
                 string fullTitle = $"{icon} {title}";

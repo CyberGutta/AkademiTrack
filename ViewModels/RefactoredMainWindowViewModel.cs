@@ -85,7 +85,6 @@ namespace AkademiTrack.ViewModels
             { 
                 if (SetProperty(ref _isLoading, value))
                 {
-                    // Update command states when loading changes
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 }
             }
@@ -98,7 +97,6 @@ namespace AkademiTrack.ViewModels
             { 
                 if (SetProperty(ref _isAuthenticated, value))
                 {
-                    // Update command states when authentication changes
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
                 }
@@ -196,7 +194,6 @@ namespace AkademiTrack.ViewModels
                     OnPropertyChanged(nameof(IsCalendarTab));
                     OnPropertyChanged(nameof(IsAbsenceTab));
                     
-                    // Load calendar data when switching to calendar tab
                     if (value == "Kalender" && Calendar != null)
                     {
                         _loggingService.LogInfo("[TAB] Switching to Calendar - loading data");
@@ -416,22 +413,18 @@ namespace AkademiTrack.ViewModels
                 if (authResult.Success && authResult.Cookies != null && authResult.Parameters != null)
                 {
                     _loggingService.LogSuccess("Autentisering fullført");
-                    _loggingService.LogDebug($"🔍 [INIT] Auth result: Cookies={authResult.Cookies.Count}, Params complete={authResult.Parameters.IsComplete}");
+                    _loggingService.LogDebug($"[INIT] Auth result: Cookies={authResult.Cookies.Count}, Params complete={authResult.Parameters.IsComplete}");
 
                     Debug.WriteLine("[MainWindow] App initialization successful");
 
                     IsAuthenticated = true;
                     _userParameters = authResult.Parameters;
                     
-                    _loggingService.LogDebug($"🔍 [INIT] Set state: IsAuthenticated={IsAuthenticated}, _userParameters complete={_userParameters.IsComplete}");
+                    _loggingService.LogDebug($"[INIT] Set state: IsAuthenticated={IsAuthenticated}, _userParameters complete={_userParameters.IsComplete}");
 
-                    // NOTE: Auto-confirmation removed from here - only happens on interactive Feide login
-
-                    // Update command states after authentication
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
 
-                    // Initialize dashboard with credentials
                     var servicesUserParams = new Services.UserParameters
                     {
                         FylkeId = authResult.Parameters.FylkeId,
@@ -441,36 +434,32 @@ namespace AkademiTrack.ViewModels
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
                     
-                    // Initialize Calendar ViewModel with credentials
                     var attendanceService = new AttendanceDataService();
                     attendanceService.SetCredentials(servicesUserParams, authResult.Cookies);
                     Calendar = new CalendarViewModel(attendanceService, _loggingService);
                     OnPropertyChanged(nameof(Calendar));
-                    _loggingService.LogInfo("[INIT] ✅ Calendar ViewModel initialized");
+                    _loggingService.LogInfo("[INIT] Calendar ViewModel initialized");
                     
-                    // Load calendar data if we're on the calendar tab
                     if (IsCalendarTab)
                     {
                         _ = Calendar.LoadCalendarDataAsync();
                     }
 
-                    // PROGRESSIVE LOADING: Load cached data first for instant UI
-                    _loggingService.LogInfo("🚀 Laster cached data for rask visning...");
+                    _loggingService.LogInfo("Laster cached data for rask visning...");
                     try
                     {
                         await Dashboard.LoadCachedDataAsync();
-                        _loggingService.LogSuccess("✓ Cached data vist - UI er klar!");
+                        _loggingService.LogSuccess("Cached data vist - UI er klar!");
                     }
                     catch (Exception cacheEx)
                     {
                         _loggingService.LogWarning($"Could not load cached data: {cacheEx.Message}");
-                        // If no cached data, do a quick initial load before showing UI
                         _loggingService.LogInfo("Ingen cached data - henter fersk data...");
                         try
                         {
                             await Dashboard.RefreshDataAsync();
                             Dashboard.UpdateNextClassFromCache();
-                            _loggingService.LogSuccess("✓ Initial data hentet!");
+                            _loggingService.LogSuccess("Initial data hentet!");
                         }
                         catch (Exception initialEx)
                         {
@@ -478,11 +467,9 @@ namespace AkademiTrack.ViewModels
                         }
                     }
 
-                    // Hide loading overlay - UI is ready
                     IsLoading = false;
                     _loggingService.LogSuccess("Autentisering fullført - UI er klar");
 
-                    // If we had cached data, refresh in background
                     _loggingService.LogInfo("Oppdaterer data i bakgrunnen...");
                     _ = Task.Run(async () =>
                     {
@@ -490,7 +477,7 @@ namespace AkademiTrack.ViewModels
                         {
                             await Dashboard.RefreshDataAsync();
                             Dashboard.UpdateNextClassFromCache();
-                            _loggingService.LogSuccess("✓ Dashboard data oppdatert!");
+                            _loggingService.LogSuccess("Dashboard data oppdatert!");
                         }
                         catch (Exception dashboardEx)
                         {
@@ -501,7 +488,6 @@ namespace AkademiTrack.ViewModels
                     _loggingService.LogSuccess("Applikasjon er klar!");
                     StatusMessage = "Klar til å starte";
 
-                    // Start services with error handling
                     try
                     {
                         await UpdateConfirmationStatusAsync();
@@ -513,7 +499,6 @@ namespace AkademiTrack.ViewModels
                     catch (Exception serviceEx)
                     {
                         _loggingService.LogError($"Service startup failed: {serviceEx.Message}");
-                        // Continue initialization even if services fail
                     }
 
                     InitializationRetryCount = 0;
@@ -532,7 +517,6 @@ namespace AkademiTrack.ViewModels
                 _isInitializing = false;
                 _initializationSemaphore.Release();
                 
-                // Safety check: ensure loading is cleared if initialization completely failed
                 if (_initializationRetryCount >= MAX_RETRY_ATTEMPTS)
                 {
                     IsLoading = false;
@@ -719,7 +703,7 @@ namespace AkademiTrack.ViewModels
                         // Only auto-refresh dashboard if automation is not running
                         if (!IsAutomationRunning)
                         {
-                            _loggingService.LogDebug("🔄 Auto-refreshing dashboard data...");
+                            _loggingService.LogDebug("Auto-refreshing dashboard data...");
 
                             await Dispatcher.UIThread.InvokeAsync(async () =>
                             {
@@ -803,17 +787,15 @@ namespace AkademiTrack.ViewModels
             _lastNotificationTime = DateTime.Now;
             _loggingService.LogDebug($"Notification added: {e.Notification.Title}");
 
-            // Don't hide overlay for confirmation-related notifications
             var isConfirmationNotification = e.Notification.Title?.Contains("Bekreftelse") == true || 
                                            e.Notification.Title?.Contains("BEKREFT") == true ||
                                            e.Notification.Message?.Contains("Trykk 'Ja, jeg er her'") == true;
 
-            // IMMEDIATELY hide overlay if a notification appears (except confirmation notifications)
             if (ShouldShowConfirmationOverlay && !isConfirmationNotification)
             {
                 _loggingService.LogInfo("Notification appeared - IMMEDIATELY hiding confirmation overlay");
                 ShouldShowConfirmationOverlay = false;
-                _pendingOverlayShow = true; // Mark as pending so it can show later after notification is handled
+                _pendingOverlayShow = true;
             }
             else if (isConfirmationNotification)
             {
@@ -821,17 +803,12 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        /// <summary>
-        /// Requests to show the confirmation overlay, but NEVER shows if notifications are active
-        /// </summary>
         private async Task RequestOverlayShowAsync()
         {
-            // Check if there are any active notifications
             var hasActiveNotifications = _notificationService.HasActiveNotifications;
 
             if (hasActiveNotifications)
             {
-                // Check if all active notifications are confirmation-related
                 var activeNotifications = _notificationService.GetActiveNotifications();
                 var hasNonConfirmationNotifications = activeNotifications.Any(n => 
                     n.Title?.Contains("Bekreftelse") != true && 
@@ -841,7 +818,7 @@ namespace AkademiTrack.ViewModels
                 if (hasNonConfirmationNotifications)
                 {
                     _loggingService.LogInfo("BLOCKING overlay - non-confirmation notifications must be handled first. Overlay will NOT be shown.");
-                    return; // HARD STOP - no overlay, no pending, no fallback timer
+                    return;
                 }
                 else
                 {
@@ -849,7 +826,6 @@ namespace AkademiTrack.ViewModels
                 }
             }
 
-            // Show overlay if no non-confirmation notifications are active
             _loggingService.LogDebug("No blocking notifications - showing overlay immediately");
             
             await Dispatcher.UIThread.InvokeAsync(() =>
@@ -857,15 +833,13 @@ namespace AkademiTrack.ViewModels
                 ShouldShowConfirmationOverlay = true;
             });
             
-            // Show initial notification if we haven't already for this session
             if (!_hasShownInitialConfirmationNotification)
             {
                 _hasShownInitialConfirmationNotification = true;
                 
-                // Show notification after a brief delay to ensure overlay is visible first
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(300); // Brief delay to ensure overlay is visible first
+                    await Task.Delay(300);
                     await _notificationService.ShowNotificationAsync(
                         "Bekreftelse Påkrevd",
                         "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
@@ -876,22 +850,14 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        /// <summary>
-        /// Checks if we should show the confirmation overlay after notifications are handled
-        /// </summary>
-        /// <summary>
-        /// Checks if we should show the confirmation overlay after notifications are handled
-        /// </summary>
         private void CheckPendingOverlayShow()
         {
             if (!_pendingOverlayShow) return;
 
-            // Check if there are any active notifications
             var hasActiveNotifications = _notificationService.HasActiveNotifications;
 
             if (hasActiveNotifications)
             {
-                // Check if all active notifications are confirmation-related
                 var activeNotifications = _notificationService.GetActiveNotifications();
                 var hasNonConfirmationNotifications = activeNotifications.Any(n => 
                     n.Title?.Contains("Bekreftelse") != true && 
@@ -901,11 +867,10 @@ namespace AkademiTrack.ViewModels
                 if (hasNonConfirmationNotifications)
                 {
                     _loggingService.LogDebug("Still have non-confirmation notifications - overlay remains BLOCKED");
-                    return; // Keep waiting, don't show overlay
+                    return;
                 }
             }
 
-            // Reduced wait time - only wait 0.5 seconds after last notification for quicker response
             var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
             var enoughTimeHasPassed = timeSinceLastNotification.TotalSeconds >= 0.5;
 
@@ -925,10 +890,8 @@ namespace AkademiTrack.ViewModels
         {
             _loggingService.LogDebug($"Notification dismissed: {e.Notification.Title}");
             
-            // Check if we should show pending overlay after notification is handled
             CheckPendingOverlayShow();
             
-            // Handle current notification UI updates
             Dispatcher.UIThread.Post(() =>
             {
                 if (CurrentNotification?.Id == e.Notification.Id)
@@ -976,7 +939,7 @@ namespace AkademiTrack.ViewModels
                         
                         // Clear manual stop flag when school hours change - this allows auto-start to work again
                         await SchoolTimeChecker.ClearManualStopAsync();
-                        _loggingService.LogInfo("✓ Manual stop flag cleared due to school hours change");
+                        _loggingService.LogInfo("Manual stop flag cleared due to school hours change");
                         
                         // Perform immediate auto-start check
                         await PerformAutoStartCheckAsync();
@@ -1301,10 +1264,10 @@ namespace AkademiTrack.ViewModels
             // Set credentials in automation service
             if (_automationService is AutomationService automationService)
             {
-                _loggingService.LogDebug("🔍 [MAIN] Loading fresh credentials for automation...");
+                _loggingService.LogDebug("[MAIN] Loading fresh credentials for automation...");
                 
                 var cookies = await SecureCredentialStorage.LoadCookiesAsync();
-                _loggingService.LogDebug($"🔍 [MAIN] Loaded {cookies?.Count ?? 0} cookies from storage");
+                _loggingService.LogDebug($"[MAIN] Loaded {cookies?.Count ?? 0} cookies from storage");
                 
                 // Also reload user parameters in case they were updated by AuthenticationService
                 Services.UserParameters? freshUserParams = null;
@@ -1321,7 +1284,7 @@ namespace AkademiTrack.ViewModels
                     {
                         var json = await File.ReadAllTextAsync(filePath);
                         freshUserParams = JsonSerializer.Deserialize<Services.UserParameters>(json);
-                        _loggingService.LogDebug($"✓ [MAIN] Reloaded fresh user parameters from file: FylkeId={freshUserParams?.FylkeId}, SkoleId={freshUserParams?.SkoleId}");
+                        _loggingService.LogDebug($"[MAIN] Reloaded fresh user parameters from file: FylkeId={freshUserParams?.FylkeId}, SkoleId={freshUserParams?.SkoleId}");
                     }
                     else
                     {
@@ -1330,7 +1293,7 @@ namespace AkademiTrack.ViewModels
                         if (!string.IsNullOrEmpty(userParamsJson))
                         {
                             freshUserParams = JsonSerializer.Deserialize<Services.UserParameters>(userParamsJson);
-                            _loggingService.LogDebug($"✓ [MAIN] Reloaded fresh user parameters from keychain: FylkeId={freshUserParams?.FylkeId}, SkoleId={freshUserParams?.SkoleId}");
+                            _loggingService.LogDebug($"[MAIN] Reloaded fresh user parameters from keychain: FylkeId={freshUserParams?.FylkeId}, SkoleId={freshUserParams?.SkoleId}");
                         }
                     }
                 }
@@ -1341,7 +1304,7 @@ namespace AkademiTrack.ViewModels
                 
                 if (freshUserParams == null)
                 {
-                    _loggingService.LogDebug("⚠️ [MAIN] No user parameters found in storage, using cached ones");
+                    _loggingService.LogDebug("[MAIN] No user parameters found in storage, using cached ones");
                 }
                 
                 // Use fresh parameters if available, otherwise fall back to cached ones
@@ -1568,7 +1531,7 @@ namespace AkademiTrack.ViewModels
                 try
                 {
                     await SchoolTimeChecker.ClearManualStopAsync();
-                    _loggingService.LogInfo("✓ Manual stop flag cleared due to school hours change");
+                    _loggingService.LogInfo("Manual stop flag cleared due to school hours change");
                     
                     // Perform immediate auto-start check
                     await PerformAutoStartCheckAsync();
@@ -1974,7 +1937,7 @@ namespace AkademiTrack.ViewModels
                 {
                     if (_autoStartCheckTimer == null)
                     {
-                        _loggingService.LogInfo("⏰ Starting smart auto-start checker (frequent checks near start times)");
+                        _loggingService.LogInfo("Starting smart auto-start checker (frequent checks near start times)");
                         _autoStartCheckTimer = new Timer(
                             async _ => 
                             {
@@ -1983,7 +1946,7 @@ namespace AkademiTrack.ViewModels
                                     // Check for wake from sleep first
                                     if (SchoolTimeChecker.DetectWakeFromSleep())
                                     {
-                                        _loggingService.LogInfo("💤 Wake from sleep detected - checking auto-start conditions");
+                                        _loggingService.LogInfo("Wake from sleep detected - checking auto-start conditions");
                                     }
 
                                     // Perform the auto-start check (this one CAN show overlay)
@@ -2017,7 +1980,7 @@ namespace AkademiTrack.ViewModels
                     }
                     else
                     {
-                        _loggingService.LogDebug("⏰ Smart auto-start checker already running");
+                        _loggingService.LogDebug("Smart auto-start checker already running");
                     }
                 });
             }
@@ -2074,7 +2037,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else if (shouldStart && !IsAutomationRunning)
                 {
-                    _loggingService.LogInfo($"🚀 Auto-starting automation: {reason}");
+                    _loggingService.LogInfo($"Auto-starting automation: {reason}");
 
                     // Mark as started
                     await SchoolTimeChecker.MarkTodayAsStartedAsync();
@@ -2119,32 +2082,28 @@ namespace AkademiTrack.ViewModels
                     {
                         // Very close to start time - check every 5 seconds for precision
                         nextCheckInterval = TimeSpan.FromSeconds(5);
-                        _loggingService.LogDebug($"⏰ Next check in 5s (start time in {timeUntilStart.TotalMinutes:F1} min)");
+                        _loggingService.LogDebug($"Next check in 5s (start time in {timeUntilStart.TotalMinutes:F1} min)");
                     }
                     else if (timeUntilStart.TotalMinutes <= 10)
                     {
-                        // Close to start time - check every 15 seconds
                         nextCheckInterval = TimeSpan.FromSeconds(15);
-                        _loggingService.LogDebug($"⏰ Next check in 15s (start time in {timeUntilStart.TotalMinutes:F0} min)");
+                        _loggingService.LogDebug($"Next check in 15s (start time in {timeUntilStart.TotalMinutes:F0} min)");
                     }
                     else if (timeUntilStart.TotalHours <= 1)
                     {
-                        // Within an hour - check every minute
                         nextCheckInterval = TimeSpan.FromMinutes(1);
-                        _loggingService.LogDebug($"⏰ Next check in 1m (start time in {timeUntilStart.TotalHours:F1} hours)");
+                        _loggingService.LogDebug($"Next check in 1m (start time in {timeUntilStart.TotalHours:F1} hours)");
                     }
                     else
                     {
-                        // Far from start time - check every 5 minutes
                         nextCheckInterval = TimeSpan.FromMinutes(5);
-                        _loggingService.LogDebug($"⏰ Next check in 5m (start time in {timeUntilStart.TotalHours:F1} hours)");
+                        _loggingService.LogDebug($"Next check in 5m (start time in {timeUntilStart.TotalHours:F1} hours)");
                     }
                 }
                 else
                 {
-                    // No next start time - check every 30 seconds for settings changes
                     nextCheckInterval = TimeSpan.FromSeconds(30);
-                    _loggingService.LogDebug("⏰ Next check in 30s (no scheduled start time)");
+                    _loggingService.LogDebug("Next check in 30s (no scheduled start time)");
                 }
 
                 // Reschedule the timer on UI thread to avoid threading issues

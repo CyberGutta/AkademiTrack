@@ -50,7 +50,6 @@ namespace AkademiTrack.Services
             {
                 var today = DateTime.Now.Date;
                 
-                // Check if already confirmed today
                 if (await IsConfirmedForDateAsync(today))
                 {
                     _loggingService.LogInfo("Daily confirmation already received for today");
@@ -59,7 +58,6 @@ namespace AkademiTrack.Services
 
                 _loggingService.LogInfo($"Requesting daily confirmation with {timeoutMinutes} minute timeout");
                 
-                // Create confirmation request
                 var confirmationId = Guid.NewGuid().ToString();
                 var confirmationRequest = new UserConfirmationRequest
                 {
@@ -70,10 +68,8 @@ namespace AkademiTrack.Services
                     IsConfirmed = false
                 };
 
-                // Notify listeners about confirmation request
                 ConfirmationRequested?.Invoke(this, new UserConfirmationEventArgs(confirmationRequest));
 
-                // Show notification to user
                 await _notificationService.ShowNotificationAsync(
                     "Bekreft tilstedeværelse",
                     $"Trykk 'Ja, jeg er her' for å starte automatisering i dag. Timeout om {timeoutMinutes} minutter.",
@@ -81,7 +77,6 @@ namespace AkademiTrack.Services
                     isHighPriority: true
                 );
 
-                // Wait for confirmation with timeout
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes));
                 
                 try
@@ -92,8 +87,6 @@ namespace AkademiTrack.Services
                     {
                         await SaveConfirmationAsync(today);
                         _loggingService.LogSuccess("Daily confirmation received - automation can proceed");
-                        
-                        // Confirmation received - no need for notification since automation will show its own status
                         
                         return true;
                     }

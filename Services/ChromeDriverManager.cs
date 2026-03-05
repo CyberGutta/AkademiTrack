@@ -90,7 +90,7 @@ namespace AkademiTrack.Services
             
             LastErrorDetails = details;
             
-            Debug.WriteLine($"[ChromeDriverManager] ❌ Error [{code}]: {message}");
+            Debug.WriteLine($"[ChromeDriverManager] Error [{code}]: {message}");
             if (!string.IsNullOrEmpty(details))
             {
                 Debug.WriteLine($"[ChromeDriverManager] Details:\n{details}");
@@ -175,7 +175,7 @@ namespace AkademiTrack.Services
                 // Selenium Manager (built into Selenium 4.6+) will automatically download the driver if needed
                 if (await TestChromeDriverAsync())
                 {
-                    Debug.WriteLine("[ChromeDriverManager] ✅ ChromeDriver is working properly");
+                    Debug.WriteLine("[ChromeDriverManager] ChromeDriver is working properly");
                     progress?.Report("ChromeDriver ready");
                     return true;
                 }
@@ -244,7 +244,7 @@ namespace AkademiTrack.Services
                         options.AddArgument("--disable-background-networking");
                         options.AddArgument("--no-first-run");
                         options.AddArgument("--no-default-browser-check");
-                        Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_OPTIONS_CREATION}] ✓ Chrome options created");
+                        Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_OPTIONS_CREATION}] Chrome options created");
                     }
                     catch (Exception ex)
                     {
@@ -262,7 +262,7 @@ namespace AkademiTrack.Services
                         service.HideCommandPromptWindow = true;
                         service.SuppressInitialDiagnosticInformation = true;
                         
-                        Debug.WriteLine($"[ChromeDriverManager] ✓ Service created successfully");
+                        Debug.WriteLine($"[ChromeDriverManager] Service created successfully");
                         Debug.WriteLine($"[ChromeDriverManager]   Path: {service.DriverServicePath ?? "(empty)"}");
                         Debug.WriteLine($"[ChromeDriverManager]   Executable: {service.DriverServiceExecutableName ?? "(empty)"}");
                     }
@@ -279,7 +279,7 @@ namespace AkademiTrack.Services
                     try
                     {
                         driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10));
-                        Debug.WriteLine("[ChromeDriverManager] ✓ ChromeDriver instance created successfully");
+                        Debug.WriteLine("[ChromeDriverManager] ChromeDriver instance created successfully");
                     }
                     catch (WebDriverTimeoutException ex)
                     {
@@ -327,7 +327,7 @@ namespace AkademiTrack.Services
                     try
                     {
                         driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>");
-                        Debug.WriteLine("[ChromeDriverManager] ✓ Navigation successful");
+                        Debug.WriteLine("[ChromeDriverManager] Navigation successful");
                     }
                     catch (WebDriverTimeoutException ex)
                     {
@@ -344,7 +344,7 @@ namespace AkademiTrack.Services
                         return false;
                     }
                     
-                    Debug.WriteLine("[ChromeDriverManager] ✅ All tests passed successfully!");
+                    Debug.WriteLine("[ChromeDriverManager] All tests passed successfully!");
                     return true;
                 }
                 catch (Exception ex)

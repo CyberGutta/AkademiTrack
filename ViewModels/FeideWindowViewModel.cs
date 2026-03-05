@@ -226,14 +226,14 @@ namespace AkademiTrack.ViewModels
 
                 if (testResult.Success)
                 {
-                    Debug.WriteLine("[FeideWindow] ✓ Credentials test successful!");
+                    Debug.WriteLine("[FeideWindow] Credentials test successful!");
                     
                     // Track successful Feide setup - removed events tracking
                     Debug.WriteLine("[FeideWindow] Feide setup completed successfully");
                     
                     // Step 3a: Mark setup as complete since credentials work
                     await MarkSetupAsCompleteAsync();
-                    Debug.WriteLine("[FeideWindow] ✓ Setup marked as complete");
+                    Debug.WriteLine("[FeideWindow] Setup marked as complete");
 
                     // Show restart message
                     IsRestarting = true;
@@ -250,7 +250,7 @@ namespace AkademiTrack.ViewModels
                 }
                 else
                 {
-                    Debug.WriteLine("[FeideWindow] ❌ Credentials test failed!");
+                    Debug.WriteLine("[FeideWindow] Credentials test failed!");
                     
                     // Track failed Feide setup - removed events tracking
                     Debug.WriteLine("[FeideWindow] Feide setup failed");
@@ -347,17 +347,17 @@ namespace AkademiTrack.ViewModels
                 
                 // Save credentials to secure storage with the correct keys that AuthenticationService expects
                 await SecureCredentialStorage.SaveCredentialAsync("LoginEmail", FeideUsername);
-                Debug.WriteLine($"[FeideWindow] ✓ Saved LoginEmail: {FeideUsername}");
+                Debug.WriteLine($"[FeideWindow] Saved LoginEmail: {FeideUsername}");
                 
                 // Convert SecureString to plaintext temporarily for saving
                 var passwordPlain = SecureStringToString(_feidePasswordSecure);
                 await SecureCredentialStorage.SaveCredentialAsync("LoginPassword", passwordPlain);
                 // Immediately clear the plaintext password
                 passwordPlain = null;
-                Debug.WriteLine("[FeideWindow] ✓ Saved LoginPassword (hidden)");
+                Debug.WriteLine("[FeideWindow] Saved LoginPassword (hidden)");
                 
                 await SecureCredentialStorage.SaveCredentialAsync("SchoolName", SchoolName);
-                Debug.WriteLine($"[FeideWindow] ✓ Saved SchoolName: {SchoolName}");
+                Debug.WriteLine($"[FeideWindow] Saved SchoolName: {SchoolName}");
             }
             catch (Exception ex)
             {
@@ -378,7 +378,7 @@ namespace AkademiTrack.ViewModels
                 };
 
                 await SafeSettingsLoader.SaveSettingsSafelyAsync(settings);
-                Debug.WriteLine("[FeideWindow] ✓ Updated settings.json - setup marked complete");
+                Debug.WriteLine("[FeideWindow] Updated settings.json - setup marked complete");
             }
             catch (Exception ex)
             {
@@ -401,7 +401,7 @@ namespace AkademiTrack.ViewModels
                 // Also delete any cached cookies
                 await SecureCredentialStorage.DeleteCookiesAsync();
                 
-                Debug.WriteLine("[FeideWindow] ✓ Invalid credentials deleted");
+                Debug.WriteLine("[FeideWindow] Invalid credentials deleted");
             }
             catch (Exception ex)
             {
