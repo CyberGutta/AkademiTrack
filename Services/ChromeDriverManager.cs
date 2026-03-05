@@ -14,6 +14,7 @@ namespace AkademiTrack.Services
     public class ChromeDriverManager
     {
         private static readonly object _lock = new object();
+        private static bool _cacheInitialized = false;
         
         // Hierarchical error codes for precise debugging
         // Format: CD-[Stage].[Step].[SubStep]
@@ -97,6 +98,60 @@ namespace AkademiTrack.Services
             }
         }
         
+        
+        private static void EnsureCacheInitialized()
+        {
+            if (_cacheInitialized)
+                return;
+                
+            lock (_lock)
+            {
+                if (_cacheInitialized)
+                    return;
+                    
+                try
+                {
+                    // Use platform-appropriate cache location
+                    string cacheBasePath;
+                    
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        // macOS: Use ~/Library/Application Support/AkademiTrack/selenium-cache
+                        cacheBasePath = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            "Library",
+                            "Application Support",
+                            "AkademiTrack",
+                            "selenium-cache"
+                        );
+                    }
+                    else
+                    {
+                        // Windows/Linux: Use AppData/AkademiTrack/selenium-cache
+                        cacheBasePath = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                            "AkademiTrack",
+                            "selenium-cache"
+                        );
+                    }
+                    
+                    // Create the cache directory if it doesn't exist
+                    Directory.CreateDirectory(cacheBasePath);
+                    
+                    // Set the environment variable for Selenium Manager
+                    Environment.SetEnvironmentVariable("SE_CACHE_PATH", cacheBasePath);
+                    
+                    Debug.WriteLine($"[ChromeDriverManager] Initialized Selenium cache at: {cacheBasePath}");
+                    _cacheInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ChromeDriverManager] Warning: Could not initialize cache location: {ex.Message}");
+                    // Don't fail - Selenium will use default location
+                }
+            }
+        }
+        
         public static string GetFullErrorReport()
         {
             var report = "=== ChromeDriver Error Report ===\n\n";
@@ -159,6 +214,9 @@ namespace AkademiTrack.Services
         {
             try
             {
+                // Initialize cache location FIRST before any ChromeDriver operations
+                EnsureCacheInitialized();
+                
                 Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_SETUP_START}] Starting ChromeDriver setup...");
                 progress?.Report("Checking ChromeDriver availability...");
                 
@@ -307,21 +365,164 @@ namespace AkademiTrack.Services
                     }
                     catch (InvalidOperationException ex)
                     {
-                        SetError(ERROR_CODE_TEST_DRIVER_INCOMPATIBLE,
-                               "ChromeDriver is incompatible with installed Chrome version",
-                               ex,
-                               $"Chrome Version: {GetChromeVersion() ?? "Unknown"}\nService Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
-                        return false;
+                        // Check if this is a version mismatch error
+                        if (ex.Message.Contains("This version of ChromeDriver only supports Chrome version"))
+                        {
+                            Debug.WriteLine($"[ChromeDriverManager] Detected ChromeDriver version mismatch. Clearing all caches and retrying...");
+                            
+                            // Clear ALL possible cache locations
+                            var cacheLocations = new List<string>();
+                            
+                            // 1. Default ~/.cache/selenium
+                            var defaultCache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "selenium");
+                            cacheLocations.Add(defaultCache);
+                            
+                            // 2. Alternative cache in Application Support
+                            var appSupportCache = Path.Combine(
+                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                "AkademiTrack",
+                                "selenium-cache"
+                            );
+                            cacheLocations.Add(appSupportCache);
+                            
+                            // 3. macOS-specific Library/Application Support
+                            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                            {
+                                var macCache = Path.Combine(
+                                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                                    "Library",
+                                    "Application Support",
+                                    "AkademiTrack",
+                                    "selenium-cache"
+                                );
+                                cacheLocations.Add(macCache);
+                            }
+                            
+                            // Clear all cache locations
+                            bool anyCleared = false;
+                            foreach (var cachePath in cacheLocations)
+                            {
+                                if (TryFixCachePermissions(cachePath))
+                                {
+                                    anyCleared = true;
+                                    Debug.WriteLine($"[ChromeDriverManager] Cleared cache: {cachePath}");
+                                }
+                            }
+                            
+                            if (anyCleared)
+                            {
+                                Debug.WriteLine($"[ChromeDriverManager] Caches cleared. Setting up alternative cache and retrying...");
+                                
+                                // Use the alternative cache location that we know works
+                                var workingCache = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) 
+                                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", "AkademiTrack", "selenium-cache")
+                                    : appSupportCache;
+                                
+                                Environment.SetEnvironmentVariable("SE_CACHE_PATH", workingCache);
+                                Directory.CreateDirectory(workingCache);
+                                Debug.WriteLine($"[ChromeDriverManager] Set SE_CACHE_PATH to: {workingCache}");
+                                
+                                // Retry once after clearing cache
+                                try
+                                {
+                                    // Recreate service to pick up new driver
+                                    service?.Dispose();
+                                    service = ChromeDriverService.CreateDefaultService();
+                                    service.HideCommandPromptWindow = true;
+                                    service.SuppressInitialDiagnosticInformation = true;
+                                    
+                                    driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10));
+                                    Debug.WriteLine("[ChromeDriverManager] ChromeDriver instance created successfully after cache clear");
+                                    // Continue with navigation test
+                                    goto NavigationTest;
+                                }
+                                catch (Exception retryEx)
+                                {
+                                    SetError(ERROR_CODE_TEST_DRIVER_INCOMPATIBLE,
+                                           "ChromeDriver is incompatible with installed Chrome version (retry failed)",
+                                           retryEx,
+                                           $"Chrome Version: {GetChromeVersion() ?? "Unknown"}\n\n" +
+                                           $"Attempted to download correct ChromeDriver version but failed.\n" +
+                                           $"Please update Chrome to the latest version and restart the app.");
+                                    return false;
+                                }
+                            }
+                            else
+                            {
+                                SetError(ERROR_CODE_TEST_DRIVER_INCOMPATIBLE,
+                                       "ChromeDriver is incompatible with installed Chrome version (cache clear failed)",
+                                       ex,
+                                       $"Chrome Version: {GetChromeVersion() ?? "Unknown"}\n\n" +
+                                       $"Could not clear cache to download correct ChromeDriver version.\n" +
+                                       $"Please update Chrome to the latest version and restart the app.");
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            SetError(ERROR_CODE_TEST_DRIVER_INCOMPATIBLE,
+                                   "ChromeDriver is incompatible with installed Chrome version",
+                                   ex,
+                                   $"Chrome Version: {GetChromeVersion() ?? "Unknown"}\nService Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                            return false;
+                        }
                     }
                     catch (Exception ex)
                     {
-                        SetError(ERROR_CODE_TEST_DRIVER_CREATION,
-                               "Failed to create ChromeDriver instance",
-                               ex,
-                               $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        // Check if this is a cache permission error
+                        var errorMessage = ex.Message + (ex.InnerException?.Message ?? "");
+                        if (errorMessage.Contains("Permission denied") && errorMessage.Contains(".cache"))
+                        {
+                            Debug.WriteLine($"[ChromeDriverManager] Detected cache permission error. Using alternative cache location...");
+                            
+                            // Use an alternative cache location in the app's data folder
+                            var appDataCache = Path.Combine(
+                                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                "AkademiTrack",
+                                "selenium-cache"
+                            );
+                            
+                            // Set environment variable to override Selenium's cache location
+                            Environment.SetEnvironmentVariable("SE_CACHE_PATH", appDataCache);
+                            Debug.WriteLine($"[ChromeDriverManager] Set alternative cache path: {appDataCache}");
+                            
+                            // Ensure the directory exists
+                            Directory.CreateDirectory(appDataCache);
+                            
+                            // Retry with alternative cache location
+                            try
+                            {
+                                // Recreate service to pick up new environment variable
+                                service?.Dispose();
+                                service = ChromeDriverService.CreateDefaultService();
+                                service.HideCommandPromptWindow = true;
+                                service.SuppressInitialDiagnosticInformation = true;
+                                
+                                driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(10));
+                                Debug.WriteLine("[ChromeDriverManager] ChromeDriver instance created successfully with alternative cache");
+                                // Continue with navigation test
+                                goto NavigationTest;
+                            }
+                            catch (Exception retryEx)
+                            {
+                                SetError(ERROR_CODE_TEST_DRIVER_CREATION,
+                                       "Failed to create ChromeDriver instance even with alternative cache location",
+                                       retryEx,
+                                       $"Alternative cache: {appDataCache}");
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            SetError(ERROR_CODE_TEST_DRIVER_CREATION,
+                                   "Failed to create ChromeDriver instance",
+                                   ex,
+                                   $"Service Path: {service?.DriverServicePath}\nService Exe: {service?.DriverServiceExecutableName}");
+                        }
                         return false;
                     }
                     
+                    NavigationTest:
                     // Step 2.4: Test navigation
                     Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_NAVIGATION}] Testing navigation...");
                     try
@@ -440,6 +641,9 @@ namespace AkademiTrack.Services
         /// </summary>
         public static ChromeDriver CreateChromeDriver(bool headless = true, string? downloadPath = null)
         {
+            // Ensure cache is initialized before creating driver
+            EnsureCacheInitialized();
+            
             var options = new ChromeOptions();
             
             // Basic Chrome options for automation
@@ -620,5 +824,100 @@ namespace AkademiTrack.Services
             
             return null;
         }
+
+        /// <summary>
+        /// Attempts to fix cache folder permissions by deleting and recreating it
+        /// </summary>
+        
+                /// <summary>
+                /// Attempts to fix cache folder permissions by deleting and recreating it
+                /// </summary>
+                private static bool TryFixCachePermissions(string seleniumCachePath)
+                {
+                    try
+                    {
+                        Debug.WriteLine($"[ChromeDriverManager] Attempting to clear cache: {seleniumCachePath}");
+
+                        // If the selenium cache folder exists, try to delete it
+                        if (Directory.Exists(seleniumCachePath))
+                        {
+                            Debug.WriteLine($"[ChromeDriverManager] Cache folder exists, attempting to delete...");
+                            try
+                            {
+                                // Try to delete all files first, then the directory
+                                var files = Directory.GetFiles(seleniumCachePath, "*", SearchOption.AllDirectories);
+                                foreach (var file in files)
+                                {
+                                    try
+                                    {
+                                        File.SetAttributes(file, FileAttributes.Normal);
+                                        File.Delete(file);
+                                    }
+                                    catch (Exception fileEx)
+                                    {
+                                        Debug.WriteLine($"[ChromeDriverManager] Could not delete file {file}: {fileEx.Message}");
+                                    }
+                                }
+                                
+                                // Now delete the directory structure
+                                Directory.Delete(seleniumCachePath, true);
+                                Debug.WriteLine($"[ChromeDriverManager] Successfully deleted cache folder");
+                            }
+                            catch (UnauthorizedAccessException uaEx)
+                            {
+                                Debug.WriteLine($"[ChromeDriverManager] Permission denied deleting cache: {uaEx.Message}");
+                                // Don't return false yet - we might still be able to use an alternative location
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[ChromeDriverManager] Error deleting cache: {ex.Message}");
+                                // Don't return false yet - we might still be able to use an alternative location
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"[ChromeDriverManager] Cache folder does not exist");
+                        }
+
+                        // Try to create the cache folder to verify we have permissions
+                        try
+                        {
+                            // Ensure the parent folder exists
+                            var parentFolder = Path.GetDirectoryName(seleniumCachePath);
+                            if (!string.IsNullOrEmpty(parentFolder) && !Directory.Exists(parentFolder))
+                            {
+                                Directory.CreateDirectory(parentFolder);
+                                Debug.WriteLine($"[ChromeDriverManager] Created parent folder: {parentFolder}");
+                            }
+
+                            // Create the selenium cache folder
+                            if (!Directory.Exists(seleniumCachePath))
+                            {
+                                Directory.CreateDirectory(seleniumCachePath);
+                                Debug.WriteLine($"[ChromeDriverManager] Created fresh selenium cache folder");
+                            }
+
+                            // Test if we can write to the folder
+                            var testFile = Path.Combine(seleniumCachePath, ".test");
+                            File.WriteAllText(testFile, "test");
+                            File.Delete(testFile);
+
+                            Debug.WriteLine($"[ChromeDriverManager] Cache cleared and recreated successfully");
+                            return true;
+                        }
+                        catch (UnauthorizedAccessException)
+                        {
+                            Debug.WriteLine($"[ChromeDriverManager] No write permission for cache folder");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ChromeDriverManager] Failed to clear cache: {ex.GetType().Name} - {ex.Message}");
+                        return false;
+                    }
+                }
+
+
     }
 }
