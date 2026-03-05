@@ -77,14 +77,15 @@ struct Provider: TimelineProvider {
         // Check if we have error/no data
         if widgetData.currentClassName == "Åpne appen" || 
            widgetData.currentClassName == "Venter på data" || 
+           widgetData.currentClassName == "Laster data..." ||
            widgetData.currentClassName == "Ingen tilgang" || 
            widgetData.currentClassName == "Kan ikke lese" || 
            widgetData.currentClassName == "Ugyldig data" {
-            // Error state: check every 5 seconds (macOS may throttle to ~15s)
-            nextUpdate = Calendar.current.date(byAdding: .second, value: 5, to: currentDate)!
+            // Error state: check every 10 seconds (macOS may throttle to ~15s)
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 10, to: currentDate)!
         } else {
-            // Normal state: update every 15 seconds
-            nextUpdate = Calendar.current.date(byAdding: .second, value: 15, to: currentDate)!
+            // Normal state: update every 20 seconds (more conservative to reduce battery usage)
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 20, to: currentDate)!
         }
         
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
@@ -135,10 +136,11 @@ struct Provider: TimelineProvider {
             return createErrorData(message: "Ugyldig data", detail: "Prøv å åpne appen")
         }
         
-        // Check if data is stale (older than 20 seconds - app updates every 3 seconds)
-        // This helps detect when app is closed
+        // Check if data is stale (older than 30 seconds - heartbeat updates every 5 seconds)
+        // This helps detect when app is closed, but gives buffer time for system delays
         let secondsSinceUpdate = Date().timeIntervalSince(widgetData.lastUpdated)
-        if secondsSinceUpdate > 20 {
+        print("📊 Widget: Data age: \(Int(secondsSinceUpdate)) seconds (threshold: 30s)")
+        if secondsSinceUpdate > 30 {
             print("⚠️ Widget: Data is stale (\(Int(secondsSinceUpdate)) seconds old)")
             return createErrorData(message: "Åpne appen", detail: "Appen må være åpen")
         }
@@ -188,6 +190,7 @@ struct SmallWidgetView: View {
     var isErrorState: Bool {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Laster data..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -196,6 +199,9 @@ struct SmallWidgetView: View {
     var errorIcon: String {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
+        }
+        if data.currentClassName == "Laster data..." {
+            return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }
@@ -357,6 +363,7 @@ struct MediumWidgetView: View {
     var isErrorState: Bool {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Laster data..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -365,6 +372,9 @@ struct MediumWidgetView: View {
     var errorIcon: String {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
+        }
+        if data.currentClassName == "Laster data..." {
+            return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }
@@ -431,6 +441,7 @@ struct LargeWidgetView: View {
     var isErrorState: Bool {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
+               data.currentClassName == "Laster data..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -439,6 +450,9 @@ struct LargeWidgetView: View {
     var errorIcon: String {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
+        }
+        if data.currentClassName == "Laster data..." {
+            return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }

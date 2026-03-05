@@ -1,4 +1,5 @@
 using AkademiTrack.ViewModels;
+using AkademiTrack.Services;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -71,6 +72,34 @@ namespace AkademiTrack.Views
                     }, DispatcherPriority.Background);
                 }
             }
+            
+            // Handle visibility changes (for macOS hide/show)
+            if (e.Property == IsVisibleProperty)
+            {
+                var wasVisible = (bool)(e.OldValue ?? false);
+                var isVisible = (bool)(e.NewValue ?? false);
+                
+                if (!wasVisible && isVisible)
+                {
+                    Debug.WriteLine("[FOCUS] Window became visible - refreshing widget");
+                    try
+                    {
+                        var widgetDataService = AkademiTrack.Services.DependencyInjection.ServiceContainer.GetService<WidgetDataService>();
+                        if (widgetDataService != null)
+                        {
+                            _ = widgetDataService.ForceRefreshWidgetAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[FOCUS] Failed to refresh widget on show: {ex.Message}");
+                    }
+                }
+                else if (wasVisible && !isVisible)
+                {
+                    Debug.WriteLine("[FOCUS] Window became hidden - ensuring heartbeat continues");
+                }
+            }
         }
 
         private async Task LoadSettingsAsync()
@@ -125,7 +154,23 @@ namespace AkademiTrack.Views
                 {
                     Debug.WriteLine("[MainWindow] macOS: Hiding window instead of closing");
                     e.Cancel = true;
-                    this.Hide(); 
+                    this.Hide();
+                    
+                    // Ensure widget heartbeat continues when window is hidden
+                    try
+                    {
+                        var widgetDataService = AkademiTrack.Services.DependencyInjection.ServiceContainer.GetService<WidgetDataService>();
+                        if (widgetDataService != null)
+                        {
+                            _ = widgetDataService.ForceRefreshWidgetAsync();
+                            Debug.WriteLine("[MainWindow] Widget refreshed after hiding window");
+                        }
+                    }
+                    catch (Exception widgetEx)
+                    {
+                        Debug.WriteLine($"[MainWindow] Failed to refresh widget after hide: {widgetEx.Message}");
+                    }
+                    
                     return;
                 }
 

@@ -72,6 +72,9 @@ namespace AkademiTrack.Services
                         File.Delete(testFile);
                         _widgetDataPath = Path.Combine(widgetDir, "widget-data.json");
                         _loggingService?.LogInfo($"✅ Using App Group path: {_widgetDataPath}");
+                        
+                        // Write initial widget data immediately so widget doesn't show error
+                        _ = WriteInitialWidgetDataAsync();
                     }
                     catch (UnauthorizedAccessException)
                     {
@@ -451,7 +454,33 @@ namespace AkademiTrack.Services
             {
                 if (_lastWidgetData == null)
                 {
-                    // No cached data yet - skip heartbeat until first real update
+                    // No cached data yet - create minimal heartbeat data to keep widget alive
+                    // But don't show "Venter på data" if the app just started - show loading instead
+                    _loggingService?.LogDebug("[WIDGET HEARTBEAT] No cached data, creating minimal heartbeat");
+                    
+                    var heartbeatData = new
+                    {
+                        DailyRegistered = 0,
+                        DailyTotal = 0,
+                        DailyBalance = 0.0,
+                        WeeklyRegistered = 0,
+                        WeeklyTotal = 0,
+                        WeeklyBalance = 0.0,
+                        MonthlyRegistered = 0,
+                        MonthlyTotal = 0,
+                        MonthlyBalance = 0.0,
+                        CurrentClassName = "Laster data...",
+                        CurrentClassTime = "Appen starter opp",
+                        CurrentClassRoom = (string?)null,
+                        NextClassName = (string?)null,
+                        NextClassTime = (string?)null,
+                        NextClassRoom = (string?)null,
+                        LastUpdated = DateTime.Now.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                    };
+                    
+                    var json = JsonSerializer.Serialize(heartbeatData, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(_widgetDataPath, json);
+                    _loggingService?.LogDebug("[WIDGET HEARTBEAT] Minimal heartbeat data written");
                     return;
                 }
 
@@ -460,7 +489,7 @@ namespace AkademiTrack.Services
 
                 var lastUpdated = _lastWidgetData.LastUpdated.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 
-                var json = JsonSerializer.Serialize(new
+                var json2 = JsonSerializer.Serialize(new
                 {
                     DailyRegistered = _lastWidgetData.DailyRegistered,
                     DailyTotal = _lastWidgetData.DailyTotal,
@@ -480,12 +509,66 @@ namespace AkademiTrack.Services
                     LastUpdated = lastUpdated
                 }, new JsonSerializerOptions { WriteIndented = true });
 
-                await File.WriteAllTextAsync(_widgetDataPath, json);
+                await File.WriteAllTextAsync(_widgetDataPath, json2);
                 _loggingService?.LogDebug($"[WIDGET HEARTBEAT] Timestamp updated");
             }
             catch (Exception ex)
             {
                 _loggingService?.LogWarning($"[WIDGET HEARTBEAT] Failed to update timestamp: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Forces a widget refresh by updating the heartbeat and triggering a reload
+        /// </summary>
+        public async Task ForceRefreshWidgetAsync()
+        {
+            try
+            {
+                await RefreshHeartbeatAsync();
+                ForceWidgetReload();
+                _loggingService?.LogInfo("Forced widget refresh completed");
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogWarning($"Failed to force refresh widget: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Writes initial widget data when the service starts to prevent "Åpne appen" error
+        /// </summary>
+        private async Task WriteInitialWidgetDataAsync()
+        {
+            try
+            {
+                var initialData = new
+                {
+                    DailyRegistered = 0,
+                    DailyTotal = 0,
+                    DailyBalance = 0.0,
+                    WeeklyRegistered = 0,
+                    WeeklyTotal = 0,
+                    WeeklyBalance = 0.0,
+                    MonthlyRegistered = 0,
+                    MonthlyTotal = 0,
+                    MonthlyBalance = 0.0,
+                    CurrentClassName = "Laster data...",
+                    CurrentClassTime = "Appen starter opp",
+                    CurrentClassRoom = (string?)null,
+                    NextClassName = (string?)null,
+                    NextClassTime = (string?)null,
+                    NextClassRoom = (string?)null,
+                    LastUpdated = DateTime.Now.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                };
+                
+                var json = JsonSerializer.Serialize(initialData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_widgetDataPath, json);
+                _loggingService?.LogInfo("[WIDGET] Initial widget data written");
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogWarning($"[WIDGET] Failed to write initial data: {ex.Message}");
             }
         }
     }

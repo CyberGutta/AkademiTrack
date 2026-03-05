@@ -123,7 +123,7 @@ namespace AkademiTrack.ViewModels
             // Connect logging service for auto-retry functionality
             _loggingService = ServiceContainer.GetService<ILoggingService>();
             _attendanceService.SetLoggingService(_loggingService);
-            _widgetDataService = new WidgetDataService(_loggingService);
+            _widgetDataService = ServiceContainer.GetService<WidgetDataService>();
             
             // Initialize persistent cache with 24-hour TTL for dashboard data
             _persistentCache = new CacheService(
@@ -689,6 +689,21 @@ namespace AkademiTrack.ViewModels
                         {
                             _loggingService?.LogInfo("[SLEEP DETECTION] Refreshing data after wake from sleep");
                             await RefreshDataAsync();
+                            
+                            // Also force refresh widget data after wake from sleep
+                            try
+                            {
+                                var widgetDataService = Services.DependencyInjection.ServiceContainer.GetService<WidgetDataService>();
+                                if (widgetDataService != null)
+                                {
+                                    await widgetDataService.ForceRefreshWidgetAsync();
+                                    _loggingService?.LogInfo("[SLEEP DETECTION] Widget force refreshed after wake");
+                                }
+                            }
+                            catch (Exception widgetEx)
+                            {
+                                _loggingService?.LogWarning($"[SLEEP DETECTION] Failed to refresh widget after wake: {widgetEx.Message}");
+                            }
                         });
                     }
                     

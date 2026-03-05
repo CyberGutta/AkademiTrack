@@ -2199,6 +2199,22 @@ namespace AkademiTrack.ViewModels
                 {
                     Dashboard.UpdateNextClassFromCache();
                 }
+                
+                // Always refresh widget heartbeat when window is activated
+                // This helps recover from any widget communication issues
+                try
+                {
+                    var widgetDataService = Services.DependencyInjection.ServiceContainer.GetService<WidgetDataService>();
+                    if (widgetDataService != null)
+                    {
+                        await widgetDataService.ForceRefreshWidgetAsync();
+                        _loggingService.LogDebug("Widget force refreshed on window activation");
+                    }
+                }
+                catch (Exception widgetEx)
+                {
+                    _loggingService.LogWarning($"Failed to refresh widget on window activation: {widgetEx.Message}");
+                }
             }
             catch (Exception ex)
             {
