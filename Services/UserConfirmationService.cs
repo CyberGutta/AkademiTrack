@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -120,56 +122,293 @@ namespace AkademiTrack.Services
             }
         }
 
-        public async Task<bool> ConfirmPresenceAsync()
-        {
-            var today = DateTime.Now.Date;
-            await SaveConfirmationAsync(today);
-            
-            _loggingService.LogSuccess("User confirmed presence for today");
-            
-            // Reset reminder timer since confirmation is received
-            _lastReminderSent = DateTime.MinValue;
-            
-            // Notify listeners
-            var confirmationRequest = new UserConfirmationRequest
-            {
-                Id = Guid.NewGuid().ToString(),
-                Date = today,
-                RequestedAt = DateTime.Now,
-                IsConfirmed = true
-            };
-            
-            ConfirmationReceived?.Invoke(this, new UserConfirmationEventArgs(confirmationRequest));
-            
-            return true;
-        }
+        private bool _interactiveFeideLoginCompleted = false;
+        private DateTime _interactiveFeideLoginTime = DateTime.MinValue;
+
         /// <summary>
-        /// Registers a Feide login as automatic presence confirmation for today
+        /// Marks that an interactive Feide login just completed
+        /// This will be used when the user manually confirms presence
         /// </summary>
-        public async Task RegisterFeideLoginConfirmationAsync()
+        public void MarkInteractiveFeideLoginCompleted()
+        {
+            _interactiveFeideLoginCompleted = true;
+            _interactiveFeideLoginTime = DateTime.Now;
+            _loggingService.LogDebug($"[INTERACTIVE-FEIDE] Marked interactive Feide login completed at {_interactiveFeideLoginTime:HH:mm}");
+        }
+
+        /// <summary>
+        /// Confirms presence for today, with special handling for interactive Feide logins
+        /// </summary>
+        /// <summary>
+        /// Confirms presence for today, with special handling for interactive Feide logins
+        /// </summary>
+        public async Task<bool> ConfirmPresenceAsync()
         {
             try
             {
                 var today = DateTime.Now.Date;
-                var confirmationData = new DailyConfirmationData
+
+                // Check if this confirmation is happening right after an interactive Feide login
+                if (_interactiveFeideLoginCompleted && 
+                    (DateTime.Now - _interactiveFeideLoginTime).TotalMinutes < 2) // Within 2 minutes of Feide login
+                {
+                    _loggingService.LogDebug("[INTERACTIVE-FEIDE] User confirmed presence within 2 minutes of interactive Feide login - checking auto-confirmation");
+
+                    // Check if we should auto-confirm based on timing
+                    if (await ShouldAutoConfirmOnInteractiveFeideLoginAsync(_interactiveFeideLoginTime))
+                    {
+                        _loggingService.LogInfo("Auto-confirming presence due to interactive Feide login during STU hours");
+
+                        var feideConfirmationData = new DailyConfirmationData
+                        {
+                            Date = today,
+                            IsConfirmed = true,
+                            ConfirmedAt = DateTime.Now,
+                            ConfirmedViaFeide = true,
+                            FeideLoginTime = _interactiveFeideLoginTime
+                        };
+
+                        var feideJson = JsonSerializer.Serialize(feideConfirmationData, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(_confirmationStatusFile, feideJson);
+
+                        // Clear the flag
+                        _interactiveFeideLoginCompleted = false;
+
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug("Interactive Feide login was not during STU hours - proceeding with manual confirmation");
+                    }
+
+                    // Clear the flag regardless
+                    _interactiveFeideLoginCompleted = false;
+                }
+
+                // Regular manual confirmation
+                var manualConfirmationData = new DailyConfirmationData
                 {
                     Date = today,
                     IsConfirmed = true,
                     ConfirmedAt = DateTime.Now,
-                    ConfirmedViaFeide = true,
-                    FeideLoginTime = DateTime.Now
+                    ConfirmedViaFeide = false,
+                    FeideLoginTime = null
                 };
 
-                var json = JsonSerializer.Serialize(confirmationData, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_confirmationStatusFile, json);
+                var manualJson = JsonSerializer.Serialize(manualConfirmationData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_confirmationStatusFile, manualJson);
 
-                _loggingService.LogInfo("Presence automatically confirmed via Feide login");
+                _loggingService.LogInfo("Presence confirmed manually");
+                return true;
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"Error saving Feide confirmation: {ex.Message}");
+                _loggingService.LogError($"Error confirming presence: {ex.Message}");
+                return false;
             }
         }
+        /// <summary>
+        /// Registers a Feide login as automatic presence confirmation for today
+        /// </summary>
+        /// <summary>
+        /// Registers an interactive Feide login (through Feide window) as automatic presence confirmation for today
+        /// This is different from automatic authentication using cached credentials
+        /// </summary>
+        /// <summary>
+        /// DEPRECATED: This method is kept for compatibility but is now disabled
+        /// Auto-confirmation now happens through the manual confirmation flow
+        /// </summary>
+        public async Task RegisterInteractiveFeideLoginConfirmationAsync()
+        {
+            _loggingService.LogDebug("RegisterInteractiveFeideLoginConfirmationAsync called but auto-confirmation now happens through manual confirmation flow");
+            await Task.CompletedTask;
+        }
+
+
+        /// <summary>
+        /// Registers a Feide login as automatic presence confirmation for today
+        /// DEPRECATED: This method is kept for compatibility but should not be used for automatic authentication
+        /// </summary>
+        public async Task RegisterFeideLoginConfirmationAsync()
+        {
+            // This method is now essentially disabled - we only want interactive logins to auto-confirm
+            _loggingService.LogDebug("RegisterFeideLoginConfirmationAsync called but auto-confirmation disabled for automatic authentication");
+            await Task.CompletedTask;
+        }
+        /// <summary>
+        /// Determines if Feide login should trigger auto-confirmation based on timing and context
+        /// </summary>
+        /// <summary>
+        /// Determines if Feide login should trigger auto-confirmation based on timing and context
+        /// </summary>
+        /// <summary>
+        /// Determines if Feide login should trigger auto-confirmation based on timing and context
+        /// </summary>
+        /// <summary>
+        /// Determines if Feide login should trigger auto-confirmation based on timing and context
+        /// </summary>
+        /// <summary>
+        /// Determines if interactive Feide login should trigger auto-confirmation based on timing and context
+        /// Much more restrictive than automatic authentication - only during actual STU hours
+        /// </summary>
+        private async Task<bool> ShouldAutoConfirmOnInteractiveFeideLoginAsync(DateTime loginTime)
+        {
+            try
+            {
+                _loggingService.LogDebug($"[INTERACTIVE-AUTO-CONFIRM] Checking if interactive Feide login at {loginTime:HH:mm} should trigger auto-confirmation");
+
+                // Check if auto-confirmation is disabled in settings
+                await _settingsService.LoadSettingsAsync();
+                if (!_settingsService.EnableFeideAutoConfirmation)
+                {
+                    _loggingService.LogDebug("[INTERACTIVE-AUTO-CONFIRM] Auto-confirmation disabled in settings");
+                    return false;
+                }
+
+                if (_settingsService.FeideGracePeriodHours <= 0)
+                {
+                    _loggingService.LogDebug("[INTERACTIVE-AUTO-CONFIRM] Auto-confirmation disabled (grace period = 0)");
+                    return false;
+                }
+
+                // Get today's STU times from the attendance service
+                var stuTimes = await GetTodaysSTUTimesAsync();
+                if (stuTimes == null || !stuTimes.Any())
+                {
+                    _loggingService.LogDebug("[INTERACTIVE-AUTO-CONFIRM] No STU times found for today - no auto-confirmation");
+                    return false; // Much more restrictive - no STU times = no auto-confirmation
+                }
+
+                var firstSTUTime = stuTimes.Min();
+                var lastSTUTime = stuTimes.Max();
+
+                _loggingService.LogDebug($"[INTERACTIVE-AUTO-CONFIRM] STU times today: First={firstSTUTime}, Last={lastSTUTime}");
+
+                // VERY RESTRICTIVE: Only auto-confirm if login happens during actual STU hours
+                // No "early arrival" or "late arrival" - only during STU sessions
+                var duringSTUHours = loginTime.TimeOfDay >= firstSTUTime && 
+                                   loginTime.TimeOfDay <= lastSTUTime.Add(TimeSpan.FromMinutes(45)); // STU sessions are 45 min
+
+                _loggingService.LogDebug($"[INTERACTIVE-AUTO-CONFIRM] Login at {loginTime:HH:mm} - During STU hours: {duringSTUHours}");
+                _loggingService.LogDebug($"[INTERACTIVE-AUTO-CONFIRM] Decision: Should auto-confirm = {duringSTUHours}");
+
+                return duringSTUHours;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[INTERACTIVE-AUTO-CONFIRM] Error checking auto-confirmation conditions: {ex.Message}");
+                return false; // Don't auto-confirm on error
+            }
+        }
+
+        /// <summary>
+        /// Gets today's STU start times from the attendance service
+        /// </summary>
+        /// <summary>
+        /// Gets today's STU start times from the attendance service
+        /// </summary>
+        /// <summary>
+        /// Gets today's STU start times from the attendance service
+        /// </summary>
+        /// <summary>
+        /// Gets today's STU start times from the attendance service
+        /// </summary>
+        private async Task<List<TimeSpan>?> GetTodaysSTUTimesAsync()
+        {
+            try
+            {
+                // Try to get attendance service from DI container first
+                var attendanceService = Services.DependencyInjection.ServiceContainer.GetOptionalService<AttendanceDataService>();
+
+                if (attendanceService == null)
+                {
+                    _loggingService.LogDebug("AttendanceDataService not available for STU time lookup - using fallback");
+                    return await GetSTUTimesFromSettingsAsync(); // Fallback to settings-based times
+                }
+
+                // Get today's schedule
+                var scheduleData = await attendanceService.GetTodayScheduleAsync();
+                if (scheduleData?.AllTodayItems == null)
+                {
+                    _loggingService.LogDebug("No daily schedule available for STU time lookup - using fallback");
+                    return await GetSTUTimesFromSettingsAsync(); // Fallback to settings-based times
+                }
+
+                return ExtractSTUTimesFromSchedule(scheduleData.AllTodayItems);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error getting today's STU times: {ex.Message}");
+                return await GetSTUTimesFromSettingsAsync(); // Fallback to settings-based times
+            }
+        }
+
+        /// <summary>
+        /// Extracts STU times from schedule items
+        /// </summary>
+        private List<TimeSpan>? ExtractSTUTimesFromSchedule(List<ScheduleItem> scheduleItems)
+        {
+            var stuTimes = new List<TimeSpan>();
+
+            foreach (var item in scheduleItems)
+            {
+                if (item.Fag?.Contains("STU", StringComparison.OrdinalIgnoreCase) == true ||
+                    item.Fag?.Contains("Studietid", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    if (TryParseTime(item.StartKl, out var startTime))
+                    {
+                        stuTimes.Add(startTime);
+                    }
+                }
+            }
+
+            return stuTimes.Any() ? stuTimes : null;
+        }
+
+        /// <summary>
+        /// Fallback method to get STU times from school hours settings
+        /// </summary>
+        private async Task<List<TimeSpan>?> GetSTUTimesFromSettingsAsync()
+        {
+            try
+            {
+                var schoolHours = await GetSchoolHoursForTodayAsync();
+                if (schoolHours == null)
+                    return null;
+
+                var (startTime, endTime) = schoolHours.Value;
+
+                // Return the school start time as the first STU time
+                // This is a reasonable fallback when actual schedule isn't available
+                return new List<TimeSpan> { startTime };
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error getting STU times from settings: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Parses time string in format "0815" to TimeSpan
+        /// </summary>
+        private bool TryParseTime(string? timeStr, out TimeSpan time)
+        {
+            time = TimeSpan.Zero;
+
+            if (string.IsNullOrEmpty(timeStr) || timeStr.Length != 4)
+                return false;
+
+            if (int.TryParse(timeStr.Substring(0, 2), out int hours) &&
+                int.TryParse(timeStr.Substring(2, 2), out int minutes))
+            {
+                time = new TimeSpan(hours, minutes, 0);
+                return true;
+            }
+
+            return false;
+        }
+
 
         public async Task<bool> IsConfirmedForDateAsync(DateTime date)
         {
@@ -393,33 +632,40 @@ namespace AkademiTrack.Services
         }
 
         private async Task<bool> ShouldSendReminderAsync()
-        {
-            try
-            {
-                // Check if we're within school hours or close to them (within 15 minutes)
-                var now = DateTime.Now;
-                var schoolHours = await GetSchoolHoursForTodayAsync();
-                
-                if (schoolHours == null)
-                    return false;
+                {
+                    try
+                    {
+                        var now = DateTime.Now;
 
-                var (startTime, endTime) = schoolHours.Value;
-                var todayStart = now.Date.Add(startTime);
-                var todayEnd = now.Date.Add(endTime);
-                
-                // Send reminders if:
-                // 1. We're within 15 minutes of school start time
-                // 2. We're currently within school hours
-                var withinReminderWindow = now >= todayStart.AddMinutes(-15) && now <= todayEnd;
-                
-                return withinReminderWindow;
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"Error checking reminder conditions: {ex.Message}");
-                return false;
-            }
-        }
+                        // Get today's STU times instead of using school hours
+                        var stuTimes = await GetTodaysSTUTimesAsync();
+                        if (stuTimes == null || !stuTimes.Any())
+                        {
+                            _loggingService.LogDebug("No STU times found - no reminders needed");
+                            return false;
+                        }
+
+                        var firstSTUTime = stuTimes.Min();
+                        var lastSTUTime = stuTimes.Max();
+
+                        var todayFirstSTU = now.Date.Add(firstSTUTime);
+                        var todayLastSTU = now.Date.Add(lastSTUTime).Add(TimeSpan.FromMinutes(45)); // Add session duration
+
+                        // Send reminders if:
+                        // 1. We're within 15 minutes of first STU time
+                        // 2. We're currently within STU hours
+                        var reminderWindow = now >= todayFirstSTU.AddMinutes(-15) && now <= todayLastSTU;
+
+                        _loggingService.LogDebug($"Reminder check: Now={now:HH:mm}, First STU={firstSTUTime}, Last STU={lastSTUTime}, In window={reminderWindow}");
+
+                        return reminderWindow;
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error checking reminder conditions: {ex.Message}");
+                        return false;
+                    }
+                }
 
         private async Task<(TimeSpan start, TimeSpan end)?> GetSchoolHoursForTodayAsync()
         {
@@ -447,37 +693,41 @@ namespace AkademiTrack.Services
 
         private async Task SendConfirmationReminderAsync()
         {
-            var now = DateTime.Now;
-            var schoolHours = await GetSchoolHoursForTodayAsync();
-            
-            string message;
-            if (schoolHours.HasValue)
+            try
             {
-                var todayStart = now.Date.Add(schoolHours.Value.start);
-                var minutesUntilStart = (todayStart - now).TotalMinutes;
-                
-                if (minutesUntilStart > 0 && minutesUntilStart <= 15)
-                {
-                    message = $"STU starter om {Math.Round(minutesUntilStart)} minutter. Bekreft tilstedeværelse nå.";
-                }
-                else
-                {
-                    message = "STU-tid har startet. Bekreft tilstedeværelse for å starte automatisering.";
-                }
-            }
-            else
-            {
-                message = "Bekreft tilstedeværelse for å starte automatisering.";
-            }
+                // Get today's STU times for more specific messaging
+                var stuTimes = await GetTodaysSTUTimesAsync();
+                string timeInfo = "i dag";
 
-            await _notificationService.ShowNotificationAsync(
-                "🔔 Påminnelse: Bekreft tilstedeværelse",
-                message,
-                NotificationLevel.Warning,
-                isHighPriority: true
-            );
-            
-            _loggingService.LogInfo("Sent confirmation reminder notification");
+                if (stuTimes != null && stuTimes.Any())
+                {
+                    var firstSTU = stuTimes.Min();
+                    var now = DateTime.Now.TimeOfDay;
+
+                    if (now < firstSTU)
+                    {
+                        // Before first STU - show the actual first STU time
+                        timeInfo = $"før {firstSTU:hh\\:mm} (første STU-time)";
+                    }
+                    else
+                    {
+                        // During or after STU hours
+                        timeInfo = "nå";
+                    }
+                }
+
+                await _notificationService.ShowNotificationAsync(
+                    "Bekreft Tilstedeværelse",
+                    $"Husk å bekrefte at du er til stede {timeInfo} for automatisk registrering av studietimer.",
+                    NotificationLevel.Info
+                );
+
+                _loggingService.LogInfo($"Sent confirmation reminder for {timeInfo}");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error sending confirmation reminder: {ex.Message}");
+            }
         }
     }
 

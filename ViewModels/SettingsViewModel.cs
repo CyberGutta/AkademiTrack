@@ -1,4 +1,4 @@
-﻿using AkademiTrack.Services;
+﻿﻿using AkademiTrack.Services;
 using AkademiTrack.Services.Configuration;
 using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -31,7 +31,7 @@ namespace AkademiTrack.ViewModels
 {
 
 
-    public class AppSettings
+public class AppSettings
     {
         public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
@@ -42,6 +42,7 @@ namespace AkademiTrack.ViewModels
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public bool InitialSetupCompleted { get; set; } = false;
         public int FeideGracePeriodHours { get; set; } = 4; // Grace period after Feide login
+        public bool EnableFeideAutoConfirmation { get; set; } = true; // Allow auto-confirmation on Feide login
     }
 
     public static class AutoStartManager

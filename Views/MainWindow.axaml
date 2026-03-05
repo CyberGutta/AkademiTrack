@@ -987,7 +987,7 @@
 				Grid.RowSpan="999"
 				Grid.ColumnSpan="999"
 				ZIndex="9999"
-				IsVisible="{Binding IsConfirmationNeeded}">
+				IsVisible="{Binding ShouldShowConfirmationOverlay}">
 			<Grid>
 				<Border Classes="loading-container"
 						Width="400"

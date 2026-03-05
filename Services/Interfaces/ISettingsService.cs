@@ -18,6 +18,7 @@ namespace AkademiTrack.Services.Interfaces
         bool EnableNotifications { get; set; }
         bool InitialSetupCompleted { get; set; }
         int FeideGracePeriodHours { get; set; }
+        bool EnableFeideAutoConfirmation { get; set; }
         
         // School Hours Settings
         SchoolHoursSettings SchoolHours { get; }

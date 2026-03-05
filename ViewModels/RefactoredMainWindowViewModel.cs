@@ -226,6 +226,18 @@ namespace AkademiTrack.ViewModels
             private set => SetProperty(ref _isConfirmationNeeded, value);
         }
 
+        // Controls when the confirmation overlay should actually be visible
+        private bool _shouldShowConfirmationOverlay = false;
+        public bool ShouldShowConfirmationOverlay
+        {
+            get => _shouldShowConfirmationOverlay;
+            private set => SetProperty(ref _shouldShowConfirmationOverlay, value);
+        }
+
+        // Track if we're waiting to show overlay after notifications are handled
+        private bool _pendingOverlayShow = false;
+        private DateTime _lastNotificationTime = DateTime.MinValue;
+
         public async Task<bool> IsConfirmationNeededAsync()
         {
             try
@@ -412,15 +424,7 @@ namespace AkademiTrack.ViewModels
                     
                     _loggingService.LogDebug($"🔍 [INIT] Set state: IsAuthenticated={IsAuthenticated}, _userParameters complete={_userParameters.IsComplete}");
 
-                    // Register Feide login as automatic presence confirmation
-                    try
-                    {
-                        await _userConfirmationService.RegisterFeideLoginConfirmationAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogError($"Failed to register Feide confirmation: {ex.Message}");
-                    }
+                    // NOTE: Auto-confirmation removed from here - only happens on interactive Feide login
 
                     // Update command states after authentication
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
@@ -777,15 +781,80 @@ namespace AkademiTrack.ViewModels
 
         private void OnNotificationAdded(object? sender, NotificationEventArgs e)
         {
-            Dispatcher.UIThread.Post(() =>
+            _lastNotificationTime = DateTime.Now;
+            _loggingService.LogDebug($"Notification added: {e.Notification.Title}");
+
+            // IMMEDIATELY hide overlay if a notification appears
+            if (ShouldShowConfirmationOverlay)
             {
-                CurrentNotification = e.Notification;
-                OnPropertyChanged(nameof(HasCurrentNotification));
+                _loggingService.LogInfo("Notification appeared - IMMEDIATELY hiding confirmation overlay");
+                ShouldShowConfirmationOverlay = false;
+                _pendingOverlayShow = true; // Mark as pending so it can show later after notification is handled
+            }
+        }
+
+        /// <summary>
+        /// Requests to show the confirmation overlay, but NEVER shows if notifications are active
+        /// </summary>
+        private async Task RequestOverlayShowAsync()
+        {
+            // ABSOLUTE RULE: Never show overlay if there are any active notifications
+            var hasActiveNotifications = _notificationService.HasActiveNotifications;
+
+            if (hasActiveNotifications)
+            {
+                _loggingService.LogInfo("BLOCKING overlay - active notifications must be handled first. Overlay will NOT be shown.");
+                return; // HARD STOP - no overlay, no pending, no fallback timer
+            }
+
+            // Only show overlay if absolutely no notifications are active
+            _loggingService.LogDebug("No active notifications - showing overlay immediately");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ShouldShowConfirmationOverlay = true;
             });
+        }
+
+        /// <summary>
+        /// Checks if we should show the confirmation overlay after notifications are handled
+        /// </summary>
+        private void CheckPendingOverlayShow()
+        {
+            if (!_pendingOverlayShow) return;
+
+            // ABSOLUTE RULE: Never show overlay if there are any active notifications
+            var hasActiveNotifications = _notificationService.HasActiveNotifications;
+
+            if (hasActiveNotifications)
+            {
+                _loggingService.LogDebug("Still have active notifications - overlay remains BLOCKED");
+                return; // Keep waiting, don't show overlay
+            }
+
+            // Wait at least 2 seconds after last notification before showing overlay
+            var timeSinceLastNotification = DateTime.Now - _lastNotificationTime;
+            var enoughTimeHasPassed = timeSinceLastNotification.TotalSeconds >= 2;
+
+            if (enoughTimeHasPassed)
+            {
+                _loggingService.LogDebug("No active notifications and enough time passed - showing pending overlay");
+                _pendingOverlayShow = false;
+                ShouldShowConfirmationOverlay = true;
+            }
+            else
+            {
+                _loggingService.LogDebug($"Waiting for time to pass - {timeSinceLastNotification.TotalSeconds}s since last notification");
+            }
         }
 
         private void OnNotificationDismissed(object? sender, NotificationEventArgs e)
         {
+            _loggingService.LogDebug($"Notification dismissed: {e.Notification.Title}");
+            
+            // Check if we should show pending overlay after notification is handled
+            CheckPendingOverlayShow();
+            
+            // Handle current notification UI updates
             Dispatcher.UIThread.Post(() =>
             {
                 if (CurrentNotification?.Id == e.Notification.Id)
@@ -1181,24 +1250,30 @@ namespace AkademiTrack.ViewModels
             try
             {
                 _loggingService.LogInfo("User manually confirmed presence");
-                
+
                 var confirmed = await _userConfirmationService.ConfirmPresenceAsync();
-                
+
                 if (confirmed)
                 {
+                    // Hide the confirmation overlay
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        ShouldShowConfirmationOverlay = false;
+                    });
+
                     // Update confirmation status
                     await UpdateConfirmationStatusAsync();
-                    
+
                     // Check if automation should start now that presence is confirmed
                     var (shouldStart, reason, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: false);
-                    
+
                     if (shouldStart && !IsAutomationRunning)
                     {
                         _loggingService.LogInfo("Starting automation after manual confirmation");
-                        
+
                         // Mark as started
                         await SchoolTimeChecker.MarkTodayAsStartedAsync();
-                        
+
                         // Start automation
                         await StartAutomationAsync();
                     }
@@ -1217,7 +1292,7 @@ namespace AkademiTrack.ViewModels
             catch (Exception ex)
             {
                 _loggingService.LogError($"Error confirming presence: {ex.Message}");
-                
+
                 await _notificationService.ShowNotificationAsync(
                     "Bekreftelse feilet",
                     "Kunne ikke bekrefte tilstedeværelse. Prøv igjen.",
@@ -1484,12 +1559,20 @@ namespace AkademiTrack.ViewModels
             {
                 var today = DateTime.Now.Date;
                 var needsConfirmation = !await _userConfirmationService.IsConfirmedForDateAsync(today);
-                
+
                 _loggingService.LogDebug($"Confirmation check: {needsConfirmation}");
-                
+
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     IsConfirmationNeeded = needsConfirmation;
+
+                    // Only show overlay if confirmation is needed AND we should show it
+                    // Initially hidden - will be shown when appropriate (e.g., when automation tries to start)
+                    if (!needsConfirmation)
+                    {
+                        ShouldShowConfirmationOverlay = false;
+                    }
+                    // Don't automatically show overlay here - let other logic decide when to show it
                 });
             }
             catch (Exception ex)
@@ -1544,7 +1627,11 @@ namespace AkademiTrack.ViewModels
             if (e.Success)
             {
                 _loggingService.LogSuccess($"Feide-oppsett fullført for {e.UserEmail}");
-                
+
+                // Mark that an interactive Feide login just happened
+                // This will be used when the user presses the confirmation button
+                _userConfirmationService.MarkInteractiveFeideLoginCompleted();
+
                 // Reset retry count
                 InitializationRetryCount = 0;
                 // Note: Navigation and StartInitializationAsync() is handled by App.axaml.cs
@@ -1586,19 +1673,19 @@ namespace AkademiTrack.ViewModels
             try
             {
                 _loggingService.LogInfo("CHECKING AUTO-START AUTOMATION");
-                
+
                 await _settingsService.LoadSettingsAsync();
                 var autoStartEnabled = _settingsService.AutoStartAutomation;
-                
+
                 _loggingService.LogInfo($"AutoStartAutomation setting: {autoStartEnabled}");
                 _loggingService.LogInfo($"Current time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 _loggingService.LogInfo($"Current day: {DateTime.Now.DayOfWeek}");
-                
+
                 if (!autoStartEnabled)
                 {
                     _loggingService.LogInfo("Auto-start is DISABLED in settings");
                     _loggingService.LogInfo("   Periodic checking will NOT run");
-                    
+
                     // Stop timer if it's running - must be on UI thread
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
@@ -1612,45 +1699,26 @@ namespace AkademiTrack.ViewModels
                 // This handles the case where app crashed while user had manually started automation
                 await SchoolTimeChecker.ClearManualStopAsync();
                 _loggingService.LogInfo("Manual stop flag cleared on app restart (auto-start enabled)");
-                
+
                 // Use the confirmation-aware method that checks manual stops, completion, and confirmation
                 var (shouldStart, reason, nextStartTime, shouldNotify, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: false);
-                
+
                 _loggingService.LogInfo($"Auto-start check result: {reason}");
-                
+
                 if (needsConfirmation)
                 {
-                    _loggingService.LogInfo("Daily confirmation required - requesting user confirmation");
-                    
-                    // Request confirmation with 10 minute timeout
-                    var confirmed = await _userConfirmationService.RequestDailyConfirmationAsync(timeoutMinutes: 10);
-                    
-                    if (confirmed)
-                    {
-                        _loggingService.LogInfo("User confirmed presence - starting automation");
-                        
-                        // Mark as started
-                        await SchoolTimeChecker.MarkTodayAsStartedAsync();
-                        
-                        // Must start automation on UI thread
-                        await Dispatcher.UIThread.InvokeAsync(async () =>
-                        {
-                            await Task.Delay(500);
-                            await StartAutomationAsync();
-                        });
-                    }
-                    else
-                    {
-                        _loggingService.LogInfo("User did not confirm presence - automation will not start automatically");
-                    }
+                    _loggingService.LogInfo("Daily confirmation required - but NOT showing overlay during initial startup");
+
+                    // DON'T show overlay during initial startup - only during periodic checks
+                    // The periodic timer will handle showing the overlay when it's actually time
                 }
                 else if (shouldStart && !IsAutomationRunning)
                 {
                     _loggingService.LogInfo("Starting automation automatically...");
-                    
+
                     // Mark as started
                     await SchoolTimeChecker.MarkTodayAsStartedAsync();
-                    
+
                     // Must start automation on UI thread
                     await Dispatcher.UIThread.InvokeAsync(async () =>
                     {
@@ -1670,7 +1738,7 @@ namespace AkademiTrack.ViewModels
                         _loggingService.LogInfo($"   Next auto-start: {nextStartTime.Value:yyyy-MM-dd HH:mm}");
                     }
                 }
-                
+
                 // SMART PERIODIC CHECKING - checks frequently near start times, less frequently otherwise
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -1687,17 +1755,17 @@ namespace AkademiTrack.ViewModels
                                     {
                                         _loggingService.LogInfo("💤 Wake from sleep detected - checking auto-start conditions");
                                     }
-                                    
-                                    // Perform the auto-start check
+
+                                    // Perform the auto-start check (this one CAN show overlay)
                                     await PerformAutoStartCheckAsync();
-                                    
+
                                     // Reschedule next check based on how close we are to start time
                                     await RescheduleAutoStartTimer();
                                 }
                                 catch (Exception ex)
                                 {
                                     _loggingService.LogError($"Error in auto-start timer: {ex.Message}");
-                                    
+
                                     // Fallback rescheduling on error
                                     try
                                     {
@@ -1737,7 +1805,7 @@ namespace AkademiTrack.ViewModels
             {
                 await _settingsService.LoadSettingsAsync();
                 var autoStartEnabled = _settingsService.AutoStartAutomation;
-                
+
                 if (!autoStartEnabled)
                 {
                     _loggingService.LogDebug("Auto-start disabled in settings");
@@ -1746,39 +1814,41 @@ namespace AkademiTrack.ViewModels
 
                 // Use the confirmation-aware method that checks manual stops, completion, and confirmation
                 var (shouldStart, reason, nextStartTime, shouldNotify, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
-                
+
                 if (needsConfirmation)
                 {
-                    _loggingService.LogDebug("Daily confirmation required - requesting user confirmation");
-                    
-                    // Request confirmation with 10 minute timeout
-                    var confirmed = await _userConfirmationService.RequestDailyConfirmationAsync(timeoutMinutes: 10);
-                    
-                    if (confirmed)
+                    // Check if it's actually time to start automation (ignoring confirmation requirement)
+                    var (wouldStartWithoutConfirmation, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
+
+                    if (wouldStartWithoutConfirmation)
                     {
-                        _loggingService.LogInfo($"🚀 Auto-starting automation after confirmation: {reason}");
-                        
-                        // Mark as started
-                        await SchoolTimeChecker.MarkTodayAsStartedAsync();
-                        
-                        // Start automation on UI thread
-                        await Dispatcher.UIThread.InvokeAsync(async () =>
+                        _loggingService.LogDebug("It's time to start automation but confirmation needed - checking if overlay can be shown");
+
+                        // STRICT CHECK: Only request overlay if NO notifications are active
+                        var hasActiveNotifications = _notificationService.HasActiveNotifications;
+                        if (hasActiveNotifications)
                         {
-                            await StartAutomationAsync();
-                        });
+                            _loggingService.LogInfo("CANNOT show overlay - active notifications present. User must handle notifications first.");
+                            return; // Don't show overlay, don't set pending - just wait for next check
+                        }
+
+                        // Safe to show overlay
+                        await RequestOverlayShowAsync();
                     }
                     else
                     {
-                        _loggingService.LogDebug("User did not confirm presence - automation will not start");
+                        _loggingService.LogDebug($"Confirmation needed but not time to start yet: {reason}");
                     }
+
+                    return;
                 }
                 else if (shouldStart && !IsAutomationRunning)
                 {
                     _loggingService.LogInfo($"🚀 Auto-starting automation: {reason}");
-                    
+
                     // Mark as started
                     await SchoolTimeChecker.MarkTodayAsStartedAsync();
-                    
+
                     // Start automation on UI thread
                     await Dispatcher.UIThread.InvokeAsync(async () =>
                     {

@@ -170,6 +170,22 @@ namespace AkademiTrack.Services
             }
         }
 
+        public bool EnableFeideAutoConfirmation
+        {
+            get => _settings.EnableFeideAutoConfirmation;
+            set
+            {
+                if (_settings.EnableFeideAutoConfirmation != value)
+                {
+                    var oldValue = _settings.EnableFeideAutoConfirmation;
+                    _settings.EnableFeideAutoConfirmation = value;
+                    OnPropertyChanged();
+                    SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(EnableFeideAutoConfirmation), oldValue, value));
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         #endregion
 
         #region Methods
@@ -293,6 +309,7 @@ namespace AkademiTrack.Services
             OnPropertyChanged(nameof(EnableNotifications));
             OnPropertyChanged(nameof(InitialSetupCompleted));
             OnPropertyChanged(nameof(FeideGracePeriodHours));
+            OnPropertyChanged(nameof(EnableFeideAutoConfirmation));
         }
 
         #endregion
