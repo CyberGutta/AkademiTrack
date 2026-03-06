@@ -1,4 +1,4 @@
-@ -0,0 +1,52 @@
+@ -0,0 +1,54 @@
 name: "CodeQL Advanced"
 
 on:
@@ -10,6 +10,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ (matrix.language == 'swift' && 30) || 15 }}
     permissions:
       security-events: write
       packages: read
@@ -19,6 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        language: ['csharp', 'python', 'swift']
         include:
         - language: csharp
           build-mode: none
