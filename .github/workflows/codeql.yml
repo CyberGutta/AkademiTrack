@@ -1,4 +1,4 @@
-@ -0,0 +1,49 @@
+@ -0,0 +1,52 @@
 name: "CodeQL Advanced"
 
 on:
@@ -42,7 +42,10 @@ jobs:
       shell: bash
       run: |
         cd AkademiTrack
-        xcodebuild -project AkademiTrack.xcodeproj -scheme AkademiTrack -configuration Debug build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        # List available schemes first
+        xcodebuild -project AkademiTrack.xcodeproj -list
+        # Build without code signing
+        xcodebuild -project AkademiTrack.xcodeproj -scheme AkademiTrack -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
