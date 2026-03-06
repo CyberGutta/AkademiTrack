@@ -1,4 +1,4 @@
-@ -0,0 +1,54 @@
+@ -0,0 +1,87 @@
 name: "CodeQL Advanced"
 
 on:
@@ -7,27 +7,14 @@ on:
     branches: [ "master" ]
 
 jobs:
-  analyze:
-    name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: ${{ (matrix.language == 'swift' && 30) || 15 }}
+  analyze-csharp:
+    name: Analyze C#
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
       actions: read
       contents: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ['csharp', 'python', 'swift']
-        include:
-        - language: csharp
-          build-mode: none
-        - language: python
-          build-mode: none
-        - language: swift
-          build-mode: manual
 
     steps:
     - name: Checkout repository
@@ -36,11 +23,57 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
-        languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
+        languages: csharp
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:csharp"
+
+  analyze-python:
+    name: Analyze Python
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: python
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:python"
+
+  analyze-swift:
+    name: Analyze Swift
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: swift
+        build-mode: manual
 
     - name: Build Swift project
-      if: matrix.build-mode == 'manual'
       shell: bash
       run: |
         cd AkademiTrack
@@ -52,4 +85,4 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
       with:
-        category: "/language:${{matrix.language}}"
+        category: "/language:swift"
