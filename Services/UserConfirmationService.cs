@@ -123,11 +123,15 @@ namespace AkademiTrack.Services
         /// This will be used when the user manually confirms presence
         /// </summary>
         public void MarkInteractiveFeideLoginCompleted()
-        {
-            _interactiveFeideLoginCompleted = true;
-            _interactiveFeideLoginTime = DateTime.Now;
-            _loggingService.LogDebug($"[INTERACTIVE-FEIDE] Marked interactive Feide login completed at {_interactiveFeideLoginTime:HH:mm}");
-        }
+                {
+                    // DISABLED: No longer auto-confirm based on Feide login
+                    // Always require manual confirmation regardless of Feide login
+                    _loggingService.LogDebug("Feide login completed - manual confirmation still required");
+
+                    // Clear any existing flags to prevent auto-confirmation
+                    _interactiveFeideLoginCompleted = false;
+                    _interactiveFeideLoginTime = DateTime.MinValue;
+                }
 
         /// <summary>
         /// Confirms presence for today, with special handling for interactive Feide logins
@@ -136,70 +140,39 @@ namespace AkademiTrack.Services
         /// Confirms presence for today, with special handling for interactive Feide logins
         /// </summary>
         public async Task<bool> ConfirmPresenceAsync()
-        {
-            try
-            {
-                var today = DateTime.Now.Date;
-
-                // Check if this confirmation is happening right after an interactive Feide login
-                if (_interactiveFeideLoginCompleted && 
-                    (DateTime.Now - _interactiveFeideLoginTime).TotalMinutes < 2) // Within 2 minutes of Feide login
                 {
-                    _loggingService.LogDebug("[INTERACTIVE-FEIDE] User confirmed presence within 2 minutes of interactive Feide login - checking auto-confirmation");
-
-                    // Check if we should auto-confirm based on timing
-                    if (await ShouldAutoConfirmOnInteractiveFeideLoginAsync(_interactiveFeideLoginTime))
+                    try
                     {
-                        _loggingService.LogInfo("Auto-confirming presence due to interactive Feide login during STU hours");
+                        var today = DateTime.Now.Date;
 
-                        var feideConfirmationData = new DailyConfirmationData
+                        // NEVER auto-confirm - always require manual confirmation
+                        _loggingService.LogInfo("Manual presence confirmation required");
+
+                        // Clear any Feide login flags to prevent auto-confirmation
+                        _interactiveFeideLoginCompleted = false;
+
+                        // Always create manual confirmation
+                        var manualConfirmationData = new DailyConfirmationData
                         {
                             Date = today,
                             IsConfirmed = true,
                             ConfirmedAt = DateTime.Now,
-                            ConfirmedViaFeide = true,
-                            FeideLoginTime = _interactiveFeideLoginTime
+                            ConfirmedViaFeide = false,
+                            FeideLoginTime = null
                         };
 
-                        var feideJson = JsonSerializer.Serialize(feideConfirmationData, new JsonSerializerOptions { WriteIndented = true });
-                        await File.WriteAllTextAsync(_confirmationStatusFile, feideJson);
+                        var manualJson = JsonSerializer.Serialize(manualConfirmationData, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(_confirmationStatusFile, manualJson);
 
-                        // Clear the flag
-                        _interactiveFeideLoginCompleted = false;
-
+                        _loggingService.LogInfo("Presence confirmed manually");
                         return true;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _loggingService.LogDebug("Interactive Feide login was not during STU hours - proceeding with manual confirmation");
+                        _loggingService.LogError($"Error confirming presence: {ex.Message}");
+                        return false;
                     }
-
-                    // Clear the flag regardless
-                    _interactiveFeideLoginCompleted = false;
                 }
-
-                // Regular manual confirmation
-                var manualConfirmationData = new DailyConfirmationData
-                {
-                    Date = today,
-                    IsConfirmed = true,
-                    ConfirmedAt = DateTime.Now,
-                    ConfirmedViaFeide = false,
-                    FeideLoginTime = null
-                };
-
-                var manualJson = JsonSerializer.Serialize(manualConfirmationData, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_confirmationStatusFile, manualJson);
-
-                _loggingService.LogInfo("Presence confirmed manually");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"Error confirming presence: {ex.Message}");
-                return false;
-            }
-        }
         /// <summary>
         /// Registers a Feide login as automatic presence confirmation for today
         /// </summary>
@@ -404,53 +377,43 @@ namespace AkademiTrack.Services
 
 
         public async Task<bool> IsConfirmedForDateAsync(DateTime date)
-        {
-            try
-            {
-                if (!File.Exists(_confirmationStatusFile))
                 {
-                    _loggingService.LogDebug("No confirmation file");
-                    return false;
-                }
-
-                var json = await File.ReadAllTextAsync(_confirmationStatusFile);
-                var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
-
-                if (confirmationData?.Date.Date != date.Date)
-                {
-                    _loggingService.LogDebug("Confirmation date mismatch");
-                    return false;
-                }
-
-                // If confirmed via Feide, check if we're still within the grace period
-                if (confirmationData.ConfirmedViaFeide && confirmationData.FeideLoginTime.HasValue)
-                {
-                    var timeSinceFeideLogin = DateTime.Now - confirmationData.FeideLoginTime.Value;
-                    var gracePeriodHours = _settingsService.FeideGracePeriodHours; // Use configurable grace period
-
-                    if (timeSinceFeideLogin.TotalHours <= gracePeriodHours)
+                    try
                     {
-                        _loggingService.LogDebug($"Within Feide grace period ({timeSinceFeideLogin.TotalHours:F1} hours since login, grace period: {gracePeriodHours}h)");
-                        return true;
+                        if (!File.Exists(_confirmationStatusFile))
+                        {
+                            _loggingService.LogDebug("No confirmation file - user needs to confirm");
+                            return false;
+                        }
+
+                        var json = await File.ReadAllTextAsync(_confirmationStatusFile);
+                        var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
+
+                        if (confirmationData?.Date.Date != date.Date)
+                        {
+                            _loggingService.LogDebug("Confirmation date mismatch - user needs to confirm");
+                            return false;
+                        }
+
+                        // NEVER use Feide auto-confirmation - always require manual confirmation
+                        // Only accept manual confirmations
+                        if (confirmationData.ConfirmedViaFeide)
+                        {
+                            _loggingService.LogDebug("Feide auto-confirmation found but ignored - manual confirmation required");
+                            return false;
+                        }
+
+                        var isConfirmed = confirmationData.IsConfirmed;
+                        _loggingService.LogDebug($"Manual confirmation status: {isConfirmed}");
+
+                        return isConfirmed;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _loggingService.LogDebug($"Feide grace period expired ({timeSinceFeideLogin.TotalHours:F1} hours since login, grace period: {gracePeriodHours}h)");
+                        _loggingService.LogError($"Confirmation check error: {ex.Message}");
                         return false;
                     }
                 }
-
-                var isConfirmed = confirmationData.IsConfirmed;
-                _loggingService.LogDebug($"Regular confirmation: {isConfirmed}");
-
-                return isConfirmed;
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"Confirmation check error: {ex.Message}");
-                return false;
-            }
-        }
 
         private async Task<bool> WaitForConfirmationAsync(string confirmationId, CancellationToken cancellationToken)
         {
@@ -515,31 +478,55 @@ namespace AkademiTrack.Services
         }
 
         private void StartFileWatcher()
-        {
-            try
-            {
-                _fileWatcher = new FileSystemWatcher(_appDataDir, "daily_confirmation.json")
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
-                    EnableRaisingEvents = true
-                };
+                    try
+                    {
+                        _fileWatcher = new FileSystemWatcher(_appDataDir, "daily_confirmation.json")
+                        {
+                            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
+                            EnableRaisingEvents = true,
+                            IncludeSubdirectories = false
+                        };
 
-                _fileWatcher.Deleted += OnConfirmationFileDeleted;
-                _fileWatcher.Changed += OnConfirmationFileChanged;
-                
-                _loggingService.LogDebug("File watcher started for confirmation file");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"Failed to start file watcher: {ex.Message}");
-            }
-        }
+                        _fileWatcher.Deleted += OnConfirmationFileDeleted;
+                        _fileWatcher.Changed += OnConfirmationFileChanged;
+                        _fileWatcher.Error += OnFileWatcherError;
+
+                        _loggingService.LogDebug($"File watcher started for confirmation file in: {_appDataDir}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Failed to start file watcher: {ex.Message}");
+                    }
+                }
+
+                private void OnFileWatcherError(object sender, ErrorEventArgs e)
+                {
+                    _loggingService.LogError($"File watcher error: {e.GetException().Message}");
+
+                    // Try to restart the file watcher
+                    try
+                    {
+                        _fileWatcher?.Dispose();
+                        StartFileWatcher();
+                        _loggingService.LogInfo("File watcher restarted after error");
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Failed to restart file watcher: {ex.Message}");
+                    }
+                }
 
         private async void OnConfirmationFileDeleted(object sender, FileSystemEventArgs e)
-        {
-            _loggingService.LogWarning("Confirmation file was deleted - triggering confirmation lost event");
-            ConfirmationLost?.Invoke(this, EventArgs.Empty);
-        }
+                {
+                    _loggingService.LogWarning($"Confirmation file was deleted: {e.FullPath} - triggering confirmation lost event");
+
+                    // Add a small delay to ensure file system operations are complete
+                    await Task.Delay(100);
+
+                    _loggingService.LogInfo("Invoking ConfirmationLost event");
+                    ConfirmationLost?.Invoke(this, EventArgs.Empty);
+                }
 
         private async void OnConfirmationFileChanged(object sender, FileSystemEventArgs e)
         {

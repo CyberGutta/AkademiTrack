@@ -102,9 +102,46 @@ namespace AkademiTrack.Services
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                foreach (var notification in _notifications)
+                var notificationsToRemove = _notifications.Where(n => n.IsVisible).ToList();
+                foreach (var notification in notificationsToRemove)
                 {
                     notification.IsVisible = false;
+                    NotificationDismissed?.Invoke(this, new NotificationEventArgs(notification));
+                }
+                
+                // Actually remove them from the collection
+                for (int i = _notifications.Count - 1; i >= 0; i--)
+                {
+                    if (!_notifications[i].IsVisible)
+                    {
+                        _notifications.RemoveAt(i);
+                    }
+                }
+            });
+        }
+
+        public async Task ClearNonConfirmationNotificationsAsync()
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var notificationsToRemove = _notifications.Where(n => n.IsVisible && 
+                    n.Title?.Contains("Bekreftelse") != true && 
+                    n.Title?.Contains("BEKREFT") != true && 
+                    n.Message?.Contains("Trykk 'Ja, jeg er her'") != true).ToList();
+                
+                foreach (var notification in notificationsToRemove)
+                {
+                    notification.IsVisible = false;
+                    NotificationDismissed?.Invoke(this, new NotificationEventArgs(notification));
+                }
+                
+                // Actually remove them from the collection
+                for (int i = _notifications.Count - 1; i >= 0; i--)
+                {
+                    if (!_notifications[i].IsVisible)
+                    {
+                        _notifications.RemoveAt(i);
+                    }
                 }
             });
         }

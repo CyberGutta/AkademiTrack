@@ -78,6 +78,7 @@ struct Provider: TimelineProvider {
         if widgetData.currentClassName == "Åpne appen" || 
            widgetData.currentClassName == "Venter på data" || 
            widgetData.currentClassName == "Laster data..." ||
+           widgetData.currentClassName == "Laster inn..." ||
            widgetData.currentClassName == "Ingen tilgang" || 
            widgetData.currentClassName == "Kan ikke lese" || 
            widgetData.currentClassName == "Ugyldig data" {
@@ -136,13 +137,21 @@ struct Provider: TimelineProvider {
             return createErrorData(message: "Ugyldig data", detail: "Prøv å åpne appen")
         }
         
-        // Check if data is stale (older than 30 seconds - heartbeat updates every 5 seconds)
-        // This helps detect when app is closed, but gives buffer time for system delays
+        // Check if data is stale - but be smarter about it
         let secondsSinceUpdate = Date().timeIntervalSince(widgetData.lastUpdated)
         print("📊 Widget: Data age: \(Int(secondsSinceUpdate)) seconds (threshold: 30s)")
-        if secondsSinceUpdate > 30 {
-            print("⚠️ Widget: Data is stale (\(Int(secondsSinceUpdate)) seconds old)")
+        
+        // If data is very old (more than 5 minutes), assume app is closed
+        if secondsSinceUpdate > 300 {
+            print("⚠️ Widget: Data is very stale (\(Int(secondsSinceUpdate)) seconds old) - app likely closed")
             return createErrorData(message: "Åpne appen", detail: "Appen må være åpen")
+        }
+        
+        // If data is moderately stale (30 seconds to 5 minutes), show loading state
+        // This handles cases where Mac was locked/sleeping and heartbeat was suspended
+        if secondsSinceUpdate > 30 {
+            print("⚠️ Widget: Data is moderately stale (\(Int(secondsSinceUpdate)) seconds old) - showing loading state")
+            return createLoadingData(message: "Laster inn...", detail: "Venter på data")
         }
         
         print("✅ Widget: Successfully loaded - Daily: \(widgetData.dailyRegistered)/\(widgetData.dailyTotal), Next: \(widgetData.nextClassName ?? "None")")
@@ -150,6 +159,17 @@ struct Provider: TimelineProvider {
     }
     
     private func createErrorData(message: String, detail: String) -> WidgetData {
+        return WidgetData(
+            dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
+            weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
+            monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
+            currentClassName: message, currentClassTime: detail, currentClassRoom: nil,
+            nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
+            lastUpdated: Date()
+        )
+    }
+    
+    private func createLoadingData(message: String, detail: String) -> WidgetData {
         return WidgetData(
             dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
             weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
@@ -191,6 +211,7 @@ struct SmallWidgetView: View {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
+               data.currentClassName == "Laster inn..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -200,7 +221,7 @@ struct SmallWidgetView: View {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." {
+        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
@@ -364,6 +385,7 @@ struct MediumWidgetView: View {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
+               data.currentClassName == "Laster inn..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -373,7 +395,7 @@ struct MediumWidgetView: View {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." {
+        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
@@ -442,6 +464,7 @@ struct LargeWidgetView: View {
         return data.currentClassName == "Åpne appen" || 
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
+               data.currentClassName == "Laster inn..." ||
                data.currentClassName == "Ingen tilgang" || 
                data.currentClassName == "Kan ikke lese" || 
                data.currentClassName == "Ugyldig data"
@@ -451,7 +474,7 @@ struct LargeWidgetView: View {
         if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." {
+        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"

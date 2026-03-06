@@ -15,6 +15,7 @@ namespace AkademiTrack.Services.Interfaces
         
         Task DismissNotificationAsync(int notificationId);
         Task ClearAllNotificationsAsync();
+        Task ClearNonConfirmationNotificationsAsync();
         
         IReadOnlyList<NotificationEntry> GetActiveNotifications();
         bool HasActiveNotifications { get; }

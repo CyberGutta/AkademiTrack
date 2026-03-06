@@ -78,20 +78,31 @@ namespace AkademiTrack.Services
         {
             try
             {
+                var now = DateTime.Now;
+                
                 // Only update if we haven't updated in the last 3 seconds
                 // This prevents excessive updates if multiple timers fire
-                if ((DateTime.Now - _lastUpdate).TotalSeconds < 3)
+                if ((now - _lastUpdate).TotalSeconds < 3)
                 {
                     return;
                 }
 
-                _lastUpdate = DateTime.Now;
+                // Check if we've been suspended for a long time (system was locked/sleeping)
+                // If so, force a widget reload to ensure it updates quickly
+                var timeSinceLastUpdate = now - _lastUpdate;
+                if (_lastUpdate != DateTime.MinValue && timeSinceLastUpdate.TotalMinutes > 2)
+                {
+                    _loggingService?.LogInfo($"[WIDGET HEARTBEAT] Long gap detected ({timeSinceLastUpdate.TotalMinutes:F1} min) - forcing widget reload");
+                    await _widgetDataService.ForceRefreshWidgetAsync();
+                }
+                else
+                {
+                    // Normal heartbeat update
+                    await _widgetDataService.RefreshHeartbeatAsync();
+                }
 
-                // Trigger a widget data refresh with current cached data
-                // This updates the LastUpdated timestamp so the widget knows the app is alive
-                await _widgetDataService.RefreshHeartbeatAsync();
-                
-                _loggingService?.LogDebug($"[WIDGET HEARTBEAT] Updated at {DateTime.Now:HH:mm:ss}");
+                _lastUpdate = now;
+                _loggingService?.LogDebug($"[WIDGET HEARTBEAT] Updated at {now:HH:mm:ss}");
             }
             catch (Exception ex)
             {
