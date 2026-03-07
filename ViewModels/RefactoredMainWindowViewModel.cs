@@ -247,8 +247,11 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
-                var today = DateTime.Now.Date;
-                return !await _userConfirmationService.IsConfirmedForDateAsync(today);
+                // First check if today is an enabled automation day
+                var (shouldStart, _, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
+                
+                // Only need confirmation if automation should start and needs confirmation
+                return shouldStart && needsConfirmation;
             }
             catch
             {

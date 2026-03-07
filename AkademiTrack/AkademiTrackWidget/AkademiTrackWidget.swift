@@ -79,14 +79,16 @@ struct Provider: TimelineProvider {
            widgetData.currentClassName == "Venter på data" || 
            widgetData.currentClassName == "Laster data..." ||
            widgetData.currentClassName == "Laster inn..." ||
-           widgetData.currentClassName == "Ingen tilgang" || 
-           widgetData.currentClassName == "Kan ikke lese" || 
+           widgetData.currentClassName == "Ingen tilgang" ||
+           widgetData.currentClassName == "Mangler tillatelser" ||
+           widgetData.currentClassName == "Kan ikke lese" ||
+           widgetData.currentClassName == "Kan ikke lese data" ||
            widgetData.currentClassName == "Ugyldig data" {
-            // Error state: check every 10 seconds (macOS may throttle to ~15s)
-            nextUpdate = Calendar.current.date(byAdding: .second, value: 10, to: currentDate)!
+            // Error state: check every 5 seconds (more aggressive for faster recovery)
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 5, to: currentDate)!
         } else {
-            // Normal state: update every 20 seconds (more conservative to reduce battery usage)
-            nextUpdate = Calendar.current.date(byAdding: .second, value: 20, to: currentDate)!
+            // Normal state: update every 15 seconds (balanced for good UX and battery)
+            nextUpdate = Calendar.current.date(byAdding: .second, value: 15, to: currentDate)!
         }
         
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
@@ -112,10 +114,10 @@ struct Provider: TimelineProvider {
             // Check if this is a permission issue by checking if the container exists
             if fileManager.fileExists(atPath: containerURL.path) {
                 // Container exists but no file - app hasn't written data yet OR permission denied
-                return createErrorData(message: "Åpne appen", detail: "Lukk appen helt og åpne på nytt, klikk Tillat")
+                return createErrorData(message: "Åpne appen", detail: "Kan være tillatelser eller data som laster inn, eller så kan det være appen som ikke er åpen")
             } else {
                 // Container doesn't exist - serious permission issue
-                return createErrorData(message: "Ingen tilgang", detail: "Lukk appen helt og åpne på nytt, klikk Tillat")
+                return createErrorData(message: "Mangler tillatelser", detail: "Lukk og åpne appen, gi tillatelser")
             }
         }
         
@@ -123,7 +125,7 @@ struct Provider: TimelineProvider {
         
         guard let data = try? Data(contentsOf: widgetFile) else {
             print("❌ Widget: Failed to read file data")
-            return createErrorData(message: "Kan ikke lese", detail: "Tillatelse nektet")
+            return createErrorData(message: "Kan ikke lese data", detail: "Sjekk app-tillatelser")
         }
         
         print("✅ Widget: Read \(data.count) bytes")
@@ -134,7 +136,7 @@ struct Provider: TimelineProvider {
         
         guard let widgetData = try? decoder.decode(WidgetData.self, from: data) else {
             print("❌ Widget: Failed to decode JSON")
-            return createErrorData(message: "Ugyldig data", detail: "Prøv å åpne appen")
+            return createErrorData(message: "Ugyldig data", detail: "Start appen på nytt")
         }
         
         // Check if data is stale - but be smarter about it
@@ -144,14 +146,14 @@ struct Provider: TimelineProvider {
         // If data is very old (more than 5 minutes), assume app is closed
         if secondsSinceUpdate > 300 {
             print("⚠️ Widget: Data is very stale (\(Int(secondsSinceUpdate)) seconds old) - app likely closed")
-            return createErrorData(message: "Åpne appen", detail: "Appen må være åpen")
+            return createErrorData(message: "Åpne appen", detail: "Kan være tillatelser eller data som laster inn, eller så kan det være appen som ikke er åpen")
         }
         
         // If data is moderately stale (30 seconds to 5 minutes), show loading state
         // This handles cases where Mac was locked/sleeping and heartbeat was suspended
         if secondsSinceUpdate > 30 {
             print("⚠️ Widget: Data is moderately stale (\(Int(secondsSinceUpdate)) seconds old) - showing loading state")
-            return createLoadingData(message: "Laster inn...", detail: "Venter på data")
+            return createLoadingData(message: "Laster inn...", detail: "Venter på app-data")
         }
         
         print("✅ Widget: Successfully loaded - Daily: \(widgetData.dailyRegistered)/\(widgetData.dailyTotal), Next: \(widgetData.nextClassName ?? "None")")
@@ -163,7 +165,7 @@ struct Provider: TimelineProvider {
             dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
             weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
             monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-            currentClassName: message, currentClassTime: detail, currentClassRoom: nil,
+            currentClassName: message, currentClassTime: detail, currentClassRoom: "error",
             nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
             lastUpdated: Date()
         )
@@ -174,7 +176,7 @@ struct Provider: TimelineProvider {
             dailyRegistered: 0, dailyTotal: 0, dailyBalance: 0,
             weeklyRegistered: 0, weeklyTotal: 0, weeklyBalance: 0,
             monthlyRegistered: 0, monthlyTotal: 0, monthlyBalance: 0,
-            currentClassName: message, currentClassTime: detail, currentClassRoom: nil,
+            currentClassName: message, currentClassTime: detail, currentClassRoom: "loading",
             nextClassName: nil, nextClassTime: nil, nextClassRoom: nil,
             lastUpdated: Date()
         )
@@ -212,22 +214,50 @@ struct SmallWidgetView: View {
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
                data.currentClassName == "Laster inn..." ||
-               data.currentClassName == "Ingen tilgang" || 
-               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data" ||
                data.currentClassName == "Ugyldig data"
     }
     
+    var isLoadingState: Bool {
+        return data.currentClassName == "Laster data..." || 
+               data.currentClassName == "Laster inn..." ||
+               data.currentClassName == "Venter på data"
+    }
+    
+    var isPermissionError: Bool {
+        return data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data"
+    }
+    
     var errorIcon: String {
-        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+        if isPermissionError {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
+        if isLoadingState {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }
     
+    var errorColor: Color {
+        if isPermissionError {
+            return .red
+        }
+        if isLoadingState {
+            return .blue
+        }
+        return .orange
+    }
+    
     var errorMessage: String {
+        if data.currentClassName == "Åpne appen" {
+            return data.currentClassTime ?? "Lukk og åpne appen på nytt hvis problemet vedvarer"
+        }
         return data.currentClassTime ?? "Hold appen åpen for å se data"
     }
     
@@ -238,9 +268,17 @@ struct SmallWidgetView: View {
             VStack(alignment: .center, spacing: 8) {
                 Spacer()
                 
-                Image(systemName: errorIcon)
-                    .font(.system(size: 28))
-                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                if isLoadingState {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 28))
+                        .foregroundColor(errorColor)
+                        .rotationEffect(.degrees(isLoadingState ? 360 : 0))
+                        .animation(.linear(duration: 2).repeatForever(autoreverses: false), value: isLoadingState)
+                } else {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 28))
+                        .foregroundColor(errorColor)
+                }
                 
                 Text("AkademiTrack")
                     .font(.system(size: 13, weight: .bold))
@@ -386,22 +424,50 @@ struct MediumWidgetView: View {
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
                data.currentClassName == "Laster inn..." ||
-               data.currentClassName == "Ingen tilgang" || 
-               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data" ||
                data.currentClassName == "Ugyldig data"
     }
     
+    var isLoadingState: Bool {
+        return data.currentClassName == "Laster data..." || 
+               data.currentClassName == "Laster inn..." ||
+               data.currentClassName == "Venter på data"
+    }
+    
+    var isPermissionError: Bool {
+        return data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data"
+    }
+    
     var errorIcon: String {
-        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+        if isPermissionError {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
+        if isLoadingState {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }
     
+    var errorColor: Color {
+        if isPermissionError {
+            return .red
+        }
+        if isLoadingState {
+            return .blue
+        }
+        return .orange
+    }
+    
     var errorMessage: String {
+        if data.currentClassName == "Åpne appen" {
+            return data.currentClassTime ?? "Lukk og åpne appen på nytt hvis problemet vedvarer"
+        }
         return data.currentClassTime ?? "Hold appen åpen for å se fremmøte og timeplan"
     }
     
@@ -412,9 +478,17 @@ struct MediumWidgetView: View {
             VStack(spacing: 10) {
                 Spacer()
                 
-                Image(systemName: errorIcon)
-                    .font(.system(size: 36))
-                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                if isLoadingState {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 36))
+                        .foregroundColor(errorColor)
+                        .rotationEffect(.degrees(isLoadingState ? 360 : 0))
+                        .animation(.linear(duration: 2).repeatForever(autoreverses: false), value: isLoadingState)
+                } else {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 36))
+                        .foregroundColor(errorColor)
+                }
                 
                 Text("AkademiTrack")
                     .font(.system(size: 17, weight: .bold))
@@ -465,22 +539,50 @@ struct LargeWidgetView: View {
                data.currentClassName == "Venter på data" || 
                data.currentClassName == "Laster data..." ||
                data.currentClassName == "Laster inn..." ||
-               data.currentClassName == "Ingen tilgang" || 
-               data.currentClassName == "Kan ikke lese" || 
+               data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data" ||
                data.currentClassName == "Ugyldig data"
     }
     
+    var isLoadingState: Bool {
+        return data.currentClassName == "Laster data..." || 
+               data.currentClassName == "Laster inn..." ||
+               data.currentClassName == "Venter på data"
+    }
+    
+    var isPermissionError: Bool {
+        return data.currentClassName == "Ingen tilgang" ||
+               data.currentClassName == "Mangler tillatelser" ||
+               data.currentClassName == "Kan ikke lese" ||
+               data.currentClassName == "Kan ikke lese data"
+    }
+    
     var errorIcon: String {
-        if data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" {
+        if isPermissionError {
             return "lock.fill"
         }
-        if data.currentClassName == "Laster data..." || data.currentClassName == "Laster inn..." {
+        if isLoadingState {
             return "arrow.clockwise"
         }
         return "exclamationmark.triangle.fill"
     }
     
+    var errorColor: Color {
+        if isPermissionError {
+            return .red
+        }
+        if isLoadingState {
+            return .blue
+        }
+        return .orange
+    }
+    
     var errorMessage: String {
+        if data.currentClassName == "Åpne appen" {
+            return data.currentClassTime ?? "Lukk og åpne appen på nytt hvis problemet vedvarer"
+        }
         return data.currentClassTime ?? "Hold appen åpen for å se fremmøte, timeplan og neste time"
     }
     
@@ -491,9 +593,17 @@ struct LargeWidgetView: View {
             VStack(spacing: 14) {
                 Spacer()
                 
-                Image(systemName: errorIcon)
-                    .font(.system(size: 52))
-                    .foregroundColor(data.currentClassName == "Ingen tilgang" || data.currentClassName == "Kan ikke lese" ? .red : .orange)
+                if isLoadingState {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 52))
+                        .foregroundColor(errorColor)
+                        .rotationEffect(.degrees(isLoadingState ? 360 : 0))
+                        .animation(.linear(duration: 2).repeatForever(autoreverses: false), value: isLoadingState)
+                } else {
+                    Image(systemName: errorIcon)
+                        .font(.system(size: 52))
+                        .foregroundColor(errorColor)
+                }
                 
                 Text("AkademiTrack")
                     .font(.system(size: 20, weight: .bold))
