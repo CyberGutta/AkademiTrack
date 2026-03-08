@@ -27,10 +27,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    ignore:
-      # Add any packages you want to ignore here
-      # - dependency-name: "PackageName"
-      #   versions: ["x.x.x"]
     
   # GitHub Actions updates
   - package-ecosystem: "github-actions"
