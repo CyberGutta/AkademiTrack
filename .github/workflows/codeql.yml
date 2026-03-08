@@ -28,6 +28,7 @@ jobs:
       uses: github/codeql-action/init@v4
       with:
         languages: csharp
+        build-mode: manual
 
     - name: Build C# project
       run: |
