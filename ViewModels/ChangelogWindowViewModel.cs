@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using AkademiTrack.Services;
+using System.Diagnostics;
 
 namespace AkademiTrack.ViewModels
 {
@@ -20,6 +21,9 @@ namespace AkademiTrack.ViewModels
             HeaderImage = data.HeaderImage;
             Description = data.Description;
             Changes = new ObservableCollection<ChangeCategory>(data.Changes);
+            
+            Debug.WriteLine($"[ChangelogViewModel] HeaderImage: {HeaderImage}");
+            Debug.WriteLine($"[ChangelogViewModel] HasHeaderImage: {HasHeaderImage}");
         }
     }
 }

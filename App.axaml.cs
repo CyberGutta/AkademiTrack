@@ -397,22 +397,26 @@ namespace AkademiTrack
             else
             {
                 mainWindow.Show();
-                Debug.WriteLine("[App] Main window shown normally");
+                Console.WriteLine("[App] Main window shown normally");
+                Console.WriteLine($"[App] showFeideSetup = {showFeideSetup}");
                 
                 // Check if we should show changelog overlay FIRST (before Feide setup or notification overlay)
                 if (!showFeideSetup)
                 {
-                    Debug.WriteLine("[App] Checking if changelog overlay should be shown");
+                    Console.WriteLine("[App] Checking if changelog overlay should be shown");
                     
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try
                         {
+                            Console.WriteLine("[App] Dispatcher.UIThread.Post executed");
                             var (shouldShow, changelogData) = await Services.ChangelogService.ShouldShowChangelogAsync();
+                            
+                            Console.WriteLine($"[App] shouldShow = {shouldShow}, changelogData = {(changelogData != null ? "not null" : "null")}");
                             
                             if (shouldShow && changelogData != null)
                             {
-                                Debug.WriteLine($"[App] Showing changelog overlay for version {changelogData.Version}");
+                                Console.WriteLine($"[App] Showing changelog overlay for version {changelogData.Version}");
                                 
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 

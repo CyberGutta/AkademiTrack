@@ -40,6 +40,8 @@ namespace AkademiTrack.Services
         {
             try
             {
+                Console.WriteLine("[ChangelogService] ========== ShouldShowChangelogAsync called ==========");
+                
                 // Check if user has any app data (existing user vs brand new user)
                 string appDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -47,15 +49,21 @@ namespace AkademiTrack.Services
                 );
                 string settingsPath = Path.Combine(appDataDir, "settings.json");
                 
+                Console.WriteLine($"[ChangelogService] Settings path: {settingsPath}");
+                Console.WriteLine($"[ChangelogService] Settings file exists: {File.Exists(settingsPath)}");
+                
                 // Brand new user - no settings file exists at all
                 if (!File.Exists(settingsPath))
                 {
-                    Debug.WriteLine("[ChangelogService] Brand new user - no settings file exists, skipping changelog");
+                    Console.WriteLine("[ChangelogService] Brand new user - no settings file exists, skipping changelog");
                     return (false, null);
                 }
                 
                 // Check if user has already seen this version
                 string changelogSeenPath = GetChangelogSeenFilePath();
+                Console.WriteLine($"[ChangelogService] Changelog seen path: {changelogSeenPath}");
+                Console.WriteLine($"[ChangelogService] Changelog seen file exists: {File.Exists(changelogSeenPath)}");
+                
                 if (File.Exists(changelogSeenPath))
                 {
                     try
@@ -63,38 +71,48 @@ namespace AkademiTrack.Services
                         string seenVersion = await File.ReadAllTextAsync(changelogSeenPath);
                         seenVersion = seenVersion.Trim();
                         
+                        Console.WriteLine($"[ChangelogService] Seen version: {seenVersion}");
+                        Console.WriteLine($"[ChangelogService] Current version: {CurrentVersion}");
+                        
                         if (seenVersion == CurrentVersion)
                         {
-                            Debug.WriteLine($"[ChangelogService] User already seen version {CurrentVersion} - no changelog needed");
+                            Console.WriteLine($"[ChangelogService] User already seen version {CurrentVersion} - no changelog needed");
                             return (false, null);
                         }
                         else
                         {
-                            Debug.WriteLine($"[ChangelogService] Version changed from {seenVersion} to {CurrentVersion}");
+                            Console.WriteLine($"[ChangelogService] Version changed from {seenVersion} to {CurrentVersion}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[ChangelogService] Error reading changelog-seen file: {ex.Message}");
+                        Console.WriteLine($"[ChangelogService] Error reading changelog-seen file: {ex.Message}");
                     }
                 }
                 else
                 {
-                    Debug.WriteLine("[ChangelogService] Existing user without changelog tracking - showing changelog");
+                    Console.WriteLine("[ChangelogService] Existing user without changelog tracking - showing changelog");
                 }
                 
                 // Load and show changelog
+                Console.WriteLine("[ChangelogService] Loading changelog data...");
                 var changelogData = await LoadChangelogAsync(CurrentVersion);
                 if (changelogData != null)
                 {
+                    Console.WriteLine($"[ChangelogService] ✅ Changelog loaded successfully");
+                    Console.WriteLine($"[ChangelogService] HeaderImage: {changelogData.HeaderImage}");
                     return (true, changelogData);
+                }
+                else
+                {
+                    Console.WriteLine($"[ChangelogService] ❌ Failed to load changelog");
                 }
 
                 return (false, null);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ChangelogService] Error checking changelog: {ex.Message}");
+                Console.WriteLine($"[ChangelogService] Error checking changelog: {ex.Message}");
                 return (false, null);
             }
         }
