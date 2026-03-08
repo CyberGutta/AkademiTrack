@@ -32,13 +32,13 @@
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
 	<ItemGroup>
-		<Content Include="Changelogs\**\*.json">
+		<Content Include="Changelogs\**\*.json" Exclude="Changelogs\**\EXAMPLE*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<Content Include="Changelogs\**\*.png">
+		<Content Include="Changelogs\**\*.png" Exclude="Changelogs\**\EXAMPLE*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<Content Include="Changelogs\**\*.jpg">
+		<Content Include="Changelogs\**\*.jpg" Exclude="Changelogs\**\EXAMPLE*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>

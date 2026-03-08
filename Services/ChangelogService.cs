@@ -121,7 +121,27 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var changelogPath = Path.Combine(AppContext.BaseDirectory, "Changelogs", $"{version}.json");
+                string changelogPath;
+                
+                // On macOS, check if we're in an app bundle and look in Resources first
+                if (OperatingSystem.IsMacOS())
+                {
+                    var resourcesPath = Path.Combine(AppContext.BaseDirectory, "..", "Resources", "Changelogs", $"{version}.json");
+                    if (File.Exists(resourcesPath))
+                    {
+                        changelogPath = resourcesPath;
+                    }
+                    else
+                    {
+                        // Fallback to the old location
+                        changelogPath = Path.Combine(AppContext.BaseDirectory, "Changelogs", $"{version}.json");
+                    }
+                }
+                else
+                {
+                    // Windows/Linux - use the standard location
+                    changelogPath = Path.Combine(AppContext.BaseDirectory, "Changelogs", $"{version}.json");
+                }
                 
                 if (!File.Exists(changelogPath))
                 {
