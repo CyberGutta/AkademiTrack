@@ -86,10 +86,11 @@ jobs:
     - name: Build Swift project
       shell: bash
       run: |
+        cd AkademiTrack
         # List available schemes first
-        xcodebuild -project AkademiTrackWidget.xcodeproj -list
+        xcodebuild -project AkademiTrack.xcodeproj -list
         # Build without code signing
-        xcodebuild -project AkademiTrackWidget.xcodeproj -scheme AkademiTrack -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES
+        xcodebuild -project AkademiTrack.xcodeproj -scheme AkademiTrack -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
