@@ -10,6 +10,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+      timezone: "Europe/Oslo"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -21,6 +22,15 @@ updates:
       - "CyberNilsen"
     assignees:
       - "CyberNilsen"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Add any packages you want to ignore here
+      # - dependency-name: "PackageName"
+      #   versions: ["x.x.x"]
     
   # GitHub Actions updates
   - package-ecosystem: "github-actions"
@@ -29,8 +39,13 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+      timezone: "Europe/Oslo"
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "ci"
+    reviewers:
+      - "CyberNilsen"
+    assignees:
+      - "CyberNilsen"
