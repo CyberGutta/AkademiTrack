@@ -247,6 +247,13 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                // Check if there are STU sessions today first
+                var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
+                if (!hasStuSessions)
+                {
+                    return false; // No STU sessions = no confirmation needed
+                }
+
                 // First check if today is an enabled automation day
                 var (shouldStart, _, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
                 
@@ -1098,13 +1105,23 @@ namespace AkademiTrack.ViewModels
                 {
                     try
                     {
+                        // Check if there are STU sessions today first
+                        var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
+                        
+                        if (!hasStuSessions)
+                        {
+                            _loggingService.LogDebug("No STU sessions today - overlay not needed");
+                            StopAggressiveOverlayChecking();
+                            return;
+                        }
+
                         // Simple check: Does the user need to confirm for today?
                         var today = DateTime.Now.Date;
                         var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
 
                         if (!isConfirmed)
                         {
-                            _loggingService.LogInfo("User needs confirmation - showing overlay");
+                            _loggingService.LogInfo("User needs confirmation and STU sessions exist - showing overlay");
                             await RequestOverlayShowAsync();
 
                             // Keep aggressive checking since confirmation is needed
@@ -1820,23 +1837,34 @@ namespace AkademiTrack.ViewModels
                         var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
                         var needsConfirmation = !isConfirmed;
 
-                        _loggingService.LogDebug($"Confirmation status - Is confirmed: {isConfirmed}, Needs confirmation: {needsConfirmation}");
+                        // Check if there are STU sessions today - no point showing overlay if there aren't any
+                        var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
+
+                        _loggingService.LogDebug($"Confirmation status - Is confirmed: {isConfirmed}, Needs confirmation: {needsConfirmation}, Has STU sessions: {hasStuSessions}");
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
-                            IsConfirmationNeeded = needsConfirmation;
+                            IsConfirmationNeeded = needsConfirmation && hasStuSessions;
 
-                            if (!needsConfirmation)
+                            if (!needsConfirmation || !hasStuSessions)
                             {
-                                // User is confirmed - hide overlay and stop checking
+                                // User is confirmed OR no STU sessions - hide overlay and stop checking
                                 ShouldShowConfirmationOverlay = false;
                                 StopAggressiveOverlayChecking();
-                                _loggingService.LogDebug("User is confirmed - overlay hidden");
+                                
+                                if (!hasStuSessions)
+                                {
+                                    _loggingService.LogDebug("No STU sessions today - overlay not needed");
+                                }
+                                else
+                                {
+                                    _loggingService.LogDebug("User is confirmed - overlay hidden");
+                                }
                             }
                             else
                             {
-                                // User needs to confirm - start checking and show overlay immediately
-                                _loggingService.LogInfo("User needs confirmation - showing overlay and starting checks");
+                                // User needs to confirm AND there are STU sessions - start checking and show overlay immediately
+                                _loggingService.LogInfo("User needs confirmation and STU sessions exist - showing overlay and starting checks");
                                 StartAggressiveOverlayChecking();
 
                                 // Show overlay immediately since user needs to confirm

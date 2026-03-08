@@ -572,6 +572,14 @@ namespace AkademiTrack.Services
                 if (await IsConfirmedForDateAsync(today))
                     return;
 
+                // Check if there are STU sessions today - no point sending reminders if there aren't any
+                var stuTimes = await GetTodaysSTUTimesAsync();
+                if (stuTimes == null || !stuTimes.Any())
+                {
+                    _loggingService.LogDebug("No STU sessions today - no reminders needed");
+                    return;
+                }
+
                 // Check if automation should start but needs confirmation
                 var (shouldStart, reason, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
 

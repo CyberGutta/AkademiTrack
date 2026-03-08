@@ -205,6 +205,9 @@ namespace AkademiTrack.ViewModels
 
         public string ClassToggleLabel => _showCurrentClass ? "Nå" : "Neste";
 
+        // Check if there are STU sessions available today
+        public bool HasStuSessionsToday => _cachedTodaySchedule?.TotalStuSessions > 0;
+
         public void ToggleClassView()
         {
             ShowCurrentClass = !ShowCurrentClass;
@@ -834,6 +837,7 @@ namespace AkademiTrack.ViewModels
         {
             _cachedTodaySchedule = data;
             _cacheDate = DateTime.Now;
+            OnPropertyChanged(nameof(HasStuSessionsToday));
         }
 
         private void UpdateTodayDisplay(TodayScheduleData data)
