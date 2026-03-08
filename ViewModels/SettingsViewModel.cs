@@ -43,6 +43,7 @@ public class AppSettings
         public bool InitialSetupCompleted { get; set; } = false;
         public int FeideGracePeriodHours { get; set; } = 0; // DISABLED: No grace period for Feide auto-confirmation
         public bool EnableFeideAutoConfirmation { get; set; } = false; // DISABLED: Never auto-confirm, always require manual confirmation
+        public string? LastSeenVersion { get; set; } = null; // Track last version user has seen changelog for
     }
 
     public static class AutoStartManager

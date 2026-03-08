@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AkademiTrack.ViewModels"
+             xmlns:services="using:AkademiTrack.Services"
+             x:Class="AkademiTrack.Views.ChangelogOverlay"
+             x:DataType="vm:ChangelogWindowViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style Selector="TextBlock.description">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+        <Style Selector="TextBlock.category">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="TextBlock.categoryIcon">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.item">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="20,5,0,5"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Image.headerImage">
+            <Setter Property="MaxHeight" Value="200"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+        </Style>
+        <Style Selector="Image.categoryImage">
+            <Setter Property="MaxHeight" Value="150"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Margin" Value="20,10,0,10"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Full screen overlay -->
+    <Grid Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+        <Grid Margin="60">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0">
+                <!-- Optional Header Image -->
+                <Image Classes="headerImage" 
+                       Source="{Binding HeaderImage}" 
+                       IsVisible="{Binding HasHeaderImage}"/>
+                
+                <TextBlock Classes="title" Text="{Binding Title}"/>
+                <TextBlock FontSize="13" Opacity="0.6" Margin="0,0,0,10" Text="{Binding VersionInfo}"/>
+                
+                <!-- Optional Description -->
+                <TextBlock Classes="description" 
+                           Text="{Binding Description}" 
+                           IsVisible="{Binding HasDescription}"/>
+            </StackPanel>
+
+            <!-- Changelog Content -->
+            <ScrollViewer Grid.Row="1" Margin="0,10,0,20">
+                <ItemsControl ItemsSource="{Binding Changes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="services:ChangeCategory">
+                            <StackPanel>
+                                <!-- Category Header with icon on same line -->
+                                <StackPanel Orientation="Horizontal" Margin="0,20,0,10">
+                                    <TextBlock Classes="categoryIcon" 
+                                              Text="{Binding Icon}" 
+                                              IsVisible="{Binding Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    <TextBlock Classes="category" Text="{Binding Category}" Margin="0"/>
+                                </StackPanel>
+                                
+                                <!-- Optional Category Image -->
+                                <Image Classes="categoryImage" 
+                                       Source="{Binding Image}" 
+                                       IsVisible="{Binding Image, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                
+                                <!-- Change Items -->
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="x:String">
+                                            <TextBlock Classes="item">
+                                                <Run Text="• "/>
+                                                <Run Text="{Binding}"/>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Close Button -->
+            <Button Grid.Row="2"
+                    Content="Skjønner!"
+                    HorizontalAlignment="Center"
+                    Padding="60,16"
+                    FontSize="16"
+                    Click="CloseButton_Click"/>
+        </Grid>
+    </Grid>
+</UserControl>

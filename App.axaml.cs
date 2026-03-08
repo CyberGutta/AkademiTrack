@@ -341,6 +341,11 @@ namespace AkademiTrack
                     if (e.Success)
                     {
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
+                        
+                        // Mark current version as seen for new users (so they don't see changelog on first login)
+                        Debug.WriteLine("[App] Marking current version as seen for new user");
+                        await Services.ChangelogService.MarkChangelogAsSeenAsync();
+                        
                         Debug.WriteLine("[App] Restarting application to load all services with new credentials");
 
                         await Task.Delay(1000);
@@ -394,91 +399,141 @@ namespace AkademiTrack
                 mainWindow.Show();
                 Debug.WriteLine("[App] Main window shown normally");
                 
+                // Check if we should show changelog overlay FIRST (before Feide setup or notification overlay)
                 if (!showFeideSetup)
                 {
-                    Debug.WriteLine("[App] Not in Feide setup mode - will show notification overlay after loading completes");
+                    Debug.WriteLine("[App] Checking if changelog overlay should be shown");
                     
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        Debug.WriteLine("DISPATCHER POST FIRED - waiting for loading to complete");
-                        
-                        // Wait for initial loading to complete
-                        var maxWaitTime = TimeSpan.FromSeconds(30); // Maximum wait time
-                        var startTime = DateTime.Now;
-                        
-                        while (mainWindowViewModel.IsLoading && (DateTime.Now - startTime) < maxWaitTime)
-                        {
-                            Debug.WriteLine($"[App] Still loading... waiting 1 second");
-                            await Task.Delay(1000);
-                        }
-                        
-                        if (mainWindowViewModel.IsLoading)
-                        {
-                            Debug.WriteLine("[App] Loading took too long, showing notification dialog anyway");
-                        }
-                        else
-                        {
-                            Debug.WriteLine("[App] ✅ Loading complete! Now showing notification dialog");
-                        }
-                        
-                        // Additional delay for better UX - let user see the loaded app first
-                        await Task.Delay(2000);
-                        
                         try
                         {
-                            Debug.WriteLine("[App] Checking if notification overlay should be shown");
+                            var (shouldShow, changelogData) = await Services.ChangelogService.ShouldShowChangelogAsync();
                             
-                            bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
-                                .ShouldShowPermissionDialogAsync();
-                            
-                            Debug.WriteLine($"[App] ShouldShow check result: {shouldShow}");
-                            
-                            if (shouldShow)
+                            if (shouldShow && changelogData != null)
                             {
-                                Debug.WriteLine("[App] Creating notification permission overlay");
+                                Debug.WriteLine($"[App] Showing changelog overlay for version {changelogData.Version}");
                                 
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
                                 if (overlayContainer != null)
                                 {
-                                    Debug.WriteLine("[App] Found OverlayContainer - creating overlay...");
-                                    
-                                    var overlay = new AkademiTrack.Views.NotificationPermissionOverlay();
-                                    
-                                    overlay.Closed += (s, e) =>
+                                    var viewModel = new ViewModels.ChangelogWindowViewModel(changelogData);
+                                    var overlay = new Views.ChangelogOverlay
                                     {
-                                        Debug.WriteLine("[App] Overlay closed - hiding container");
+                                        DataContext = viewModel
+                                    };
+                                    
+                                    overlay.Closed += async (s, e) =>
+                                    {
+                                        Debug.WriteLine("[App] ========== CHANGELOG OVERLAY CLOSED EVENT FIRED ==========");
+                                        Debug.WriteLine("[App] Hiding overlay container...");
                                         overlayContainer.Content = null;
                                         overlayContainer.IsVisible = false;
+                                        Debug.WriteLine("[App] Overlay container hidden");
+                                        
+                                        // Mark as seen
+                                        Debug.WriteLine("[App] Calling MarkChangelogAsSeenAsync...");
+                                        await Services.ChangelogService.MarkChangelogAsSeenAsync();
+                                        Debug.WriteLine("[App] MarkChangelogAsSeenAsync completed");
+                                        
+                                        // Now show notification overlay if needed
+                                        Debug.WriteLine("[App] Checking for notification overlay...");
+                                        await ShowNotificationOverlayIfNeededAsync(mainWindow, mainWindowViewModel, overlayContainer);
+                                        Debug.WriteLine("[App] ========== CHANGELOG OVERLAY CLOSED HANDLER COMPLETE ==========");
                                     };
                                     
                                     overlayContainer.Content = overlay;
                                     overlayContainer.IsVisible = true;
                                     
-                                    Debug.WriteLine("[App] Overlay shown successfully!");
+                                    Debug.WriteLine("[App] Changelog overlay shown successfully!");
                                 }
                                 else
                                 {
                                     Debug.WriteLine("[App] ERROR: Could not find OverlayContainer in MainWindow");
-                                    Debug.WriteLine("[App] Make sure you added <ContentControl Name=\"OverlayContainer\" .../> to MainWindow.axaml");
                                 }
                             }
                             else
                             {
-                                Debug.WriteLine("[App] Not showing notification overlay - user already prompted or not on macOS");
+                                Debug.WriteLine("[App] No changelog to show - checking notification overlay");
+                                var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
+                                await ShowNotificationOverlayIfNeededAsync(mainWindow, mainWindowViewModel, overlayContainer);
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[App] ERROR showing notification overlay: {ex.Message}");
-                            Debug.WriteLine($"[App] Stack trace: {ex.StackTrace}");
+                            Debug.WriteLine($"[App] ERROR showing changelog overlay: {ex.Message}");
                         }
                     }, DispatcherPriority.Background);
                 }
                 else
                 {
-                    Debug.WriteLine("[App] In Feide setup mode - skipping notification overlay");
+                    Debug.WriteLine("[App] In Feide setup mode - skipping changelog and notification overlays");
                 }
+            }
+        }
+
+        private async Task ShowNotificationOverlayIfNeededAsync(MainWindow mainWindow, RefactoredMainWindowViewModel mainWindowViewModel, ContentControl? overlayContainer)
+        {
+            Debug.WriteLine("[App] Waiting for loading to complete before showing notification overlay");
+            
+            // Wait for initial loading to complete
+            var maxWaitTime = TimeSpan.FromSeconds(30);
+            var startTime = DateTime.Now;
+            
+            while (mainWindowViewModel.IsLoading && (DateTime.Now - startTime) < maxWaitTime)
+            {
+                Debug.WriteLine($"[App] Still loading... waiting 1 second");
+                await Task.Delay(1000);
+            }
+            
+            if (mainWindowViewModel.IsLoading)
+            {
+                Debug.WriteLine("[App] Loading took too long, showing notification dialog anyway");
+            }
+            else
+            {
+                Debug.WriteLine("[App] ✅ Loading complete! Now showing notification dialog");
+            }
+            
+            // Additional delay for better UX
+            await Task.Delay(2000);
+            
+            try
+            {
+                Debug.WriteLine("[App] Checking if notification overlay should be shown");
+                
+                bool shouldShow = await AkademiTrack.Services.NotificationPermissionChecker
+                    .ShouldShowPermissionDialogAsync();
+                
+                Debug.WriteLine($"[App] ShouldShow check result: {shouldShow}");
+                
+                if (shouldShow && overlayContainer != null)
+                {
+                    Debug.WriteLine("[App] Creating notification permission overlay");
+                    
+                    var overlay = new AkademiTrack.Views.NotificationPermissionOverlay();
+                    
+                    overlay.Closed += (s, e) =>
+                    {
+                        Debug.WriteLine("[App] Notification overlay closed - hiding container");
+                        overlayContainer.Content = null;
+                        overlayContainer.IsVisible = false;
+                    };
+                    
+                    overlayContainer.Content = overlay;
+                    overlayContainer.IsVisible = true;
+                    
+                    Debug.WriteLine("[App] Notification overlay shown successfully!");
+                }
+                else
+                {
+                    Debug.WriteLine("[App] Not showing notification overlay");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[App] ERROR showing notification overlay: {ex.Message}");
             }
         }
 

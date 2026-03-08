@@ -1,0 +1,22 @@
+{
+  "version": "1.2.0",
+  "title": "What's New in AkademiTrack 1.2.0",
+  "releaseDate": "2026-02-8",
+  "changes": [
+    {
+      "category": "New Features",
+      "items": [
+        "Added tray icon support",
+        "Implemented start with system option",
+        "Added notification system"
+      ]
+    },
+    {
+      "category": "Improvements",
+      "items": [
+        "Better error handling",
+        "Improved UI responsiveness"
+      ]
+    }
+  ]
+}

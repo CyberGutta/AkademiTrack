@@ -1,0 +1,46 @@
+{
+  "version": "1.4.0",
+  "title": "What's New in AkademiTrack 1.4.0",
+  "releaseDate": "2024-04-01",
+  "headerImage": "/Assets/changelog-header.png",
+  "description": "This is a major update with exciting new features! Check out what's new below.",
+  "changes": [
+    {
+      "category": "New Dashboard Design",
+      "icon": "🎨",
+      "image": "/Assets/changelog-dashboard.png",
+      "items": [
+        "Completely redesigned dashboard with modern UI",
+        "Dark mode support",
+        "Customizable widgets"
+      ]
+    },
+    {
+      "category": "Performance Improvements",
+      "icon": "⚡",
+      "items": [
+        "50% faster startup time",
+        "Reduced memory usage",
+        "Optimized background tasks"
+      ]
+    },
+    {
+      "category": "New Features",
+      "icon": "✨",
+      "items": [
+        "Added calendar integration",
+        "Export data to CSV",
+        "Multi-language support"
+      ]
+    },
+    {
+      "category": "Bug Fixes",
+      "icon": "🐛",
+      "items": [
+        "Fixed crash on startup",
+        "Resolved sync issues",
+        "Fixed notification sounds"
+      ]
+    }
+  ]
+}
