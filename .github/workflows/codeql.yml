@@ -32,9 +32,8 @@ jobs:
 
     - name: Build C# project
       run: |
-        cd AkademiTrack
-        dotnet restore
-        dotnet build --no-restore --configuration Release
+        dotnet restore AkademiTrack.sln
+        dotnet build AkademiTrack.sln --no-restore --configuration Release
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
@@ -87,11 +86,10 @@ jobs:
     - name: Build Swift project
       shell: bash
       run: |
-        cd AkademiTrack
         # List available schemes first
-        xcodebuild -project AkademiTrack.xcodeproj -list
+        xcodebuild -project AkademiTrackWidget.xcodeproj -list
         # Build without code signing
-        xcodebuild -project AkademiTrack.xcodeproj -scheme AkademiTrack -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES
+        xcodebuild -project AkademiTrackWidget.xcodeproj -scheme AkademiTrack -configuration Debug -destination 'platform=macOS' build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
