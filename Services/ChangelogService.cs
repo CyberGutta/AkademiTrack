@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using AkademiTrack.ViewModels;
@@ -10,24 +11,25 @@ namespace AkademiTrack.Services
 {
     public class ChangelogData
     {
-        public string Version { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-        public string ReleaseDate { get; set; } = string.Empty;
+        public required string Version { get; set; } = string.Empty;
+        public required string Title { get; set; } = string.Empty;
+        public required string ReleaseDate { get; set; } = string.Empty;
         public string? HeaderImage { get; set; } // Optional header image path
         public string? Description { get; set; } // Optional description text
-        public ChangeCategory[] Changes { get; set; } = Array.Empty<ChangeCategory>();
+        public required ChangeCategory[] Changes { get; set; } = Array.Empty<ChangeCategory>();
     }
 
     public class ChangeCategory
     {
-        public string Category { get; set; } = string.Empty;
+        public required string Category { get; set; } = string.Empty;
         public string? Icon { get; set; } // Optional icon/emoji for the category
         public string? Image { get; set; } // Optional image for this category
-        public string[] Items { get; set; } = Array.Empty<string>();
+        public required string[] Items { get; set; } = Array.Empty<string>();
     }
 
     public static class ChangelogService
     {
+        private static readonly SemaphoreSlim _changelogFileSemaphore = new SemaphoreSlim(1, 1);
         private static readonly string CurrentVersion = 
             Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
@@ -174,6 +176,12 @@ namespace AkademiTrack.Services
                     PropertyNameCaseInsensitive = true
                 });
 
+                if (data is null)
+                {
+                    Debug.WriteLine($"[ChangelogService] ❌ Failed to deserialize changelog from file: {changelogPath}");
+                    return null;
+                }
+
                 return data;
             }
             catch (Exception ex)
@@ -196,19 +204,27 @@ namespace AkademiTrack.Services
                 string changelogSeenPath = GetChangelogSeenFilePath();
                 Debug.WriteLine($"[ChangelogService] Writing version {CurrentVersion} to: {changelogSeenPath}");
                 
-                await File.WriteAllTextAsync(changelogSeenPath, CurrentVersion);
-                
-                Debug.WriteLine($"[ChangelogService] ✅ Successfully marked version {CurrentVersion} as seen");
-                
-                // Verify it was written
-                if (File.Exists(changelogSeenPath))
+                await _changelogFileSemaphore.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    string written = await File.ReadAllTextAsync(changelogSeenPath);
-                    Debug.WriteLine($"[ChangelogService] ✅ Verified file contents: {written}");
+                    await File.WriteAllTextAsync(changelogSeenPath, CurrentVersion).ConfigureAwait(false);
+                    
+                    Debug.WriteLine($"[ChangelogService] ✅ Successfully marked version {CurrentVersion} as seen");
+                    
+                    // Verify it was written
+                    if (File.Exists(changelogSeenPath))
+                    {
+                        string written = await File.ReadAllTextAsync(changelogSeenPath).ConfigureAwait(false);
+                        Debug.WriteLine($"[ChangelogService] ✅ Verified file contents: {written}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[ChangelogService] ❌ File does not exist after write!");
+                    }
                 }
-                else
+                finally
                 {
-                    Debug.WriteLine($"[ChangelogService] ❌ File does not exist after write!");
+                    _changelogFileSemaphore.Release();
                 }
             }
             catch (Exception ex)
