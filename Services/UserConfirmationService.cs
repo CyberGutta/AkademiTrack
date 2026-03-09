@@ -389,7 +389,13 @@ namespace AkademiTrack.Services
                         var json = await File.ReadAllTextAsync(_confirmationStatusFile);
                         var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
 
-                        if (confirmationData?.Date.Date != date.Date)
+                        if (confirmationData == null)
+                        {
+                            _loggingService.LogDebug("Failed to deserialize confirmation data");
+                            return false;
+                        }
+
+                        if (confirmationData.Date.Date != date.Date)
                         {
                             _loggingService.LogDebug("Confirmation date mismatch - user needs to confirm");
                             return false;
