@@ -206,7 +206,11 @@ namespace AkademiTrack.Services
                         _trayIcon?.Dispose();
                         _trayIcon = null;
                     }
-                    catch { }
+                    catch (Exception disposeEx)
+                    {
+                        Debug.WriteLine($"Error disposing tray icon: {disposeEx.Message}");
+                        // Suppress exception during cleanup to prevent app crash
+                    }
                 }
             }
         }

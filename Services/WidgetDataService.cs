@@ -93,7 +93,11 @@ namespace AkademiTrack.Services
                                 NotificationLevel.Warning
                             );
                         }
-                        catch { }
+                        catch (Exception notifEx)
+                        {
+                            Debug.WriteLine($"Failed to show widget permission notification: {notifEx.Message}");
+                            // Suppress notification errors to prevent blocking the main flow
+                        }
                     }
                 }
                 catch (Exception ex)

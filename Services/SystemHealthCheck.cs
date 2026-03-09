@@ -324,7 +324,11 @@ namespace AkademiTrack.Services
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error checking driver path: {ex.Message}");
+                            // Continue checking other paths
+                        }
                     }
                     
                     stopwatch.Stop();

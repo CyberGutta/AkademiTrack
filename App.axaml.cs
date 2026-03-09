@@ -702,7 +702,11 @@ github.com/CyberGutta/AkademiTrack";
                         await widgetService.WriteAppClosedStateAsync();
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error writing app closed state to widget: {ex.Message}");
+                    // Suppress errors during shutdown to prevent blocking app exit
+                }
             });
             
             // Shutdown immediately
