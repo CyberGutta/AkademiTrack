@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -46,7 +47,7 @@ namespace AkademiTrack.ViewModels
                     OnPropertyChanged(nameof(IsMonthView));
                     OnPropertyChanged(nameof(IsWeekView));
                     OnPropertyChanged(nameof(IsDayView));
-                    _ = LoadCalendarDataAsync();
+                    FireAndForget(LoadCalendarDataAsync());
                 }
             }
         }
@@ -282,23 +283,7 @@ namespace AkademiTrack.ViewModels
 
         private TimeSpan ParseTime(string? timeStr)
         {
-            if (string.IsNullOrEmpty(timeStr)) return TimeSpan.Zero;
-            
-            if (timeStr.Contains(':'))
-            {
-                if (TimeSpan.TryParse(timeStr, out var time))
-                    return time;
-            }
-            else if (timeStr.Length == 4)
-            {
-                if (int.TryParse(timeStr.Substring(0, 2), out var hours) &&
-                    int.TryParse(timeStr.Substring(2, 2), out var minutes))
-                {
-                    return new TimeSpan(hours, minutes, 0);
-                }
-            }
-            
-            return TimeSpan.Zero;
+            return TimeParsingHelper.ParseTime(timeStr);
         }
 
         private DateTime ParseDate(string? dateStr)
@@ -325,6 +310,18 @@ namespace AkademiTrack.ViewModels
             return culture.Calendar.GetWeekOfYear(date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
         }
 
+        private void FireAndForget(Task task)
+        {
+            task.ContinueWith(t =>
+            {
+                if (t.Exception != null)
+                {
+                    _loggingService?.LogError($"[CALENDAR] Error in background task: {t.Exception.Message}");
+                    Debug.WriteLine($"[CALENDAR] Error in background task: {t.Exception}");
+                }
+            }, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
         public void NavigatePrevious()
         {
             if (IsWeekView)
@@ -339,7 +336,7 @@ namespace AkademiTrack.ViewModels
             {
                 CurrentDate = _currentDate.AddMonths(-1);
             }
-            _ = LoadCalendarDataAsync();
+            FireAndForget(LoadCalendarDataAsync());
         }
 
         public void NavigateNext()
@@ -356,13 +353,13 @@ namespace AkademiTrack.ViewModels
             {
                 CurrentDate = _currentDate.AddMonths(1);
             }
-            _ = LoadCalendarDataAsync();
+            FireAndForget(LoadCalendarDataAsync());
         }
 
         public void NavigateToday()
         {
             CurrentDate = DateTime.Now;
-            _ = LoadCalendarDataAsync();
+            FireAndForget(LoadCalendarDataAsync());
         }
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -426,6 +423,14 @@ namespace AkademiTrack.ViewModels
         }
         
         private TimeSpan ParseTime(string? timeStr)
+        {
+            return TimeParsingHelper.ParseTime(timeStr);
+        }
+    }
+    
+    internal static class TimeParsingHelper
+    {
+        public static TimeSpan ParseTime(string? timeStr)
         {
             if (string.IsNullOrEmpty(timeStr)) return TimeSpan.Zero;
             
