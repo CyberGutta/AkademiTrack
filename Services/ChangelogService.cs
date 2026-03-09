@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Diagnostics;
@@ -27,7 +28,7 @@ namespace AkademiTrack.Services
 
     public static class ChangelogService
     {
-        private static readonly string CurrentVersion = "1.3.0";
+        private static readonly string CurrentVersion = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
 
         private static string GetChangelogSeenFilePath()
         {

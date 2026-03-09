@@ -640,7 +640,8 @@ namespace AkademiTrack
 
         private void ShowAbout(object? sender, EventArgs e)
         {
-            var aboutText = $@"AkademiTrack v1.3.0
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+            var aboutText = $@"AkademiTrack v{version}
 
 Automatisk oppmøteregistrering for STU-økter på Akademiet
 
