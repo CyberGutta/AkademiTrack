@@ -8,7 +8,7 @@ namespace AkademiTrack.Views
 {
     public partial class DependencyDownloadWindow : Window
     {
-        private DependencyDownloadViewModel? _viewModel;
+        private readonly DependencyDownloadViewModel? _viewModel;
         
         public DependencyDownloadWindow()
         {

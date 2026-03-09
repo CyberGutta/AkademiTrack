@@ -17,7 +17,7 @@ namespace AkademiTrack.ViewModels
     public class DashboardViewModel : INotifyPropertyChanged
     {
         private readonly AttendanceDataService _attendanceService;
-        private ILoggingService? _loggingService;
+        private readonly ILoggingService? _loggingService;
         private readonly ICacheService _persistentCache;
         private readonly WidgetDataService _widgetDataService;
 
