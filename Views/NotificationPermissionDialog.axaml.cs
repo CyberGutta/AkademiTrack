@@ -12,7 +12,7 @@ namespace AkademiTrack.Views
         public event EventHandler? Closed;
         public bool UserGrantedPermission { get; private set; }
         
-        private static bool _notificationsEnabled = false;
+        private bool _notificationsEnabled = false;
 
         public NotificationPermissionOverlay()
         {
