@@ -405,7 +405,7 @@
 
 			<!-- Tab Navigation -->
 			<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="0" Margin="0,0,0,20">
-				<Button Content="🏠 Dashboard"
+				<Button Content="Dashboard"
 						Background="{Binding IsDashboardTab, Converter={StaticResource BoolToBackgroundConverter}}"
 						Foreground="{Binding IsDashboardTab, Converter={StaticResource BoolToForegroundConverter}}"
 						BorderThickness="0,0,0,2"

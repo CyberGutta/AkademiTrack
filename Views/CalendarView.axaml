@@ -141,7 +141,6 @@
                 <!-- Week View with time-based positioning -->
                 <Grid IsVisible="{Binding IsWeekView}" MinHeight="600">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="60"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
@@ -149,30 +148,8 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Time labels -->
-                    <Grid Grid.Column="0" Grid.Row="1" Margin="0,-160,8,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                            <RowDefinition Height="*" MinHeight="60"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Text="08:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="1" Text="09:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="2" Text="10:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="3" Text="11:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="4" Text="12:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="5" Text="13:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="6" Text="14:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                        <TextBlock Grid.Row="7" Text="15:00" FontSize="11" Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}" VerticalAlignment="Top" Margin="0,0,0,0"/>
-                    </Grid>
-
                     <!-- Day headers and content -->
-                    <Grid Grid.Column="1" Grid.Row="0" Grid.RowSpan="2">
+                    <Grid Grid.Column="0" Grid.Row="0" Grid.RowSpan="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
@@ -222,240 +199,114 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="vm:CalendarDayData">
                                     <Border BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
-                                            BorderThickness="1,0,0,0">
-                                        <Grid Margin="4,0">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                                <RowDefinition Height="*" MinHeight="60"/>
-                                            </Grid.RowDefinitions>
+                                            BorderThickness="1,0,0,0"
+                                            Padding="4,0">
+                                        <!-- All sessions grouped by exact time -->
+                                        <ItemsControl ItemsSource="{Binding GroupedSessions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:SessionGroup">
+                                                    <StackPanel>
+                                                        <!-- Add spacing before this group based on actual gap duration -->
+                                                        <Border Height="{Binding GapHeight}"/>
+                                                        
+                                                        <!-- Sessions with same exact time displayed horizontally -->
+                                                        <ItemsControl ItemsSource="{Binding Sessions}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <UniformGrid Rows="1"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate DataType="services:ScheduleItem">
+                                                                    <Border Classes="session-card"
+                                                                            Classes.stu="{Binding IsStu}"
+                                                                            ToolTip.Tip="{Binding DisplayName}"
+                                                                            Margin="2,1"
+                                                                            Height="50">
+                                                                        <StackPanel>
+                                                                            <TextBlock Classes="session-subject"
+                                                                                       Text="{Binding DisplayName}"
+                                                                                       TextWrapping="Wrap"
+                                                                                       TextTrimming="CharacterEllipsis"
+                                                                                       MaxLines="2"/>
+                                                                            <TextBlock Classes="session-time" Margin="0,2,0,0">
+                                                                                <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
+                                                                                <Run Text="-"/>
+                                                                                <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
+                                                                            </TextBlock>
+                                                                            <TextBlock Classes="session-room"
+                                                                                       Text="{Binding Romnr}"
+                                                                                       IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Grid>
+
+                <!-- Day View -->
+                <StackPanel IsVisible="{Binding IsDayView}" Spacing="0">
+                    <ItemsControl ItemsSource="{Binding CalendarDays}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CalendarDayData">
+                                <ItemsControl ItemsSource="{Binding GroupedSessions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:SessionGroup">
+                                            <StackPanel>
+                                                <!-- Add spacing before this group based on actual gap duration -->
+                                                <Border Height="{Binding GapHeight}"/>
                                                 
-                                                <!-- 08:00 hour slot -->
-                                                <ItemsControl Grid.Row="0" ItemsSource="{Binding SessionsAt08}">
+                                                <!-- Sessions with same exact time displayed horizontally -->
+                                                <ItemsControl ItemsSource="{Binding Sessions}">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Vertical"/>
+                                                            <UniformGrid Rows="1"/>
                                                         </ItemsPanelTemplate>
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="services:ScheduleItem">
                                                             <Border Classes="session-card"
                                                                     Classes.stu="{Binding IsStu}"
-                                                                    ToolTip.Tip="{Binding DisplayName}"
                                                                     Margin="2"
+                                                                    Padding="12,8"
                                                                     Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject"
-                                                                               Text="{Binding DisplayName}"
-                                                                               TextWrapping="Wrap"
-                                                                               TextTrimming="CharacterEllipsis"
-                                                                               MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room"
-                                                                               Text="{Binding Romnr}"
-                                                                               IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <!-- 09:00 hour slot -->
-                                                <ItemsControl Grid.Row="1" ItemsSource="{Binding SessionsAt09}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Vertical"/>
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <!-- 10:00 hour slot -->
-                                                <ItemsControl Grid.Row="2" ItemsSource="{Binding SessionsAt10}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <StackPanel Orientation="Vertical"/>
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <!-- Continue for other hours... -->
-                                                <ItemsControl Grid.Row="3" ItemsSource="{Binding SessionsAt11}">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Vertical"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <ItemsControl Grid.Row="4" ItemsSource="{Binding SessionsAt12}">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Vertical"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <ItemsControl Grid.Row="5" ItemsSource="{Binding SessionsAt13}">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Vertical"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <ItemsControl Grid.Row="6" ItemsSource="{Binding SessionsAt14}">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Vertical"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                                
-                                                <ItemsControl Grid.Row="7" ItemsSource="{Binding SessionsAt15}">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Vertical"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="services:ScheduleItem">
-                                                            <Border Classes="session-card" Classes.stu="{Binding IsStu}" ToolTip.Tip="{Binding DisplayName}" Margin="2" Height="50">
-                                                                <StackPanel>
-                                                                    <TextBlock Classes="session-subject" Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-                                                                    <TextBlock Classes="session-time" Margin="0,2,0,0">
-                                                                        <Run Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                        <Run Text="-"/>
-                                                                        <Run Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                                    </TextBlock>
-                                                                    <TextBlock Classes="session-room" Text="{Binding Romnr}" IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Grid>
-                </Grid>
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
 
-                <!-- Day View -->
-                <StackPanel IsVisible="{Binding IsDayView}" Spacing="8">
-                    <ItemsControl ItemsSource="{Binding CalendarDays}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:CalendarDayData">
-                                <ItemsControl ItemsSource="{Binding Sessions}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="services:ScheduleItem">
-                                            <Border Classes="session-card"
-                                                    Classes.stu="{Binding IsStu}"
-                                                    Margin="0,4"
-                                                    Padding="12,8">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel Grid.Column="0" Width="80" Margin="0,0,16,0">
+                                                                        <TextBlock Classes="session-time" FontWeight="SemiBold" FontSize="12"
+                                                                                   Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
+                                                                        <TextBlock Classes="session-time" FontSize="12"
+                                                                                   Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
+                                                                    </StackPanel>
 
-                                                    <StackPanel Grid.Column="0" Width="80" Margin="0,0,16,0">
-                                                        <TextBlock Classes="session-time" FontWeight="SemiBold" FontSize="12"
-                                                                   Text="{Binding StartKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                        <TextBlock Classes="session-time" FontSize="12"
-                                                                   Text="{Binding SluttKl, Converter={StaticResource TimeFormatConverter}}"/>
-                                                    </StackPanel>
-
-                                                    <StackPanel Grid.Column="1">
-                                                        <TextBlock Classes="session-subject"
-                                                                   Text="{Binding DisplayName}"
-                                                                   FontSize="14"/>
-                                                        <TextBlock Classes="session-room"
-                                                                   Text="{Binding Romnr, StringFormat='Rom {0}'}"
-                                                                   IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                   Margin="0,2,0,0"/>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
+                                                                    <StackPanel Grid.Column="1">
+                                                                        <TextBlock Classes="session-subject"
+                                                                                   Text="{Binding DisplayName}"
+                                                                                   FontSize="14"/>
+                                                                        <TextBlock Classes="session-room"
+                                                                                   Text="{Binding Romnr, StringFormat='Rom {0}'}"
+                                                                                   IsVisible="{Binding Romnr, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                                   Margin="0,2,0,0"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

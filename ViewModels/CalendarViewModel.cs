@@ -94,28 +94,8 @@ namespace AkademiTrack.ViewModels
             {
                 _calendarDays = value;
                 OnPropertyChanged(nameof(CalendarDays));
-                
-                // Calculate max sessions per hour across all days
-                OnPropertyChanged(nameof(MaxHeight08));
-                OnPropertyChanged(nameof(MaxHeight09));
-                OnPropertyChanged(nameof(MaxHeight10));
-                OnPropertyChanged(nameof(MaxHeight11));
-                OnPropertyChanged(nameof(MaxHeight12));
-                OnPropertyChanged(nameof(MaxHeight13));
-                OnPropertyChanged(nameof(MaxHeight14));
-                OnPropertyChanged(nameof(MaxHeight15));
             }
         }
-        
-        // Calculate maximum row heights across all days (each session = 54px)
-        public double MaxHeight08 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt08.Count) * 54, 40) : 40;
-        public double MaxHeight09 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt09.Count) * 54, 40) : 40;
-        public double MaxHeight10 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt10.Count) * 54, 40) : 40;
-        public double MaxHeight11 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt11.Count) * 54, 40) : 40;
-        public double MaxHeight12 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt12.Count) * 54, 40) : 40;
-        public double MaxHeight13 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt13.Count) * 54, 40) : 40;
-        public double MaxHeight14 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt14.Count) * 54, 40) : 40;
-        public double MaxHeight15 => _calendarDays.Any() ? Math.Max(_calendarDays.Max(d => d.SessionsAt15.Count) * 54, 40) : 40;
 
         public bool IsLoading
         {
@@ -399,25 +379,95 @@ namespace AkademiTrack.ViewModels
         public string DayName => Date.ToString("ddd", new System.Globalization.CultureInfo("nb-NO"));
         public string DayNumber => Date.Day.ToString();
         
-        // Sessions grouped by hour
-        public List<ScheduleItem> SessionsAt08 => Sessions.Where(s => s.HourSlot == 0).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt09 => Sessions.Where(s => s.HourSlot == 1).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt10 => Sessions.Where(s => s.HourSlot == 2).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt11 => Sessions.Where(s => s.HourSlot == 3).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt12 => Sessions.Where(s => s.HourSlot == 4).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt13 => Sessions.Where(s => s.HourSlot == 5).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt14 => Sessions.Where(s => s.HourSlot == 6).Select(s => s.Item).ToList();
-        public List<ScheduleItem> SessionsAt15 => Sessions.Where(s => s.HourSlot == 7).Select(s => s.Item).ToList();
+        // Group all sessions by exact time (start + end), maintaining order, with gap info
+        public List<SessionGroup> GroupedSessions
+        {
+            get
+            {
+                var allSessions = Sessions.Select(s => s.Item).OrderBy(s => s.StartKl).ToList();
+                var grouped = allSessions
+                    .GroupBy(s => new { s.StartKl, s.SluttKl })
+                    .Select(g => g.ToList())
+                    .ToList();
+                
+                var result = new List<SessionGroup>();
+                var dayStartTime = new TimeSpan(8, 0, 0); // Day starts at 08:00
+                
+                for (int i = 0; i < grouped.Count; i++)
+                {
+                    var group = grouped[i];
+                    var gapMinutes = 0.0;
+                    
+                    if (i == 0)
+                    {
+                        // First session: calculate gap from start of day (08:00)
+                        var firstStartTime = ParseTime(group[0].StartKl);
+                        gapMinutes = (firstStartTime - dayStartTime).TotalMinutes;
+                    }
+                    else
+                    {
+                        // Calculate the gap in minutes between this group and the previous one
+                        var prevGroup = grouped[i - 1];
+                        var prevEndTime = ParseTime(prevGroup[0].SluttKl);
+                        var currentStartTime = ParseTime(group[0].StartKl);
+                        
+                        gapMinutes = (currentStartTime - prevEndTime).TotalMinutes;
+                    }
+                    
+                    result.Add(new SessionGroup
+                    {
+                        Sessions = group,
+                        GapMinutes = gapMinutes
+                    });
+                }
+                
+                return result;
+            }
+        }
         
-        // Calculate row heights based on number of sessions (each session = 54px including margin)
-        public double Height08 => Math.Max(SessionsAt08.Count * 54, 40);
-        public double Height09 => Math.Max(SessionsAt09.Count * 54, 40);
-        public double Height10 => Math.Max(SessionsAt10.Count * 54, 40);
-        public double Height11 => Math.Max(SessionsAt11.Count * 54, 40);
-        public double Height12 => Math.Max(SessionsAt12.Count * 54, 40);
-        public double Height13 => Math.Max(SessionsAt13.Count * 54, 40);
-        public double Height14 => Math.Max(SessionsAt14.Count * 54, 40);
-        public double Height15 => Math.Max(SessionsAt15.Count * 54, 40);
+        private TimeSpan ParseTime(string? timeStr)
+        {
+            if (string.IsNullOrEmpty(timeStr)) return TimeSpan.Zero;
+            
+            if (timeStr.Contains(':'))
+            {
+                if (TimeSpan.TryParse(timeStr, out var time))
+                    return time;
+            }
+            else if (timeStr.Length == 4)
+            {
+                if (int.TryParse(timeStr.Substring(0, 2), out var hours) &&
+                    int.TryParse(timeStr.Substring(2, 2), out var minutes))
+                {
+                    return new TimeSpan(hours, minutes, 0);
+                }
+            }
+            
+            return TimeSpan.Zero;
+        }
+    }
+    
+    public class SessionGroup
+    {
+        public List<ScheduleItem> Sessions { get; set; } = new();
+        public double GapMinutes { get; set; }
+        
+        // Convert gap minutes to pixel height based on session box scale
+        // Each session box is 50px high and represents its duration
+        // We calculate pixels per minute from the first session's duration
+        public double GapHeight
+        {
+            get
+            {
+                if (GapMinutes <= 0) return 0;
+                
+                // Use a standard scale: assume 45-minute sessions are 50px
+                // This gives us approximately 1.11 pixels per minute
+                var pixelsPerMinute = 50.0 / 45.0;
+                
+                return GapMinutes * pixelsPerMinute;
+            }
+        }
     }
 
     public class ScheduleItemWithSpacing
