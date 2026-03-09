@@ -115,11 +115,11 @@ namespace AkademiTrack.Services
                 }
 
                 // PRE-CHECK: Check for already registered STU sessions
-                _loggingService.LogInfo("🔍 Sjekker allerede registrerte STU-økter...");
+                _loggingService.LogInfo("Sjekker allerede registrerte STU-økter...");
                 var preCheckResult = await PreCheckRegisteredSTUSessionsAsync();
                 if (preCheckResult.AllSessionsRegistered)
                 {
-                    _loggingService.LogSuccess("✅ Alle STU-økter for i dag er allerede registrert!");
+                    _loggingService.LogSuccess("Alle STU-økter for i dag er allerede registrert!");
                     await _notificationService.ShowNotificationAsync(
                         "Alle STU-økter registrert",
                         $"Alle {preCheckResult.TotalSessions} STU-økter for i dag er allerede registrert. Ingen automatisering nødvendig.",
@@ -131,7 +131,7 @@ namespace AkademiTrack.Services
                 }
                 else if (preCheckResult.RegisteredSessions.Count > 0)
                 {
-                    _loggingService.LogInfo($"📋 Fant {preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter allerede registrert");
+                    _loggingService.LogInfo($"Fant {preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter allerede registrert");
                     await _notificationService.ShowNotificationAsync(
                         "Noen STU-økter allerede registrert",
                         $"{preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter er allerede registrert. Hopper over disse.",
@@ -478,7 +478,7 @@ namespace AkademiTrack.Services
             
             if (registeredSessionKeys.Count > 0)
             {
-                _loggingService.LogInfo($"📋 Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag (inkludert online sjekk)");
+                _loggingService.LogInfo($"Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag (inkludert online sjekk)");
             }
 
             while (!cancellationToken.IsCancellationRequested)
@@ -711,7 +711,7 @@ namespace AkademiTrack.Services
                 if (allSessions.Count != todaySessions.Count)
                 {
                     var oldCount = allSessions.Count - todaySessions.Count;
-                    _loggingService.LogInfo($"🧹 Rydder opp {oldCount} gamle registrering(er)");
+                    _loggingService.LogInfo($"Rydder opp {oldCount} gamle registrering(er)");
                     
                     var cleanJson = JsonSerializer.Serialize(todaySessions, new JsonSerializerOptions { WriteIndented = true });
                     await File.WriteAllTextAsync(filePath, cleanJson);
@@ -1263,12 +1263,12 @@ namespace AkademiTrack.Services
                 // Check if it's marked as attended (Typefravaer = "M" means "Møtt" / attended)
                 if (registeredSession.Typefravaer == "M")
                 {
-                    _loggingService.LogSuccess($"✅ [VERIFY] Confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is registered in iSkole!");
+                    _loggingService.LogSuccess($"[VERIFY] Confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is registered in iSkole!");
                 }
                 else
                 {
                     // Registration didn't stick - try again
-                    _loggingService.LogWarning($"⚠️ [VERIFY] Registration not found in iSkole for {stuTime.StartKl}-{stuTime.SluttKl}. Typefravaer status: {registeredSession.Typefravaer ?? "null"}");
+                    _loggingService.LogWarning($"[VERIFY] Registration not found in iSkole for {stuTime.StartKl}-{stuTime.SluttKl}. Typefravaer status: {registeredSession.Typefravaer ?? "null"}");
                     _loggingService.LogInfo($"[VERIFY] Attempting to re-register...");
 
                     var retryResult = await RegisterAttendanceAsync(stuTime);
@@ -1292,11 +1292,11 @@ namespace AkademiTrack.Services
 
                             if (reVerifySession?.Typefravaer == "M")
                             {
-                                _loggingService.LogSuccess($"✅ [VERIFY] Re-registration confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is now registered!");
+                                _loggingService.LogSuccess($"[VERIFY] Re-registration confirmed: {stuTime.StartKl}-{stuTime.SluttKl} is now registered!");
                             }
                             else
                             {
-                                _loggingService.LogError($"❌ [VERIFY] Re-registration also failed for {stuTime.StartKl}-{stuTime.SluttKl}");
+                                _loggingService.LogError($"[VERIFY] Re-registration also failed for {stuTime.StartKl}-{stuTime.SluttKl}");
                                 
                                 // Track verification failure
                                 try
@@ -1511,7 +1511,7 @@ namespace AkademiTrack.Services
                         if (!string.IsNullOrEmpty(session.Fravaer) && session.Fravaer == "M")
                         {
                             registeredSessions.Add(sessionKey);
-                            _loggingService.LogInfo($"✅ STU økt {sessionKey} er allerede registrert online");
+                            _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert online");
                             
                             // Also mark it in local cache to avoid re-checking
                             await MarkSessionAsRegisteredAsync(sessionKey);
