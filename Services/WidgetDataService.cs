@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -273,7 +274,7 @@ namespace AkademiTrack.Services
             {
                 // Use Darwin notifications to signal the widget to reload
                 // This is the proper way to communicate between app and widget
-                var notifyProcess = new System.Diagnostics.Process
+                using var notifyProcess = new System.Diagnostics.Process
                 {
                     StartInfo = new System.Diagnostics.ProcessStartInfo
                     {
@@ -291,7 +292,7 @@ namespace AkademiTrack.Services
                 _loggingService?.LogDebug("Sent widget reload notification");
                 
                 // Also kill WidgetKit as backup
-                var killProcess = new System.Diagnostics.Process
+                using var killProcess = new System.Diagnostics.Process
                 {
                     StartInfo = new System.Diagnostics.ProcessStartInfo
                     {

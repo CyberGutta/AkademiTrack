@@ -271,7 +271,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -313,7 +313,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -353,7 +353,7 @@ namespace AkademiTrack.Services
 
             try
             {
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -669,7 +669,7 @@ namespace AkademiTrack.Services
                 Debug.WriteLine("Clearing macOS Keychain data");
 
                 // Use security command to delete all AkademiTrack entries
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -703,7 +703,7 @@ namespace AkademiTrack.Services
                 if (File.Exists("/usr/bin/secret-tool"))
                 {
                     // Clear all AkademiTrack entries from secret service
-                    var process = new Process
+                    using var process = new Process
                     {
                         StartInfo = new ProcessStartInfo
                         {

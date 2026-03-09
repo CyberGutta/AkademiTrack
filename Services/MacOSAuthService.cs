@@ -18,7 +18,7 @@ namespace AkademiTrack.Services
             if (!File.Exists(helperPath))
                 return false;
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {

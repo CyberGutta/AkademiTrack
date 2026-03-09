@@ -17,7 +17,7 @@ namespace AkademiTrack.Services
 
             await DeleteFromKeychain(key);
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -43,7 +43,7 @@ namespace AkademiTrack.Services
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 throw new PlatformNotSupportedException("Keychain is only available on macOS");
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -101,7 +101,7 @@ namespace AkademiTrack.Services
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return;
 
-            var process = new Process
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
