@@ -138,7 +138,7 @@ namespace AkademiTrack.Services
 
         private string ReadHiddenInput()
         {
-            var input = string.Empty;
+            var input = new StringBuilder();
             ConsoleKeyInfo key;
 
             do
@@ -149,16 +149,16 @@ namespace AkademiTrack.Services
 
                 if (key.Key == ConsoleKey.Backspace && input.Length > 0)
                 {
-                    input = input[..^1];
+                    input.Length--;
                 }
                 else if (!char.IsControl(key.KeyChar))
                 {
-                    input += key.KeyChar;
+                    input.Append(key.KeyChar);
                 }
             } while (true);
 
             Console.WriteLine();
-            return input;
+            return input.ToString();
         }
 
         private string Hash(string input)
