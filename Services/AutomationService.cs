@@ -114,6 +114,31 @@ namespace AkademiTrack.Services
                     return AutomationResult.Failed("No internet connection available");
                 }
 
+                // PRE-CHECK: Check for already registered STU sessions
+                _loggingService.LogInfo("🔍 Sjekker allerede registrerte STU-økter...");
+                var preCheckResult = await PreCheckRegisteredSTUSessionsAsync();
+                if (preCheckResult.AllSessionsRegistered)
+                {
+                    _loggingService.LogSuccess("✅ Alle STU-økter for i dag er allerede registrert!");
+                    await _notificationService.ShowNotificationAsync(
+                        "Alle STU-økter registrert",
+                        $"Alle {preCheckResult.TotalSessions} STU-økter for i dag er allerede registrert. Ingen automatisering nødvendig.",
+                        NotificationLevel.Success
+                    );
+                    await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                    finalStatus = "Alle STU-økter allerede registrert";
+                    return AutomationResult.Successful("All STU sessions already registered");
+                }
+                else if (preCheckResult.RegisteredSessions.Count > 0)
+                {
+                    _loggingService.LogInfo($"📋 Fant {preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter allerede registrert");
+                    await _notificationService.ShowNotificationAsync(
+                        "Noen STU-økter allerede registrert",
+                        $"{preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter er allerede registrert. Hopper over disse.",
+                        NotificationLevel.Info
+                    );
+                }
+
                 // Mark today as started to prevent duplicate auto-starts
                 await SchoolTimeChecker.MarkTodayAsStartedAsync();
 
@@ -135,8 +160,8 @@ namespace AkademiTrack.Services
                 // Start caffinate to keep macOS awake during automation
                 await _caffinateService.StartCaffinateAsync();
 
-                // Start the monitoring loop
-                var loopResult = await RunMonitoringLoopAsync(combinedToken);
+                // Start the monitoring loop with pre-check results
+                var loopResult = await RunMonitoringLoopAsync(combinedToken, preCheckResult);
 
                 // Set final status based on loop result
                 if (loopResult.HasValue)
@@ -356,7 +381,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<MonitoringLoopResult?> RunMonitoringLoopAsync(CancellationToken cancellationToken)
+        private async Task<MonitoringLoopResult?> RunMonitoringLoopAsync(CancellationToken cancellationToken, STUPreCheckResult? preCheckResult = null)
         {
             int cycleCount = 0;
 
@@ -438,13 +463,22 @@ namespace AkademiTrack.Services
 
             _loggingService.LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige");
 
-            // Load previously registered sessions from disk
+            // Load previously registered sessions from disk AND from pre-check
             var registeredSessions = await GetRegisteredSessionsForTodayAsync();
             var registeredSessionKeys = new HashSet<string>(registeredSessions.Keys);
             
+            // Add sessions from pre-check that are already registered online
+            if (preCheckResult?.RegisteredSessions != null)
+            {
+                foreach (var preRegisteredSession in preCheckResult.RegisteredSessions)
+                {
+                    registeredSessionKeys.Add(preRegisteredSession);
+                }
+            }
+            
             if (registeredSessionKeys.Count > 0)
             {
-                _loggingService.LogInfo($"📋 Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag");
+                _loggingService.LogInfo($"📋 Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag (inkludert online sjekk)");
             }
 
             while (!cancellationToken.IsCancellationRequested)
@@ -1376,6 +1410,262 @@ namespace AkademiTrack.Services
             }
         }
 
+        /// <summary>
+        /// Pre-check to see which STU sessions are already registered online
+        /// </summary>
+        private async Task<STUPreCheckResult> PreCheckRegisteredSTUSessionsAsync()
+        {
+            try
+            {
+                // Get attendance service
+                var attendanceService = Services.DependencyInjection.ServiceContainer.GetOptionalService<AttendanceDataService>();
+                if (attendanceService == null)
+                {
+                    _loggingService.LogWarning("AttendanceDataService not available for pre-check - using local cache only");
+                    return new STUPreCheckResult
+                    {
+                        TotalSessions = 0,
+                        RegisteredSessions = new List<string>(),
+                        AllSessionsRegistered = false
+                    };
+                }
+
+                // Set credentials for attendance service
+                if (_userParameters != null && _cookies != null)
+                {
+                    attendanceService.SetCredentials(_userParameters, _cookies);
+                }
+
+                // Fetch today's schedule items directly
+                var todayScheduleItems = await FetchTodayScheduleItemsAsync();
+                if (todayScheduleItems == null || todayScheduleItems.Count == 0)
+                {
+                    _loggingService.LogWarning("Could not fetch today's schedule items for pre-check");
+                    return new STUPreCheckResult
+                    {
+                        TotalSessions = 0,
+                        RegisteredSessions = new List<string>(),
+                        AllSessionsRegistered = false
+                    };
+                }
+
+                // Find STU sessions for today
+                var today = DateTime.Now.ToString("yyyyMMdd");
+                var stuSessions = todayScheduleItems
+                    .Where(item => item.Dato == today && 
+                                  (item.Fag?.Contains("STU") == true || item.Fagnavn?.Contains("Studietid") == true))
+                    .ToList();
+
+                if (stuSessions.Count == 0)
+                {
+                    _loggingService.LogInfo("No STU sessions found for today in pre-check");
+                    return new STUPreCheckResult
+                    {
+                        TotalSessions = 0,
+                        RegisteredSessions = new List<string>(),
+                        AllSessionsRegistered = false
+                    };
+                }
+
+                // Filter out sessions that conflict with regular classes
+                var regularClasses = todayScheduleItems
+                    .Where(item => item.Dato == today && 
+                                  item.Fag != null && 
+                                  !item.Fag.Contains("STU") &&
+                                  item.Fagnavn != null &&
+                                  !item.Fagnavn.Contains("Studietid"))
+                    .ToList();
+
+                var validStuSessions = new List<MonthlyScheduleItem>();
+                foreach (var stuSession in stuSessions)
+                {
+                    bool hasConflict = false;
+                    foreach (var regularClass in regularClasses)
+                    {
+                        if (DoSessionsOverlap(stuSession, regularClass))
+                        {
+                            hasConflict = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!hasConflict)
+                    {
+                        validStuSessions.Add(stuSession);
+                    }
+                }
+
+                // Check which sessions are already registered (Fravaer == "M")
+                var registeredSessions = new List<string>();
+                foreach (var session in validStuSessions)
+                {
+                    // Extract time from Fradato and Tildato
+                    var startTime = ExtractTimeFromDateTime(session.Fradato);
+                    var endTime = ExtractTimeFromDateTime(session.Tildato);
+                    
+                    if (!string.IsNullOrEmpty(startTime) && !string.IsNullOrEmpty(endTime))
+                    {
+                        var sessionKey = $"{startTime}-{endTime}";
+                        
+                        // Check if this session is marked as registered online
+                        if (!string.IsNullOrEmpty(session.Fravaer) && session.Fravaer == "M")
+                        {
+                            registeredSessions.Add(sessionKey);
+                            _loggingService.LogInfo($"✅ STU økt {sessionKey} er allerede registrert online");
+                            
+                            // Also mark it in local cache to avoid re-checking
+                            await MarkSessionAsRegisteredAsync(sessionKey);
+                        }
+                    }
+                }
+
+                bool allRegistered = registeredSessions.Count == validStuSessions.Count && validStuSessions.Count > 0;
+
+                _loggingService.LogInfo($"Pre-check resultat: {registeredSessions.Count}/{validStuSessions.Count} STU-økter allerede registrert");
+
+                return new STUPreCheckResult
+                {
+                    TotalSessions = validStuSessions.Count,
+                    RegisteredSessions = registeredSessions,
+                    AllSessionsRegistered = allRegistered
+                };
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error during STU pre-check: {ex.Message}");
+                return new STUPreCheckResult
+                {
+                    TotalSessions = 0,
+                    RegisteredSessions = new List<string>(),
+                    AllSessionsRegistered = false
+                };
+            }
+        }
+
+        /// <summary>
+        /// Fetch today's schedule items with registration status
+        /// </summary>
+        private async Task<List<MonthlyScheduleItem>?> FetchTodayScheduleItemsAsync()
+        {
+            try
+            {
+                if (_userParameters == null || _cookies == null)
+                {
+                    return null;
+                }
+
+                var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
+                if (string.IsNullOrEmpty(jsessionId))
+                {
+                    return null;
+                }
+
+                var today = DateTime.Now;
+                var startDate = today.ToString("yyyyMMdd");
+                var endDate = today.ToString("yyyyMMdd");
+
+                var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev;jsessionid={jsessionId}";
+                url += $"?finder=RESTFilter;fylkeid={_userParameters.FylkeId},planperi={_userParameters.PlanPeri},skoleid={_userParameters.SkoleId},startDate={startDate},endDate={endDate}&onlyData=true&limit=1000&totalResults=true";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Host", "iskole.net");
+                request.Headers.Add("Accept", "application/json, text/javascript, */*; q=0.01");
+                request.Headers.Add("Accept-Language", "no-NB");
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36");
+                request.Headers.Add("Referer", "https://iskole.net/elev/?isFeideinnlogget=true&ojr=fravar");
+
+                var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
+                request.Headers.Add("Cookie", cookieString);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var json = await response.Content.ReadAsStringAsync();
+                var scheduleResponse = JsonSerializer.Deserialize<MonthlyScheduleResponse>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return scheduleResponse?.Items;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error fetching today's schedule items: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to extract time (HH:mm) from datetime string
+        /// </summary>
+        private string? ExtractTimeFromDateTime(string? dateTimeStr)
+        {
+            if (string.IsNullOrEmpty(dateTimeStr))
+                return null;
+
+            try
+            {
+                // Try to parse the datetime and extract time
+                if (DateTime.TryParse(dateTimeStr, out var dateTime))
+                {
+                    return dateTime.ToString("HH:mm");
+                }
+                
+                // If direct parsing fails, try to extract time pattern
+                var timeMatch = System.Text.RegularExpressions.Regex.Match(dateTimeStr, @"(\d{2}):(\d{2})");
+                if (timeMatch.Success)
+                {
+                    return timeMatch.Value;
+                }
+            }
+            catch
+            {
+                // Ignore parsing errors
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Check if two monthly schedule sessions overlap in time
+        /// </summary>
+        private bool DoSessionsOverlap(MonthlyScheduleItem session1, MonthlyScheduleItem session2)
+        {
+            try
+            {
+                var start1 = ParseDateTime(session1.Fradato);
+                var end1 = ParseDateTime(session1.Tildato);
+                var start2 = ParseDateTime(session2.Fradato);
+                var end2 = ParseDateTime(session2.Tildato);
+
+                if (!start1.HasValue || !end1.HasValue || !start2.HasValue || !end2.HasValue)
+                    return false;
+
+                // Sessions overlap if one starts before the other ends
+                return start1 < end2 && start2 < end1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Parse datetime string to DateTime
+        /// </summary>
+        private DateTime? ParseDateTime(string? dateTimeStr)
+        {
+            if (string.IsNullOrEmpty(dateTimeStr))
+                return null;
+
+            if (DateTime.TryParse(dateTimeStr, out var result))
+                return result;
+
+            return null;
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -1442,5 +1732,15 @@ namespace AkademiTrack.Services
         }
 
         
+    }
+
+    /// <summary>
+    /// Result of pre-checking which STU sessions are already registered
+    /// </summary>
+    public class STUPreCheckResult
+    {
+        public int TotalSessions { get; set; }
+        public List<string> RegisteredSessions { get; set; } = new List<string>();
+        public bool AllSessionsRegistered { get; set; }
     }
 }
