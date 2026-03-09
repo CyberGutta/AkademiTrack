@@ -446,10 +446,6 @@ namespace AkademiTrack.Services
             {
                 Debug.WriteLine($"[Migration] Performing fresh migration check (Session: {MigrationSessionId})");
                 
-                // Clear any potential .NET file system caches
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                
                 // Small delay to ensure file system operations are complete
                 await Task.Delay(200);
                 
