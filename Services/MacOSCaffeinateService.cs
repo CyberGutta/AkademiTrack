@@ -6,36 +6,36 @@ using System.Threading.Tasks;
 namespace AkademiTrack.Services
 {
     /// <summary>
-    /// Service for managing macOS caffinate to keep the system awake during automation
+    /// Service for managing macOS caffeinate to keep the system awake during automation
     /// </summary>
-    public class MacOSCaffinateService : IDisposable
+    public class MacOSCaffeinateService : IDisposable
     {
-        private Process? _caffinateProcess;
+        private Process? _caffeinateProcess;
         private bool _isActive = false;
         private bool _disposed = false;
 
         /// <summary>
-        /// Start caffinate to prevent system sleep
+        /// Start caffeinate to prevent system sleep
         /// </summary>
-        public Task StartCaffinateAsync()
+        public Task StartCaffeinateAsync()
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                Debug.WriteLine("[Caffinate] Not on macOS - skipping caffinate");
+                Debug.WriteLine("[Caffeinate] Not on macOS - skipping caffeinate");
                 return Task.CompletedTask;
             }
 
             if (_isActive)
             {
-                Debug.WriteLine("[Caffinate] Already active - skipping");
+                Debug.WriteLine("[Caffeinate] Already active - skipping");
                 return Task.CompletedTask;
             }
 
             try
             {
-                Debug.WriteLine("[Caffinate] Starting caffinate to keep system awake");
+                Debug.WriteLine("[Caffeinate] Starting caffeinate to keep system awake");
 
-                // Start caffinate with options:
+                // Start caffeinate with options:
                 // -d: prevent display sleep
                 // -i: prevent idle sleep
                 // -s: prevent system sleep
@@ -49,63 +49,63 @@ namespace AkademiTrack.Services
                     RedirectStandardError = true
                 };
 
-                _caffinateProcess = Process.Start(startInfo);
+                _caffeinateProcess = Process.Start(startInfo);
 
-                if (_caffinateProcess != null)
+                if (_caffeinateProcess != null)
                 {
                     _isActive = true;
-                    Debug.WriteLine($"[Caffinate] ✓ Started successfully (PID: {_caffinateProcess.Id})");
+                    Debug.WriteLine($"[Caffeinate] ✓ Started successfully (PID: {_caffeinateProcess.Id})");
                 }
                 else
                 {
-                    Debug.WriteLine("[Caffinate] ❌ Failed to start process");
+                    Debug.WriteLine("[Caffeinate] ❌ Failed to start process");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Caffinate] ❌ Error starting caffinate: {ex.Message}");
+                Debug.WriteLine($"[Caffeinate] ❌ Error starting caffeinate: {ex.Message}");
             }
             
             return Task.CompletedTask;
         }
 
         /// <summary>
-        /// Stop caffinate and allow system sleep
+        /// Stop caffeinate and allow system sleep
         /// </summary>
-        public async Task StopCaffinateAsync()
+        public async Task StopCaffeinateAsync()
         {
-            if (!_isActive || _caffinateProcess == null)
+            if (!_isActive || _caffeinateProcess == null)
             {
-                Debug.WriteLine("[Caffinate] Not active - nothing to stop");
+                Debug.WriteLine("[Caffeinate] Not active - nothing to stop");
                 return;
             }
 
             try
             {
-                Debug.WriteLine("[Caffinate] Stopping caffinate");
+                Debug.WriteLine("[Caffeinate] Stopping caffeinate");
 
-                if (!_caffinateProcess.HasExited)
+                if (!_caffeinateProcess.HasExited)
                 {
-                    _caffinateProcess.Kill();
-                    await Task.Run(() => _caffinateProcess.WaitForExit(5000)); // Wait max 5 seconds
+                    _caffeinateProcess.Kill();
+                    await Task.Run(() => _caffeinateProcess.WaitForExit(5000)); // Wait max 5 seconds
                 }
 
-                _caffinateProcess.Dispose();
-                _caffinateProcess = null;
+                _caffeinateProcess.Dispose();
+                _caffeinateProcess = null;
                 _isActive = false;
 
-                Debug.WriteLine("[Caffinate] ✓ Stopped successfully");
+                Debug.WriteLine("[Caffeinate] ✓ Stopped successfully");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Caffinate] ❌ Error stopping caffinate: {ex.Message}");
+                Debug.WriteLine($"[Caffeinate] ❌ Error stopping caffeinate: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Check if caffinate is currently active
+        /// Check if caffeinate is currently active
         /// </summary>
-        public bool IsActive => _isActive && _caffinateProcess != null && !_caffinateProcess.HasExited;
+        public bool IsActive => _isActive && _caffeinateProcess != null && !_caffeinateProcess.HasExited;
 
         public void Dispose()
         {
@@ -116,12 +116,12 @@ namespace AkademiTrack.Services
                 if (_isActive)
                 {
                     // Synchronous stop for disposal
-                    StopCaffinateAsync().Wait(2000);
+                    StopCaffeinateAsync().Wait(2000);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Caffinate] Error during disposal: {ex.Message}");
+                Debug.WriteLine($"[Caffeinate] Error during disposal: {ex.Message}");
             }
 
             _disposed = true;

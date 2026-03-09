@@ -20,7 +20,7 @@ namespace AkademiTrack.Services
         private readonly ILoggingService _loggingService;
         private readonly INotificationService _notificationService;
         private readonly HttpClient _httpClient;
-        private readonly MacOSCaffinateService _caffinateService;
+        private readonly MacOSCaffeinateService _caffeinateService;
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _isRunning;
         private string _currentStatus = "Ready";
@@ -49,12 +49,12 @@ namespace AkademiTrack.Services
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _httpClient = HttpClientFactory.DefaultClient;
-            _caffinateService = new MacOSCaffinateService();
+            _caffeinateService = new MacOSCaffeinateService();
             
             // Track the HttpClient for monitoring (but don't dispose it as it's shared)
-            // Track the caffinate service for disposal
-            TrackDisposable(_caffinateService);
-            _loggingService.LogDebug("[AutomationService] Initialized with shared HttpClient and caffinate service");
+            // Track the caffeinate service for disposal
+            TrackDisposable(_caffeinateService);
+            _loggingService.LogDebug("[AutomationService] Initialized with shared HttpClient and caffeinate service");
         }
 
         /// <summary>
@@ -157,8 +157,8 @@ namespace AkademiTrack.Services
                     NotificationLevel.Success
                 );
 
-                // Start caffinate to keep macOS awake during automation
-                await _caffinateService.StartCaffinateAsync();
+                // Start caffeinate to keep macOS awake during automation
+                await _caffeinateService.StartCaffeinateAsync();
 
                 // Start the monitoring loop with pre-check results
                 var loopResult = await RunMonitoringLoopAsync(combinedToken, preCheckResult);
@@ -218,8 +218,8 @@ namespace AkademiTrack.Services
                 _isRunning = false;
                 _currentStatus = finalStatus; // Use the tracked final status instead of always "Ready"
                 
-                // Stop caffinate when automation ends
-                await _caffinateService.StopCaffinateAsync();
+                // Stop caffeinate when automation ends
+                await _caffeinateService.StopCaffeinateAsync();
                 
                 // Clean up cancellation token source
                 if (localCancellationSource != null)
@@ -255,8 +255,8 @@ namespace AkademiTrack.Services
             {
                 _cancellationTokenSource?.Cancel();
                 
-                // Stop caffinate when user manually stops automation
-                await _caffinateService.StopCaffinateAsync();
+                // Stop caffeinate when user manually stops automation
+                await _caffeinateService.StopCaffeinateAsync();
                 
                 _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
                 await _notificationService.ShowNotificationAsync(
