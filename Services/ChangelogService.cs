@@ -28,7 +28,8 @@ namespace AkademiTrack.Services
 
     public static class ChangelogService
     {
-        private static readonly string CurrentVersion = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+        private static readonly string CurrentVersion = 
+            Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
         private static string GetChangelogSeenFilePath()
         {
@@ -41,7 +42,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                Console.WriteLine("[ChangelogService] ========== ShouldShowChangelogAsync called ==========");
+                Debug.WriteLine("[ChangelogService] ========== ShouldShowChangelogAsync called ==========");
                 
                 // Check if user has any app data (existing user vs brand new user)
                 string appDataDir = Path.Combine(
@@ -50,20 +51,20 @@ namespace AkademiTrack.Services
                 );
                 string settingsPath = Path.Combine(appDataDir, "settings.json");
                 
-                Console.WriteLine($"[ChangelogService] Settings path: {settingsPath}");
-                Console.WriteLine($"[ChangelogService] Settings file exists: {File.Exists(settingsPath)}");
+                Debug.WriteLine($"[ChangelogService] Settings path: {settingsPath}");
+                Debug.WriteLine($"[ChangelogService] Settings file exists: {File.Exists(settingsPath)}");
                 
                 // Brand new user - no settings file exists at all
                 if (!File.Exists(settingsPath))
                 {
-                    Console.WriteLine("[ChangelogService] Brand new user - no settings file exists, skipping changelog");
+                    Debug.WriteLine("[ChangelogService] Brand new user - no settings file exists, skipping changelog");
                     return (false, null);
                 }
                 
                 // Check if user has already seen this version
                 string changelogSeenPath = GetChangelogSeenFilePath();
-                Console.WriteLine($"[ChangelogService] Changelog seen path: {changelogSeenPath}");
-                Console.WriteLine($"[ChangelogService] Changelog seen file exists: {File.Exists(changelogSeenPath)}");
+                Debug.WriteLine($"[ChangelogService] Changelog seen path: {changelogSeenPath}");
+                Debug.WriteLine($"[ChangelogService] Changelog seen file exists: {File.Exists(changelogSeenPath)}");
                 
                 if (File.Exists(changelogSeenPath))
                 {
@@ -72,48 +73,48 @@ namespace AkademiTrack.Services
                         string seenVersion = await File.ReadAllTextAsync(changelogSeenPath);
                         seenVersion = seenVersion.Trim();
                         
-                        Console.WriteLine($"[ChangelogService] Seen version: {seenVersion}");
-                        Console.WriteLine($"[ChangelogService] Current version: {CurrentVersion}");
+                        Debug.WriteLine($"[ChangelogService] Seen version: {seenVersion}");
+                        Debug.WriteLine($"[ChangelogService] Current version: {CurrentVersion}");
                         
                         if (seenVersion == CurrentVersion)
                         {
-                            Console.WriteLine($"[ChangelogService] User already seen version {CurrentVersion} - no changelog needed");
+                            Debug.WriteLine($"[ChangelogService] User has already seen version {CurrentVersion} - no changelog needed");
                             return (false, null);
                         }
                         else
                         {
-                            Console.WriteLine($"[ChangelogService] Version changed from {seenVersion} to {CurrentVersion}");
+                            Debug.WriteLine($"[ChangelogService] Version changed from {seenVersion} to {CurrentVersion}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ChangelogService] Error reading changelog-seen file: {ex.Message}");
+                        Debug.WriteLine($"[ChangelogService] Error reading changelog-seen file: {ex.Message}");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("[ChangelogService] Existing user without changelog tracking - showing changelog");
+                    Debug.WriteLine("[ChangelogService] Existing user without changelog tracking - showing changelog");
                 }
                 
                 // Load and show changelog
-                Console.WriteLine("[ChangelogService] Loading changelog data...");
+                Debug.WriteLine("[ChangelogService] Loading changelog data...");
                 var changelogData = await LoadChangelogAsync(CurrentVersion);
                 if (changelogData != null)
                 {
-                    Console.WriteLine($"[ChangelogService] ✅ Changelog loaded successfully");
-                    Console.WriteLine($"[ChangelogService] HeaderImage: {changelogData.HeaderImage}");
+                    Debug.WriteLine($"[ChangelogService] ✅ Changelog loaded successfully");
+                    Debug.WriteLine($"[ChangelogService] HeaderImage: {changelogData.HeaderImage}");
                     return (true, changelogData);
                 }
                 else
                 {
-                    Console.WriteLine($"[ChangelogService] ❌ Failed to load changelog");
+                    Debug.WriteLine($"[ChangelogService] ❌ Failed to load changelog");
                 }
 
                 return (false, null);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ChangelogService] Error checking changelog: {ex.Message}");
+                Debug.WriteLine($"[ChangelogService] Error checking changelog: {ex.Message}");
                 return (false, null);
             }
         }
@@ -127,15 +128,32 @@ namespace AkademiTrack.Services
                 // On macOS, check if we're in an app bundle and look in Resources first
                 if (OperatingSystem.IsMacOS())
                 {
-                    var resourcesPath = Path.Combine(AppContext.BaseDirectory, "..", "Resources", "Changelogs", $"{version}.json");
-                    if (File.Exists(resourcesPath))
+                    // Attempt to resolve the macOS .app bundle structure robustly
+                    var baseDir = AppContext.BaseDirectory;
+                    var currentDir = new DirectoryInfo(baseDir);
+                    DirectoryInfo? contentsDir = null;
+                    
+                    // Walk up the directory tree to find "Contents" within a ".app" bundle
+                    while (currentDir != null)
                     {
-                        changelogPath = resourcesPath;
+                        if (string.Equals(currentDir.Name, "Contents", StringComparison.OrdinalIgnoreCase) &&
+                            currentDir.Parent != null &&
+                            currentDir.Parent.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                        {
+                            contentsDir = currentDir;
+                            break;
+                        }
+                        currentDir = currentDir.Parent;
+                    }
+                    
+                    if (contentsDir != null)
+                    {
+                        changelogPath = Path.Combine(contentsDir.FullName, "Resources", "Changelogs", $"{version}.json");
                     }
                     else
                     {
-                        // Fallback to the old location
-                        changelogPath = Path.Combine(AppContext.BaseDirectory, "Changelogs", $"{version}.json");
+                        // If we cannot detect the bundle layout, fall back to the standard location
+                        changelogPath = Path.Combine(baseDir, "Changelogs", $"{version}.json");
                     }
                 }
                 else
