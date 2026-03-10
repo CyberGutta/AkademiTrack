@@ -15,6 +15,9 @@ using AkademiTrack.Services.Configuration;
 
 namespace AkademiTrack.Services
 {
+    // NOTE: Other members of AutomationService are defined elsewhere in this file.
+    // The following field is used to track background verification tasks to avoid
+    // unobserved exceptions from fire-and-forget Task.Run usage.
     public class AutomationService : IAutomationService, IDisposable
     {
         private readonly ILoggingService _loggingService;
@@ -32,6 +35,7 @@ namespace AkademiTrack.Services
         // Resource tracking for proper disposal
         private readonly List<IDisposable> _disposables = new();
         private readonly object _disposalLock = new object();
+        private readonly List<Task> _backgroundVerificationTasks = new List<Task>();
 
         // Constants
         private const int MONITORING_INTERVAL_MS = 30_000; // 30 seconds
@@ -108,7 +112,7 @@ namespace AkademiTrack.Services
                 }
 
                 // Check internet connection
-                if (!await CheckInternetConnectionAsync())
+                if (!await CheckInternetConnectionAsync(cancellationToken))
                 {
                     finalStatus = "Ingen internett-tilkobling";
                     return AutomationResult.Failed("No internet connection available");
@@ -147,8 +151,10 @@ namespace AkademiTrack.Services
                 TrackDisposable(localCancellationSource);
                 _cancellationTokenSource = localCancellationSource;
                 
-                var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(
-                    cancellationToken, _cancellationTokenSource.Token).Token;
+                var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken, _cancellationTokenSource.Token);
+                TrackDisposable(linkedCancellationSource);
+                var combinedToken = linkedCancellationSource.Token;
 
                 _loggingService.LogInfo("Starter automatisering");
                 await _notificationService.ShowNotificationAsync(
@@ -278,8 +284,9 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogInfo("Starting re-authentication");
                 
-                var authService = new AuthenticationService(_notificationService);
-                var authResult = await authService.AuthenticateAsync();
+                using (var authService = new AuthenticationService(_notificationService))
+                {
+                    var authResult = await authService.AuthenticateAsync();
 
                 if (authResult.Success && authResult.Cookies != null && authResult.Cookies.Count > 0)
                 {
@@ -303,6 +310,7 @@ namespace AkademiTrack.Services
                 {
                     _loggingService.LogError("Authentication returned no cookies or failed");
                     return AutomationResult.Failed("Authentication failed - no cookies received");
+                }
                 }
             }
             catch (Exception ex)
@@ -366,13 +374,14 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<bool> CheckInternetConnectionAsync()
+        private async Task<bool> CheckInternetConnectionAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 _loggingService.LogDebug("Checking internet connectivity");
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.Time.SHORT_TIMEOUT_SECONDS));
-                var response = await _httpClient.GetAsync("https://www.google.com", cts.Token);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(Constants.Time.SHORT_TIMEOUT_SECONDS));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                var response = await _httpClient.GetAsync("https://www.google.com", linkedCts.Token);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -445,7 +454,7 @@ namespace AkademiTrack.Services
                     var analyticsService = Services.DependencyInjection.ServiceContainer.GetService<AnalyticsService>();
                     await analyticsService.LogErrorAsync(
                         "automation_all_sessions_conflict",
-                        $"All {validStuSessions.Count} STU sessions conflict with regular classes"
+                        $"All {todaysStuSessions.Count} STU sessions conflict with regular classes"
                     );
                 }
                 catch (Exception analyticsEx)
@@ -1186,7 +1195,7 @@ namespace AkademiTrack.Services
                     });
 
                     // Schedule delayed verification (20 seconds later)
-                    _ = Task.Run(async () =>
+                    var verificationTask = Task.Run(async () =>
                     {
                         try
                         {
@@ -1198,6 +1207,7 @@ namespace AkademiTrack.Services
                             _loggingService.LogError($"Verification task failed: {ex.Message}");
                         }
                     });
+                    _backgroundVerificationTasks.Add(verificationTask);
 
                     return true;
                 }
@@ -1676,6 +1686,25 @@ namespace AkademiTrack.Services
                 
                 // Cancel any running operations
                 _cancellationTokenSource?.Cancel();
+                
+                // Wait for background verification tasks to complete (synchronously)
+                try
+                {
+                    if (_backgroundVerificationTasks.Count > 0)
+                    {
+                        _loggingService?.LogDebug($"Waiting for {_backgroundVerificationTasks.Count} background verification tasks to complete");
+                        var incompleteTasks = _backgroundVerificationTasks.Where(t => !t.IsCompleted).ToArray();
+                        if (incompleteTasks.Length > 0)
+                        {
+                            Task.WaitAll(incompleteTasks, TimeSpan.FromSeconds(5)); // Wait max 5 seconds
+                        }
+                        _backgroundVerificationTasks.Clear();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService?.LogError($"Error waiting for background tasks: {ex.Message}");
+                }
                 
                 // Dispose all tracked resources
                 lock (_disposalLock)
