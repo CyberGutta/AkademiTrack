@@ -1323,6 +1323,13 @@ namespace AkademiTrack.ViewModels
         #region Command Implementations
         private async Task StartAutomationAsync()
         {
+            // Don't start automation while changelog is showing
+            if (App.IsChangelogShowing)
+            {
+                _loggingService.LogInfo("Changelog overlay is showing - delaying automation start");
+                return;
+            }
+
             _loggingService.LogDebug($"[START] Checking authentication state: IsAuthenticated={IsAuthenticated}, _userParameters null={_userParameters == null}, complete={_userParameters?.IsComplete ?? false}");
             
             // Clear manual stop flag when user manually starts automation
@@ -2028,6 +2035,31 @@ namespace AkademiTrack.ViewModels
             };
 
             return importantMessages.Any(important => message.StartsWith(important));
+        }
+
+        public async Task CheckAutoStartAfterChangelogAsync()
+        {
+            try
+            {
+                _loggingService.LogInfo("Checking if automation should start after changelog closed");
+                
+                // Check if automation should start now
+                var (shouldStart, reason, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: false);
+                
+                if (shouldStart && !needsConfirmation && !IsAutomationRunning)
+                {
+                    _loggingService.LogInfo("Starting automation after changelog closed");
+                    await StartAutomationAsync();
+                }
+                else
+                {
+                    _loggingService.LogInfo($"Not starting automation after changelog: {reason}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking auto-start after changelog: {ex.Message}");
+            }
         }
 
         private async Task CheckAutoStartAutomationAsync()

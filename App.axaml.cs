@@ -460,6 +460,21 @@ namespace AkademiTrack
                                         await Services.ChangelogService.MarkChangelogAsSeenAsync();
                                         Debug.WriteLine("[App] MarkChangelogAsSeenAsync completed");
                                         
+                                        // Check if automation should start now that changelog is closed
+                                        try
+                                        {
+                                            var mainViewModel = mainWindow.DataContext as ViewModels.RefactoredMainWindowViewModel;
+                                            if (mainViewModel != null)
+                                            {
+                                                Debug.WriteLine("[App] Checking if automation should start after changelog closed");
+                                                await mainViewModel.CheckAutoStartAfterChangelogAsync();
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.WriteLine($"[App] Error checking auto-start after changelog: {ex.Message}");
+                                        }
+                                        
                                         // Now show notification overlay if needed
                                         Debug.WriteLine("[App] Checking for notification overlay...");
                                         await ShowNotificationOverlayIfNeededAsync(mainWindow, mainWindowViewModel, overlayContainer);

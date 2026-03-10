@@ -42,6 +42,13 @@ namespace AkademiTrack.Services
         public async Task ShowNotificationAsync(string title, string message, NotificationLevel level = NotificationLevel.Info, 
             string? imageUrl = null, string? customColor = null, bool isHighPriority = false)
         {
+            // Don't show notifications while changelog is visible
+            if (App.IsChangelogShowing)
+            {
+                Console.WriteLine($"[NotificationService] Blocking notification while changelog is showing: {title}");
+                return;
+            }
+
             var queueItem = new NotificationQueueItem
             {
                 Title = title,
