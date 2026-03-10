@@ -2288,7 +2288,7 @@ Terminal=false
         private void OpenWebsite()
         {
             try { Process.Start(new ProcessStartInfo { FileName = "https://cybergutta.github.io/AkademietTrack/", UseShellExecute = true }); }
-            catch (Exception ex) { Debug.WriteLine($"Error opening webiste: {ex.Message}"); }
+            catch (Exception ex) { Debug.WriteLine($"Error opening website: {ex.Message}"); }
         }
 
         private void ClearLogs()
