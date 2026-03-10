@@ -132,11 +132,11 @@ namespace AkademiTrack.Services
                 else if (preCheckResult.RegisteredSessions.Count > 0)
                 {
                     _loggingService.LogInfo($"Fant {preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter allerede registrert");
-                    await _notificationService.ShowNotificationAsync(
+                    /*await _notificationService.ShowNotificationAsync(
                         "Noen STU-økter allerede registrert",
                         $"{preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter er allerede registrert. Hopper over disse.",
                         NotificationLevel.Info
-                    );
+                    ); */
                 }
 
                 // Mark today as started to prevent duplicate auto-starts
