@@ -342,6 +342,21 @@ namespace AkademiTrack
                     {
                         Debug.WriteLine($"[App] Feide setup completed successfully for: {e.UserEmail}");
                         
+                        // Create flag file to indicate Feide was completed today
+                        try
+                        {
+                            var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AkademiTrack");
+                            Directory.CreateDirectory(appDataDir);
+                            var flagFile = Path.Combine(appDataDir, "feide_completed_today.flag");
+                            var flagContent = $"Feide completed on {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                            await File.WriteAllTextAsync(flagFile, flagContent);
+                            Debug.WriteLine($"[App] Created Feide completion flag: {flagFile}");
+                        }
+                        catch (Exception flagEx)
+                        {
+                            Debug.WriteLine($"[App] Failed to create Feide flag: {flagEx.Message}");
+                        }
+                        
                         // Mark current version as seen for new users (so they don't see changelog on first login)
                         Debug.WriteLine("[App] Marking current version as seen for new user");
                         await Services.ChangelogService.MarkChangelogAsSeenAsync();

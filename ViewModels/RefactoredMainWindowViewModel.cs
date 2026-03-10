@@ -443,11 +443,17 @@ namespace AkademiTrack.ViewModels
                     try
                     {
                         var today = DateTime.Now.Date;
+                        _loggingService.LogInfo($"STARTUP: Checking confirmation for {today:yyyy-MM-dd}");
+                        
+                        // First check if Feide was completed today
+                        var feideCompletedToday = await _userConfirmationService.CheckFeideCompletionTodayAsync();
+                        
                         var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
+                        _loggingService.LogInfo($"STARTUP: Feide completed today: {feideCompletedToday}, Confirmation check result: {isConfirmed}");
                         
                         if (!isConfirmed)
                         {
-                            _loggingService.LogInfo("🚨 POST-AUTH: User not confirmed - showing overlay NOW");
+                            _loggingService.LogInfo("POST-AUTH: User not confirmed - showing overlay NOW");
                             
                             await Dispatcher.UIThread.InvokeAsync(() =>
                             {
@@ -469,6 +475,10 @@ namespace AkademiTrack.ViewModels
                                     isHighPriority: true
                                 );
                             });
+                        }
+                        else
+                        {
+                            _loggingService.LogSuccess("STARTUP: User already confirmed - no popup needed");
                         }
                     }
                     catch (Exception confirmEx)
@@ -1099,7 +1109,7 @@ namespace AkademiTrack.ViewModels
 
         private async void OnConfirmationLost(object? sender, EventArgs e)
         {
-            _loggingService.LogWarning("🚨 CONFIRMATION LOST EVENT RECEIVED - stopping automation and showing overlay immediately");
+            _loggingService.LogWarning("CONFIRMATION LOST EVENT RECEIVED - stopping automation and showing overlay immediately");
 
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
@@ -1190,7 +1200,7 @@ namespace AkademiTrack.ViewModels
             
             if (isConfirmationNeeded && !ShouldShowConfirmationOverlay)
             {
-                _loggingService.LogInfo("🚨 FORCE CLEARING ALL NOTIFICATIONS AND SHOWING OVERLAY");
+                _loggingService.LogInfo("FORCE CLEARING ALL NOTIFICATIONS AND SHOWING OVERLAY");
                 
                 // Force clear ALL notifications
                 await _notificationService.ClearAllNotificationsAsync();
@@ -1202,7 +1212,7 @@ namespace AkademiTrack.ViewModels
                     ShouldShowConfirmationOverlay = true;
                 });
                 
-                _loggingService.LogInfo("🚨 FORCE OVERLAY COMPLETED");
+                _loggingService.LogInfo("FORCE OVERLAY COMPLETED");
             }
             
             await CheckIfOverlayShouldShowAsync();
@@ -1240,7 +1250,7 @@ namespace AkademiTrack.ViewModels
                                     if (!ShouldShowConfirmationOverlay)
                                     {
                                         // User hasn't confirmed and overlay is not showing - show it
-                                        _loggingService.LogWarning("🚨 User confirmation missing - showing overlay (detected by aggressive checking)");
+                                        _loggingService.LogWarning("User confirmation missing - showing overlay (detected by aggressive checking)");
 
                                         // Stop automation if running
                                         if (IsAutomationRunning)
@@ -1258,7 +1268,7 @@ namespace AkademiTrack.ViewModels
                                         // Every 5th attempt, force clear all notifications
                                         if (checkCount % 5 == 0)
                                         {
-                                            _loggingService.LogWarning("🚨 FORCE CLEARING - 5th attempt to show overlay");
+                                            _loggingService.LogWarning("FORCE CLEARING - 5th attempt to show overlay");
                                             await ForceCheckOverlayStatusAsync();
                                         }
                                         else
@@ -1938,7 +1948,7 @@ namespace AkademiTrack.ViewModels
         {
             // Only go back to dashboard - don't retry authentication
             // Authentication retry is handled by OnCredentialsSaved when user clicks "Lagre"
-            _ = BackToDashboardAsync();
+            await BackToDashboardAsync();
         }
 
         private async void OnCredentialsSaved(object? sender, EventArgs e)
@@ -1972,15 +1982,17 @@ namespace AkademiTrack.ViewModels
             _ = InitializeAsync();
         }
 
-        private void OnFeideSetupCompleted(object? sender, FeideSetupCompletedEventArgs e)
+        private async void OnFeideSetupCompleted(object? sender, FeideSetupCompletedEventArgs e)
         {
+            _loggingService.LogInfo("FEIDE SETUP COMPLETED EVENT FIRED!");
+            
             if (e.Success)
             {
                 _loggingService.LogSuccess($"Feide-oppsett fullført for {e.UserEmail}");
 
                 // Mark that an interactive Feide login just happened
-                // This will be used when the user presses the confirmation button
-                _userConfirmationService.MarkInteractiveFeideLoginCompleted();
+                // This will auto-confirm the user's presence for today
+                await _userConfirmationService.MarkInteractiveFeideLoginCompleted();
 
                 // Reset retry count
                 InitializationRetryCount = 0;

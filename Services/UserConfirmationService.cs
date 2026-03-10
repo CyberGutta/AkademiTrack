@@ -15,6 +15,7 @@ namespace AkademiTrack.Services
         private readonly ILoggingService _loggingService;
         private readonly ISettingsService _settingsService;
         private readonly string _confirmationStatusFile;
+        private readonly string _feideCompletionFlagFile;
         private readonly string _appDataDir;
         private readonly SemaphoreSlim _confirmationSemaphore;
         private FileSystemWatcher? _fileWatcher;
@@ -38,6 +39,7 @@ namespace AkademiTrack.Services
             );
             Directory.CreateDirectory(_appDataDir);
             _confirmationStatusFile = Path.Combine(_appDataDir, "daily_confirmation.json");
+            _feideCompletionFlagFile = Path.Combine(_appDataDir, "feide_completed_today.flag");
             
             StartFileWatcher();
             StartReminderSystem();
@@ -122,15 +124,42 @@ namespace AkademiTrack.Services
         /// Marks that an interactive Feide login just completed
         /// This will be used when the user manually confirms presence
         /// </summary>
-        public void MarkInteractiveFeideLoginCompleted()
+        public async Task MarkInteractiveFeideLoginCompleted()
                 {
-                    // DISABLED: No longer auto-confirm based on Feide login
-                    // Always require manual confirmation regardless of Feide login
-                    _loggingService.LogDebug("Feide login completed - manual confirmation still required");
-
-                    // Clear any existing flags to prevent auto-confirmation
-                    _interactiveFeideLoginCompleted = false;
-                    _interactiveFeideLoginTime = DateTime.MinValue;
+                    try
+                    {
+                        _loggingService.LogInfo(" FEIDE: Interactive Feide login completed - auto-confirming presence for today");
+                        
+                        // Log the file path for debugging
+                        _loggingService.LogInfo($"FEIDE: Confirmation file path: {_confirmationStatusFile}");
+                        
+                        // Auto-confirm presence since user just interacted with Feide
+                        var confirmed = await ConfirmPresenceViaFeideAsync();
+                        
+                        if (confirmed)
+                        {
+                            _loggingService.LogSuccess("FEIDE: Auto-confirmed presence after interactive Feide login - persisted to disk");
+                            
+                            // Verify the file was actually written
+                            if (File.Exists(_confirmationStatusFile))
+                            {
+                                var fileContent = await File.ReadAllTextAsync(_confirmationStatusFile);
+                                _loggingService.LogInfo($"FEIDE: Confirmation file content: {fileContent}");
+                            }
+                            else
+                            {
+                                _loggingService.LogError("FEIDE: Confirmation file does not exist after writing!");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService.LogWarning("FEIDE: Failed to auto-confirm presence after interactive Feide login");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"FEIDE: Error auto-confirming after Feide login: {ex.Message}");
+                    }
                 }
 
         /// <summary>
@@ -170,6 +199,80 @@ namespace AkademiTrack.Services
                     catch (Exception ex)
                     {
                         _loggingService.LogError($"Error confirming presence: {ex.Message}");
+                        return false;
+                    }
+                }
+
+                public async Task<bool> ConfirmPresenceViaFeideAsync()
+                {
+                    try
+                    {
+                        var today = DateTime.Now.Date;
+
+                        _loggingService.LogInfo("Auto-confirming presence via Feide login");
+
+                        // Create Feide-based confirmation
+                        var feideConfirmationData = new DailyConfirmationData
+                        {
+                            Date = today,
+                            IsConfirmed = true,
+                            ConfirmedAt = DateTime.Now,
+                            ConfirmedViaFeide = true,
+                            FeideLoginTime = DateTime.Now
+                        };
+
+                        var feideJson = JsonSerializer.Serialize(feideConfirmationData, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(_confirmationStatusFile, feideJson);
+
+                        // Also create a simple flag file for today
+                        var flagContent = $"Feide completed on {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                        await File.WriteAllTextAsync(_feideCompletionFlagFile, flagContent);
+
+                        _loggingService.LogSuccess("Presence auto-confirmed via Feide login - saved to disk");
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error auto-confirming presence via Feide: {ex.Message}");
+                        return false;
+                    }
+                }
+
+                public async Task<bool> CheckFeideCompletionTodayAsync()
+                {
+                    try
+                    {
+                        if (!File.Exists(_feideCompletionFlagFile))
+                            return false;
+
+                        var flagContent = await File.ReadAllTextAsync(_feideCompletionFlagFile);
+                        var fileDate = File.GetCreationTime(_feideCompletionFlagFile).Date;
+                        var today = DateTime.Now.Date;
+
+                        if (fileDate == today)
+                        {
+                            _loggingService.LogInfo($"Found Feide completion flag for today: {flagContent}");
+                            
+                            // Auto-confirm if not already confirmed
+                            var isConfirmed = await IsConfirmedForDateAsync(today);
+                            if (!isConfirmed)
+                            {
+                                _loggingService.LogInfo("Auto-confirming based on Feide completion flag");
+                                await ConfirmPresenceViaFeideAsync();
+                            }
+                            
+                            return true;
+                        }
+                        else
+                        {
+                            // Old flag file, delete it
+                            File.Delete(_feideCompletionFlagFile);
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Error checking Feide completion flag: {ex.Message}");
                         return false;
                     }
                 }
@@ -397,20 +500,15 @@ namespace AkademiTrack.Services
 
                         if (confirmationData.Date.Date != date.Date)
                         {
-                            _loggingService.LogDebug("Confirmation date mismatch - user needs to confirm");
+                            _loggingService.LogDebug($"Confirmation date mismatch - stored: {confirmationData.Date.Date}, requested: {date.Date} - user needs to confirm");
                             return false;
                         }
 
-                        // NEVER use Feide auto-confirmation - always require manual confirmation
-                        // Only accept manual confirmations
-                        if (confirmationData.ConfirmedViaFeide)
-                        {
-                            _loggingService.LogDebug("Feide auto-confirmation found but ignored - manual confirmation required");
-                            return false;
-                        }
-
+                        // Accept both manual and Feide confirmations
                         var isConfirmed = confirmationData.IsConfirmed;
-                        _loggingService.LogDebug($"Manual confirmation status: {isConfirmed}");
+                        var confirmationType = confirmationData.ConfirmedViaFeide ? "Feide auto-confirmation" : "manual confirmation";
+                        
+                        _loggingService.LogDebug($"Found {confirmationType} for {date.Date:yyyy-MM-dd}: {isConfirmed}");
 
                         return isConfirmed;
                     }
@@ -534,7 +632,7 @@ namespace AkademiTrack.Services
                     ConfirmationLost?.Invoke(this, EventArgs.Empty);
                 }
 
-        private async void OnConfirmationFileChanged(object sender, FileSystemEventArgs e)
+        private void OnConfirmationFileChanged(object sender, FileSystemEventArgs e)
         {
             // File was modified - could be a new confirmation or cleared
             _loggingService.LogDebug("Confirmation file changed");
