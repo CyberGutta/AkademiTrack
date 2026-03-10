@@ -31,6 +31,8 @@
 		<vm:BoolToBackgroundConverter x:Key="BoolToBackgroundConverter"/>
 		<vm:BoolToForegroundConverter x:Key="BoolToForegroundConverter"/>
 		<vm:BoolToBorderConverter x:Key="BoolToBorderConverter"/>
+		<vm:CalendarMonthBackgroundConverter x:Key="CalendarMonthBackgroundConverter"/>
+		<vm:CalendarTodayForegroundConverter x:Key="CalendarTodayForegroundConverter"/>
 	</Window.Resources>
 
 	<Window.Styles>

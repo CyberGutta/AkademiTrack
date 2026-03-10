@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using AkademiTrack.Services;
 using AkademiTrack.Services.Interfaces;
 using Avalonia.Threading;
+using System.Globalization;
 
 namespace AkademiTrack.ViewModels
 {
@@ -47,7 +47,8 @@ namespace AkademiTrack.ViewModels
                     OnPropertyChanged(nameof(IsMonthView));
                     OnPropertyChanged(nameof(IsWeekView));
                     OnPropertyChanged(nameof(IsDayView));
-                    FireAndForget(LoadCalendarDataAsync());
+                    OnPropertyChanged(nameof(DisplayDateRange)); // Update the date display when view changes
+                    _ = LoadCalendarDataAsync();
                 }
             }
         }
@@ -71,6 +72,7 @@ namespace AkademiTrack.ViewModels
         {
             get
             {
+                var culture = new CultureInfo("nb-NO");
                 if (IsWeekView)
                 {
                     var monday = GetMonday(_currentDate);
@@ -79,11 +81,11 @@ namespace AkademiTrack.ViewModels
                 }
                 else if (IsDayView)
                 {
-                    return _currentDate.ToString("dddd dd. MMMM yyyy", new System.Globalization.CultureInfo("nb-NO"));
+                    return _currentDate.ToString("dddd dd. MMMM yyyy", culture);
                 }
                 else // Month
                 {
-                    return _currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("nb-NO"));
+                    return _currentDate.ToString("MMMM yyyy", culture);
                 }
             }
         }
@@ -114,7 +116,6 @@ namespace AkademiTrack.ViewModels
             {
                 IsLoading = true;
                 _loggingService?.LogInfo($"[CALENDAR] Loading {_selectedView} view for {_currentDate:yyyy-MM-dd}");
-
                 List<ScheduleItem>? scheduleItems = null;
 
                 if (IsWeekView)
@@ -133,10 +134,9 @@ namespace AkademiTrack.ViewModels
                 }
                 else // Month
                 {
-                    var firstDay = new DateTime(_currentDate.Year, _currentDate.Month, 1);
-                    var lastDay = firstDay.AddMonths(1).AddDays(-1);
-                    _loggingService?.LogInfo($"[CALENDAR] Fetching month data from {firstDay:yyyy-MM-dd} to {lastDay:yyyy-MM-dd}");
-                    scheduleItems = await _attendanceService.GetScheduleRangeAsync(firstDay, lastDay);
+                    var (startDate, endDate) = GetMonthRange();
+                    _loggingService?.LogInfo($"[CALENDAR] Fetching month data from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
+                    scheduleItems = await _attendanceService.GetScheduleRangeAsync(startDate, endDate);
                     _loggingService?.LogInfo($"[CALENDAR] Received {scheduleItems?.Count ?? 0} items for month");
                 }
 
@@ -157,10 +157,33 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        private (DateTime startDate, DateTime endDate) GetMonthRange()
+        {
+            var firstDayOfMonth = new DateTime(_currentDate.Year, _currentDate.Month, 1);
+            var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+            
+            // For month view, we need to include days from previous/next month to fill the grid
+            // Start from the Monday of the week containing the first day of the month
+            var startOfWeek = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek + 1);
+            if (startOfWeek > firstDayOfMonth) startOfWeek = startOfWeek.AddDays(-7);
+            
+            // End at the Sunday of the week containing the last day of the month
+            var endOfWeek = lastDayOfMonth.AddDays(7 - (int)lastDayOfMonth.DayOfWeek);
+            if (endOfWeek < lastDayOfMonth) endOfWeek = endOfWeek.AddDays(7);
+            
+            // Ensure we have complete weeks (42 days = 6 weeks)
+            var totalDays = (endOfWeek - startOfWeek).Days + 1;
+            if (totalDays < 42)
+            {
+                endOfWeek = startOfWeek.AddDays(41); // 42 days total (6 weeks)
+            }
+            
+            return (startOfWeek, endOfWeek);
+        }
+
         private void ProcessScheduleData(List<ScheduleItem>? items)
         {
             _loggingService?.LogInfo($"[CALENDAR] Processing {items?.Count ?? 0} schedule items");
-            
             var calendarDays = new List<CalendarDayData>();
 
             if (IsWeekView)
@@ -250,30 +273,31 @@ namespace AkademiTrack.ViewModels
             }
             else // Month view
             {
-                // For month view, group by date
-                if (items != null && items.Any())
+                // For month view, create calendar grid with all days
+                var (startDate, endDate) = GetMonthRange();
+                var current = startDate;
+                
+                while (current <= endDate)
                 {
-                    var groupedByDate = items.GroupBy(i => i.Dato).OrderBy(g => g.Key);
+                    var dateStr = current.ToString("yyyyMMdd");
+                    var sessions = items?
+                        .Where(item => item.Dato == dateStr)
+                        .OrderBy(s => s.StartKl)
+                        .ToList() ?? new List<ScheduleItem>();
                     
-                    foreach (var dayGroup in groupedByDate)
+                    var sessionsWithSpacing = sessions.Select(s => new ScheduleItemWithSpacing
                     {
-                        var date = ParseDate(dayGroup.Key);
-                        var sessions = dayGroup.OrderBy(s => s.StartKl).ToList();
-                        
-                        var sessionsWithSpacing = sessions.Select(s => new ScheduleItemWithSpacing
-                        {
-                            Item = s,
-                            TopMargin = 2
-                        }).ToList();
-                        
-                        _loggingService?.LogInfo($"[CALENDAR] Date {date:yyyy-MM-dd}: {sessions.Count} sessions");
-                        
-                        calendarDays.Add(new CalendarDayData
-                        {
-                            Date = date,
-                            Sessions = sessionsWithSpacing
-                        });
-                    }
+                        Item = s,
+                        TopMargin = 2
+                    }).ToList();
+                    
+                    calendarDays.Add(new CalendarDayData
+                    {
+                        Date = current,
+                        Sessions = sessionsWithSpacing
+                    });
+                    
+                    current = current.AddDays(1);
                 }
             }
 
@@ -283,14 +307,30 @@ namespace AkademiTrack.ViewModels
 
         private TimeSpan ParseTime(string? timeStr)
         {
-            return TimeParsingHelper.ParseTime(timeStr);
+            if (string.IsNullOrEmpty(timeStr)) return TimeSpan.Zero;
+            
+            if (timeStr.Contains(':'))
+            {
+                if (TimeSpan.TryParse(timeStr, out var time))
+                    return time;
+            }
+            else if (timeStr.Length == 4)
+            {
+                if (int.TryParse(timeStr.Substring(0, 2), out var hours) &&
+                    int.TryParse(timeStr.Substring(2, 2), out var minutes))
+                {
+                    return new TimeSpan(hours, minutes, 0);
+                }
+            }
+            
+            return TimeSpan.Zero;
         }
 
         private DateTime ParseDate(string? dateStr)
         {
             if (string.IsNullOrEmpty(dateStr)) return DateTime.Now;
             
-            if (DateTime.TryParseExact(dateStr, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var date))
+            if (DateTime.TryParseExact(dateStr, "yyyyMMdd", null, DateTimeStyles.None, out var date))
             {
                 return date;
             }
@@ -306,20 +346,8 @@ namespace AkademiTrack.ViewModels
 
         private int GetWeekNumber(DateTime date)
         {
-            var culture = new System.Globalization.CultureInfo("nb-NO");
-            return culture.Calendar.GetWeekOfYear(date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
-        }
-
-        private void FireAndForget(Task task)
-        {
-            task.ContinueWith(t =>
-            {
-                if (t.Exception != null)
-                {
-                    _loggingService?.LogError($"[CALENDAR] Error in background task: {t.Exception.Message}");
-                    Debug.WriteLine($"[CALENDAR] Error in background task: {t.Exception}");
-                }
-            }, TaskContinuationOptions.OnlyOnFaulted);
+            var culture = new CultureInfo("nb-NO");
+            return culture.Calendar.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
         }
 
         public void NavigatePrevious()
@@ -336,7 +364,7 @@ namespace AkademiTrack.ViewModels
             {
                 CurrentDate = _currentDate.AddMonths(-1);
             }
-            FireAndForget(LoadCalendarDataAsync());
+            _ = LoadCalendarDataAsync();
         }
 
         public void NavigateNext()
@@ -353,13 +381,13 @@ namespace AkademiTrack.ViewModels
             {
                 CurrentDate = _currentDate.AddMonths(1);
             }
-            FireAndForget(LoadCalendarDataAsync());
+            _ = LoadCalendarDataAsync();
         }
 
         public void NavigateToday()
         {
             CurrentDate = DateTime.Now;
-            FireAndForget(LoadCalendarDataAsync());
+            _ = LoadCalendarDataAsync();
         }
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -373,8 +401,10 @@ namespace AkademiTrack.ViewModels
         public DateTime Date { get; set; }
         public List<ScheduleItemWithSpacing> Sessions { get; set; } = new();
         
-        public string DayName => Date.ToString("ddd", new System.Globalization.CultureInfo("nb-NO"));
+        public string DayName => Date.ToString("ddd", new CultureInfo("nb-NO"));
         public string DayNumber => Date.Day.ToString();
+        public bool IsCurrentMonth => Date.Month == DateTime.Now.Month && Date.Year == DateTime.Now.Year;
+        public bool IsToday => Date.Date == DateTime.Now.Date;
         
         // Group all sessions by exact time (start + end), maintaining order, with gap info
         public List<SessionGroup> GroupedSessions
@@ -423,14 +453,6 @@ namespace AkademiTrack.ViewModels
         }
         
         private TimeSpan ParseTime(string? timeStr)
-        {
-            return TimeParsingHelper.ParseTime(timeStr);
-        }
-    }
-    
-    internal static class TimeParsingHelper
-    {
-        public static TimeSpan ParseTime(string? timeStr)
         {
             if (string.IsNullOrEmpty(timeStr)) return TimeSpan.Zero;
             

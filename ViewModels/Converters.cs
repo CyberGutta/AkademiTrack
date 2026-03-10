@@ -169,7 +169,7 @@ namespace AkademiTrack.ViewModels
         {
             if (value is bool isActive && isActive)
             {
-                return new SolidColorBrush(Color.Parse("#1A5B9BFF")); // Light blue background
+                return new SolidColorBrush(Color.Parse("#1A5B9BFF")); // Light blue background for active tabs
             }
             return new SolidColorBrush(Colors.Transparent);
         }
@@ -188,9 +188,54 @@ namespace AkademiTrack.ViewModels
         {
             if (value is bool isActive && isActive)
             {
-                return new SolidColorBrush(Color.Parse("#5B9BFF")); // Blue text
+                return new SolidColorBrush(Color.Parse("#5B9BFF")); // Blue text for active tabs
             }
             return ThemeManager.Instance.TextSecondary;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class CalendarMonthBackgroundConverter : IValueConverter
+    {
+        public static readonly CalendarMonthBackgroundConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isCurrentMonth)
+            {
+                if (isCurrentMonth)
+                {
+                    return new SolidColorBrush(Colors.Transparent); // Current month - normal background
+                }
+                else
+                {
+                    return new SolidColorBrush(Color.Parse("#2A2A2A")); // Other month - dark grey
+                }
+            }
+            return new SolidColorBrush(Colors.Transparent);
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class CalendarTodayForegroundConverter : IValueConverter
+    {
+        public static readonly CalendarTodayForegroundConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isToday && isToday)
+            {
+                return new SolidColorBrush(Color.Parse("#5B9BFF")); // Blue text for today
+            }
+            return ThemeManager.Instance.TextPrimary;
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -348,6 +393,44 @@ namespace AkademiTrack.ViewModels
                 return new Avalonia.Thickness(0, topMargin, 0, 0);
             }
             return new Avalonia.Thickness(0, 0, 0, 0);
+        }
+    }
+
+    public class BoolToFontWeightConverter : IValueConverter
+    {
+        public static readonly BoolToFontWeightConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isToday && isToday)
+            {
+                return Avalonia.Media.FontWeight.Bold;
+            }
+            return Avalonia.Media.FontWeight.Normal;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BoolToBorderThicknessConverter : IValueConverter
+    {
+        public static readonly BoolToBorderThicknessConverter Instance = new();
+
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool isToday && isToday)
+            {
+                return new Avalonia.Thickness(2);
+            }
+            return new Avalonia.Thickness(0);
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }

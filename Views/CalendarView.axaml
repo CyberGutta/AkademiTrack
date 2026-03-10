@@ -52,30 +52,60 @@
         </Style>
 
         <Style Selector="Border.session-card">
-            <Setter Property="Background" Value="#B3E5D8"/>
+            <Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+            <Setter Property="BorderBrush" Value="#5B9BFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="Margin" Value="2,0"/>
         </Style>
 
+        <Style Selector="Border.session-card.month">
+            <Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBackground}"/>
+            <Setter Property="BorderBrush" Value="#5B9BFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Margin" Value="0,1"/>
+        </Style>
+
+        <Style Selector="Border.session-card.month.stu">
+            <Setter Property="BorderBrush" Value="#4CAF50"/>
+        </Style>
+
         <Style Selector="Border.session-card.stu">
-            <Setter Property="Background" Value="#B3E5D8"/>
+            <Setter Property="BorderBrush" Value="#4CAF50"/>
+        </Style>
+
+        <Style Selector="TextBlock.day-number">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
+        </Style>
+
+        <Style Selector="TextBlock.day-number.other-month">
+            <Setter Property="Foreground" Value="#666666"/>
+        </Style>
+
+        <Style Selector="TextBlock.day-number.today">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#5B9BFF"/>
         </Style>
 
         <Style Selector="TextBlock.session-subject">
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
         </Style>
 
         <Style Selector="TextBlock.session-time">
             <Setter Property="FontSize" Value="10"/>
-            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
         </Style>
 
         <Style Selector="TextBlock.session-room">
             <Setter Property="FontSize" Value="10"/>
-            <Setter Property="Foreground" Value="#555555"/>
+            <Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"/>
         </Style>
     </UserControl.Styles>
 
@@ -316,13 +346,123 @@
                 </StackPanel>
 
                 <!-- Month View -->
-                <TextBlock IsVisible="{Binding IsMonthView}"
-                           Text="Månedsvisning kommer snart..."
-                           FontSize="16"
-                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Margin="0,40,0,0"/>
+                <Grid IsVisible="{Binding IsMonthView}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Month header with day names -->
+                    <Grid Grid.Row="0" Height="40">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="MAN" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="TIR" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="ONS" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="TOR" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="4" Text="FRE" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="5" Text="LØR" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="6" Text="SØN" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Calendar grid -->
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding CalendarDays}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="7"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CalendarDayData">
+                                <Border BorderBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=CardBorder}"
+                                        BorderThickness="0.5"
+                                        MinHeight="120"
+                                        Background="{Binding IsCurrentMonth, Converter={x:Static vm:CalendarMonthBackgroundConverter.Instance}}">
+                                    <Border BorderBrush="#5B9BFF"
+                                            BorderThickness="{Binding IsToday, Converter={x:Static vm:BoolToBorderThicknessConverter.Instance}}"
+                                            CornerRadius="4">
+                                        <Grid Margin="4">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Day number -->
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding DayNumber}"
+                                                   Classes="day-number"
+                                                   Classes.other-month="{Binding !IsCurrentMonth}"
+                                                   Classes.today="{Binding IsToday}"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Top"
+                                                   Margin="2"/>
+
+                                        <!-- Sessions -->
+                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                                            <ItemsControl ItemsSource="{Binding Sessions}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="vm:ScheduleItemWithSpacing">
+                                                        <Border Classes="session-card month"
+                                                                Classes.stu="{Binding Item.IsStu}"
+                                                                Margin="0,1"
+                                                                Height="16"
+                                                                ToolTip.Tip="{Binding Item.DisplayName}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <TextBlock Grid.Column="0"
+                                                                           Text="{Binding Item.StartKl, Converter={StaticResource TimeFormatConverter}}"
+                                                                           FontSize="8"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="0,0,2,0"/>
+
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding Item.DisplayName}"
+                                                                           FontSize="8"
+                                                                           FontWeight="Medium"
+                                                                           Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           VerticalAlignment="Center"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                    </Border>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </Grid>
         </ScrollViewer>
 
