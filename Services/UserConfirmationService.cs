@@ -279,7 +279,7 @@ namespace AkademiTrack.Services
         /// <summary>
         /// Gets today's STU start times from the attendance service
         /// </summary>
-        private async Task<List<TimeSpan>?> GetTodaysSTUTimesAsync()
+        public async Task<List<TimeSpan>?> GetTodaysSTUTimesAsync()
         {
             try
             {
@@ -605,7 +605,7 @@ namespace AkademiTrack.Services
 
                 // Check if enough time has passed since last reminder
                 var timeSinceLastReminder = DateTime.Now - _lastReminderSent;
-                var reminderInterval = wouldStartWithoutConfirmation ? 2 : 5; // More frequent when automation should start
+                var reminderInterval = wouldStartWithoutConfirmation ? 1 : 3; // More frequent reminders: 1min urgent, 3min normal
 
                 if (timeSinceLastReminder.TotalMinutes < reminderInterval)
                     return;

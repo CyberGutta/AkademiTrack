@@ -439,6 +439,45 @@ namespace AkademiTrack.ViewModels
                     
                     _loggingService.LogDebug($"[INIT] Set state: IsAuthenticated={IsAuthenticated}, _userParameters complete={_userParameters.IsComplete}");
 
+                    // IMMEDIATE confirmation check after auth - bypass complex logic
+                    try
+                    {
+                        var today = DateTime.Now.Date;
+                        var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
+                        
+                        if (!isConfirmed)
+                        {
+                            _loggingService.LogInfo("🚨 POST-AUTH: User not confirmed - showing overlay NOW");
+                            
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                ShouldShowConfirmationOverlay = true;
+                                IsConfirmationNeeded = true;
+                            });
+                            
+                            // Start the reminder system immediately
+                            _userConfirmationService.StartReminderSystem();
+                            
+                            // Show notification immediately
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(200);
+                                await _notificationService.ShowNotificationAsync(
+                                    "Bekreftelse Påkrevd",
+                                    "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
+                                    NotificationLevel.Warning,
+                                    isHighPriority: true
+                                );
+                            });
+                        }
+                    }
+                    catch (Exception confirmEx)
+                    {
+                        _loggingService.LogError($"Post-auth confirmation check failed: {confirmEx.Message}");
+                    }
+
+
+
                     ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                     ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
 
@@ -507,7 +546,6 @@ namespace AkademiTrack.ViewModels
 
                     try
                     {
-                        await UpdateConfirmationStatusAsync();
                         await CheckAutoStartAutomationAsync();
 
                         StartDashboardRefreshTimer();
@@ -1837,8 +1875,19 @@ namespace AkademiTrack.ViewModels
                         var isConfirmed = await _userConfirmationService.IsConfirmedForDateAsync(today);
                         var needsConfirmation = !isConfirmed;
 
-                        // Check if there are STU sessions today - no point showing overlay if there aren't any
-                        var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
+                        // Check if there are STU sessions today independently of Dashboard
+                        bool hasStuSessions;
+                        if (Dashboard?.HasStuSessionsToday == true)
+                        {
+                            // Use Dashboard if available and has data
+                            hasStuSessions = true;
+                        }
+                        else
+                        {
+                            // Fallback: check STU sessions directly via UserConfirmationService
+                            var stuTimes = await _userConfirmationService.GetTodaysSTUTimesAsync();
+                            hasStuSessions = stuTimes != null && stuTimes.Any();
+                        }
 
                         _loggingService.LogDebug($"Confirmation status - Is confirmed: {isConfirmed}, Needs confirmation: {needsConfirmation}, Has STU sessions: {hasStuSessions}");
 
@@ -1870,7 +1919,7 @@ namespace AkademiTrack.ViewModels
                                 // Show overlay immediately since user needs to confirm
                                 _ = Task.Run(async () =>
                                 {
-                                    await Task.Delay(500); // Brief delay to let initialization complete
+                                    await Task.Delay(100); // Minimal delay to let UI thread complete
                                     await RequestOverlayShowAsync();
                                 });
                             }
