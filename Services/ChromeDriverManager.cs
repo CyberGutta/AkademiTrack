@@ -426,7 +426,6 @@ namespace AkademiTrack.Services
                                 try
                                 {
                                     // Recreate service to pick up new driver
-                                    service?.Dispose();
                                     service = ChromeDriverService.CreateDefaultService();
                                     service.HideCommandPromptWindow = true;
                                     service.SuppressInitialDiagnosticInformation = true;
@@ -493,7 +492,6 @@ namespace AkademiTrack.Services
                             try
                             {
                                 // Recreate service to pick up new environment variable
-                                service?.Dispose();
                                 service = ChromeDriverService.CreateDefaultService();
                                 service.HideCommandPromptWindow = true;
                                 service.SuppressInitialDiagnosticInformation = true;
@@ -561,6 +559,7 @@ namespace AkademiTrack.Services
                     {
                         driver?.Quit();
                         driver?.Dispose();
+                        service?.Dispose();
                     }
                     catch (Exception ex)
                     {

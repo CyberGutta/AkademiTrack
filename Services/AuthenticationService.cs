@@ -536,8 +536,15 @@ namespace AkademiTrack.Services
                 }
                 finally
                 {
-                    driver?.Quit();
-                    driver?.Dispose();
+                    try
+                    {
+                        driver?.Quit();
+                        driver?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[AUTH] Warning: Error during driver cleanup: {ex.Message}");
+                    }
                 }
             });
         }

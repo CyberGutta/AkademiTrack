@@ -26,18 +26,18 @@ public partial class ExportLogsDialog : Window
             Cancelled = false
         };
 
-        if (JsonFormatRadio?.IsChecked == true)
+        if (JsonFormatRadio?.IsChecked ?? false)
             result.Format = "json";
-        else if (ReportFormatRadio?.IsChecked == true)
+        else if (ReportFormatRadio?.IsChecked ?? false)
             result.Format = "report";
         else
             result.Format = "text";
 
-        if (DocumentsRadio?.IsChecked == true)
+        if (DocumentsRadio?.IsChecked ?? false)
             result.Destination = "documents";
-        else if (ClipboardRadio?.IsChecked == true)
+        else if (ClipboardRadio?.IsChecked ?? false)
             result.Destination = "clipboard";
-        else if (CustomRadio?.IsChecked == true)
+        else if (CustomRadio?.IsChecked ?? false)
             result.Destination = "custom";
         else
             result.Destination = "desktop";

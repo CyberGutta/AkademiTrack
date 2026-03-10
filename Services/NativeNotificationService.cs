@@ -183,17 +183,10 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
                         CreateNoWindow = true
                     };
 
-                    var process = Process.Start(startInfo);
+                    using var process = Process.Start(startInfo);
                     if (process != null)
                     {
-                        try
-                        {
-                            await process.WaitForExitAsync();
-                        }
-                        finally
-                        {
-                            process.Dispose();
-                        }
+                        await process.WaitForExitAsync();
                     }
                 }
                 catch (Exception psEx)
@@ -217,18 +210,11 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
                     CreateNoWindow = true
                 };
 
-                var process = Process.Start(startInfo);
+                using var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    try
-                    {
-                        await process.WaitForExitAsync();
-                        Console.WriteLine($"Linux notification shown: {title}");
-                    }
-                    finally
-                    {
-                        process.Dispose();
-                    }
+                    await process.WaitForExitAsync();
+                    Console.WriteLine($"Linux notification shown: {title}");
                 }
             }
             catch (Exception ex)

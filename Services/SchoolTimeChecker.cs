@@ -521,7 +521,7 @@ namespace AkademiTrack.Services
                 var data = JsonSerializer.Deserialize<JsonElement>(json);
 
                 if (data.TryGetProperty("completed", out var completedElement) &&
-                    completedElement.GetBoolean() == true)
+                    completedElement.GetBoolean())
                 {
                     if (data.TryGetProperty("lastRun", out var lastRunElement))
                     {
