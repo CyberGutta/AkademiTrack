@@ -35,7 +35,7 @@
         <Style Selector="Image.headerImage">
             <Setter Property="MaxHeight" Value="200"/>
             <Setter Property="Stretch" Value="Uniform"/>
-            <Setter Property="Margin" Value="0,0,0,20"/>
+            <Setter Property="Margin" Value="-140,0,0,20"/>
         </Style>
         <Style Selector="Image.categoryImage">
             <Setter Property="MaxHeight" Value="150"/>
