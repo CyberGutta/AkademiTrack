@@ -523,6 +523,15 @@ namespace AkademiTrack.Services
                     NavigationTest:
                     // Step 2.4: Test navigation
                     Debug.WriteLine($"[ChromeDriverManager] [{ERROR_CODE_TEST_NAVIGATION}] Testing navigation...");
+                    
+                    if (driver == null)
+                    {
+                        SetError(ERROR_CODE_TEST_NAVIGATION,
+                               "Driver is null before navigation test",
+                               null);
+                        return false;
+                    }
+                    
                     try
                     {
                         driver.Navigate().GoToUrl("data:text/html,<html><body>Test</body></html>");
