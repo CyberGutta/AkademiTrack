@@ -30,6 +30,19 @@
 	<ItemGroup>
 		<Folder Include="Models\" />
 		<AvaloniaResource Include="Assets\**" />
+		<!-- Also copy Assets as content for changelog service -->
+		<Content Include="Assets\*.png" Exclude="Assets\**\EXAMPLE*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\*.jpg" Exclude="Assets\**\EXAMPLE*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\*.ico" Exclude="Assets\**\EXAMPLE*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\*.icns" Exclude="Assets\**\EXAMPLE*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 	<ItemGroup>
 		<Content Include="Changelogs\**\*.json" Exclude="Changelogs\**\EXAMPLE*">

@@ -153,7 +153,13 @@ namespace AkademiTrack.Services
                     
                     if (contentsDir != null)
                     {
+                        // Try Resources directory first (proper macOS app bundle structure)
                         changelogPath = Path.Combine(contentsDir.FullName, "Resources", "Changelogs", $"{version}.json");
+                        if (!File.Exists(changelogPath))
+                        {
+                            // Fallback to MacOS directory (legacy)
+                            changelogPath = Path.Combine(contentsDir.FullName, "MacOS", "Changelogs", $"{version}.json");
+                        }
                     }
                     else
                     {
@@ -221,7 +227,10 @@ namespace AkademiTrack.Services
                         
                         if (contentsDir != null)
                         {
+                            // Try Resources directory first (proper macOS app bundle structure)
                             searchPaths.Add(Path.Combine(contentsDir.FullName, "Resources", "Assets", imageName));
+                            // Fallback to MacOS directory (legacy)
+                            searchPaths.Add(Path.Combine(contentsDir.FullName, "MacOS", "Assets", imageName));
                         }
                     }
                     
