@@ -563,12 +563,12 @@ Terminal=false
 
         private SchoolHoursSettings _schoolHours = new SchoolHoursSettings();
 
+        private const int LOG_RETENTION_DAYS = 7;
+
         // Monday
         private bool _mondayEnabled = true;
         private TimeSpan _mondayStart = new TimeSpan(9, 0, 0);
         private TimeSpan _mondayEnd = new TimeSpan(15, 15, 0);
-
-        private const int LOG_RETENTION_DAYS = 7;
 
         public bool MondayEnabled
         {
@@ -768,9 +768,8 @@ Terminal=false
             }
         }
 
-        private DateTime _lastDiagnosticsRun = DateTime.MinValue;
         private const int DIAGNOSTICS_COOLDOWN_SECONDS = 5;
-
+        private DateTime _lastDiagnosticsRun = DateTime.MinValue;
 
         public bool StartMinimized
         {
