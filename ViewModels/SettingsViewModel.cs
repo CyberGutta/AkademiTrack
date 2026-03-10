@@ -39,6 +39,7 @@ public class AppSettings
         public bool AutoStartAutomation { get; set; } = true;
         public bool StartMinimized { get; set; } = false;
         public bool EnableNotifications { get; set; } = true;
+        public bool EnableConfirmationNotifications { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public bool InitialSetupCompleted { get; set; } = false;
         public int FeideGracePeriodHours { get; set; } = 0; // DISABLED: No grace period for Feide auto-confirmation
@@ -545,6 +546,21 @@ Terminal=false
             }
         }
 
+        private bool _enableConfirmationNotifications = true;
+        public bool EnableConfirmationNotifications
+        {
+            get => _enableConfirmationNotifications;
+            set
+            {
+                if (_enableConfirmationNotifications != value)
+                {
+                    _enableConfirmationNotifications = value;
+                    OnPropertyChanged();
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         private SchoolHoursSettings _schoolHours = new SchoolHoursSettings();
 
         // Monday
@@ -844,6 +860,7 @@ Terminal=false
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
         public ICommand ToggleNotificationsCommand { get; }
+        public ICommand ToggleConfirmationNotificationsCommand { get; }
         public ICommand SaveLoginCredentialsCommand { get; }
 
         public ICommand ResetSchoolHoursCommand { get; }
@@ -1169,6 +1186,7 @@ Terminal=false
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
             ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
+            ToggleConfirmationNotificationsCommand = new RelayCommand(ToggleConfirmationNotifications);
             ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
             RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
             SaveLoginCredentialsCommand = new RelayCommand(SaveLoginCredentials, () => HasUnsavedLoginChanges);
@@ -1223,6 +1241,8 @@ Terminal=false
         }
 
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
+
+        private void ToggleConfirmationNotifications() => EnableConfirmationNotifications = !EnableConfirmationNotifications;
 
 
         public void ConnectToMainViewModel(RefactoredMainWindowViewModel mainViewModel)
@@ -2612,6 +2632,7 @@ Terminal=false
                 _autoStartAutomation  = settings.AutoStartAutomation;
                 _startMinimized       = settings.StartMinimized;
                 _enableNotifications = settings.EnableNotifications;
+                _enableConfirmationNotifications = settings.EnableConfirmationNotifications;
 
 
                 var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")     ?? "";
@@ -2637,6 +2658,7 @@ Terminal=false
                     OnPropertyChanged(nameof(AutoStartAutomation));
                     OnPropertyChanged(nameof(StartMinimized));
                     OnPropertyChanged(nameof(EnableNotifications));
+                    OnPropertyChanged(nameof(EnableConfirmationNotifications));
                     OnPropertyChanged(nameof(LoginEmail));
                     OnPropertyChanged(nameof(LoginPassword));
                     OnPropertyChanged(nameof(SchoolName));
@@ -2683,6 +2705,7 @@ Terminal=false
                     AutoStartAutomation  = _autoStartAutomation,
                     StartMinimized       = _startMinimized,
                     EnableNotifications = _enableNotifications,
+                    EnableConfirmationNotifications = _enableConfirmationNotifications,
                     InitialSetupCompleted = true,
                     LastUpdated          = DateTime.Now
                 };

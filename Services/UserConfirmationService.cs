@@ -71,12 +71,16 @@ namespace AkademiTrack.Services
 
                 ConfirmationRequested?.Invoke(this, new UserConfirmationEventArgs(confirmationRequest));
 
-                await _notificationService.ShowNotificationAsync(
-                    "Bekreft tilstedeværelse",
-                    $"Trykk 'Ja, jeg er her' for å starte automatisering i dag. Timeout om {timeoutMinutes} minutter.",
-                    NotificationLevel.Warning,
-                    isHighPriority: true
-                );
+                // Only show notification if confirmation notifications are enabled
+                if (_settingsService.EnableConfirmationNotifications)
+                {
+                    await _notificationService.ShowNotificationAsync(
+                        "Bekreft tilstedeværelse",
+                        $"Trykk 'Ja, jeg er her' for å starte automatisering i dag. Timeout om {timeoutMinutes} minutter.",
+                        NotificationLevel.Warning,
+                        isHighPriority: true
+                    );
+                }
 
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes));
                 
@@ -95,11 +99,15 @@ namespace AkademiTrack.Services
                     {
                         _loggingService.LogWarning("Daily confirmation timed out - automation will not start");
                         
-                        await _notificationService.ShowNotificationAsync(
-                            "Bekreftelse utløpt",
-                            "Automatisering starter ikke uten bekreftelse. Du kan starte manuelt senere.",
-                            NotificationLevel.Warning
-                        );
+                        // Only show timeout notification if confirmation notifications are enabled
+                        if (_settingsService.EnableConfirmationNotifications)
+                        {
+                            await _notificationService.ShowNotificationAsync(
+                                "Bekreftelse utløpt",
+                                "Automatisering starter ikke uten bekreftelse. Du kan starte manuelt senere.",
+                                NotificationLevel.Warning
+                            );
+                        }
                         
                         return false;
                     }
@@ -828,14 +836,22 @@ namespace AkademiTrack.Services
                     ? $"Trykk 'Ja, jeg er her' {timeInfo} for å starte automatisk registrering."
                     : $"Husk å bekrefte at du er til stede {timeInfo} for automatisk registrering av studietimer.";
 
-                await _notificationService.ShowNotificationAsync(
-                    title,
-                    message,
-                    level,
-                    isHighPriority: isUrgent
-                );
+                // Only show reminder notification if confirmation notifications are enabled
+                if (_settingsService.EnableConfirmationNotifications)
+                {
+                    await _notificationService.ShowNotificationAsync(
+                        title,
+                        message,
+                        level,
+                        isHighPriority: isUrgent
+                    );
 
-                _loggingService.LogInfo($"Sent confirmation reminder for {timeInfo} (urgent: {isUrgent})");
+                    _loggingService.LogInfo($"Sent confirmation reminder for {timeInfo} (urgent: {isUrgent})");
+                }
+                else
+                {
+                    _loggingService.LogInfo($"Skipped confirmation reminder for {timeInfo} - notifications disabled");
+                }
             }
             catch (Exception ex)
             {

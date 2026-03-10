@@ -1397,6 +1397,23 @@
 
 					<Border Classes="setting-card">
 						<StackPanel Spacing="12">
+							<TextBlock Text="Bekreftelsesvarslinger" Classes="setting-title"/>
+							<TextBlock Classes="setting-description">
+								<Run Text="Kontroller om du vil motta varslinger for daglige bekreftelser."/>
+								<LineBreak/>
+								<Run Text="Når deaktivert vil bekreftelsesdialogen fortsatt vises, men uten varslinger."/>
+							</TextBlock>
+
+							<Button Content="{Binding EnableConfirmationNotifications, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
+									Classes="toggle-button"
+									Classes.enabled="{Binding EnableConfirmationNotifications}"
+									Classes.disabled="{Binding !EnableConfirmationNotifications}"
+									Command="{Binding ToggleConfirmationNotificationsCommand}"/>
+						</StackPanel>
+					</Border>
+
+					<Border Classes="setting-card">
+						<StackPanel Spacing="12">
 							<TextBlock Text="Ressursbruk" Classes="setting-title"/>
 							<TextBlock Text="Sanntidsovervåking av CPU- og minnebruk for AkademiTrack."
 									   Classes="setting-description"/>

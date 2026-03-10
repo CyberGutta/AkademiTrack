@@ -16,6 +16,7 @@ namespace AkademiTrack.Services.Interfaces
         bool AutoStartAutomation { get; set; }
         bool StartMinimized { get; set; }
         bool EnableNotifications { get; set; }
+        bool EnableConfirmationNotifications { get; set; }
         bool InitialSetupCompleted { get; set; }
         int FeideGracePeriodHours { get; set; }
         bool EnableFeideAutoConfirmation { get; set; }

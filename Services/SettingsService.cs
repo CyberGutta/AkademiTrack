@@ -136,6 +136,22 @@ namespace AkademiTrack.Services
             }
         }
 
+        public bool EnableConfirmationNotifications
+        {
+            get => _settings.EnableConfirmationNotifications;
+            set
+            {
+                if (_settings.EnableConfirmationNotifications != value)
+                {
+                    var oldValue = _settings.EnableConfirmationNotifications;
+                    _settings.EnableConfirmationNotifications = value;
+                    OnPropertyChanged();
+                    SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(EnableConfirmationNotifications), oldValue, value));
+                    _ = SaveSettingsAsync();
+                }
+            }
+        }
+
         public bool InitialSetupCompleted
         {
             get => _settings.InitialSetupCompleted;
@@ -307,6 +323,7 @@ namespace AkademiTrack.Services
             OnPropertyChanged(nameof(AutoStartAutomation));
             OnPropertyChanged(nameof(StartMinimized));
             OnPropertyChanged(nameof(EnableNotifications));
+            OnPropertyChanged(nameof(EnableConfirmationNotifications));
             OnPropertyChanged(nameof(InitialSetupCompleted));
             OnPropertyChanged(nameof(FeideGracePeriodHours));
             OnPropertyChanged(nameof(EnableFeideAutoConfirmation));

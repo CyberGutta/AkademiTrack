@@ -238,6 +238,17 @@ namespace AkademiTrack.ViewModels
             }
         }
 
+        // Property to track confirmation notifications setting
+        public bool ConfirmationNotificationsEnabled
+        {
+            get 
+            {
+                var value = _settingsService?.EnableConfirmationNotifications ?? true;
+                _loggingService?.LogInfo($"🔔 ConfirmationNotificationsEnabled getter called: {value}");
+                return value;
+            }
+        }
+
         // Track if we're waiting to show overlay after notifications are handled
         private bool _pendingOverlayShow = false;
         private DateTime _lastNotificationTime = DateTime.MinValue;
@@ -298,6 +309,7 @@ namespace AkademiTrack.ViewModels
         public ICommand StartAutomationCommand { get; }
         public ICommand StopAutomationCommand { get; }
         public ICommand ConfirmPresenceCommand { get; }
+        public ICommand ToggleConfirmationNotificationsCommand { get; }
         public ICommand BackToDashboardCommand { get; }
         public ICommand OpenSettingsCommand { get; }
         public ICommand OpenFeideCommand { get; }
@@ -335,6 +347,7 @@ namespace AkademiTrack.ViewModels
             StartAutomationCommand = new AsyncRelayCommand(StartAutomationAsync, () => IsAuthenticated && !IsAutomationRunning);
             StopAutomationCommand = new AsyncRelayCommand(StopAutomationAsync, () => IsAutomationRunning);
             ConfirmPresenceCommand = new AsyncRelayCommand(ConfirmPresenceAsync);
+            ToggleConfirmationNotificationsCommand = new RelayCommand(ToggleConfirmationNotifications);
             BackToDashboardCommand = new AsyncRelayCommand(BackToDashboardAsync);
             OpenSettingsCommand = new AsyncRelayCommand(OpenSettings);
             OpenFeideCommand = new AsyncRelayCommand(OpenFeideAsync);
@@ -464,16 +477,27 @@ namespace AkademiTrack.ViewModels
                             // Start the reminder system immediately
                             _userConfirmationService.StartReminderSystem();
                             
-                            // Show notification immediately
+                            // Show notification immediately if confirmation notifications are enabled
                             _ = Task.Run(async () =>
                             {
                                 await Task.Delay(200);
-                                await _notificationService.ShowNotificationAsync(
-                                    "Bekreftelse Påkrevd",
-                                    "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
-                                    NotificationLevel.Warning,
-                                    isHighPriority: true
-                                );
+                                var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
+                                _loggingService.LogInfo($"🔔 Confirmation notifications enabled: {notificationsEnabled}");
+                                
+                                if (notificationsEnabled)
+                                {
+                                    await _notificationService.ShowNotificationAsync(
+                                        "Bekreftelse Påkrevd",
+                                        "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
+                                        NotificationLevel.Warning,
+                                        isHighPriority: true
+                                    );
+                                    _loggingService.LogInfo("🔔 Confirmation notification sent");
+                                }
+                                else
+                                {
+                                    _loggingService.LogInfo("🔕 Confirmation notification skipped - disabled by user");
+                                }
                             });
                         }
                         else
@@ -916,13 +940,23 @@ namespace AkademiTrack.ViewModels
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(300);
-                    await _notificationService.ShowNotificationAsync(
-                        "Bekreftelse Påkrevd",
-                        "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
-                        NotificationLevel.Warning,
-                        isHighPriority: true
-                    );
-                    _loggingService.LogInfo("Confirmation notification sent");
+                    var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
+                    _loggingService.LogInfo($"🔔 Confirmation notifications enabled: {notificationsEnabled}");
+                    
+                    if (notificationsEnabled)
+                    {
+                        await _notificationService.ShowNotificationAsync(
+                            "Bekreftelse Påkrevd",
+                            "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
+                            NotificationLevel.Warning,
+                            isHighPriority: true
+                        );
+                        _loggingService.LogInfo("🔔 Confirmation notification sent");
+                    }
+                    else
+                    {
+                        _loggingService.LogInfo("🔕 Confirmation notification skipped - disabled by user");
+                    }
                 });
             }
             else
@@ -990,6 +1024,10 @@ namespace AkademiTrack.ViewModels
             if (e.PropertyName == nameof(_settingsService.ShowDetailedLogs))
             {
                 OnPropertyChanged(nameof(ShowDetailedLogs));
+            }
+            else if (e.PropertyName == nameof(_settingsService.EnableConfirmationNotifications))
+            {
+                OnPropertyChanged(nameof(ConfirmationNotificationsEnabled));
             }
             else if (e.PropertyName == nameof(_settingsService.AutoStartAutomation))
             {
@@ -1624,6 +1662,37 @@ namespace AkademiTrack.ViewModels
                     "Kunne ikke bekrefte tilstedeværelse. Prøv igjen.",
                     NotificationLevel.Error
                 );
+            }
+        }
+
+        private void ToggleConfirmationNotifications()
+        {
+            _loggingService.LogInfo("🔔 BELL CLICKED - ToggleConfirmationNotifications called!");
+            
+            try
+            {
+                if (_settingsService != null)
+                {
+                    var oldValue = _settingsService.EnableConfirmationNotifications;
+                    _settingsService.EnableConfirmationNotifications = !_settingsService.EnableConfirmationNotifications;
+                    var newValue = _settingsService.EnableConfirmationNotifications;
+                    
+                    OnPropertyChanged(nameof(ConfirmationNotificationsEnabled));
+                    
+                    var status = newValue ? "aktivert" : "deaktivert";
+                    _loggingService.LogInfo($"🔔 Bekreftelsesvarslinger toggled: {oldValue} → {newValue} ({status})");
+                    
+                    // Don't show a notification when toggling confirmation notifications
+                    // as it might be confusing to the user
+                }
+                else
+                {
+                    _loggingService.LogError("🔔 BELL ERROR - _settingsService is null!");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"🔔 BELL ERROR - Error toggling confirmation notifications: {ex.Message}");
             }
         }
 
