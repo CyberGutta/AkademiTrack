@@ -23,7 +23,6 @@ namespace AkademiTrack.Services
         private DateTime _lastReminderSent = DateTime.MinValue;
         
         public event EventHandler<UserConfirmationEventArgs>? ConfirmationRequested;
-        public event EventHandler<UserConfirmationEventArgs>? ConfirmationReceived;
         public event EventHandler? ConfirmationLost;
 
         public UserConfirmationService(INotificationService notificationService, ILoggingService loggingService, ISettingsService settingsService)
@@ -117,7 +116,6 @@ namespace AkademiTrack.Services
             }
         }
 
-        private bool _interactiveFeideLoginCompleted = false;
         private DateTime _interactiveFeideLoginTime = DateTime.MinValue;
 
         /// <summary>
@@ -178,8 +176,6 @@ namespace AkademiTrack.Services
                         _loggingService.LogInfo("Manual presence confirmation required");
 
                         // Clear any Feide login flags to prevent auto-confirmation
-                        _interactiveFeideLoginCompleted = false;
-
                         // Always create manual confirmation
                         var manualConfirmationData = new DailyConfirmationData
                         {

@@ -55,11 +55,6 @@
 
             <!-- Header -->
             <StackPanel Grid.Row="0">
-                <!-- Optional Header Image -->
-                <Image Classes="headerImage" 
-                       Source="{Binding HeaderImage}" 
-                       IsVisible="{Binding HasHeaderImage}"/>
-                
                 <TextBlock Classes="title" Text="{Binding Title}"/>
                 <TextBlock FontSize="13" Opacity="0.6" Margin="0,0,0,10" Text="{Binding VersionInfo}"/>
                 
@@ -69,41 +64,60 @@
                            IsVisible="{Binding HasDescription}"/>
             </StackPanel>
 
-            <!-- Changelog Content -->
-            <ScrollViewer Grid.Row="1" Margin="0,10,0,20">
-                <ItemsControl ItemsSource="{Binding Changes}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="services:ChangeCategory">
-                            <StackPanel>
-                                <!-- Category Header with icon on same line -->
-                                <StackPanel Orientation="Horizontal" Margin="0,20,0,10">
-                                    <TextBlock Classes="categoryIcon" 
-                                              Text="{Binding Icon}" 
-                                              IsVisible="{Binding Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                    <TextBlock Classes="category" Text="{Binding Category}" Margin="0"/>
-                                </StackPanel>
-                                
-                                <!-- Optional Category Image -->
-                                <Image Classes="categoryImage" 
-                                       Source="{Binding Image}" 
-                                       IsVisible="{Binding Image, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                
-                                <!-- Change Items -->
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="x:String">
-                                            <TextBlock Classes="item">
-                                                <Run Text="• "/>
-                                                <Run Text="{Binding}"/>
-                                            </TextBlock>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+            <!-- Main content area -->
+            <Grid Grid.Row="1" Margin="0,10,0,20">
+                <!-- Changelog Content with image inside the scrollable area -->
+                <ScrollViewer>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="300"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Changelog items (left side) -->
+                        <ItemsControl Grid.Column="0" ItemsSource="{Binding Changes}" Margin="0,0,20,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="services:ChangeCategory">
+                                    <StackPanel>
+                                        <!-- Category Header with icon on same line -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,20,0,10">
+                                            <TextBlock Classes="categoryIcon" 
+                                                      Text="{Binding Icon}" 
+                                                      IsVisible="{Binding Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            <TextBlock Classes="category" Text="{Binding Category}" Margin="0"/>
+                                        </StackPanel>
+                                        
+                                        <!-- Optional Category Image -->
+                                        <Image Classes="categoryImage" 
+                                               Source="{Binding Image}" 
+                                               IsVisible="{Binding Image, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        
+                                        <!-- Change Items -->
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="x:String">
+                                                    <TextBlock Classes="item">
+                                                        <Run Text="• "/>
+                                                        <Run Text="{Binding}"/>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Header Image (right side, inside scroll area, vertically centered) -->
+                        <Image Grid.Column="1" 
+                               Classes="headerImage" 
+                               Source="{Binding HeaderImageBitmap}" 
+                               IsVisible="{Binding HasHeaderImage}"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
 
             <!-- Close Button -->
             <Button Grid.Row="2"

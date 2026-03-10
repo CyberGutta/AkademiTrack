@@ -1,6 +1,8 @@
+using System;
 using System.Collections.ObjectModel;
 using AkademiTrack.Services;
 using System.Diagnostics;
+using Avalonia.Media.Imaging;
 
 namespace AkademiTrack.ViewModels
 {
@@ -9,8 +11,9 @@ namespace AkademiTrack.ViewModels
         public string Title { get; set; }
         public string VersionInfo { get; set; }
         public string? HeaderImage { get; set; }
+        public Bitmap? HeaderImageBitmap { get; set; }
         public string? Description { get; set; }
-        public bool HasHeaderImage => !string.IsNullOrEmpty(HeaderImage);
+        public bool HasHeaderImage => HeaderImageBitmap != null;
         public bool HasDescription => !string.IsNullOrEmpty(Description);
         public ObservableCollection<ChangeCategory> Changes { get; set; }
 
@@ -19,11 +22,13 @@ namespace AkademiTrack.ViewModels
             Title = data.Title;
             VersionInfo = $"Version {data.Version} - Released {data.ReleaseDate}";
             HeaderImage = data.HeaderImage;
+            HeaderImageBitmap = data.HeaderImageBitmap;
             Description = data.Description;
             Changes = new ObservableCollection<ChangeCategory>(data.Changes);
             
-            Debug.WriteLine($"[ChangelogViewModel] HeaderImage: {HeaderImage}");
-            Debug.WriteLine($"[ChangelogViewModel] HasHeaderImage: {HasHeaderImage}");
+            Console.WriteLine($"[ChangelogViewModel] HeaderImage: {HeaderImage}");
+            Console.WriteLine($"[ChangelogViewModel] HeaderImageBitmap: {(HeaderImageBitmap != null ? "Loaded" : "Null")}");
+            Console.WriteLine($"[ChangelogViewModel] HasHeaderImage: {HasHeaderImage}");
         }
     }
 }

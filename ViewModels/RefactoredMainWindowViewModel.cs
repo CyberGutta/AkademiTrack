@@ -2036,6 +2036,13 @@ namespace AkademiTrack.ViewModels
             {
                 _loggingService.LogInfo("CHECKING AUTO-START AUTOMATION");
 
+                // Don't auto-start if changelog is showing
+                if (App.IsChangelogShowing)
+                {
+                    _loggingService.LogInfo("Changelog overlay is showing - skipping auto-start check");
+                    return;
+                }
+
                 await _settingsService.LoadSettingsAsync();
                 var autoStartEnabled = _settingsService.AutoStartAutomation;
 

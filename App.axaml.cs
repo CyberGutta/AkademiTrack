@@ -24,6 +24,7 @@ namespace AkademiTrack
 {
     public partial class App : Application
     {
+        public static bool IsChangelogShowing { get; set; } = false;
         private bool _isShuttingDown = false;
         private static bool _hasShownHideNotification = false; 
         public static bool IsShuttingDown => ((App)Current!)._isShuttingDown;
@@ -433,6 +434,8 @@ namespace AkademiTrack
                             {
                                 Console.WriteLine($"[App] Showing changelog overlay for version {changelogData.Version}");
                                 
+                                App.IsChangelogShowing = true;
+                                
                                 var overlayContainer = mainWindow.FindControl<ContentControl>("OverlayContainer");
                                 
                                 if (overlayContainer != null)
@@ -447,6 +450,7 @@ namespace AkademiTrack
                                     {
                                         Debug.WriteLine("[App] ========== CHANGELOG OVERLAY CLOSED EVENT FIRED ==========");
                                         Debug.WriteLine("[App] Hiding overlay container...");
+                                        App.IsChangelogShowing = false;
                                         overlayContainer.Content = null;
                                         overlayContainer.IsVisible = false;
                                         Debug.WriteLine("[App] Overlay container hidden");
