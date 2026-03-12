@@ -244,7 +244,7 @@ namespace AkademiTrack.ViewModels
             get 
             {
                 var value = _settingsService?.EnableConfirmationNotifications ?? true;
-                _loggingService?.LogInfo($"🔔 ConfirmationNotificationsEnabled getter called: {value}");
+                _loggingService?.LogInfo($"ConfirmationNotificationsEnabled getter called: {value}");
                 return value;
             }
         }
@@ -482,7 +482,7 @@ namespace AkademiTrack.ViewModels
                             {
                                 await Task.Delay(200);
                                 var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
-                                _loggingService.LogInfo($"🔔 Confirmation notifications enabled: {notificationsEnabled}");
+                                _loggingService.LogInfo($"Confirmation notifications enabled: {notificationsEnabled}");
                                 
                                 if (notificationsEnabled)
                                 {
@@ -492,11 +492,11 @@ namespace AkademiTrack.ViewModels
                                         NotificationLevel.Warning,
                                         isHighPriority: true
                                     );
-                                    _loggingService.LogInfo("🔔 Confirmation notification sent");
+                                    _loggingService.LogInfo("Confirmation notification sent");
                                 }
                                 else
                                 {
-                                    _loggingService.LogInfo("🔕 Confirmation notification skipped - disabled by user");
+                                    _loggingService.LogInfo("Confirmation notification skipped - disabled by user");
                                 }
                             });
                         }
@@ -935,13 +935,13 @@ namespace AkademiTrack.ViewModels
             if (!_hasShownInitialConfirmationNotification)
             {
                 _hasShownInitialConfirmationNotification = true;
-                _loggingService.LogInfo("Showing confirmation notification - user needs to confirm presence");
+                _loggingService.LogInfo("Showing initial confirmation notification - user needs to confirm presence");
 
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(300);
                     var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
-                    _loggingService.LogInfo($"🔔 Confirmation notifications enabled: {notificationsEnabled}");
+                    _loggingService.LogInfo($"Confirmation notifications enabled: {notificationsEnabled}");
                     
                     if (notificationsEnabled)
                     {
@@ -951,17 +951,17 @@ namespace AkademiTrack.ViewModels
                             NotificationLevel.Warning,
                             isHighPriority: true
                         );
-                        _loggingService.LogInfo("🔔 Confirmation notification sent");
+                        _loggingService.LogInfo("Initial confirmation notification sent");
                     }
                     else
                     {
-                        _loggingService.LogInfo("🔕 Confirmation notification skipped - disabled by user");
+                        _loggingService.LogInfo("Initial confirmation notification skipped - disabled by user");
                     }
                 });
             }
             else
             {
-                _loggingService.LogDebug("Notification already shown - not showing again");
+                _loggingService.LogDebug("Initial notification already shown - reminder system will handle further notifications");
             }
         }
 
@@ -1667,7 +1667,7 @@ namespace AkademiTrack.ViewModels
 
         private void ToggleConfirmationNotifications()
         {
-            _loggingService.LogInfo("🔔 BELL CLICKED - ToggleConfirmationNotifications called!");
+            _loggingService.LogInfo("BELL CLICKED - ToggleConfirmationNotifications called!");
             
             try
             {
@@ -1680,19 +1680,19 @@ namespace AkademiTrack.ViewModels
                     OnPropertyChanged(nameof(ConfirmationNotificationsEnabled));
                     
                     var status = newValue ? "aktivert" : "deaktivert";
-                    _loggingService.LogInfo($"🔔 Bekreftelsesvarslinger toggled: {oldValue} → {newValue} ({status})");
+                    _loggingService.LogInfo($"Bekreftelsesvarslinger toggled: {oldValue} → {newValue} ({status})");
                     
                     // Don't show a notification when toggling confirmation notifications
                     // as it might be confusing to the user
                 }
                 else
                 {
-                    _loggingService.LogError("🔔 BELL ERROR - _settingsService is null!");
+                    _loggingService.LogError("BELL ERROR - _settingsService is null!");
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"🔔 BELL ERROR - Error toggling confirmation notifications: {ex.Message}");
+                _loggingService.LogError($"BELL ERROR - Error toggling confirmation notifications: {ex.Message}");
             }
         }
 

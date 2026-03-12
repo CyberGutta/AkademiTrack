@@ -197,6 +197,9 @@ namespace AkademiTrack.Services
                         var manualJson = JsonSerializer.Serialize(manualConfirmationData, new JsonSerializerOptions { WriteIndented = true });
                         await File.WriteAllTextAsync(_confirmationStatusFile, manualJson);
 
+                        // Reset reminder timer since user has confirmed
+                        _lastReminderSent = DateTime.MinValue;
+
                         _loggingService.LogInfo("Presence confirmed manually");
                         return true;
                     }
@@ -231,6 +234,9 @@ namespace AkademiTrack.Services
                         // Also create a simple flag file for today
                         var flagContent = $"Feide completed on {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
                         await File.WriteAllTextAsync(_feideCompletionFlagFile, flagContent);
+
+                        // Reset reminder timer since user has confirmed via Feide
+                        _lastReminderSent = DateTime.MinValue;
 
                         _loggingService.LogSuccess("Presence auto-confirmed via Feide login - saved to disk");
                         return true;
@@ -684,8 +690,17 @@ namespace AkademiTrack.Services
                 var stuTimes = await GetTodaysSTUTimesAsync();
                 if (stuTimes == null || !stuTimes.Any())
                 {
-                    _loggingService.LogDebug("No STU sessions today - no reminders needed");
-                    return;
+                    // Double-check with the confirmation system's logic
+                    var (shouldStartConfirm, reasonConfirm, _, _, needsConfirmationCheck) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
+                    if (!needsConfirmationCheck)
+                    {
+                        _loggingService.LogDebug("No STU sessions today - no reminders needed");
+                        return;
+                    }
+                    else
+                    {
+                        _loggingService.LogDebug("STU times not found in schedule, but confirmation system indicates STU sessions exist - proceeding with reminders");
+                    }
                 }
 
                 // Check if automation should start but needs confirmation
@@ -714,10 +729,13 @@ namespace AkademiTrack.Services
 
                 // Send reminder with urgency based on timing
                 var isUrgent = wouldStartWithoutConfirmation;
+                
+                _loggingService.LogInfo($"Sending confirmation reminder: urgent={isUrgent}, interval={reminderInterval}min, timeSinceLastReminder={timeSinceLastReminder.TotalMinutes:F1}min");
+                
                 await SendConfirmationReminderAsync(isUrgent);
                 _lastReminderSent = DateTime.Now;
 
-                _loggingService.LogInfo($"Sent confirmation reminder (urgent: {isUrgent}, interval: {reminderInterval} min)");
+                _loggingService.LogInfo($"Confirmation reminder sent successfully (urgent: {isUrgent}, interval: {reminderInterval} min)");
             }
             catch (Exception ex)
             {
@@ -850,7 +868,7 @@ namespace AkademiTrack.Services
                 }
                 else
                 {
-                    _loggingService.LogInfo($"Skipped confirmation reminder for {timeInfo} - notifications disabled");
+                    _loggingService.LogInfo($"Skipped confirmation reminder for {timeInfo} - notifications disabled in settings");
                 }
             }
             catch (Exception ex)
