@@ -686,6 +686,18 @@ namespace AkademiTrack.Services
                 if (await IsConfirmedForDateAsync(today))
                     return;
 
+                // Don't send reminders if AutoStartAutomation is disabled - user must manually start anyway
+                var settingsService = Services.DependencyInjection.ServiceContainer.GetOptionalService<ISettingsService>();
+                if (settingsService != null)
+                {
+                    await settingsService.LoadSettingsAsync();
+                    if (!settingsService.AutoStartAutomation)
+                    {
+                        _loggingService.LogDebug("AutoStartAutomation disabled - no confirmation reminders needed since user must manually start");
+                        return;
+                    }
+                }
+
                 // Check if there are STU sessions today - no point sending reminders if there aren't any
                 var stuTimes = await GetTodaysSTUTimesAsync();
                 if (stuTimes == null || !stuTimes.Any())

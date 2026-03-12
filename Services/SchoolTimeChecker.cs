@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Diagnostics;
+using AkademiTrack.Services.Interfaces;
 
 namespace AkademiTrack.Services
 {
@@ -265,6 +266,19 @@ namespace AkademiTrack.Services
         {
             try
             {
+                // Check if auto-start automation is enabled first
+                var settingsService = Services.DependencyInjection.ServiceContainer.GetOptionalService<ISettingsService>();
+                if (settingsService != null)
+                {
+                    await settingsService.LoadSettingsAsync();
+                    if (!settingsService.AutoStartAutomation)
+                    {
+                        if (!silent)
+                            Debug.WriteLine("[AUTO-START] AutoStartAutomation disabled - no confirmation needed since user must manually start");
+                        return (false, "AutoStartAutomation er deaktivert", null, false, false);
+                    }
+                }
+
                 // First check basic conditions
                 var (shouldStart, reason, nextStartTime, shouldNotify) = await ShouldAutoStartAutomationAsync(silent);
                 
@@ -273,7 +287,7 @@ namespace AkademiTrack.Services
                     return (false, reason, nextStartTime, shouldNotify, false);
                 }
 
-                // Always require confirmation when automation should start
+                // Auto-start is enabled, so check for manual confirmation
                 var confirmationService = Services.DependencyInjection.ServiceContainer.GetOptionalService<UserConfirmationService>();
                 if (confirmationService == null)
                 {
@@ -293,7 +307,7 @@ namespace AkademiTrack.Services
                 }
 
                 if (!silent)
-                    Debug.WriteLine("[AUTO-START] Daily confirmation required before starting");
+                    Debug.WriteLine("[AUTO-START] AutoStartAutomation enabled but daily confirmation required before starting");
                 
                 return (false, "Venter på bekreftelse av tilstedeværelse", nextStartTime, true, true);
             }

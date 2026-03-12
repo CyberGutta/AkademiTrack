@@ -258,6 +258,12 @@ namespace AkademiTrack.ViewModels
         {
             try
             {
+                // First check if AutoStartAutomation is enabled - if not, no confirmation needed
+                if (!_settingsService.AutoStartAutomation)
+                {
+                    return false; // No auto-start = no confirmation needed
+                }
+
                 // Check if there are STU sessions today first
                 var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
                 if (!hasStuSessions)
@@ -466,39 +472,47 @@ namespace AkademiTrack.ViewModels
                         
                         if (!isConfirmed)
                         {
-                            _loggingService.LogInfo("POST-AUTH: User not confirmed - showing overlay NOW");
-                            
-                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            // Only show overlay if AutoStartAutomation is enabled
+                            if (_settingsService?.AutoStartAutomation == true)
                             {
-                                ShouldShowConfirmationOverlay = true;
-                                IsConfirmationNeeded = true;
-                            });
-                            
-                            // Start the reminder system immediately
-                            _userConfirmationService.StartReminderSystem();
-                            
-                            // Show notification immediately if confirmation notifications are enabled
-                            _ = Task.Run(async () =>
-                            {
-                                await Task.Delay(200);
-                                var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
-                                _loggingService.LogInfo($"Confirmation notifications enabled: {notificationsEnabled}");
+                                _loggingService.LogInfo("POST-AUTH: User not confirmed and AutoStartAutomation enabled - showing overlay NOW");
                                 
-                                if (notificationsEnabled)
+                                await Dispatcher.UIThread.InvokeAsync(() =>
                                 {
-                                    await _notificationService.ShowNotificationAsync(
-                                        "Bekreftelse Påkrevd",
-                                        "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
-                                        NotificationLevel.Warning,
-                                        isHighPriority: true
-                                    );
-                                    _loggingService.LogInfo("Confirmation notification sent");
-                                }
-                                else
+                                    ShouldShowConfirmationOverlay = true;
+                                    IsConfirmationNeeded = true;
+                                });
+                                
+                                // Start the reminder system immediately
+                                _userConfirmationService.StartReminderSystem();
+                                
+                                // Show notification immediately if confirmation notifications are enabled
+                                _ = Task.Run(async () =>
                                 {
-                                    _loggingService.LogInfo("Confirmation notification skipped - disabled by user");
-                                }
-                            });
+                                    await Task.Delay(200);
+                                    var notificationsEnabled = _settingsService?.EnableConfirmationNotifications ?? true;
+                                    _loggingService.LogInfo($"Confirmation notifications enabled: {notificationsEnabled}");
+                                    
+                                    if (notificationsEnabled)
+                                    {
+                                        await _notificationService.ShowNotificationAsync(
+                                            "Bekreftelse Påkrevd",
+                                            "Trykk 'Ja, jeg er her' for å starte automatisk registrering.",
+                                            NotificationLevel.Warning,
+                                            isHighPriority: true
+                                        );
+                                        _loggingService.LogInfo("Confirmation notification sent");
+                                    }
+                                    else
+                                    {
+                                        _loggingService.LogInfo("Confirmation notification skipped - disabled by user");
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                _loggingService.LogInfo("POST-AUTH: User not confirmed but AutoStartAutomation disabled - no overlay needed");
+                            }
                         }
                         else
                         {
@@ -761,7 +775,8 @@ namespace AkademiTrack.ViewModels
                         
                         // Additional check: if confirmation is needed but overlay is not showing, 
                         // and automation should be running, show overlay immediately
-                        if (IsConfirmationNeeded && !ShouldShowConfirmationOverlay)
+                        // BUT ONLY if AutoStartAutomation is enabled
+                        if (IsConfirmationNeeded && !ShouldShowConfirmationOverlay && _settingsService.AutoStartAutomation)
                         {
                             var (shouldStart, _, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
                             if (shouldStart && needsConfirmation)
@@ -1033,6 +1048,14 @@ namespace AkademiTrack.ViewModels
             {
                 _loggingService.LogInfo($"AutoStartAutomation setting changed to: {e.NewValue}");
                 
+                // If AutoStartAutomation is disabled, hide the confirmation overlay
+                if (e.NewValue is false)
+                {
+                    _loggingService.LogInfo("AutoStartAutomation disabled - hiding confirmation overlay");
+                    ShouldShowConfirmationOverlay = false;
+                    StopAggressiveOverlayChecking();
+                }
+                
                 // Restart auto-start checking when the setting changes
                 _ = Task.Run(async () =>
                 {
@@ -1191,6 +1214,14 @@ namespace AkademiTrack.ViewModels
                 {
                     try
                     {
+                        // First check if AutoStartAutomation is enabled - if not, no overlay needed
+                        if (!_settingsService.AutoStartAutomation)
+                        {
+                            _loggingService.LogDebug("AutoStartAutomation disabled - overlay not needed");
+                            StopAggressiveOverlayChecking();
+                            return;
+                        }
+
                         // Check if there are STU sessions today first
                         var hasStuSessions = Dashboard?.HasStuSessionsToday ?? false;
                         
@@ -1284,6 +1315,14 @@ namespace AkademiTrack.ViewModels
                                 if (!isConfirmed)
                                 {
                                     _loggingService.LogDebug("Aggressive check: User not confirmed");
+
+                                    // Only show overlay if AutoStartAutomation is enabled
+                                    if (!_settingsService.AutoStartAutomation)
+                                    {
+                                        _loggingService.LogDebug("AutoStartAutomation disabled - stopping aggressive checking");
+                                        StopAggressiveOverlayChecking();
+                                        return;
+                                    }
 
                                     if (!ShouldShowConfirmationOverlay)
                                     {
@@ -1998,16 +2037,26 @@ namespace AkademiTrack.ViewModels
                             }
                             else
                             {
-                                // User needs to confirm AND there are STU sessions - start checking and show overlay immediately
-                                _loggingService.LogInfo("User needs confirmation and STU sessions exist - showing overlay and starting checks");
-                                StartAggressiveOverlayChecking();
-
-                                // Show overlay immediately since user needs to confirm
-                                _ = Task.Run(async () =>
+                                // User needs to confirm AND there are STU sessions
+                                // BUT only show overlay if AutoStartAutomation is enabled
+                                if (_settingsService.AutoStartAutomation)
                                 {
-                                    await Task.Delay(100); // Minimal delay to let UI thread complete
-                                    await RequestOverlayShowAsync();
-                                });
+                                    _loggingService.LogInfo("User needs confirmation and STU sessions exist - showing overlay and starting checks");
+                                    StartAggressiveOverlayChecking();
+
+                                    // Show overlay immediately since user needs to confirm
+                                    _ = Task.Run(async () =>
+                                    {
+                                        await Task.Delay(100); // Minimal delay to let UI thread complete
+                                        await RequestOverlayShowAsync();
+                                    });
+                                }
+                                else
+                                {
+                                    _loggingService.LogDebug("AutoStartAutomation disabled - no overlay needed even with STU sessions");
+                                    ShouldShowConfirmationOverlay = false;
+                                    StopAggressiveOverlayChecking();
+                                }
                             }
                         });
                     }
