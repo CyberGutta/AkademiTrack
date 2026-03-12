@@ -939,7 +939,7 @@ struct AkademiTrackWidget: Widget {
             AkademiTrackWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("AkademiTrack")
-        .description("Se dine timer over/under målet og neste time")
+        .description("Oversikt over registrerte timer og neste time")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
