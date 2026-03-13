@@ -12,7 +12,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional notification customization options
 - Enhanced error recovery mechanisms
 
-## [1.0.0] - 5-10-2025
+## [1.2.0] - 2026-02-08
+
+### Added
+- **Real-Time Dashboard** - New dashboard view showing today's STU sessions, registration status, and attendance overview at a glance
+- **Weekly Attendance Tracker** - Visual breakdown of attendance by day with completion percentages and color-coded status indicators
+- **Monthly Statistics** - Track your monthly attendance rate and total registered sessions
+- **Next Class Widget** - Shows your current or upcoming class with time, room number, and subject information
+- **Overtime/Undertime Tracking** - Monitor your attendance balance with color-coded status (green/orange/red)
+- **Smart Caching** - Instant dashboard loading with background data refresh for better performance
+- **Persistent Cache System** - 24-hour TTL cache with automatic cleanup reduces API calls and improves load times
+- **Health Diagnostics** - Built-in system health checks and troubleshooting tools in settings
+- **Enhanced Logging** - Comprehensive activity logs with optional detailed debug mode
+- **Priority Notifications** - Queue-based notification system with importance levels
+
+### Changed
+- **Optimized Data Loading** - Parallel API requests with individual timeouts for faster data fetching
+- **Enhanced Error Recovery** - Automatic retry mechanisms with exponential backoff for failed requests
+- **Improved Authentication** - Better handling of expired cookies with automatic re-authentication
+- **Better Conflict Detection** - Improved logic for detecting STU sessions that overlap with regular classes
+- **UI Improvements** - Better visual feedback and status indicators throughout the app
+
+### Added
+- **Sleep Detection** - Automatically refreshes data when system wakes from sleep
+- **Network Status Handling** - Better detection and messaging when not connected to school WiFi
+- **Memory Management** - Reduced memory footprint with proper resource disposal
+
+### Fixed
+- Threading issue with tray icon disposal on app exit
+- Various stability improvements and bug fixes
+
+### Technical
+- Code quality improvements with dependency injection and better separation of concerns
+- Refactored services architecture
+- Better resource management and cleanup
+
+## [1.1.0] - 2025-12-15
+
+### Note
+- **Test Release** - Internal testing version with experimental features
+- Not publicly released - used for beta testing and development validation
+
+## [1.0.0] - 2025-10-05
 
 ### Added
 - **Encrypted Credential Storage** - Secure storage of Feide username, password, and school name
@@ -61,5 +102,7 @@ When contributing, please update this changelog with your changes under the `[Un
 - **Fixed** for any bug fixes
 - **Security** for vulnerability fixes
 
-[Unreleased]: https://github.com/CyberGutta/AkademiTrack/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/CyberGutta/AkademiTrack/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/CyberGutta/AkademiTrack/compare/v1.0.0...v1.2.0
+[1.1.0]: https://github.com/CyberGutta/AkademiTrack/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/CyberGutta/AkademiTrack/releases/tag/v1.0.0
