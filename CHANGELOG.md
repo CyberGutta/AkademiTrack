@@ -47,11 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored services architecture
 - Better resource management and cleanup
 
-## [1.1.0] - 2025-12-15
+## [1.1.0] - No real date
 
 ### Note
-- **Test Release** - Internal testing version with experimental features
-- Not publicly released - used for beta testing and development validation
+- **Test Release** - Testing version with experimental features
 
 ## [1.0.0] - 2025-10-05
 
