@@ -315,6 +315,7 @@ namespace AkademiTrack.ViewModels
         public ICommand StartAutomationCommand { get; }
         public ICommand StopAutomationCommand { get; }
         public ICommand ConfirmPresenceCommand { get; }
+        public ICommand SkipConfirmationForTodayCommand { get; }
         public ICommand ToggleConfirmationNotificationsCommand { get; }
         public ICommand BackToDashboardCommand { get; }
         public ICommand OpenSettingsCommand { get; }
@@ -353,6 +354,7 @@ namespace AkademiTrack.ViewModels
             StartAutomationCommand = new AsyncRelayCommand(StartAutomationAsync, () => IsAuthenticated && !IsAutomationRunning);
             StopAutomationCommand = new AsyncRelayCommand(StopAutomationAsync, () => IsAutomationRunning);
             ConfirmPresenceCommand = new AsyncRelayCommand(ConfirmPresenceAsync);
+            SkipConfirmationForTodayCommand = new AsyncRelayCommand(SkipConfirmationForTodayAsync);
             ToggleConfirmationNotificationsCommand = new RelayCommand(ToggleConfirmationNotifications);
             BackToDashboardCommand = new AsyncRelayCommand(BackToDashboardAsync);
             OpenSettingsCommand = new AsyncRelayCommand(OpenSettings);
@@ -1699,6 +1701,45 @@ namespace AkademiTrack.ViewModels
                 await _notificationService.ShowNotificationAsync(
                     "Bekreftelse feilet",
                     "Kunne ikke bekrefte tilstedeværelse. Prøv igjen.",
+                    NotificationLevel.Error
+                );
+            }
+        }
+        private async Task SkipConfirmationForTodayAsync()
+        {
+            try
+            {
+                _loggingService.LogInfo("User skipped confirmation for today");
+
+                var skipped = await _userConfirmationService.SkipConfirmationForTodayAsync();
+
+                if (skipped)
+                {
+                    // Hide the confirmation overlay
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        ShouldShowConfirmationOverlay = false;
+                    });
+
+                    // Stop aggressive overlay checking since confirmation is skipped
+                    StopAggressiveOverlayChecking();
+
+                    // Reset the initial notification flag for next time
+                    _hasShownInitialConfirmationNotification = false;
+
+                    // Update confirmation status
+                    await UpdateConfirmationStatusAsync();
+
+                    _loggingService.LogInfo("Confirmation skipped for today - automation will not start automatically");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error skipping confirmation: {ex.Message}");
+
+                await _notificationService.ShowNotificationAsync(
+                    "Feil ved hopping over",
+                    "Kunne ikke hoppe over bekreftelse. Prøv igjen.",
                     NotificationLevel.Error
                 );
             }

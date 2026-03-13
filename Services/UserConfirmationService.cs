@@ -302,6 +302,35 @@ namespace AkademiTrack.Services
             _loggingService.LogDebug("RegisterInteractiveFeideLoginConfirmationAsync called but auto-confirmation now happens through manual confirmation flow");
             await Task.CompletedTask;
         }
+        /// <summary>
+        /// Skips confirmation for today by marking it as skipped
+        /// </summary>
+        public async Task<bool> SkipConfirmationForTodayAsync()
+        {
+            try
+            {
+                var today = DateTime.Today;
+                _loggingService.LogInfo($"User skipped confirmation for today ({today:yyyy-MM-dd})");
+
+                var confirmationData = new DailyConfirmationData
+                {
+                    Date = today,
+                    IsConfirmed = false,
+                    IsSkipped = true,
+                    SkippedAt = DateTime.Now
+                };
+
+                var json = JsonSerializer.Serialize(confirmationData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_confirmationStatusFile, json);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error skipping confirmation: {ex.Message}");
+                return false;
+            }
+        }
 
 
         /// <summary>
@@ -490,44 +519,51 @@ namespace AkademiTrack.Services
 
 
         public async Task<bool> IsConfirmedForDateAsync(DateTime date)
+        {
+            try
+            {
+                if (!File.Exists(_confirmationStatusFile))
                 {
-                    try
-                    {
-                        if (!File.Exists(_confirmationStatusFile))
-                        {
-                            _loggingService.LogDebug("No confirmation file - user needs to confirm");
-                            return false;
-                        }
-
-                        var json = await File.ReadAllTextAsync(_confirmationStatusFile);
-                        var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
-
-                        if (confirmationData == null)
-                        {
-                            _loggingService.LogDebug("Failed to deserialize confirmation data");
-                            return false;
-                        }
-
-                        if (confirmationData.Date.Date != date.Date)
-                        {
-                            _loggingService.LogDebug($"Confirmation date mismatch - stored: {confirmationData.Date.Date}, requested: {date.Date} - user needs to confirm");
-                            return false;
-                        }
-
-                        // Accept both manual and Feide confirmations
-                        var isConfirmed = confirmationData.IsConfirmed;
-                        var confirmationType = confirmationData.ConfirmedViaFeide ? "Feide auto-confirmation" : "manual confirmation";
-                        
-                        _loggingService.LogDebug($"Found {confirmationType} for {date.Date:yyyy-MM-dd}: {isConfirmed}");
-
-                        return isConfirmed;
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogError($"Confirmation check error: {ex.Message}");
-                        return false;
-                    }
+                    _loggingService.LogDebug("No confirmation file - user needs to confirm");
+                    return false;
                 }
+
+                var json = await File.ReadAllTextAsync(_confirmationStatusFile);
+                var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
+
+                if (confirmationData == null)
+                {
+                    _loggingService.LogDebug("Failed to deserialize confirmation data");
+                    return false;
+                }
+
+                if (confirmationData.Date.Date != date.Date)
+                {
+                    _loggingService.LogDebug($"Confirmation date mismatch - stored: {confirmationData.Date.Date}, requested: {date.Date} - user needs to confirm");
+                    return false;
+                }
+
+                // If skipped, treat as "confirmed" to prevent showing overlay again
+                if (confirmationData.IsSkipped)
+                {
+                    _loggingService.LogDebug($"Confirmation was skipped for {date.Date:yyyy-MM-dd}");
+                    return true;
+                }
+
+                // Accept both manual and Feide confirmations
+                var isConfirmed = confirmationData.IsConfirmed;
+                var confirmationType = confirmationData.ConfirmedViaFeide ? "Feide auto-confirmation" : "manual confirmation";
+                
+                _loggingService.LogDebug($"Found {confirmationType} for {date.Date:yyyy-MM-dd}: {isConfirmed}");
+
+                return isConfirmed;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Confirmation check error: {ex.Message}");
+                return false;
+            }
+        }
 
         private async Task<bool> WaitForConfirmationAsync(string confirmationId, CancellationToken cancellationToken)
         {
@@ -916,5 +952,7 @@ namespace AkademiTrack.Services
         public DateTime ConfirmedAt { get; set; }
         public bool ConfirmedViaFeide { get; set; }
         public DateTime? FeideLoginTime { get; set; }
+        public bool IsSkipped { get; set; }
+        public DateTime? SkippedAt { get; set; }
     }
 }
