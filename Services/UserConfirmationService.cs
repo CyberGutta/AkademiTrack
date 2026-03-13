@@ -564,6 +564,39 @@ namespace AkademiTrack.Services
                 return false;
             }
         }
+        /// <summary>
+        /// Checks if confirmation was skipped for the specified date
+        /// </summary>
+        public async Task<bool> IsSkippedForDateAsync(DateTime date)
+        {
+            try
+            {
+                if (!File.Exists(_confirmationStatusFile))
+                {
+                    return false;
+                }
+
+                var json = await File.ReadAllTextAsync(_confirmationStatusFile);
+                var confirmationData = JsonSerializer.Deserialize<DailyConfirmationData>(json);
+
+                if (confirmationData == null)
+                {
+                    return false;
+                }
+
+                if (confirmationData.Date.Date != date.Date)
+                {
+                    return false;
+                }
+
+                return confirmationData.IsSkipped;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking if confirmation was skipped: {ex.Message}");
+                return false;
+            }
+        }
 
         private async Task<bool> WaitForConfirmationAsync(string confirmationId, CancellationToken cancellationToken)
         {

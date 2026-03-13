@@ -298,6 +298,14 @@ namespace AkademiTrack.Services
 
                 var today = DateTime.Now.Date;
                 var isConfirmed = await confirmationService.IsConfirmedForDateAsync(today);
+                var isSkipped = await confirmationService.IsSkippedForDateAsync(today);
+                
+                if (isSkipped)
+                {
+                    if (!silent)
+                        Debug.WriteLine("[AUTO-START] Daily confirmation was skipped - will not auto-start");
+                    return (false, "Bekreftelse hoppet over for i dag - automatisering starter ikke", nextStartTime, false, false);
+                }
                 
                 if (isConfirmed)
                 {
