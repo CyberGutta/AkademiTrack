@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Fix for Linux auto-start functionality
-- Additional notification customization options
+- Widgets for mac
 - Enhanced error recovery mechanisms
 
 ## [1.2.0] - 2026-02-08
