@@ -951,9 +951,14 @@
 							<StackPanel Spacing="12">
 								<TextBlock Text="Start automatisering ved oppstart" Classes="setting-title"/>
 								<TextBlock Classes="setting-description">
-									<Run Text="Automatiseringen starter automatisk når programmet åpnes."/>
+									<Run Text="Automatiseringen starter automatisk når programmet åpnes på skoledager innenfor skoletid."/>
 									<LineBreak/>
 									<Run Text="Perfekt for å aldri glemme å registrere STU-timer."/>
+									<LineBreak/>
+									<LineBreak/>
+									<Run Text="Viktig: Du må være tilkoblet skolens nettverk for å registrere STU-økter."/>
+									<LineBreak/>
+									<Run Text="Denne innstillingen påvirker også tilstedeværelse godkjennelse ved oppstart eller i løpet av dagen."/>
 								</TextBlock>
 								<Button Content="{Binding AutoStartAutomation, Converter={x:Static vm:BoolToStringConverter.Instance}, ConverterParameter='Aktiver|Deaktiver'}"
 										Classes="toggle-button"
