@@ -524,7 +524,7 @@ Terminal=false
         private bool _hasUnsavedLoginChanges = false;
         private string _originalLoginEmail = "";
         private string _originalSchoolName = "";
-        private SecureString? _originalLoginPasswordSecure;
+        private string _originalLoginPassword = "";
 
         public ObservableCollection<string> Schools { get; }
 
@@ -2728,6 +2728,7 @@ Terminal=false
                 }
                 finally
                 {
+                    // Immediately clear the temporary plaintext password
                     passwordPlain = null;
                 }
 
@@ -2743,10 +2744,11 @@ Terminal=false
         private void CheckForLoginChanges()
         {
             var currentEmail = _loginEmail ?? "";
+            var currentPassword = SecureStringToString(_loginPasswordSecure) ?? "";
             var currentSchool = _schoolName ?? "";
 
             bool hasChanges = currentEmail != _originalLoginEmail ||
-                             !SecureStringEquals(_loginPasswordSecure, _originalLoginPasswordSecure) ||
+                             currentPassword != _originalLoginPassword ||
                              currentSchool != _originalSchoolName;
 
             HasUnsavedLoginChanges = hasChanges;
@@ -2756,15 +2758,17 @@ Terminal=false
         {
             try
             {
+                // Update the original values to match current values
                 _originalLoginEmail = _loginEmail ?? "";
-                _originalLoginPasswordSecure?.Dispose();
-                _originalLoginPasswordSecure = _loginPasswordSecure;
+                _originalLoginPassword = SecureStringToString(_loginPasswordSecure) ?? "";
                 _originalSchoolName = _schoolName ?? "";
 
+                // Reset the unsaved changes flag
                 HasUnsavedLoginChanges = false;
 
                 Debug.WriteLine("[Settings] Login credentials saved successfully");
                 
+                // Notify that credentials were saved - trigger re-authentication
                 CredentialsSaved?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -2776,8 +2780,7 @@ Terminal=false
         private void InitializeOriginalLoginValues()
         {
             _originalLoginEmail = _loginEmail ?? "";
-            _originalLoginPasswordSecure?.Dispose();
-            _originalLoginPasswordSecure = _loginPasswordSecure;
+            _originalLoginPassword = SecureStringToString(_loginPasswordSecure) ?? "";
             _originalSchoolName = _schoolName ?? "";
             HasUnsavedLoginChanges = false;
         }
@@ -2787,7 +2790,7 @@ Terminal=false
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private static unsafe SecureString StringToSecureString(string? str)
+        private static SecureString StringToSecureString(string str)
         {
             if (string.IsNullOrEmpty(str))
                 return new SecureString();
@@ -2798,62 +2801,7 @@ Terminal=false
                 secure.AppendChar(c);
             }
             secure.MakeReadOnly();
-            
-            // Attempt to clear the original string from memory
-            fixed (char* p = str)
-            {
-                for (int i = 0; i < str.Length; i++)
-                {
-                    p[i] = '\0';
-                }
-            }
-            
             return secure;
-        }
-
-        private static bool SecureStringEquals(SecureString? a, SecureString? b)
-        {
-            if (ReferenceEquals(a, b))
-                return true;
-            
-            if (a is null || b is null)
-                return false;
-            
-            if (a.Length != b.Length)
-                return false;
-
-            IntPtr ptrA = IntPtr.Zero;
-            IntPtr ptrB = IntPtr.Zero;
-            try
-            {
-                ptrA = Marshal.SecureStringToBSTR(a);
-                ptrB = Marshal.SecureStringToBSTR(b);
-                
-                unsafe
-                {
-                    char* cA = (char*)ptrA;
-                    char* cB = (char*)ptrB;
-                    for (int i = 0; i < a.Length; i++)
-                    {
-                        if (cA[i] != cB[i])
-                        {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-            finally
-            {
-                if (ptrA != IntPtr.Zero)
-                {
-                    Marshal.ZeroFreeBSTR(ptrA);
-                }
-                if (ptrB != IntPtr.Zero)
-                {
-                    Marshal.ZeroFreeBSTR(ptrB);
-                }
-            }
         }
 
         private static string SecureStringToString(SecureString? secure)
@@ -2879,8 +2827,6 @@ Terminal=false
         {
             _loginPasswordSecure?.Dispose();
             _loginPasswordSecure = null;
-            _originalLoginPasswordSecure?.Dispose();
-            _originalLoginPasswordSecure = null;
             
             Services.ResourceMonitor.Instance.StopMonitoring();
             
