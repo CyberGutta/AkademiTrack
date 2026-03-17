@@ -726,7 +726,10 @@ namespace AkademiTrack.Services
         public void StartReminderSystem()
         {
             if (_reminderTimer != null)
+            {
+                _loggingService.LogDebug("Reminder system already running - skipping start");
                 return;
+            }
 
             _reminderTimer = new Timer(
                 async _ => await CheckAndSendRemindersAsync(),
@@ -735,7 +738,7 @@ namespace AkademiTrack.Services
                 TimeSpan.FromMinutes(1)
             );
             
-            _loggingService.LogDebug("Confirmation reminder system started");
+            _loggingService.LogInfo("Confirmation reminder system started - will check every minute");
         }
 
         public void StopReminderSystem()
@@ -753,7 +756,10 @@ namespace AkademiTrack.Services
 
                 // Don't send reminders if already confirmed
                 if (await IsConfirmedForDateAsync(today))
+                {
+                    _loggingService.LogDebug("User already confirmed for today - no reminders needed");
                     return;
+                }
 
                 // Don't send reminders if AutoStartAutomation is disabled - user must manually start anyway
                 var settingsService = Services.DependencyInjection.ServiceContainer.GetOptionalService<ISettingsService>();
@@ -767,29 +773,16 @@ namespace AkademiTrack.Services
                     }
                 }
 
-                // Check if there are STU sessions today - no point sending reminders if there aren't any
-                var stuTimes = await GetTodaysSTUTimesAsync();
-                if (stuTimes == null || !stuTimes.Any())
-                {
-                    // Double-check with the confirmation system's logic
-                    var (shouldStartConfirm, reasonConfirm, _, _, needsConfirmationCheck) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
-                    if (!needsConfirmationCheck)
-                    {
-                        _loggingService.LogDebug("No STU sessions today - no reminders needed");
-                        return;
-                    }
-                    else
-                    {
-                        _loggingService.LogDebug("STU times not found in schedule, but confirmation system indicates STU sessions exist - proceeding with reminders");
-                    }
-                }
-
-                // Check if automation should start but needs confirmation
+                // Check if automation should start but needs confirmation - this is the primary check
                 var (shouldStart, reason, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
 
                 if (!needsConfirmation)
+                {
+                    _loggingService.LogDebug("No confirmation needed - skipping reminders");
                     return; // No confirmation needed
+                }
 
+                // If we get here, confirmation is needed. Now check timing for reminders.
                 // Check if it's actually time to start automation (ignoring confirmation requirement)
                 var (wouldStartWithoutConfirmation, _, _, _) = await SchoolTimeChecker.ShouldAutoStartAutomationAsync(silent: true);
 
@@ -798,7 +791,10 @@ namespace AkademiTrack.Services
                     // Not time to start yet, but check if we should send early reminder
                     var shouldSendEarlyReminder = await ShouldSendReminderAsync();
                     if (!shouldSendEarlyReminder)
+                    {
+                        _loggingService.LogDebug("Not time for automation and not in early reminder window - skipping");
                         return;
+                    }
                 }
 
                 // Check if enough time has passed since last reminder
@@ -806,7 +802,10 @@ namespace AkademiTrack.Services
                 var reminderInterval = wouldStartWithoutConfirmation ? 1 : 3; // More frequent reminders: 1min urgent, 3min normal
 
                 if (timeSinceLastReminder.TotalMinutes < reminderInterval)
+                {
+                    _loggingService.LogDebug($"Too soon for next reminder - {timeSinceLastReminder.TotalMinutes:F1}min since last, need {reminderInterval}min interval");
                     return;
+                }
 
                 // Send reminder with urgency based on timing
                 var isUrgent = wouldStartWithoutConfirmation;
@@ -840,40 +839,73 @@ namespace AkademiTrack.Services
         }
 
         private async Task<bool> ShouldSendReminderAsync()
+        {
+            try
+            {
+                var now = DateTime.Now;
+
+                // Get today's STU times instead of using school hours
+                var stuTimes = await GetTodaysSTUTimesAsync();
+                if (stuTimes == null || !stuTimes.Any())
                 {
-                    try
+                    // If no STU times found, check if confirmation is still needed via SchoolTimeChecker
+                    var (_, _, _, _, needsConfirmation) = await SchoolTimeChecker.ShouldAutoStartAutomationWithConfirmationAsync(silent: true);
+                    if (!needsConfirmation)
                     {
-                        var now = DateTime.Now;
-
-                        // Get today's STU times instead of using school hours
-                        var stuTimes = await GetTodaysSTUTimesAsync();
-                        if (stuTimes == null || !stuTimes.Any())
-                        {
-                            _loggingService.LogDebug("No STU times found - no reminders needed");
-                            return false;
-                        }
-
-                        var firstSTUTime = stuTimes.Min();
-                        var lastSTUTime = stuTimes.Max();
-
-                        var todayFirstSTU = now.Date.Add(firstSTUTime);
-                        var todayLastSTU = now.Date.Add(lastSTUTime).Add(TimeSpan.FromMinutes(45)); // Add session duration
-
-                        // Send reminders if:
-                        // 1. We're within 15 minutes of first STU time
-                        // 2. We're currently within STU hours
-                        var reminderWindow = now >= todayFirstSTU.AddMinutes(-15) && now <= todayLastSTU;
-
-                        _loggingService.LogDebug($"Reminder check: Now={now:HH:mm}, First STU={firstSTUTime}, Last STU={lastSTUTime}, In window={reminderWindow}");
-
-                        return reminderWindow;
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogError($"Error checking reminder conditions: {ex.Message}");
+                        _loggingService.LogDebug("No STU times found and no confirmation needed - no reminders");
                         return false;
                     }
+                    
+                    // If confirmation is needed but no STU times found, use school hours as fallback
+                    var settingsService = Services.DependencyInjection.ServiceContainer.GetOptionalService<ISettingsService>();
+                    if (settingsService != null)
+                    {
+                        await settingsService.LoadSettingsAsync();
+                        var schoolHours = settingsService.SchoolHours;
+                        
+                        if (schoolHours.WeekSchedule.ContainsKey(now.DayOfWeek))
+                        {
+                            var todaySchedule = schoolHours.WeekSchedule[now.DayOfWeek];
+                            
+                            if (todaySchedule.IsEnabled)
+                            {
+                                var schoolStart = now.Date.Add(todaySchedule.StartTime);
+                                var schoolEnd = now.Date.Add(todaySchedule.EndTime);
+                                
+                                // Send reminders if we're within 15 minutes of school start or during school hours
+                                var fallbackReminderWindow = now >= schoolStart.AddMinutes(-15) && now <= schoolEnd;
+                                
+                                _loggingService.LogDebug($"Reminder check (fallback): Now={now:HH:mm}, School={todaySchedule.StartTime}-{todaySchedule.EndTime}, In window={fallbackReminderWindow}");
+                                return fallbackReminderWindow;
+                            }
+                        }
+                    }
+                    
+                    _loggingService.LogDebug("No STU times found and no school hours available - no reminders");
+                    return false;
                 }
+
+                var firstSTUTime = stuTimes.Min();
+                var lastSTUTime = stuTimes.Max();
+
+                var todayFirstSTU = now.Date.Add(firstSTUTime);
+                var todayLastSTU = now.Date.Add(lastSTUTime).Add(TimeSpan.FromMinutes(45)); // Add session duration
+
+                // Send reminders if:
+                // 1. We're within 15 minutes of first STU time
+                // 2. We're currently within STU hours
+                var reminderWindow = now >= todayFirstSTU.AddMinutes(-15) && now <= todayLastSTU;
+
+                _loggingService.LogDebug($"Reminder check: Now={now:HH:mm}, First STU={firstSTUTime}, Last STU={lastSTUTime}, In window={reminderWindow}");
+
+                return reminderWindow;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error checking reminder conditions: {ex.Message}");
+                return false;
+            }
+        }
 
         private async Task<(TimeSpan start, TimeSpan end)?> GetSchoolHoursForTodayAsync()
         {
@@ -949,7 +981,7 @@ namespace AkademiTrack.Services
                 }
                 else
                 {
-                    _loggingService.LogInfo($"Skipped confirmation reminder for {timeInfo} - notifications disabled in settings");
+                    _loggingService.LogInfo($"Skipped confirmation reminder for {timeInfo} - notifications disabled in settings (EnableConfirmationNotifications: {_settingsService.EnableConfirmationNotifications})");
                 }
             }
             catch (Exception ex)
