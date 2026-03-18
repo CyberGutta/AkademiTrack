@@ -738,15 +738,7 @@
                     </StackPanel>
                 </Button>
                 
-                <Button x:Name="UpdatesButton" Classes="category-tab" Tag="updates">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <materialIcons:MaterialIcon Kind="Refresh" 
-                                                   Width="20" 
-                                                   Height="20"
-                                                   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextPrimary}"/>
-                        <TextBlock Text="Oppdateringer" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
+              
                 
                 <Button x:Name="AboutButton" Classes="category-tab" Tag="about">
                     <StackPanel Orientation="Horizontal" Spacing="12">
@@ -1486,34 +1478,6 @@
 					</Border>
 
 					<Rectangle Height="140" Fill="Transparent"/>
-				</StackPanel>
-
-					<!-- Updates Category -->
-					<StackPanel x:Name="UpdatesSection" Spacing="16" IsVisible="False">
-					<TextBlock Text="Programoppdateringer" Classes="section-header"/>
-
-					<!-- Message Box -->
-					<Border Classes="info-panel">
-						<StackPanel Spacing="8">
-							<StackPanel Orientation="Horizontal" Spacing="8">
-								<materialIcons:MaterialIcon Kind="Information" 
-														   Width="16" 
-														   Height="16"
-														   Foreground="#FFA500"
-														   VerticalAlignment="Center"/>
-								<TextBlock Text="Viktig informasjon"
-										   FontWeight="SemiBold"
-										   FontSize="14"
-										   Foreground="#FFA500"
-										   VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock Text="Vi har fjernet denne funksjonen på grunn av kompatibilitetsproblemer. Vi vil senere prøve å legge noe sånt tilbake eller legge appen på app store så vær forberedt på å slette appen manuelt når vi sier ifra!"
-									   FontSize="13"
-									   Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=TextSecondary}"
-									   TextWrapping="Wrap"
-									   LineHeight="19"/>
-						</StackPanel>
-					</Border>
 				</StackPanel>
 
 					<!-- About Category -->
