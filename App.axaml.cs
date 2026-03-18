@@ -466,8 +466,7 @@ namespace AkademiTrack
                                             var mainViewModel = mainWindow.DataContext as ViewModels.RefactoredMainWindowViewModel;
                                             if (mainViewModel != null)
                                             {
-                                                Debug.WriteLine("[App] Checking if automation should start after changelog closed");
-                                                await mainViewModel.CheckAutoStartAfterChangelogAsync();
+                                                Debug.WriteLine("[App] Changelog closed");
                                             }
                                         }
                                         catch (Exception ex)

@@ -132,13 +132,6 @@ namespace AkademiTrack.Services.DependencyInjection
             });
             services.AddSingleton<AuthenticationService>();
             services.AddSingleton<SystemHealthCheck>();
-            services.AddSingleton<UserConfirmationService>(provider =>
-            {
-                var notificationService = provider.GetRequiredService<INotificationService>();
-                var loggingService = provider.GetRequiredService<ILoggingService>();
-                var settingsService = provider.GetRequiredService<ISettingsService>();
-                return new UserConfirmationService(notificationService, loggingService, settingsService);
-            });
             
             // Widget services
             services.AddSingleton<WidgetDataService>(provider =>

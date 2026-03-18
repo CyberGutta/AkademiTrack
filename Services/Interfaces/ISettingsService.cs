@@ -13,13 +13,10 @@ namespace AkademiTrack.Services.Interfaces
         bool ShowActivityLog { get; set; }
         bool ShowDetailedLogs { get; set; }
         bool StartWithSystem { get; set; }
-        bool AutoStartAutomation { get; set; }
         bool StartMinimized { get; set; }
         bool EnableNotifications { get; set; }
-        bool EnableConfirmationNotifications { get; set; }
         bool InitialSetupCompleted { get; set; }
         int FeideGracePeriodHours { get; set; }
-        bool EnableFeideAutoConfirmation { get; set; }
         
         // School Hours Settings
         SchoolHoursSettings SchoolHours { get; }

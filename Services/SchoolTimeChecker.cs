@@ -179,7 +179,7 @@ namespace AkademiTrack.Services
             return false;
         }
 
-        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify)> ShouldAutoStartAutomationAsync(bool silent = false)
+        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify)> ShouldStartAutomationAsync(bool silent = false)
         {
             try
             {
@@ -262,70 +262,7 @@ namespace AkademiTrack.Services
             }
         }
 
-        public static async Task<(bool shouldStart, string reason, DateTime? nextStartTime, bool shouldNotify, bool needsConfirmation)> ShouldAutoStartAutomationWithConfirmationAsync(bool silent = false)
-        {
-            try
-            {
-                // Check if auto-start automation is enabled first
-                var settingsService = Services.DependencyInjection.ServiceContainer.GetOptionalService<ISettingsService>();
-                if (settingsService != null)
-                {
-                    await settingsService.LoadSettingsAsync();
-                    if (!settingsService.AutoStartAutomation)
-                    {
-                        if (!silent)
-                            Debug.WriteLine("[AUTO-START] AutoStartAutomation disabled - no confirmation needed since user must manually start");
-                        return (false, "AutoStartAutomation er deaktivert", null, false, false);
-                    }
-                }
-
-                // First check basic conditions
-                var (shouldStart, reason, nextStartTime, shouldNotify) = await ShouldAutoStartAutomationAsync(silent);
-                
-                if (!shouldStart)
-                {
-                    return (false, reason, nextStartTime, shouldNotify, false);
-                }
-
-                // Auto-start is enabled, so check for manual confirmation
-                var confirmationService = Services.DependencyInjection.ServiceContainer.GetOptionalService<UserConfirmationService>();
-                if (confirmationService == null)
-                {
-                    if (!silent)
-                        Debug.WriteLine("[AUTO-START] No confirmation service available - proceeding without confirmation");
-                    return (true, reason, nextStartTime, shouldNotify, false);
-                }
-
-                var today = DateTime.Now.Date;
-                var isConfirmed = await confirmationService.IsConfirmedForDateAsync(today);
-                var isSkipped = await confirmationService.IsSkippedForDateAsync(today);
-                
-                if (isSkipped)
-                {
-                    if (!silent)
-                        Debug.WriteLine("[AUTO-START] Daily confirmation was skipped - will not auto-start");
-                    return (false, "Bekreftelse hoppet over for i dag - automatisering starter ikke", nextStartTime, false, false);
-                }
-                
-                if (isConfirmed)
-                {
-                    if (!silent)
-                        Debug.WriteLine("[AUTO-START] Daily confirmation already received - can start");
-                    return (true, reason, nextStartTime, shouldNotify, false);
-                }
-
-                if (!silent)
-                    Debug.WriteLine("[AUTO-START] AutoStartAutomation enabled but daily confirmation required before starting");
-                
-                return (false, "Venter på bekreftelse av tilstedeværelse", nextStartTime, true, true);
-            }
-            catch (Exception ex)
-            {
-                if (!silent)
-                    Debug.WriteLine($"[AUTO-START] Error checking confirmation: {ex.Message}");
-                return (false, $"Feil ved sjekk: {ex.Message}", null, false, false);
-            }
-        }
+        
 
         private static bool ShouldShowNotification(string message)
         {

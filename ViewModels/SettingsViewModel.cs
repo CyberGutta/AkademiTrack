@@ -36,14 +36,11 @@ public class AppSettings
         public bool ShowActivityLog { get; set; } = false;
         public bool ShowDetailedLogs { get; set; } = true;
         public bool StartWithSystem { get; set; } = true;
-        public bool AutoStartAutomation { get; set; } = true;
         public bool StartMinimized { get; set; } = false;
         public bool EnableNotifications { get; set; } = true;
-        public bool EnableConfirmationNotifications { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public bool InitialSetupCompleted { get; set; } = false;
-        public int FeideGracePeriodHours { get; set; } = 0; // DISABLED: No grace period for Feide auto-confirmation
-        public bool EnableFeideAutoConfirmation { get; set; } = false; // DISABLED: Never auto-confirm, always require manual confirmation
+        public int FeideGracePeriodHours { get; set; } = 0;
         public string? LastSeenVersion { get; set; } = null; // Track last version user has seen changelog for
     }
 
@@ -512,7 +509,6 @@ Terminal=false
         private bool _showActivityLog = false;
         private bool _showDetailedLogs = true;
         private bool _startWithSystem = true;
-        private bool _autoStartAutomation = true;
 
         private ObservableCollection<LogEntry> _allLogEntries = new();
         private ObservableCollection<LogEntry> _displayedLogEntries = new();
@@ -546,185 +542,11 @@ Terminal=false
             }
         }
 
-        private bool _enableConfirmationNotifications = true;
-        public bool EnableConfirmationNotifications
-        {
-            get => _enableConfirmationNotifications;
-            set
-            {
-                if (_enableConfirmationNotifications != value)
-                {
-                    _enableConfirmationNotifications = value;
-                    OnPropertyChanged();
-                    _ = SaveSettingsAsync();
-                }
-            }
-        }
-
         private SchoolHoursSettings _schoolHours = new SchoolHoursSettings();
 
         private const int LOG_RETENTION_DAYS = 7;
 
-        // Monday
-        private bool _mondayEnabled = true;
-        private TimeSpan _mondayStart = new TimeSpan(9, 0, 0);
-        private TimeSpan _mondayEnd = new TimeSpan(15, 15, 0);
-
-        public bool MondayEnabled
-        {
-            get => _mondayEnabled;
-            set { if (_mondayEnabled != value) { _mondayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan MondayStart
-        {
-            get => _mondayStart;
-            set { if (_mondayStart != value) { _mondayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan MondayEnd
-        {
-            get => _mondayEnd;
-            set { if (_mondayEnd != value) { _mondayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Tuesday
-        private bool _tuesdayEnabled = true;
-        private TimeSpan _tuesdayStart = new TimeSpan(8, 15, 0);
-        private TimeSpan _tuesdayEnd = new TimeSpan(15, 15, 0);
-
-        public bool TuesdayEnabled
-        {
-            get => _tuesdayEnabled;
-            set { if (_tuesdayEnabled != value) { _tuesdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan TuesdayStart
-        {
-            get => _tuesdayStart;
-            set { if (_tuesdayStart != value) { _tuesdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan TuesdayEnd
-        {
-            get => _tuesdayEnd;
-            set { if (_tuesdayEnd != value) { _tuesdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Wednesday
-        private bool _wednesdayEnabled = true;
-        private TimeSpan _wednesdayStart = new TimeSpan(8, 15, 0);
-        private TimeSpan _wednesdayEnd = new TimeSpan(15, 15, 0);
-
-        public bool WednesdayEnabled
-        {
-            get => _wednesdayEnabled;
-            set { if (_wednesdayEnabled != value) { _wednesdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan WednesdayStart
-        {
-            get => _wednesdayStart;
-            set { if (_wednesdayStart != value) { _wednesdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan WednesdayEnd
-        {
-            get => _wednesdayEnd;
-            set { if (_wednesdayEnd != value) { _wednesdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Thursday
-        private bool _thursdayEnabled = true;
-        private TimeSpan _thursdayStart = new TimeSpan(8, 15, 0);
-        private TimeSpan _thursdayEnd = new TimeSpan(15, 15, 0);
-
-        public bool ThursdayEnabled
-        {
-            get => _thursdayEnabled;
-            set { if (_thursdayEnabled != value) { _thursdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan ThursdayStart
-        {
-            get => _thursdayStart;
-            set { if (_thursdayStart != value) { _thursdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan ThursdayEnd
-        {
-            get => _thursdayEnd;
-            set { if (_thursdayEnd != value) { _thursdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Friday
-        private bool _fridayEnabled = true;
-        private TimeSpan _fridayStart = new TimeSpan(8, 15, 0);
-        private TimeSpan _fridayEnd = new TimeSpan(15, 15, 0);
-
-        public bool FridayEnabled
-        {
-            get => _fridayEnabled;
-            set { if (_fridayEnabled != value) { _fridayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan FridayStart
-        {
-            get => _fridayStart;
-            set { if (_fridayStart != value) { _fridayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan FridayEnd
-        {
-            get => _fridayEnd;
-            set { if (_fridayEnd != value) { _fridayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Saturday
-        private bool _saturdayEnabled = false;
-        private TimeSpan _saturdayStart = new TimeSpan(8, 0, 0);
-        private TimeSpan _saturdayEnd = new TimeSpan(15, 0, 0);
-
-        public bool SaturdayEnabled
-        {
-            get => _saturdayEnabled;
-            set { if (_saturdayEnabled != value) { _saturdayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan SaturdayStart
-        {
-            get => _saturdayStart;
-            set { if (_saturdayStart != value) { _saturdayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan SaturdayEnd
-        {
-            get => _saturdayEnd;
-            set { if (_saturdayEnd != value) { _saturdayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        // Sunday
-        private bool _sundayEnabled = false;
-        private TimeSpan _sundayStart = new TimeSpan(8, 0, 0);
-        private TimeSpan _sundayEnd = new TimeSpan(15, 0, 0);
-
-        public bool SundayEnabled
-        {
-            get => _sundayEnabled;
-            set { if (_sundayEnabled != value) { _sundayEnabled = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan SundayStart
-        {
-            get => _sundayStart;
-            set { if (_sundayStart != value) { _sundayStart = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
-
-        public TimeSpan SundayEnd
-        {
-            get => _sundayEnd;
-            set { if (_sundayEnd != value) { _sundayEnd = value; OnPropertyChanged(); SaveSchoolHours(); } }
-        }
+        // Day configuration properties removed - no longer accessible via UI
 
         private bool _isRunningDiagnostics;
         public bool IsRunningDiagnostics
@@ -835,7 +657,6 @@ Terminal=false
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event EventHandler? CloseRequested;
-        public event EventHandler? SchoolHoursChanged;
         public event EventHandler? CredentialsSaved;
 
         public ApplicationInfo ApplicationInfo { get; }
@@ -849,7 +670,6 @@ Terminal=false
         public ICommand ToggleActivityLogCommand { get; }
         public ICommand ExportLogsCommand { get; }
         public ICommand ToggleAutoStartCommand { get; }
-        public ICommand ToggleAutoStartAutomationCommand { get; }
         public ICommand OpenWebsiteCommand { get; }
         public ICommand OpenEmailCommand { get; }
         public ICommand DeleteLocalDataCommand { get; }
@@ -859,170 +679,16 @@ Terminal=false
         public ICommand ExportDataAsCsvCommand { get; }
         public ICommand ToggleStartMinimizedCommand { get; }
         public ICommand ToggleNotificationsCommand { get; }
-        public ICommand ToggleConfirmationNotificationsCommand { get; }
         public ICommand SaveLoginCredentialsCommand { get; }
-
-        public ICommand ResetSchoolHoursCommand { get; }
         public ICommand RunDiagnosticsCommand { get; }
 
-        public bool AutoStartAutomation
-        {
-            get => _autoStartAutomation;
-            set
-            {
-                if (_autoStartAutomation != value)
-                {
-                    _autoStartAutomation = value;
-                    OnPropertyChanged();
-                    _ = SaveSettingsAsync();
+        // ResetSchoolHoursToDefaults method removed - no longer accessible via UI
 
-                    _ = NotifyMainWindowAutoStartChanged();
-                }
-            }
-        }
+        // LoadSchoolHoursAsync method removed - day configuration no longer accessible via UI
 
-        private void ResetSchoolHoursToDefaults()
-        {
-            var defaults = SchoolHoursSettings.GetDefault();
+        // LoadDayScheduleToUI method removed - day configuration no longer accessible via UI
 
-            MondayEnabled = defaults.WeekSchedule[DayOfWeek.Monday].IsEnabled;
-            MondayStart = defaults.WeekSchedule[DayOfWeek.Monday].StartTime;
-            MondayEnd = defaults.WeekSchedule[DayOfWeek.Monday].EndTime;
-
-            TuesdayEnabled = defaults.WeekSchedule[DayOfWeek.Tuesday].IsEnabled;
-            TuesdayStart = defaults.WeekSchedule[DayOfWeek.Tuesday].StartTime;
-            TuesdayEnd = defaults.WeekSchedule[DayOfWeek.Tuesday].EndTime;
-
-            WednesdayEnabled = defaults.WeekSchedule[DayOfWeek.Wednesday].IsEnabled;
-            WednesdayStart = defaults.WeekSchedule[DayOfWeek.Wednesday].StartTime;
-            WednesdayEnd = defaults.WeekSchedule[DayOfWeek.Wednesday].EndTime;
-
-            ThursdayEnabled = defaults.WeekSchedule[DayOfWeek.Thursday].IsEnabled;
-            ThursdayStart = defaults.WeekSchedule[DayOfWeek.Thursday].StartTime;
-            ThursdayEnd = defaults.WeekSchedule[DayOfWeek.Thursday].EndTime;
-
-            FridayEnabled = defaults.WeekSchedule[DayOfWeek.Friday].IsEnabled;
-            FridayStart = defaults.WeekSchedule[DayOfWeek.Friday].StartTime;
-            FridayEnd = defaults.WeekSchedule[DayOfWeek.Friday].EndTime;
-
-            SaturdayEnabled = defaults.WeekSchedule[DayOfWeek.Saturday].IsEnabled;
-            SaturdayStart = defaults.WeekSchedule[DayOfWeek.Saturday].StartTime;
-            SaturdayEnd = defaults.WeekSchedule[DayOfWeek.Saturday].EndTime;
-
-            SundayEnabled = defaults.WeekSchedule[DayOfWeek.Sunday].IsEnabled;
-            SundayStart = defaults.WeekSchedule[DayOfWeek.Sunday].StartTime;
-            SundayEnd = defaults.WeekSchedule[DayOfWeek.Sunday].EndTime;
-
-            // Ensure cache is invalidated immediately after reset
-            SchoolTimeChecker.InvalidateSchoolHoursCache();
-            
-            // Notify that school hours have changed
-            SchoolHoursChanged?.Invoke(this, EventArgs.Empty);
-            
-            Debug.WriteLine("✓ School hours reset to defaults and cache invalidated");
-        }
-
-        private async Task LoadSchoolHoursAsync()
-        {
-            try
-            {
-                var filePath = GetSchoolHoursFilePath();
-
-                if (File.Exists(filePath))
-                {
-                    var json = await File.ReadAllTextAsync(filePath);
-                    _schoolHours = JsonSerializer.Deserialize<SchoolHoursSettings>(json) ?? new SchoolHoursSettings();
-                }
-                else
-                {
-                    _schoolHours = SchoolHoursSettings.GetDefault();
-                }
-
-                LoadDayScheduleToUI(DayOfWeek.Monday, ref _mondayEnabled, ref _mondayStart, ref _mondayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Tuesday, ref _tuesdayEnabled, ref _tuesdayStart, ref _tuesdayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Wednesday, ref _wednesdayEnabled, ref _wednesdayStart, ref _wednesdayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Thursday, ref _thursdayEnabled, ref _thursdayStart, ref _thursdayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Friday, ref _fridayEnabled, ref _fridayStart, ref _fridayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Saturday, ref _saturdayEnabled, ref _saturdayStart, ref _saturdayEnd);
-                LoadDayScheduleToUI(DayOfWeek.Sunday, ref _sundayEnabled, ref _sundayStart, ref _sundayEnd);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    OnPropertyChanged(nameof(MondayEnabled));
-                    OnPropertyChanged(nameof(MondayStart));
-                    OnPropertyChanged(nameof(MondayEnd));
-                    OnPropertyChanged(nameof(TuesdayEnabled));
-                    OnPropertyChanged(nameof(TuesdayStart));
-                    OnPropertyChanged(nameof(TuesdayEnd));
-                    OnPropertyChanged(nameof(WednesdayEnabled));
-                    OnPropertyChanged(nameof(WednesdayStart));
-                    OnPropertyChanged(nameof(WednesdayEnd));
-                    OnPropertyChanged(nameof(ThursdayEnabled));
-                    OnPropertyChanged(nameof(ThursdayStart));
-                    OnPropertyChanged(nameof(ThursdayEnd));
-                    OnPropertyChanged(nameof(FridayEnabled));
-                    OnPropertyChanged(nameof(FridayStart));
-                    OnPropertyChanged(nameof(FridayEnd));
-                    OnPropertyChanged(nameof(SaturdayEnabled));
-                    OnPropertyChanged(nameof(SaturdayStart));
-                    OnPropertyChanged(nameof(SaturdayEnd));
-                    OnPropertyChanged(nameof(SundayEnabled));
-                    OnPropertyChanged(nameof(SundayStart));
-                    OnPropertyChanged(nameof(SundayEnd));
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error loading school hours: {ex.Message}");
-                _schoolHours = SchoolHoursSettings.GetDefault();
-            }
-        }
-
-        private void LoadDayScheduleToUI(DayOfWeek day, ref bool enabled, ref TimeSpan start, ref TimeSpan end)
-        {
-            if (_schoolHours.WeekSchedule.ContainsKey(day))
-            {
-                var schedule = _schoolHours.WeekSchedule[day];
-                enabled = schedule.IsEnabled;
-                start = schedule.StartTime;
-                end = schedule.EndTime;
-            }
-        }
-
-        private void SaveSchoolHours()
-        {
-            _ = SaveSchoolHoursAsync();
-        }
-
-        private async Task SaveSchoolHoursAsync()
-        {
-            try
-            {
-                _schoolHours.WeekSchedule[DayOfWeek.Monday] = new DaySchedule(_mondayEnabled, _mondayStart, _mondayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Tuesday] = new DaySchedule(_tuesdayEnabled, _tuesdayStart, _tuesdayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Wednesday] = new DaySchedule(_wednesdayEnabled, _wednesdayStart, _wednesdayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Thursday] = new DaySchedule(_thursdayEnabled, _thursdayStart, _thursdayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Friday] = new DaySchedule(_fridayEnabled, _fridayStart, _fridayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Saturday] = new DaySchedule(_saturdayEnabled, _saturdayStart, _saturdayEnd);
-                _schoolHours.WeekSchedule[DayOfWeek.Sunday] = new DaySchedule(_sundayEnabled, _sundayStart, _sundayEnd);
-
-                var filePath = GetSchoolHoursFilePath();
-                var json = JsonSerializer.Serialize(_schoolHours, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(filePath, json);
-
-                // Invalidate the cache so SchoolTimeChecker picks up the new times immediately
-                SchoolTimeChecker.InvalidateSchoolHoursCache();
-
-                // Notify that school hours have changed
-                SchoolHoursChanged?.Invoke(this, EventArgs.Empty);
-
-                Debug.WriteLine("✓ School hours saved successfully and cache invalidated");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error saving school hours: {ex.Message}");
-            }
-        }
+        // SaveSchoolHours methods removed - day configuration no longer accessible via UI
 
         private string GetSchoolHoursFilePath()
         {
@@ -1032,32 +698,6 @@ Terminal=false
             );
             Directory.CreateDirectory(appDataDir);
             return Path.Combine(appDataDir, "school_hours.json");
-        }
-
-        private async Task NotifyMainWindowAutoStartChanged()
-        {
-            try
-            {
-                await Task.Delay(100);
-
-                _ = Dispatcher.UIThread.InvokeAsync(async () =>
-                {
-                    if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                    {
-                        var mainWindow = desktop.MainWindow as MainWindow;
-                        if (mainWindow?.DataContext is RefactoredMainWindowViewModel viewModel)
-                        {
-                            Debug.WriteLine("[SETTINGS] Auto-start setting changed - triggering immediate refresh");
-                            await viewModel.RefreshAutoStartStatusAsync();
-                        }
-                    }
-                }, Avalonia.Threading.DispatcherPriority.Background);
-                
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error notifying MainWindow of auto-start change: {ex.Message}");
-            }
         }
 
         public bool HasUnsavedLoginChanges
@@ -1175,7 +815,6 @@ Terminal=false
             ToggleActivityLogCommand = new RelayCommand(ToggleActivityLog);
             ExportLogsCommand = new RelayCommand(async () => await ExportLogsAsync());
             ToggleAutoStartCommand = new RelayCommand(ToggleAutoStart);
-            ToggleAutoStartAutomationCommand = new RelayCommand(ToggleAutoStartAutomation);
             OpenWebsiteCommand = new RelayCommand(OpenWebsite);
             OpenEmailCommand = new RelayCommand(OpenEmail);
             DeleteLocalDataCommand = new RelayCommand(async () => await DeleteLocalDataAsync());
@@ -1185,14 +824,10 @@ Terminal=false
             ExportDataAsCsvCommand = new RelayCommand(async () => await ExportDataAsync("csv"));
             ToggleStartMinimizedCommand = new RelayCommand(ToggleStartMinimized);
             ToggleNotificationsCommand = new RelayCommand(ToggleNotifications);
-            ToggleConfirmationNotificationsCommand = new RelayCommand(ToggleConfirmationNotifications);
-            ResetSchoolHoursCommand = new RelayCommand(ResetSchoolHoursToDefaults);
             RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync);
             SaveLoginCredentialsCommand = new RelayCommand(SaveLoginCredentials, () => HasUnsavedLoginChanges);
     
               _ = CleanOldLogsAsync();
-
-            _ = LoadSchoolHoursAsync();
 
             _ = LoadSettingsAsync();
 
@@ -1240,8 +875,6 @@ Terminal=false
         }
 
         private void ToggleNotifications() => EnableNotifications = !EnableNotifications;
-
-        private void ToggleConfirmationNotifications() => EnableConfirmationNotifications = !EnableConfirmationNotifications;
 
 
         public void ConnectToMainViewModel(RefactoredMainWindowViewModel mainViewModel)
@@ -2277,7 +1910,6 @@ Terminal=false
         private void ToggleActivityLog() => ShowActivityLog = !ShowActivityLog;
         private void ToggleAutoStart() => StartWithSystem = !StartWithSystem;
         private void CloseWindow() => CloseRequested?.Invoke(this, EventArgs.Empty);
-        private void ToggleAutoStartAutomation() => AutoStartAutomation = !AutoStartAutomation;
         private void OpenEmail()
         {
             try { Process.Start(new ProcessStartInfo { FileName = "mailto:cyberbrothershq@gmail.com", UseShellExecute = true }); }
@@ -2628,10 +2260,8 @@ Terminal=false
                 _showActivityLog      = settings.ShowActivityLog;
                 _showDetailedLogs     = settings.ShowDetailedLogs;
                 _startWithSystem      = settings.StartWithSystem;
-                _autoStartAutomation  = settings.AutoStartAutomation;
                 _startMinimized       = settings.StartMinimized;
                 _enableNotifications = settings.EnableNotifications;
-                _enableConfirmationNotifications = settings.EnableConfirmationNotifications;
 
 
                 var email   = await SecureCredentialStorage.GetCredentialAsync("LoginEmail")     ?? "";
@@ -2654,10 +2284,8 @@ Terminal=false
                     OnPropertyChanged(nameof(ShowActivityLog));
                     OnPropertyChanged(nameof(ShowDetailedLogs));
                     OnPropertyChanged(nameof(StartWithSystem));
-                    OnPropertyChanged(nameof(AutoStartAutomation));
                     OnPropertyChanged(nameof(StartMinimized));
                     OnPropertyChanged(nameof(EnableNotifications));
-                    OnPropertyChanged(nameof(EnableConfirmationNotifications));
                     OnPropertyChanged(nameof(LoginEmail));
                     OnPropertyChanged(nameof(LoginPassword));
                     OnPropertyChanged(nameof(SchoolName));
@@ -2701,10 +2329,8 @@ Terminal=false
                     ShowActivityLog      = _showActivityLog,
                     ShowDetailedLogs     = _showDetailedLogs,
                     StartWithSystem      = _startWithSystem,
-                    AutoStartAutomation  = _autoStartAutomation,
                     StartMinimized       = _startMinimized,
                     EnableNotifications = _enableNotifications,
-                    EnableConfirmationNotifications = _enableConfirmationNotifications,
                     InitialSetupCompleted = true,
                     LastUpdated          = DateTime.Now
                 };

@@ -324,7 +324,7 @@ namespace AkademiTrack.Services
         {
             try
             {
-                var result = await SchoolTimeChecker.ShouldAutoStartAutomationAsync();
+                var result = await SchoolTimeChecker.ShouldStartAutomationAsync();
                 return result.shouldStart;
             }
             catch (Exception ex)

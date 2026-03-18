@@ -65,7 +65,6 @@ namespace AkademiTrack.Views
         private void SetupCategoryButtons()
         {
             var loginBtn = this.FindControl<Button>("LoginButton");
-            var automationBtn = this.FindControl<Button>("AutomationButton");
             var systemBtn = this.FindControl<Button>("SystemButton");
             var advancedBtn = this.FindControl<Button>("AdvancedButton");
             var updatesBtn = this.FindControl<Button>("UpdatesButton");
@@ -73,7 +72,6 @@ namespace AkademiTrack.Views
             var helpBtn = this.FindControl<Button>("HelpButton");
 
             if (loginBtn != null) loginBtn.Click += (_, _) => SelectCategory("login");
-            if (automationBtn != null) automationBtn.Click += (_, _) => SelectCategory("automation");
             if (systemBtn != null) systemBtn.Click += (_, _) => SelectCategory("system");
             if (advancedBtn != null) advancedBtn.Click += (_, _) => SelectCategory("advanced");
             if (updatesBtn != null) updatesBtn.Click += (_, _) => SelectCategory("updates");
@@ -90,7 +88,6 @@ namespace AkademiTrack.Views
         private void UpdateCategorySelection()
         {
             UpdateButtonClass("LoginButton", "login");
-            UpdateButtonClass("AutomationButton", "automation");
             UpdateButtonClass("SystemButton", "system");
             UpdateButtonClass("AdvancedButton", "advanced");
             UpdateButtonClass("UpdatesButton", "updates");
@@ -98,7 +95,6 @@ namespace AkademiTrack.Views
             UpdateButtonClass("HelpButton", "help");
 
             UpdateSectionVisibility("LoginSection", "login");
-            UpdateSectionVisibility("AutomationSection", "automation");
             UpdateSectionVisibility("SystemSection", "system");
             UpdateSectionVisibility("AdvancedSection", "advanced");
             UpdateSectionVisibility("UpdatesSection", "updates");
