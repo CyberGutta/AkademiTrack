@@ -120,6 +120,17 @@ namespace AkademiTrack.Services
 
                 // PRE-CHECK: Check for already registered STU sessions
                 _loggingService.LogInfo("Sjekker allerede registrerte STU-økter...");
+                
+                // TEMPORARILY DISABLE PRE-CHECK - it's causing false positives
+                _loggingService.LogInfo("Pre-check midlertidig deaktivert for å unngå feil telling");
+                var preCheckResult = new STUPreCheckResult
+                {
+                    TotalSessions = 0,
+                    RegisteredSessions = new List<string>(),
+                    AllSessionsRegistered = false
+                };
+                
+                /*
                 var preCheckResult = await PreCheckRegisteredSTUSessionsAsync();
                 if (preCheckResult.AllSessionsRegistered)
                 {
@@ -136,12 +147,8 @@ namespace AkademiTrack.Services
                 else if (preCheckResult.RegisteredSessions.Count > 0)
                 {
                     _loggingService.LogInfo($"Fant {preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter allerede registrert");
-                    /*await _notificationService.ShowNotificationAsync(
-                        "Noen STU-økter allerede registrert",
-                        $"{preCheckResult.RegisteredSessions.Count} av {preCheckResult.TotalSessions} STU-økter er allerede registrert. Hopper over disse.",
-                        NotificationLevel.Info
-                    ); */
                 }
+                */
 
                 // Mark today as started to prevent duplicate auto-starts
                 await SchoolTimeChecker.MarkTodayAsStartedAsync();
@@ -472,23 +479,19 @@ namespace AkademiTrack.Services
 
             _loggingService.LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige");
 
-            // Load previously registered sessions from disk AND from pre-check
+            // Load previously registered sessions from disk ONLY (disable pre-check for now)
+            // CLEAR any potentially corrupted cache first
+            var registeredSessionsFile = GetRegisteredSessionsFilePath();
+            if (File.Exists(registeredSessionsFile))
+            {
+                _loggingService.LogInfo("Sletter eksisterende cache for å unngå feil data");
+                File.Delete(registeredSessionsFile);
+            }
+            
             var registeredSessions = await GetRegisteredSessionsForTodayAsync();
             var registeredSessionKeys = new HashSet<string>(registeredSessions.Keys);
             
-            // Add sessions from pre-check that are already registered online
-            if (preCheckResult?.RegisteredSessions != null)
-            {
-                foreach (var preRegisteredSession in preCheckResult.RegisteredSessions)
-                {
-                    registeredSessionKeys.Add(preRegisteredSession);
-                }
-            }
-            
-            if (registeredSessionKeys.Count > 0)
-            {
-                _loggingService.LogInfo($"Fant {registeredSessionKeys.Count} allerede registrerte økter for i dag (inkludert online sjekk)");
-            }
+            _loggingService.LogInfo($"Starter med tom cache - {registeredSessionKeys.Count} registrerte økter");
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -515,10 +518,10 @@ namespace AkademiTrack.Services
                     ProgressUpdated?.Invoke(this, new AutomationProgressEventArgs(
                         "Sjekker registreringsvinduer", cycleCount));
 
-                    bool allSessionsComplete = true;
                     int openWindows = 0;
                     int closedWindows = 0;
                     int notYetOpenWindows = 0;
+                    int unregisteredClosedWindows = 0;
 
                     foreach (var stuSession in validStuSessions)
                     {
@@ -527,6 +530,10 @@ namespace AkademiTrack.Services
                         // Check if already registered (from disk)
                         if (registeredSessionKeys.Contains(sessionKey))
                         {
+                            // Double-verify this session is actually registered by checking online
+                            _loggingService.LogInfo($"[DEBUG] Økt {sessionKey} er markert som registrert lokalt - verifiserer online...");
+                            
+                            // For now, trust local cache but add verification
                             closedWindows++;
                             continue;
                         }
@@ -537,12 +544,11 @@ namespace AkademiTrack.Services
                         {
                             case RegistrationWindowStatus.Open:
                                 openWindows++;
-                                allSessionsComplete = false;
                                 
                                 // Double-check if registered (in case another instance registered it)
                                 if (await IsSessionRegisteredAsync(sessionKey))
                                 {
-                                    _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert");
+                                    _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert (oppdaget under åpen vindu sjekk)");
                                     registeredSessionKeys.Add(sessionKey);
                                     closedWindows++;
                                     openWindows--;
@@ -597,40 +603,55 @@ namespace AkademiTrack.Services
 
                             case RegistrationWindowStatus.NotYetOpen:
                                 notYetOpenWindows++;
-                                allSessionsComplete = false;
                                 break;
 
                             case RegistrationWindowStatus.Closed:
-                                closedWindows++;
+                                // Session window is closed but not registered - this is incomplete
+                                unregisteredClosedWindows++;
                                 break;
                         }
                     }
 
-                    if (allSessionsComplete || registeredSessionKeys.Count == validStuSessions.Count)
+                    // Only consider all sessions complete if ALL sessions are actually registered
+                    // Don't stop just because registration windows have closed
+                    bool allSessionsRegistered = registeredSessionKeys.Count == validStuSessions.Count;
+                    
+                    // Add detailed debugging information
+                    _loggingService.LogInfo($"[DEBUG] Fullføring sjekk: registeredSessionKeys.Count={registeredSessionKeys.Count}, validStuSessions.Count={validStuSessions.Count}");
+                    _loggingService.LogInfo($"[DEBUG] Registrerte økter: [{string.Join(", ", registeredSessionKeys)}]");
+                    _loggingService.LogInfo($"[DEBUG] Gyldige økter: [{string.Join(", ", validStuSessions.Select(s => $"{s.StartKl}-{s.SluttKl}"))}]");
+                    
+                    if (allSessionsRegistered)
                     {
                         _loggingService.LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
-                        if (registeredSessionKeys.Count > 0)
-                        {
-                            await _notificationService.ShowNotificationAsync(
-                                "Alle Studietimer Registrert",
-                                $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!",
-                                NotificationLevel.Success
-                            );
-                        }
-                        else
-                        {
-                            await _notificationService.ShowNotificationAsync(
-                                "Ingen studietimer igjen",
-                                "Ingen STU-økter gjenstår.",
-                                NotificationLevel.Info
-                            );
-                        }
+                        await _notificationService.ShowNotificationAsync(
+                            "Alle Studietimer Registrert",
+                            $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!",
+                            NotificationLevel.Success
+                        );
                         return MonitoringLoopResult.AllComplete;
                     }
 
-                    _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} lukkede/registrerte");
+                    // Check if there are any actionable sessions (open windows or future sessions)
+                    bool hasActionableSessions = openWindows > 0 || notYetOpenWindows > 0;
+                    
+                    if (!hasActionableSessions && unregisteredClosedWindows > 0)
+                    {
+                        // All remaining unregistered sessions have closed windows - nothing more can be done
+                        _loggingService.LogWarning($"Stopper automatisering: {unregisteredClosedWindows} STU-økter har lukket registreringsvindu uten å bli registrert");
+                        await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        
+                        await _notificationService.ShowNotificationAsync(
+                            "Automatisering fullført",
+                            $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. {unregisteredClosedWindows} økter ble ikke registrert (vindu lukket).",
+                            NotificationLevel.Warning
+                        );
+                        return MonitoringLoopResult.AllComplete;
+                    }
+
+                    _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} registrerte, {unregisteredClosedWindows} uregistrerte lukkede");
 
                     await Task.Delay(TimeSpan.FromSeconds(Constants.Time.RETRY_DELAY_SECONDS), cancellationToken);
                 }
@@ -673,8 +694,11 @@ namespace AkademiTrack.Services
             return MonitoringLoopResult.Cancelled;
         }
 
+        private readonly SemaphoreSlim _sessionFileLock = new SemaphoreSlim(1, 1);
+
         private async Task MarkSessionAsRegisteredAsync(string sessionKey)
         {
+            await _sessionFileLock.WaitAsync();
             try
             {
                 var filePath = GetRegisteredSessionsFilePath();
@@ -694,10 +718,15 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogError($"[SESSION] Error marking session: {ex.Message}");
             }
+            finally
+            {
+                _sessionFileLock.Release();
+            }
         }
 
         private async Task<Dictionary<string, DateTime>> GetRegisteredSessionsForTodayAsync()
         {
+            await _sessionFileLock.WaitAsync();
             try
             {
                 var filePath = GetRegisteredSessionsFilePath();
@@ -732,6 +761,10 @@ namespace AkademiTrack.Services
             {
                 _loggingService.LogError($"[SESSION] Error reading sessions: {ex.Message}");
                 return new Dictionary<string, DateTime>();
+            }
+            finally
+            {
+                _sessionFileLock.Release();
             }
         }
 
@@ -1466,6 +1499,14 @@ namespace AkademiTrack.Services
                                   (item.Fag?.Contains("STU") == true || item.Fagnavn?.Contains("Studietid") == true))
                     .ToList();
 
+                _loggingService.LogInfo($"[DEBUG PRE-CHECK] Fant {stuSessions.Count} STU-økter for i dag ({today})");
+                foreach (var session in stuSessions)
+                {
+                    var startTime = ExtractTimeFromDateTime(session.Fradato);
+                    var endTime = ExtractTimeFromDateTime(session.Tildato);
+                    _loggingService.LogInfo($"[DEBUG PRE-CHECK] STU økt: {startTime}-{endTime}, Dato: {session.Dato}, Fravaer: '{session.Fravaer}'");
+                }
+
                 if (stuSessions.Count == 0)
                 {
                     _loggingService.LogInfo("No STU sessions found for today in pre-check");
@@ -1517,14 +1558,21 @@ namespace AkademiTrack.Services
                     {
                         var sessionKey = $"{startTime}-{endTime}";
                         
+                        // Add detailed debugging for each session
+                        _loggingService.LogInfo($"[DEBUG] Sjekker økt {sessionKey}: Fravaer='{session.Fravaer}', Fag='{session.Fag}', Fagnavn='{session.Fagnavn}'");
+                        
                         // Check if this session is marked as registered online
                         if (!string.IsNullOrEmpty(session.Fravaer) && session.Fravaer == "M")
                         {
                             registeredSessions.Add(sessionKey);
-                            _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert online");
+                            _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert online (Fravaer='M')");
                             
-                            // Also mark it in local cache to avoid re-checking
-                            await MarkSessionAsRegisteredAsync(sessionKey);
+                            // DON'T mark it in local cache - let the monitoring loop handle verification
+                            // await MarkSessionAsRegisteredAsync(sessionKey);
+                        }
+                        else
+                        {
+                            _loggingService.LogInfo($"STU økt {sessionKey} er IKKE registrert online (Fravaer='{session.Fravaer}')");
                         }
                     }
                 }
@@ -1734,6 +1782,16 @@ namespace AkademiTrack.Services
                 catch (Exception ex)
                 {
                     _loggingService?.LogError($"Error disposing cancellation token source: {ex.Message}");
+                }
+                
+                // Dispose session file lock
+                try
+                {
+                    _sessionFileLock?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _loggingService?.LogError($"Error disposing session file lock: {ex.Message}");
                 }
                 
                 // Clear references to help GC

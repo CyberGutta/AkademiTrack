@@ -254,6 +254,7 @@ namespace AkademiTrack.ViewModels
             // Cache is stale if:
             // 1. No cached data exists
             // 2. Cache is from a different day (midnight has passed)
+            // 3. Cache is older than 5 minutes (to catch same-day updates)
 
             if (_cachedTodaySchedule == null)
             {
@@ -267,7 +268,15 @@ namespace AkademiTrack.ViewModels
                 return true;
             }
 
-            _loggingService?.LogDebug($"[CACHE] Cache is fresh (from today {_cacheDate:HH:mm:ss})");
+            // NEW: Check if cache is older than 5 minutes to catch same-day updates
+            var cacheAge = DateTime.Now - _cacheDate;
+            if (cacheAge.TotalMinutes > 5)
+            {
+                _loggingService?.LogDebug($"[CACHE] Cache is {cacheAge.TotalMinutes:F1} minutes old - refreshing to ensure accuracy");
+                return true;
+            }
+
+            _loggingService?.LogDebug($"[CACHE] Cache is fresh (from today {_cacheDate:HH:mm:ss}, {cacheAge.TotalMinutes:F1} min ago)");
             return false;
         }
 
