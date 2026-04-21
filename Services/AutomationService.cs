@@ -268,6 +268,39 @@ namespace AkademiTrack.Services
             {
                 _cancellationTokenSource?.Cancel();
                 
+                // Cancel and clean up background verification tasks immediately
+                try
+                {
+                    if (_backgroundVerificationTasks.Count > 0)
+                    {
+                        _loggingService.LogDebug($"Cancelling {_backgroundVerificationTasks.Count} background verification tasks");
+                        
+                        // Wait a short time for tasks to cancel gracefully
+                        var incompleteTasks = _backgroundVerificationTasks.Where(t => !t.IsCompleted).ToArray();
+                        if (incompleteTasks.Length > 0)
+                        {
+                            try
+                            {
+                                await Task.WhenAll(incompleteTasks).WaitAsync(TimeSpan.FromSeconds(2));
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // Expected when tasks are cancelled
+                                _loggingService.LogDebug("Background verification tasks cancelled successfully");
+                            }
+                            catch (TimeoutException)
+                            {
+                                _loggingService.LogWarning("Some background verification tasks did not cancel within timeout");
+                            }
+                        }
+                        _backgroundVerificationTasks.Clear();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Error cancelling background tasks: {ex.Message}");
+                }
+                
                 // Stop caffeinate when user manually stops automation
                 await _caffeinateService.StopCaffeinateAsync();
                 
@@ -1234,6 +1267,11 @@ namespace AkademiTrack.Services
                         {
                             await Task.Delay(TimeSpan.FromSeconds(20), cancellationToken);
                             await VerifyRegistrationAsync(stuTime, cancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Expected when automation is stopped - don't log as error
+                            _loggingService.LogDebug("Verification task cancelled (automation stopped)");
                         }
                         catch (Exception ex)
                         {
