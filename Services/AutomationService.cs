@@ -559,7 +559,7 @@ namespace AkademiTrack.Services
 
                                 try
                                 {
-                                    var registrationResult = await RegisterAttendanceAsync(stuSession);
+                                    var registrationResult = await RegisterAttendanceAsync(stuSession, cancellationToken);
                                     if (registrationResult)
                                     {
                                         _loggingService.LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
@@ -1143,7 +1143,7 @@ namespace AkademiTrack.Services
                 return RegistrationWindowStatus.Closed;
         }
 
-        private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime)
+        private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -1232,14 +1232,14 @@ namespace AkademiTrack.Services
                     {
                         try
                         {
-                            await Task.Delay(TimeSpan.FromSeconds(20));
-                            await VerifyRegistrationAsync(stuTime);
+                            await Task.Delay(TimeSpan.FromSeconds(20), cancellationToken);
+                            await VerifyRegistrationAsync(stuTime, cancellationToken);
                         }
                         catch (Exception ex)
                         {
                             _loggingService.LogError($"Verification task failed: {ex.Message}");
                         }
-                    });
+                    }, cancellationToken);
                     _backgroundVerificationTasks.Add(verificationTask);
 
                     return true;
@@ -1274,7 +1274,7 @@ namespace AkademiTrack.Services
         /// Verify that a registration was actually saved in iSkole
         /// Called 20 seconds after registration attempt
         /// </summary>
-        private async Task VerifyRegistrationAsync(ScheduleItem stuTime)
+        private async Task VerifyRegistrationAsync(ScheduleItem stuTime, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -1314,7 +1314,7 @@ namespace AkademiTrack.Services
                     _loggingService.LogWarning($"[VERIFY] Registration not found in iSkole for {stuTime.StartKl}-{stuTime.SluttKl}. Typefravaer status: {registeredSession.Typefravaer ?? "null"}");
                     _loggingService.LogInfo($"[VERIFY] Attempting to re-register...");
 
-                    var retryResult = await RegisterAttendanceAsync(stuTime);
+                    var retryResult = await RegisterAttendanceAsync(stuTime, cancellationToken);
                     
                     if (retryResult)
                     {
