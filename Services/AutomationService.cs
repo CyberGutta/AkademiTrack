@@ -645,8 +645,7 @@ namespace AkademiTrack.Services
                         }
                     }
 
-                    // Only consider all sessions complete if ALL sessions are actually registered
-                    // Don't stop just because registration windows have closed
+                    // Check completion: All sessions are either registered OR have closed registration windows
                     bool allSessionsRegistered = registeredSessionKeys.Count == validStuSessions.Count;
                     
                     // Add detailed debugging information
@@ -656,7 +655,7 @@ namespace AkademiTrack.Services
                     
                     if (allSessionsRegistered)
                     {
-                        _loggingService.LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er håndtert for i dag!");
+                        _loggingService.LogSuccess($"Alle {validStuSessions.Count} gyldige STU-økter er registrert for i dag!");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
                         await _notificationService.ShowNotificationAsync(
@@ -667,19 +666,32 @@ namespace AkademiTrack.Services
                         return MonitoringLoopResult.AllComplete;
                     }
 
-                    // Check if there are any actionable sessions (open windows or future sessions)
-                    bool hasActionableSessions = openWindows > 0 || notYetOpenWindows > 0;
-                    
-                    if (!hasActionableSessions && unregisteredClosedWindows > 0)
+                    // Check if all STU sessions have finished (either registered or registration window closed)
+                    bool allSessionsFinished = validStuSessions.All(session =>
                     {
-                        // All remaining unregistered sessions have closed windows - nothing more can be done
-                        _loggingService.LogWarning($"Stopper automatisering: {unregisteredClosedWindows} STU-økter har lukket registreringsvindu uten å bli registrert");
-                        await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                        var sessionKey = $"{session.StartKl}-{session.SluttKl}";
                         
+                        // If already registered, it's finished
+                        if (registeredSessionKeys.Contains(sessionKey))
+                            return true;
+                            
+                        // If registration window is closed, it's finished (can't register anymore)
+                        var status = GetRegistrationWindowStatus(session);
+                        return status == RegistrationWindowStatus.Closed;
+                    });
+
+                    _loggingService.LogInfo($"[DEBUG] Alle økter ferdig sjekk: allSessionsFinished={allSessionsFinished}");
+                    _loggingService.LogInfo($"[DEBUG] Status oversikt: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} registrerte, {unregisteredClosedWindows} uregistrerte lukkede");
+
+                    if (allSessionsFinished)
+                    {
+                        _loggingService.LogSuccess($"Alle STU-økter for i dag er ferdig håndtert (registrert eller registreringsvindu lukket)");
+                        await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+
                         await _notificationService.ShowNotificationAsync(
-                            "Automatisering fullført",
-                            $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. {unregisteredClosedWindows} økter ble ikke registrert (vindu lukket).",
-                            NotificationLevel.Warning
+                            "Alle STU-økter ferdig",
+                            $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. Resten har lukket registreringsvindu.",
+                            NotificationLevel.Info
                         );
                         return MonitoringLoopResult.AllComplete;
                     }
