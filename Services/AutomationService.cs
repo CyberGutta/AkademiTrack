@@ -48,6 +48,58 @@ namespace AkademiTrack.Services
         public bool IsRunning => _isRunning;
         public string CurrentStatus => _currentStatus;
 
+        /// <summary>
+        /// Force stop automation immediately without waiting - for UI emergency stop
+        /// </summary>
+        public async Task<AutomationResult> ForceStopAsync()
+        {
+            _loggingService.LogWarning("Force stop requested - immediately stopping automation");
+            
+            try
+            {
+                // Immediately set to stopped
+                _isRunning = false;
+                _currentStatus = "Forcibly stopped";
+                
+                // Cancel everything
+                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
+                
+                // Clear background tasks
+                _backgroundVerificationTasks.Clear();
+                
+                // Stop caffeinate
+                await _caffeinateService.StopCaffeinateAsync();
+                
+                // Notify UI immediately
+                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
+                
+                await _notificationService.ShowNotificationAsync(
+                    "Automatisering force-stoppet", 
+                    "Automatisering har blitt force-stoppet", 
+                    NotificationLevel.Warning
+                );
+                
+                return AutomationResult.Successful("Automation force stopped");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error during force stop: {ex.Message}");
+                return AutomationResult.Failed($"Force stop failed: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Get diagnostic information about automation state
+        /// </summary>
+        public string GetDiagnosticInfo()
+        {
+            return $"IsRunning: {_isRunning}, Status: {_currentStatus}, " +
+                   $"CancellationToken: {(_cancellationTokenSource?.Token.IsCancellationRequested ?? true)}, " +
+                   $"BackgroundTasks: {_backgroundVerificationTasks.Count}";
+        }
+
         public AutomationService(ILoggingService loggingService, INotificationService notificationService)
         {
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
@@ -261,14 +313,23 @@ namespace AkademiTrack.Services
         {
             if (!_isRunning)
             {
-                return AutomationResult.Failed("Automation is not running");
+                _loggingService.LogInfo("Automation is already stopped");
+                return AutomationResult.Successful("Automation is already stopped");
             }
 
             try
             {
                 _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
                 
+                // Immediately set running to false to prevent multiple stop attempts
+                _isRunning = false;
+                
+                // Cancel the monitoring loop
                 _cancellationTokenSource?.Cancel();
+                
+                // Force immediate status update
+                _currentStatus = "Stopper automatisering...";
+                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
                 
                 // Cancel and clean up background verification tasks immediately
                 try
@@ -277,24 +338,7 @@ namespace AkademiTrack.Services
                     {
                         _loggingService.LogDebug($"Cancelling {_backgroundVerificationTasks.Count} background verification tasks");
                         
-                        // Wait a short time for tasks to cancel gracefully
-                        var incompleteTasks = _backgroundVerificationTasks.Where(t => !t.IsCompleted).ToArray();
-                        if (incompleteTasks.Length > 0)
-                        {
-                            try
-                            {
-                                await Task.WhenAll(incompleteTasks).WaitAsync(TimeSpan.FromSeconds(2));
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                // Expected when tasks are cancelled
-                                _loggingService.LogDebug("Background verification tasks cancelled successfully");
-                            }
-                            catch (TimeoutException)
-                            {
-                                _loggingService.LogWarning("Some background verification tasks did not cancel within timeout");
-                            }
-                        }
+                        // Don't wait for tasks - just clear them
                         _backgroundVerificationTasks.Clear();
                     }
                 }
@@ -306,15 +350,33 @@ namespace AkademiTrack.Services
                 // Stop caffeinate when user manually stops automation
                 await _caffeinateService.StopCaffeinateAsync();
                 
+                // Final status update
+                _currentStatus = "Automatisering stoppet";
+                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
+                
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering stoppet", 
                     "Automatisering har blitt stoppet av bruker", 
                     NotificationLevel.Info
                 );
+                
+                _loggingService.LogInfo("Automation stopped successfully");
+                
+                // Extra status update to ensure UI gets the message
+                await Task.Delay(100);
+                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
+                
                 return AutomationResult.Successful("Automation stopped successfully");
             }
             catch (Exception ex)
             {
+                _loggingService.LogError($"Error during stop: {ex.Message}");
+                
+                // Ensure we're marked as stopped even if there's an error
+                _isRunning = false;
+                _currentStatus = "Automatisering stoppet (feil)";
+                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
+                
                 return AutomationResult.Failed($"Failed to stop automation: {ex.Message}", ex);
             }
         }
@@ -434,6 +496,8 @@ namespace AkademiTrack.Services
         private async Task<MonitoringLoopResult?> RunMonitoringLoopAsync(CancellationToken cancellationToken, STUPreCheckResult? preCheckResult = null)
         {
             int cycleCount = 0;
+            var lastCheckTime = DateTime.Now; // For wake-from-sleep detection
+            const int WAKE_DETECTION_THRESHOLD_MINUTES = 5;
 
             _loggingService.LogInfo("Henter timeplandata for hele dagen");
             _cachedScheduleData = await GetFullDayScheduleDataAsync();
@@ -473,16 +537,14 @@ namespace AkademiTrack.Services
                 }
                 
                 await _notificationService.ShowNotificationAsync(
-                    "Ingen STUDIE-økter funnet for i dag",
-                    "Det er ingen STU-økter å registrere for i dag. Automatiseringen stopper.",
+                    "Ingen STU-økter i dag",
+                    "Ingen studietimer å registrere i dag.",
                     NotificationLevel.Info
                 );
                 return MonitoringLoopResult.NoSessionsFound;
             }
 
-            var validStuSessions = todaysStuSessions
-                .Where(session => !HasConflictingClass(session, _cachedScheduleData))
-                .ToList();
+            var validStuSessions = FilterValidStuSessions(todaysStuSessions);
 
             if (validStuSessions.Count == 0)
             {
@@ -504,8 +566,8 @@ namespace AkademiTrack.Services
                 }
                 
                 await _notificationService.ShowNotificationAsync(
-                    "Ingen gyldige STU-økter",
-                    "Alle STU-økter overlapper med andre klasser. Ingen registreringer vil bli gjort.",
+                    "Ingen STU-økter i dag",
+                    "Ingen studietimer å registrere i dag.",
                     NotificationLevel.Warning
                 );
                 return MonitoringLoopResult.AllSessionsConflict;
@@ -534,9 +596,56 @@ namespace AkademiTrack.Services
                     // Explicit cancellation check at start of each iteration
                     cancellationToken.ThrowIfCancellationRequested();
                     
+                    // Wake-from-sleep detection
+                    var currentTime = DateTime.Now;
+                    var timeSinceLastCheck = currentTime - lastCheckTime;
+                    if (timeSinceLastCheck.TotalMinutes > WAKE_DETECTION_THRESHOLD_MINUTES)
+                    {
+                        _loggingService.LogInfo($"[WAKE DETECTION] 💤 System wake detected - time gap: {timeSinceLastCheck.TotalMinutes:F1} minutes");
+                        _loggingService.LogInfo("[WAKE DETECTION] Refreshing schedule data after wake from sleep");
+                        
+                        // Refresh schedule data after wake - registration windows may have changed
+                        _cachedScheduleData = await GetFullDayScheduleDataAsync();
+                        if (_cachedScheduleData == null)
+                        {
+                            _loggingService.LogError("Kunne ikke hente timeplandata etter oppvåkning - cookies kan være utløpt");
+                            throw new InvalidOperationException("Failed to refresh schedule data after wake");
+                        }
+                        
+                        // Recalculate valid STU sessions after wake
+                        var todayAfterWake = DateTime.Now.ToString("yyyyMMdd");
+                        todaysStuSessions = _cachedScheduleData
+                            .Where(item => item.Dato == todayAfterWake && item.KNavn == "STU")
+                            .ToList();
+
+                        validStuSessions = FilterValidStuSessions(todaysStuSessions);
+                        _loggingService.LogInfo($"[WAKE DETECTION] Recalculated: {validStuSessions.Count} valid STU sessions after wake");
+                        
+                        // Check if all registration windows closed while sleeping
+                        bool allWindowsClosed = validStuSessions.All(session =>
+                        {
+                            var status = GetRegistrationWindowStatus(session);
+                            return status == RegistrationWindowStatus.Closed;
+                        });
+                        
+                        if (allWindowsClosed && validStuSessions.Count > 0)
+                        {
+                            _loggingService.LogInfo("[WAKE DETECTION] All STU registration windows closed while sleeping - stopping automation");
+                            await SchoolTimeChecker.MarkTodayAsCompletedAsync();
+                            
+                            await _notificationService.ShowNotificationAsync(
+                                "Automatisering stoppet",
+                                "Ingen flere studietimer å registrere.",
+                                NotificationLevel.Info
+                            );
+                            return MonitoringLoopResult.AllComplete;
+                        }
+                    }
+                    lastCheckTime = currentTime;
+                    
                     cycleCount++;
-                    var currentTime = DateTime.Now.ToString("HH:mm");
-                    _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
+                    var currentTimeString = currentTime.ToString("HH:mm");
+                    _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTimeString})");
 
                     // Check if we're still within school hours - auto-stop if AFTER school ends
                     var (isWithin, isAfter) = await SchoolTimeChecker.GetSchoolHoursStatusAsync();
@@ -546,7 +655,7 @@ namespace AkademiTrack.Services
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
                         await _notificationService.ShowNotificationAsync(
                             "Automatisering stoppet",
-                            "Skoletiden er over. Automatiseringen har stoppet.",
+                            "Skoletiden er over.",
                             NotificationLevel.Info
                         );
                         return MonitoringLoopResult.AllComplete;
@@ -562,6 +671,9 @@ namespace AkademiTrack.Services
 
                     foreach (var stuSession in validStuSessions)
                     {
+                        // Check for cancellation before processing each session
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
                         // Check if already registered (from disk)
@@ -596,13 +708,16 @@ namespace AkademiTrack.Services
 
                                 try
                                 {
+                                    // Check for cancellation before attempting registration
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    
                                     var registrationResult = await RegisterAttendanceAsync(stuSession, cancellationToken);
                                     if (registrationResult)
                                     {
                                         _loggingService.LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
                                         await _notificationService.ShowNotificationAsync(
-                                            "Registrering vellykket",
-                                            $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}",
+                                            "STU registrert",
+                                            $"Studietimen {stuSession.StartKl}–{stuSession.SluttKl} er registrert.",
                                             NotificationLevel.Success
                                         );
                                         
@@ -631,8 +746,8 @@ namespace AkademiTrack.Services
                                     }
                                     
                                     await _notificationService.ShowNotificationAsync(
-                                        "Registrering Feilet",
-                                        $"Kunne ikke registrere STU {stuSession.StartKl}-{stuSession.SluttKl}: {regEx.Message}",
+                                        "Registrering feilet",
+                                        $"Kunne ikke registrere {stuSession.StartKl}–{stuSession.SluttKl}. Prøver igjen.",
                                         NotificationLevel.Error
                                     );
                                 }
@@ -663,8 +778,8 @@ namespace AkademiTrack.Services
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
                         await _notificationService.ShowNotificationAsync(
-                            "Alle Studietimer Registrert",
-                            $"Alle {validStuSessions.Count} gyldige STU-økter er fullført og registrert!",
+                            "Alle studietimer registrert",
+                            "Alle STU-økter for i dag er registrert.",
                             NotificationLevel.Success
                         );
                         return MonitoringLoopResult.AllComplete;
@@ -684,14 +799,10 @@ namespace AkademiTrack.Services
                         _loggingService.LogSuccess($"Ingen flere STU-økter å håndtere for i dag. Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} økter.");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
-                        string message = registeredSessionKeys.Count == validStuSessions.Count 
-                            ? $"Alle {validStuSessions.Count} STU-økter er registrert!"
-                            : $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. {unregisteredClosedWindows} økter kunne ikke registreres (vindu lukket).";
-
                         await _notificationService.ShowNotificationAsync(
                             "Automatisering fullført",
-                            message,
-                            registeredSessionKeys.Count == validStuSessions.Count ? NotificationLevel.Success : NotificationLevel.Info
+                            "Ingen flere studietimer å registrere.",
+                            NotificationLevel.Info
                         );
                         return MonitoringLoopResult.AllComplete;
                     }
@@ -726,8 +837,8 @@ namespace AkademiTrack.Services
                         }
                         
                         await _notificationService.ShowNotificationAsync(
-                            "Overvåkingsfeil",
-                            $"Feil under overvåking: {ex.Message}. Prøver igjen",
+                            "Midlertidig feil",
+                            "Noe gikk galt. Prøver igjen.",
                             NotificationLevel.Warning
                         );
                     }
@@ -1772,6 +1883,16 @@ namespace AkademiTrack.Services
                 return result;
 
             return null;
+        }
+
+        /// <summary>
+        /// Filter STU sessions to remove those that conflict with regular classes
+        /// </summary>
+        private List<ScheduleItem> FilterValidStuSessions(List<ScheduleItem> stuSessions)
+        {
+            return stuSessions
+                .Where(session => !HasConflictingClass(session, _cachedScheduleData))
+                .ToList();
         }
 
         public void Dispose()
