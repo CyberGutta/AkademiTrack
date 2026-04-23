@@ -266,6 +266,8 @@ namespace AkademiTrack.Services
 
             try
             {
+                _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
+                
                 _cancellationTokenSource?.Cancel();
                 
                 // Cancel and clean up background verification tasks immediately
@@ -304,7 +306,6 @@ namespace AkademiTrack.Services
                 // Stop caffeinate when user manually stops automation
                 await _caffeinateService.StopCaffeinateAsync();
                 
-                _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
                 await _notificationService.ShowNotificationAsync(
                     "Automatisering stoppet", 
                     "Automatisering har blitt stoppet av bruker", 
@@ -530,6 +531,9 @@ namespace AkademiTrack.Services
             {
                 try
                 {
+                    // Explicit cancellation check at start of each iteration
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
                     cycleCount++;
                     var currentTime = DateTime.Now.ToString("HH:mm");
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
@@ -666,32 +670,28 @@ namespace AkademiTrack.Services
                         return MonitoringLoopResult.AllComplete;
                     }
 
-                    // Check if all STU sessions have finished (either registered or registration window closed)
-                    bool allSessionsFinished = validStuSessions.All(session =>
-                    {
-                        var sessionKey = $"{session.StartKl}-{session.SluttKl}";
-                        
-                        // If already registered, it's finished
-                        if (registeredSessionKeys.Contains(sessionKey))
-                            return true;
-                            
-                        // If registration window is closed, it's finished (can't register anymore)
-                        var status = GetRegistrationWindowStatus(session);
-                        return status == RegistrationWindowStatus.Closed;
-                    });
+                    // Check if all STU sessions have finished - stop when there's nothing more to do
+                    bool hasOpenWindows = openWindows > 0;
+                    bool hasFutureWindows = notYetOpenWindows > 0;
+                    bool hasActionableWork = hasOpenWindows || hasFutureWindows;
 
-                    _loggingService.LogInfo($"[DEBUG] Alle økter ferdig sjekk: allSessionsFinished={allSessionsFinished}");
+                    _loggingService.LogInfo($"[DEBUG] Arbeid sjekk: hasOpenWindows={hasOpenWindows}, hasFutureWindows={hasFutureWindows}, hasActionableWork={hasActionableWork}");
                     _loggingService.LogInfo($"[DEBUG] Status oversikt: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} registrerte, {unregisteredClosedWindows} uregistrerte lukkede");
 
-                    if (allSessionsFinished)
+                    // Stop automation if there's no more work to do (no open windows, no future windows)
+                    if (!hasActionableWork)
                     {
-                        _loggingService.LogSuccess($"Alle STU-økter for i dag er ferdig håndtert (registrert eller registreringsvindu lukket)");
+                        _loggingService.LogSuccess($"Ingen flere STU-økter å håndtere for i dag. Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} økter.");
                         await SchoolTimeChecker.MarkTodayAsCompletedAsync();
 
+                        string message = registeredSessionKeys.Count == validStuSessions.Count 
+                            ? $"Alle {validStuSessions.Count} STU-økter er registrert!"
+                            : $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. {unregisteredClosedWindows} økter kunne ikke registreres (vindu lukket).";
+
                         await _notificationService.ShowNotificationAsync(
-                            "Alle STU-økter ferdig",
-                            $"Registrerte {registeredSessionKeys.Count} av {validStuSessions.Count} STU-økter. Resten har lukket registreringsvindu.",
-                            NotificationLevel.Info
+                            "Automatisering fullført",
+                            message,
+                            registeredSessionKeys.Count == validStuSessions.Count ? NotificationLevel.Success : NotificationLevel.Info
                         );
                         return MonitoringLoopResult.AllComplete;
                     }
@@ -1234,7 +1234,7 @@ namespace AkademiTrack.Services
                 var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
                 request.Headers.Add("Cookie", cookieString);
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(request, cancellationToken);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
