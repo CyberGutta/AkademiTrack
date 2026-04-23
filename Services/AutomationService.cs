@@ -25,6 +25,8 @@ namespace AkademiTrack.Services
         private readonly HttpClient _httpClient;
         private readonly MacOSCaffeinateService _caffeinateService;
         private CancellationTokenSource? _cancellationTokenSource;
+        private Task? _runningTask; // Tracks the active StartAsync task so StopAsync can await actual completion
+        private TaskCompletionSource<bool>? _stoppedTcs; // Signals when StartAsync's finally block has fully completed
         private bool _isRunning;
         private string _currentStatus = "Ready";
         private UserParameters? _userParameters;
@@ -148,6 +150,10 @@ namespace AkademiTrack.Services
 
             string finalStatus = "Ready"; // Track what final status to send
             CancellationTokenSource? localCancellationSource = null;
+
+            // Create a TCS that StopAsync can await to know the loop has truly finished
+            var stoppedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _stoppedTcs = stoppedTcs;
 
             try
             {
@@ -297,7 +303,12 @@ namespace AkademiTrack.Services
                 }
                 _cancellationTokenSource = null;
                 
+                // Single authoritative status update — StopAsync waits for this before returning
                 StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
+                
+                // Signal StopAsync (or anyone waiting) that the loop has fully wound down
+                stoppedTcs.TrySetResult(true);
+                _stoppedTcs = null;
             }
         }
 
@@ -320,63 +331,53 @@ namespace AkademiTrack.Services
             try
             {
                 _loggingService.LogInfo("Stopp forespurt - stopper automatisering");
-                
-                // Immediately set running to false to prevent multiple stop attempts
-                _isRunning = false;
-                
-                // Cancel the monitoring loop
+
+                // Capture the TCS before cancelling so we can await it
+                var stoppedTcs = _stoppedTcs;
+
+                // Cancel the monitoring loop — this is the only thing StopAsync needs to do
                 _cancellationTokenSource?.Cancel();
-                
-                // Force immediate status update
-                _currentStatus = "Stopper automatisering...";
-                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
-                
-                // Cancel and clean up background verification tasks immediately
-                try
+
+                // Clear background verification tasks
+                if (_backgroundVerificationTasks.Count > 0)
                 {
-                    if (_backgroundVerificationTasks.Count > 0)
+                    _loggingService.LogDebug($"Clearing {_backgroundVerificationTasks.Count} background verification tasks");
+                    _backgroundVerificationTasks.Clear();
+                }
+
+                // Wait for StartAsync's finally block to finish (it owns the status update and cleanup).
+                // 5-second timeout as a safety net — if the loop doesn't exit cleanly we don't hang forever.
+                if (stoppedTcs != null)
+                {
+                    var completed = await Task.WhenAny(stoppedTcs.Task, Task.Delay(5000));
+                    if (completed != stoppedTcs.Task)
                     {
-                        _loggingService.LogDebug($"Cancelling {_backgroundVerificationTasks.Count} background verification tasks");
-                        
-                        // Don't wait for tasks - just clear them
-                        _backgroundVerificationTasks.Clear();
+                        _loggingService.LogWarning("StopAsync: timed out waiting for loop to exit — forcing state");
+                        _isRunning = false;
+                        _currentStatus = "Automatisering stoppet";
+                        StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
                     }
+                    // If it completed normally, StartAsync's finally already fired StatusChanged — nothing to do here
                 }
-                catch (Exception ex)
-                {
-                    _loggingService.LogError($"Error cancelling background tasks: {ex.Message}");
-                }
-                
-                // Stop caffeinate when user manually stops automation
-                await _caffeinateService.StopCaffeinateAsync();
-                
-                // Final status update
-                _currentStatus = "Automatisering stoppet";
-                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
-                
+
                 await _notificationService.ShowNotificationAsync(
-                    "Automatisering stoppet", 
-                    "Automatisering har blitt stoppet av bruker", 
+                    "Automatisering stoppet",
+                    "Automatisering har blitt stoppet av bruker",
                     NotificationLevel.Info
                 );
-                
+
                 _loggingService.LogInfo("Automation stopped successfully");
-                
-                // Extra status update to ensure UI gets the message
-                await Task.Delay(100);
-                StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
-                
                 return AutomationResult.Successful("Automation stopped successfully");
             }
             catch (Exception ex)
             {
                 _loggingService.LogError($"Error during stop: {ex.Message}");
-                
+
                 // Ensure we're marked as stopped even if there's an error
                 _isRunning = false;
                 _currentStatus = "Automatisering stoppet (feil)";
                 StatusChanged?.Invoke(this, new AutomationStatusChangedEventArgs(false, _currentStatus));
-                
+
                 return AutomationResult.Failed($"Failed to stop automation: {ex.Message}", ex);
             }
         }
