@@ -1016,47 +1016,33 @@ namespace AkademiTrack.ViewModels
             }
 
             StatusMessage = "Starter automatisering";
+            var result = await _automationService.StartAsync();
 
-            // Update UI immediately so Start button disables and Stop button enables
+            if (!result.Success)
+            {
+                // Log automation failure for developers
+                try
+                {
+                    await _analyticsService.LogErrorAsync(
+                        "automation_start_failure",
+                        result.Message ?? "Unknown automation start error"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Analytics] Failed to log automation start: {ex.Message}");
+                }
+
+                // Automation failed - log but don't show notification to user
+                _loggingService.LogError($"Automation start failed: {result.Message ?? "Network or authentication error"}");
+
+                Debug.WriteLine("[MainWindow] Automation start failed");
+            }
+
+            // Update UI
             OnPropertyChanged(nameof(IsAutomationRunning));
             ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
             ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-
-            // Run the automation loop on a background thread so the UI thread stays
-            // responsive. This is critical: if we await StartAsync() directly here,
-            // the AsyncRelayCommand holds _isExecuting=true for the entire loop duration,
-            // which disables both buttons and prevents Stop from working properly.
-            _ = Task.Run(async () =>
-            {
-                var result = await _automationService.StartAsync();
-
-                if (!result.Success)
-                {
-                    try
-                    {
-                        await _analyticsService.LogErrorAsync(
-                            "automation_start_failure",
-                            result.Message ?? "Unknown automation start error"
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[Analytics] Failed to log automation start: {ex.Message}");
-                    }
-
-                    _loggingService.LogError($"Automation start failed: {result.Message ?? "Network or authentication error"}");
-                    Debug.WriteLine("[MainWindow] Automation start failed");
-                }
-
-                // StatusChanged event from AutomationService already updates the UI,
-                // but do a final refresh here as a safety net.
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    OnPropertyChanged(nameof(IsAutomationRunning));
-                    ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-                });
-            });
         }
 
         private async Task StopAutomationAsync()
@@ -1073,17 +1059,9 @@ namespace AkademiTrack.ViewModels
             }
             
             // Note: TrackAutomationStopAsync is now called automatically by OnAutomationStatusChanged event
-            Debug.WriteLine("[MainWindow] Automation stop requested");
+            Debug.WriteLine("[MainWindow] Automation stopped");
 
-            // Try normal stop first
             var result = await _automationService.StopAsync();
-            
-            // If normal stop fails, try force stop
-            if (!result.Success)
-            {
-                Debug.WriteLine("[MainWindow] Normal stop failed, trying force stop");
-                result = await _automationService.ForceStopAsync();
-            }
             
             if (!result.Success)
             {
@@ -1106,31 +1084,13 @@ namespace AkademiTrack.ViewModels
                     NotificationLevel.Warning
                 );
             }
-            else
-            {
-                Debug.WriteLine("[MainWindow] Automation stopped successfully");
-            }
             
-            // Force immediate UI update - ensure buttons are in correct state right away
+            // Update UI - waits for UI thread
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                Debug.WriteLine($"[MainWindow] Immediate UI update - IsAuthenticated: {IsAuthenticated}, IsAutomationRunning: {IsAutomationRunning}");
                 OnPropertyChanged(nameof(IsAutomationRunning));
-                OnPropertyChanged(nameof(IsAuthenticated));
                 ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
                 ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-            });
-            
-            // Schedule a delayed verification update in the background (don't await it)
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(500);
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    Debug.WriteLine($"[MainWindow] Delayed verification update - IsAuthenticated: {IsAuthenticated}, IsAutomationRunning: {IsAutomationRunning}");
-                    ((AsyncRelayCommand)StartAutomationCommand).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)StopAutomationCommand).RaiseCanExecuteChanged();
-                });
             });
         }
 

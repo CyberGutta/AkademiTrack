@@ -22,7 +22,7 @@ namespace AkademiTrack.Common
             public const int CACHE_SHORT_TTL_MINUTES = 5;
             public const int CACHE_LONG_TTL_MINUTES = 30;
             
-            public const int RETRY_DELAY_SECONDS = 5;
+            public const int RETRY_DELAY_SECONDS = 30;
             public const int HEARTBEAT_ACTIVE_MINUTES = 5;
             public const int HEARTBEAT_INACTIVE_MINUTES = 10;
             

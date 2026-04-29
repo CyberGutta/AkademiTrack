@@ -3,7 +3,6 @@ using AkademiTrack.Services.Configuration;
 using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Converters;
-using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;

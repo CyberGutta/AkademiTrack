@@ -15,7 +15,6 @@ namespace AkademiTrack.Services.Interfaces
         
         Task<AutomationResult> StartAsync(CancellationToken cancellationToken = default);
         Task<AutomationResult> StopAsync();
-        Task<AutomationResult> ForceStopAsync();
         
         Task<AutomationResult> RefreshAuthenticationAsync();
         Task<bool> CheckSchoolHoursAsync();
