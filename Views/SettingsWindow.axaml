@@ -24,6 +24,11 @@
 			<Setter Property="Padding" Value="14,12"/>
 			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="PlaceholderForeground" Value="#8E8E93"/>
+		</Style>
+		
+		<Style Selector="TextBox.credential-input /template/ TextBlock#PART_Watermark">
+			<Setter Property="Foreground" Value="#8E8E93"/>
 		</Style>
 
 		<Style Selector="TextBox.credential-input /template/ Border#PART_BorderElement">
@@ -866,7 +871,7 @@
 										   Classes="setting-description-compact"/>
 								<TextBox Text="{Binding LoginEmail}"
 										 Classes="credential-input"
-										 Watermark="F.eks: 78abcdef"/>
+										 PlaceholderText="F.eks: 78abcdef"/>
 							</StackPanel>
 						</Border>
 
@@ -881,7 +886,7 @@
 											 Text="{Binding LoginPassword}"
 											 Classes="credential-input"
 											 PasswordChar="•"
-											 Watermark="Ditt passord"
+											 PlaceholderText="Ditt passord"
 											 Padding="14,12,48,12"
 											 KeyDown="OnPasswordKeyDown"/>
 

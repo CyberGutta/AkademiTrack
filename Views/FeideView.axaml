@@ -20,6 +20,11 @@
 			<Setter Property="BorderThickness" Value="1.5"/>
 			<Setter Property="CornerRadius" Value="12"/>
 			<Setter Property="MinHeight" Value="48"/>
+			<Setter Property="PlaceholderForeground" Value="#8E8E93"/>
+		</Style>
+		
+		<Style Selector="TextBox /template/ TextBlock#PART_Watermark">
+			<Setter Property="Foreground" Value="#8E8E93"/>
 		</Style>
 
 		<Style Selector="TextBox /template/ Border#PART_BorderElement">
@@ -265,7 +270,7 @@
 				<StackPanel Spacing="6">
 					<TextBlock Text="Feide Brukernavn" Classes="label"/>
 					<TextBox Name="UsernameTextBox"
-							 Watermark="Eksempel: 78abcdef"
+							 PlaceholderText="Eksempel: 78abcdef"
 							 Text="{Binding FeideUsername}"/>
 					<TextBlock Text="Ditt unike Feide brukernavn fra skolen"
 							   Classes="helper"/>
@@ -276,7 +281,7 @@
 					<TextBlock Text="Feide Passord" Classes="label"/>
 					<Grid>
 						<TextBox Name="PasswordTextBox"
-								Watermark="Ditt Feide-passord"
+								PlaceholderText="Ditt Feide-passord"
 								PasswordChar="{Binding PasswordChar}"
 								Text="{Binding FeidePassword}"
 								Padding="16,14,60,14"/>
