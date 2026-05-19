@@ -63,9 +63,6 @@ namespace AkademiTrack.ViewModels
         private bool _showTutorial = false;
         private bool _showFeide = false;
         
-        // Tab navigation for main content
-        private string _selectedTab = "Dashboard"; // Dashboard, Kalender, Fravær
-        
         // Current notification
         private NotificationEntry? _currentNotification;
         #endregion
@@ -181,35 +178,6 @@ namespace AkademiTrack.ViewModels
             }
         }
 
-        // Tab Navigation
-        public string SelectedTab
-        {
-            get => _selectedTab;
-            set
-            {
-                if (SetProperty(ref _selectedTab, value))
-                {
-                    OnPropertyChanged(nameof(IsDashboardTab));
-                    OnPropertyChanged(nameof(IsCalendarTab));
-                    OnPropertyChanged(nameof(IsAbsenceTab));
-                    
-                    if (value == "Kalender" && Calendar != null)
-                    {
-                        _loggingService.LogInfo("[TAB] Switching to Calendar - loading data");
-                        _ = Calendar.LoadCalendarDataAsync();
-                    }
-                    else if (value == "Kalender" && Calendar == null)
-                    {
-                        _loggingService.LogWarning("[TAB] Calendar not initialized yet - waiting for authentication");
-                    }
-                }
-            }
-        }
-
-        public bool IsDashboardTab => _selectedTab == "Dashboard";
-        public bool IsCalendarTab => _selectedTab == "Kalender";
-        public bool IsAbsenceTab => _selectedTab == "Fravær";
-
         // Automation
         public bool IsAutomationRunning => _automationService?.IsRunning ?? false;
 
@@ -239,7 +207,6 @@ namespace AkademiTrack.ViewModels
         // ViewModels
         public SettingsViewModel SettingsViewModel { get; set; }
         public DashboardViewModel Dashboard { get; private set; }
-        public CalendarViewModel? Calendar { get; private set; }
         public FeideWindowViewModel FeideViewModel { get; set; }
 
         // Application Info
@@ -260,7 +227,6 @@ namespace AkademiTrack.ViewModels
         public ICommand DismissNotificationCommand { get; }
         public ICommand ToggleThemeCommand { get; }
         public ICommand ToggleClassViewCommand { get; }
-        public ICommand SelectTabCommand { get; }
         #endregion
 
         #region Constructor
@@ -295,7 +261,6 @@ namespace AkademiTrack.ViewModels
             DismissNotificationCommand = new AsyncRelayCommand(DismissCurrentNotificationAsync);
             ToggleThemeCommand = new AsyncRelayCommand(ToggleThemeAsync);
             ToggleClassViewCommand = new AsyncRelayCommand(ToggleClassViewAsync);
-            SelectTabCommand = new AsyncRelayCommand<string>(SelectTabAsync);
 
             // Subscribe to service events
             SubscribeToServiceEvents();
@@ -405,17 +370,6 @@ namespace AkademiTrack.ViewModels
                     };
 
                     Dashboard.SetCredentials(servicesUserParams, authResult.Cookies);
-                    
-                    var attendanceService = new AttendanceDataService();
-                    attendanceService.SetCredentials(servicesUserParams, authResult.Cookies);
-                    Calendar = new CalendarViewModel(attendanceService, _loggingService);
-                    OnPropertyChanged(nameof(Calendar));
-                    _loggingService.LogInfo("[INIT] Calendar ViewModel initialized");
-                    
-                    if (IsCalendarTab)
-                    {
-                        _ = Calendar.LoadCalendarDataAsync();
-                    }
 
                     _loggingService.LogInfo("Laster cached data for rask visning...");
                     try
@@ -997,16 +951,6 @@ namespace AkademiTrack.ViewModels
                     // Also update Dashboard with fresh credentials
                     Dashboard.SetCredentials(paramsToUse, cookies);
                     
-                    // Initialize Calendar if not already initialized
-                    if (Calendar == null)
-                    {
-                        var attendanceService = new AttendanceDataService();
-                        attendanceService.SetCredentials(paramsToUse, cookies);
-                        Calendar = new CalendarViewModel(attendanceService, _loggingService);
-                        OnPropertyChanged(nameof(Calendar));
-                        _loggingService.LogInfo("[MAIN] Calendar ViewModel initialized from cached credentials");
-                    }
-                    
                     // Credentials set successfully - no need for verbose logging
                 }
                 else
@@ -1282,16 +1226,6 @@ namespace AkademiTrack.ViewModels
         private Task ToggleClassViewAsync()
         {
             Dashboard.ToggleClassView();
-            return Task.CompletedTask;
-        }
-
-        private Task SelectTabAsync(string? tabName)
-        {
-            if (!string.IsNullOrEmpty(tabName))
-            {
-                SelectedTab = tabName;
-                _loggingService.LogInfo($"Switched to {tabName} tab");
-            }
             return Task.CompletedTask;
         }
 
