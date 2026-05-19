@@ -259,14 +259,19 @@ namespace AkademiTrack.Services
 
         public async Task<AutomationResult> StopAsync()
         {
+            _loggingService.LogInfo($"[STOP] StopAsync called. IsRunning={_isRunning}");
+            
             if (!_isRunning)
             {
+                _loggingService.LogWarning("[STOP] Automation is not running - cannot stop");
                 return AutomationResult.Failed("Automation is not running");
             }
 
             try
             {
+                _loggingService.LogInfo("[STOP] Calling Cancel() on cancellation token source");
                 _cancellationTokenSource?.Cancel();
+                _loggingService.LogInfo($"[STOP] Cancel() called. Token IsCancellationRequested={_cancellationTokenSource?.Token.IsCancellationRequested ?? false}");
                 
                 // Stop caffeinate when user manually stops automation
                 await _caffeinateService.StopCaffeinateAsync();
@@ -281,6 +286,7 @@ namespace AkademiTrack.Services
             }
             catch (Exception ex)
             {
+                _loggingService.LogError($"[STOP] Failed to stop automation: {ex.Message}");
                 return AutomationResult.Failed($"Failed to stop automation: {ex.Message}", ex);
             }
         }
@@ -501,6 +507,10 @@ namespace AkademiTrack.Services
                     var currentTime = DateTime.Now.ToString("HH:mm");
                     _loggingService.LogInfo($"Syklus #{cycleCount} - Sjekker STU registreringsvinduer (kl. {currentTime})");
 
+                    // Check cancellation at the start of each cycle
+                    _loggingService.LogDebug($"[CANCEL CHECK] Start of cycle - IsCancellationRequested={cancellationToken.IsCancellationRequested}");
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     // Check if we're still within school hours - auto-stop if AFTER school ends
                     var (isWithin, isAfter) = await SchoolTimeChecker.GetSchoolHoursStatusAsync();
                     if (!isWithin && isAfter)
@@ -519,22 +529,20 @@ namespace AkademiTrack.Services
                         "Sjekker registreringsvinduer", cycleCount));
 
                     int openWindows = 0;
-                    int closedWindows = 0;
                     int notYetOpenWindows = 0;
                     int unregisteredClosedWindows = 0;
 
                     foreach (var stuSession in validStuSessions)
                     {
+                        // Check cancellation before processing each session
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
                         // Check if already registered (from disk)
                         if (registeredSessionKeys.Contains(sessionKey))
                         {
-                            // Double-verify this session is actually registered by checking online
-                            _loggingService.LogInfo($"[DEBUG] Økt {sessionKey} er markert som registrert lokalt - verifiserer online...");
-                            
-                            // For now, trust local cache but add verification
-                            closedWindows++;
+                            // Already registered - skip
                             continue;
                         }
 
@@ -550,7 +558,6 @@ namespace AkademiTrack.Services
                                 {
                                     _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert (oppdaget under åpen vindu sjekk)");
                                     registeredSessionKeys.Add(sessionKey);
-                                    closedWindows++;
                                     openWindows--;
                                     break;
                                 }
@@ -559,20 +566,44 @@ namespace AkademiTrack.Services
 
                                 try
                                 {
-                                    var registrationResult = await RegisterAttendanceAsync(stuSession);
+                                    var registrationResult = await RegisterAttendanceAsync(stuSession, cancellationToken);
+                                    
+                                    // Check cancellation IMMEDIATELY after registration returns
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    
                                     if (registrationResult)
                                     {
                                         _loggingService.LogSuccess($"Registrerte oppmøte for {stuSession.StartKl}-{stuSession.SluttKl}!");
-                                        await _notificationService.ShowNotificationAsync(
+                                        
+                                        // Check cancellation before notification
+                                        cancellationToken.ThrowIfCancellationRequested();
+                                        
+                                        // Fire notification in background - don't wait for it
+                                        _ = Task.Run(() => _notificationService.ShowNotificationAsync(
                                             "Registrering vellykket",
                                             $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}",
                                             NotificationLevel.Success
-                                        );
+                                        ));
                                         
-                                        // Mark as registered on disk
-                                        await MarkSessionAsRegisteredAsync(sessionKey);
+                                        // Check cancellation before file I/O
+                                        cancellationToken.ThrowIfCancellationRequested();
+                                        
+                                        // Mark as registered on disk (fire and forget to avoid blocking)
+                                        _ = Task.Run(() => MarkSessionAsRegisteredAsync(sessionKey));
                                         registeredSessionKeys.Add(sessionKey);
+                                        
+                                        // Decrement open windows since we just registered it
+                                        openWindows--;
+                                        
+                                        // CRITICAL: Check cancellation immediately after registration
+                                        cancellationToken.ThrowIfCancellationRequested();
                                     }
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    // Re-throw cancellation to stop immediately
+                                    _loggingService.LogInfo("Kansellering oppdaget etter registrering - stopper umiddelbart");
+                                    throw;
                                 }
                                 catch (Exception regEx)
                                 {
@@ -612,14 +643,23 @@ namespace AkademiTrack.Services
                         }
                     }
 
+                    // CRITICAL: Check cancellation immediately after processing all sessions
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     // Only consider all sessions complete if ALL sessions are actually registered
                     // Don't stop just because registration windows have closed
                     bool allSessionsRegistered = registeredSessionKeys.Count == validStuSessions.Count;
+                    
+                    // Check cancellation before logging debug info
+                    cancellationToken.ThrowIfCancellationRequested();
                     
                     // Add detailed debugging information
                     _loggingService.LogInfo($"[DEBUG] Fullføring sjekk: registeredSessionKeys.Count={registeredSessionKeys.Count}, validStuSessions.Count={validStuSessions.Count}");
                     _loggingService.LogInfo($"[DEBUG] Registrerte økter: [{string.Join(", ", registeredSessionKeys)}]");
                     _loggingService.LogInfo($"[DEBUG] Gyldige økter: [{string.Join(", ", validStuSessions.Select(s => $"{s.StartKl}-{s.SluttKl}"))}]");
+                    
+                    // Check cancellation before completion check
+                    cancellationToken.ThrowIfCancellationRequested();
                     
                     if (allSessionsRegistered)
                     {
@@ -633,6 +673,9 @@ namespace AkademiTrack.Services
                         );
                         return MonitoringLoopResult.AllComplete;
                     }
+
+                    // Check cancellation before actionable sessions check
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     // Check if there are any actionable sessions (open windows or future sessions)
                     bool hasActionableSessions = openWindows > 0 || notYetOpenWindows > 0;
@@ -651,12 +694,19 @@ namespace AkademiTrack.Services
                         return MonitoringLoopResult.AllComplete;
                     }
 
-                    _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {closedWindows} registrerte, {unregisteredClosedWindows} uregistrerte lukkede");
+                    _loggingService.LogInfo($"Status: {openWindows} åpne, {notYetOpenWindows} venter, {registeredSessionKeys.Count} registrerte, {unregisteredClosedWindows} uregistrerte lukkede");
 
-                    await Task.Delay(TimeSpan.FromSeconds(Constants.Time.RETRY_DELAY_SECONDS), cancellationToken);
+                    // Check cancellation before delay
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // TEMPORARY: Reduced delay for testing stop button
+                    _loggingService.LogDebug("[DELAY] Starting 5 second delay before next cycle");
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                    _loggingService.LogDebug("[DELAY] Delay completed, starting next cycle");
                 }
                 catch (OperationCanceledException)
                 {
+                    _loggingService.LogInfo("Automatisering kansellert - stopper umiddelbart");
                     return MonitoringLoopResult.Cancelled;
                 }
                 catch (Exception ex)
@@ -1143,17 +1193,23 @@ namespace AkademiTrack.Services
                 return RegistrationWindowStatus.Closed;
         }
 
-        private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime)
+        private async Task<bool> RegisterAttendanceAsync(ScheduleItem stuTime, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (_userParameters == null || _cookies == null)
                     return false;
 
+                // Check cancellation before starting registration
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var jsessionId = _cookies.GetValueOrDefault("JSESSIONID", "");
                 var url = $"https://iskole.net/iskole_elev/rest/v0/VoTimeplan_elev_oppmote;jsessionid={jsessionId}";
 
-                var publicIp = await GetPublicIpAsync();
+                var publicIp = await GetPublicIpAsync(cancellationToken);
+
+                // Check cancellation before building payload
+                cancellationToken.ThrowIfCancellationRequested();
 
                 var payload = new
                 {
@@ -1189,7 +1245,10 @@ namespace AkademiTrack.Services
                 var cookieString = string.Join("; ", _cookies.Select(c => $"{c.Key}={c.Value}"));
                 request.Headers.Add("Cookie", cookieString);
 
-                var response = await _httpClient.SendAsync(request);
+                // Check cancellation before sending request
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var response = await _httpClient.SendAsync(request, cancellationToken);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -1221,26 +1280,25 @@ namespace AkademiTrack.Services
                         return false;
                     }
 
-                    SessionRegistered?.Invoke(this, new SessionRegisteredEventArgs 
-                    { 
-                        SessionTime = $"{stuTime.StartKl}-{stuTime.SluttKl}",
-                        RegistrationTime = DateTime.Now
-                    });
-
-                    // Schedule delayed verification (20 seconds later)
-                    var verificationTask = Task.Run(async () =>
+                    // Fire SessionRegistered event in background (non-blocking)
+                    // This triggers dashboard refresh without blocking the stop button
+                    _ = Task.Run(() =>
                     {
                         try
                         {
-                            await Task.Delay(TimeSpan.FromSeconds(20));
-                            await VerifyRegistrationAsync(stuTime);
+                            SessionRegistered?.Invoke(this, new SessionRegisteredEventArgs 
+                            { 
+                                SessionTime = $"{stuTime.StartKl}-{stuTime.SluttKl}",
+                                RegistrationTime = DateTime.Now
+                            });
                         }
                         catch (Exception ex)
                         {
-                            _loggingService.LogError($"Verification task failed: {ex.Message}");
+                            _loggingService.LogError($"[REGISTRATION] SessionRegistered event handler failed: {ex.Message}");
                         }
                     });
-                    _backgroundVerificationTasks.Add(verificationTask);
+                    
+                    _loggingService.LogDebug($"[REGISTRATION] Successfully registered {stuTime.StartKl}-{stuTime.SluttKl}, dashboard refresh triggered in background");
 
                     return true;
                 }
@@ -1250,6 +1308,11 @@ namespace AkademiTrack.Services
                     return false;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _loggingService.LogInfo($"Registrering av {stuTime.StartKl}-{stuTime.SluttKl} ble kansellert");
+                throw; // Re-throw to propagate cancellation
+            }
             catch (Exception ex)
             {
                 _loggingService.LogError($"Registration error: {ex.Message}");
@@ -1257,12 +1320,16 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<string> GetPublicIpAsync()
+        private async Task<string> GetPublicIpAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                var ip = await _httpClient.GetStringAsync("https://api.ipify.org");
+                var ip = await _httpClient.GetStringAsync("https://api.ipify.org", cancellationToken);
                 return ip;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Re-throw cancellation
             }
             catch
             {
