@@ -485,19 +485,11 @@ namespace AkademiTrack.Services
 
             _loggingService.LogInfo($"Etter konflikt-sjekking: {validStuSessions.Count} av {todaysStuSessions.Count} STU-økter er gyldige");
 
-            // Load previously registered sessions from disk ONLY (disable pre-check for now)
-            // CLEAR any potentially corrupted cache first
-            var registeredSessionsFile = GetRegisteredSessionsFilePath();
-            if (File.Exists(registeredSessionsFile))
-            {
-                _loggingService.LogInfo("Sletter eksisterende cache for å unngå feil data");
-                File.Delete(registeredSessionsFile);
-            }
-            
-            var registeredSessions = await GetRegisteredSessionsForTodayAsync();
+            // Load previously registered sessions from disk
+            var registeredSessions = await GetRegisteredSessionsForTodayAsync(cancellationToken);
             var registeredSessionKeys = new HashSet<string>(registeredSessions.Keys);
             
-            _loggingService.LogInfo($"Starter med tom cache - {registeredSessionKeys.Count} registrerte økter");
+            _loggingService.LogInfo($"Lastet {registeredSessionKeys.Count} tidligere registrerte økter fra cache");
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -539,10 +531,16 @@ namespace AkademiTrack.Services
                         
                         var sessionKey = $"{stuSession.StartKl}-{stuSession.SluttKl}";
 
-                        // Check if already registered (from disk)
-                        if (registeredSessionKeys.Contains(sessionKey))
+                        // Check if already registered (from disk) - reload from disk each cycle to catch updates
+                        var currentRegisteredSessions = await GetRegisteredSessionsForTodayAsync(cancellationToken);
+                        if (currentRegisteredSessions.ContainsKey(sessionKey))
                         {
-                            // Already registered - skip
+                            // Already registered - add to in-memory set if not present
+                            if (!registeredSessionKeys.Contains(sessionKey))
+                            {
+                                _loggingService.LogInfo($"STU økt {sessionKey} funnet som registrert i cache");
+                                registeredSessionKeys.Add(sessionKey);
+                            }
                             continue;
                         }
 
@@ -554,7 +552,7 @@ namespace AkademiTrack.Services
                                 openWindows++;
                                 
                                 // Double-check if registered (in case another instance registered it)
-                                if (await IsSessionRegisteredAsync(sessionKey))
+                                if (await IsSessionRegisteredAsync(sessionKey, cancellationToken))
                                 {
                                     _loggingService.LogInfo($"STU økt {sessionKey} er allerede registrert (oppdaget under åpen vindu sjekk)");
                                     registeredSessionKeys.Add(sessionKey);
@@ -583,17 +581,34 @@ namespace AkademiTrack.Services
                                             "Registrering vellykket",
                                             $"Registrert for STU {stuSession.StartKl}-{stuSession.SluttKl}",
                                             NotificationLevel.Success
-                                        ));
+                                        ), CancellationToken.None); // Use None to prevent notification cancellation
                                         
                                         // Check cancellation before file I/O
                                         cancellationToken.ThrowIfCancellationRequested();
                                         
-                                        // Mark as registered on disk (fire and forget to avoid blocking)
-                                        _ = Task.Run(() => MarkSessionAsRegisteredAsync(sessionKey));
+                                        // Mark as registered on disk (await to ensure it's saved before continuing)
+                                        await MarkSessionAsRegisteredAsync(sessionKey, cancellationToken);
                                         registeredSessionKeys.Add(sessionKey);
                                         
                                         // Decrement open windows since we just registered it
                                         openWindows--;
+                                        
+                                        // Fire SessionRegistered event in background (non-blocking)
+                                        _ = Task.Run(() =>
+                                        {
+                                            try
+                                            {
+                                                SessionRegistered?.Invoke(this, new SessionRegisteredEventArgs 
+                                                { 
+                                                    SessionTime = $"{stuSession.StartKl}-{stuSession.SluttKl}",
+                                                    RegistrationTime = DateTime.Now
+                                                });
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                _loggingService.LogError($"[REGISTRATION] SessionRegistered event handler failed: {ex.Message}");
+                                            }
+                                        }, CancellationToken.None);
                                         
                                         // CRITICAL: Check cancellation immediately after registration
                                         cancellationToken.ThrowIfCancellationRequested();
@@ -699,9 +714,20 @@ namespace AkademiTrack.Services
                     // Check cancellation before delay
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // TEMPORARY: Reduced delay for testing stop button
-                    _loggingService.LogDebug("[DELAY] Starting 5 second delay before next cycle");
-                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                    // Use shorter delay intervals with cancellation checks for responsive stop button
+                    _loggingService.LogDebug("[DELAY] Starting 30 second delay before next cycle (with cancellation checks)");
+                    
+                    // Break the delay into smaller chunks to check cancellation more frequently
+                    for (int i = 0; i < 30; i++)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            _loggingService.LogDebug($"[DELAY] Cancellation detected at {i} seconds");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                    }
+                    
                     _loggingService.LogDebug("[DELAY] Delay completed, starting next cycle");
                 }
                 catch (OperationCanceledException)
@@ -746,23 +772,40 @@ namespace AkademiTrack.Services
 
         private readonly SemaphoreSlim _sessionFileLock = new SemaphoreSlim(1, 1);
 
-        private async Task MarkSessionAsRegisteredAsync(string sessionKey)
+        private async Task MarkSessionAsRegisteredAsync(string sessionKey, CancellationToken cancellationToken = default)
         {
-            await _sessionFileLock.WaitAsync();
+            await _sessionFileLock.WaitAsync(cancellationToken);
             try
             {
                 var filePath = GetRegisteredSessionsFilePath();
-                var registeredSessions = await GetRegisteredSessionsForTodayAsync();
+                
+                // Read file directly to avoid deadlock (don't call GetRegisteredSessionsForTodayAsync which also locks)
+                Dictionary<string, DateTime> registeredSessions;
+                if (File.Exists(filePath))
+                {
+                    var json = await File.ReadAllTextAsync(filePath, cancellationToken);
+                    registeredSessions = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json) 
+                        ?? new Dictionary<string, DateTime>();
+                }
+                else
+                {
+                    registeredSessions = new Dictionary<string, DateTime>();
+                }
                 
                 if (!registeredSessions.ContainsKey(sessionKey))
                 {
                     registeredSessions[sessionKey] = DateTime.Now;
                     
                     var json = JsonSerializer.Serialize(registeredSessions, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(filePath, json);
+                    await File.WriteAllTextAsync(filePath, json, cancellationToken);
                     
                     _loggingService.LogDebug($"[SESSION] Marked {sessionKey} as registered");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                _loggingService.LogDebug($"[SESSION] Marking session {sessionKey} was cancelled");
+                throw;
             }
             catch (Exception ex)
             {
@@ -774,9 +817,9 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<Dictionary<string, DateTime>> GetRegisteredSessionsForTodayAsync()
+        private async Task<Dictionary<string, DateTime>> GetRegisteredSessionsForTodayAsync(CancellationToken cancellationToken = default)
         {
-            await _sessionFileLock.WaitAsync();
+            await _sessionFileLock.WaitAsync(cancellationToken);
             try
             {
                 var filePath = GetRegisteredSessionsFilePath();
@@ -784,7 +827,7 @@ namespace AkademiTrack.Services
                 if (!File.Exists(filePath))
                     return new Dictionary<string, DateTime>();
 
-                var json = await File.ReadAllTextAsync(filePath);
+                var json = await File.ReadAllTextAsync(filePath, cancellationToken);
                 var allSessions = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json) 
                     ?? new Dictionary<string, DateTime>();
                 
@@ -802,10 +845,15 @@ namespace AkademiTrack.Services
                     _loggingService.LogInfo($"Rydder opp {oldCount} gamle registrering(er)");
                     
                     var cleanJson = JsonSerializer.Serialize(todaySessions, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(filePath, cleanJson);
+                    await File.WriteAllTextAsync(filePath, cleanJson, cancellationToken);
                 }
                 
                 return todaySessions;
+            }
+            catch (OperationCanceledException)
+            {
+                _loggingService.LogDebug("[SESSION] Reading sessions was cancelled");
+                throw;
             }
             catch (Exception ex)
             {
@@ -818,9 +866,9 @@ namespace AkademiTrack.Services
             }
         }
 
-        private async Task<bool> IsSessionRegisteredAsync(string sessionKey)
+        private async Task<bool> IsSessionRegisteredAsync(string sessionKey, CancellationToken cancellationToken = default)
         {
-            var sessions = await GetRegisteredSessionsForTodayAsync();
+            var sessions = await GetRegisteredSessionsForTodayAsync(cancellationToken);
             return sessions.ContainsKey(sessionKey);
         }
 
@@ -1280,25 +1328,7 @@ namespace AkademiTrack.Services
                         return false;
                     }
 
-                    // Fire SessionRegistered event in background (non-blocking)
-                    // This triggers dashboard refresh without blocking the stop button
-                    _ = Task.Run(() =>
-                    {
-                        try
-                        {
-                            SessionRegistered?.Invoke(this, new SessionRegisteredEventArgs 
-                            { 
-                                SessionTime = $"{stuTime.StartKl}-{stuTime.SluttKl}",
-                                RegistrationTime = DateTime.Now
-                            });
-                        }
-                        catch (Exception ex)
-                        {
-                            _loggingService.LogError($"[REGISTRATION] SessionRegistered event handler failed: {ex.Message}");
-                        }
-                    });
-                    
-                    _loggingService.LogDebug($"[REGISTRATION] Successfully registered {stuTime.StartKl}-{stuTime.SluttKl}, dashboard refresh triggered in background");
+                    _loggingService.LogDebug($"[REGISTRATION] Successfully registered {stuTime.StartKl}-{stuTime.SluttKl}");
 
                     return true;
                 }
