@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
-using SeleniumExtras.WaitHelpers;
 using System.Security;
 using System.Text.Json;
 using System.Runtime.InteropServices;
@@ -290,7 +289,13 @@ namespace AkademiTrack.Services
                     
                     // Wait for element to be clickable
                     Debug.WriteLine("[SELENIUM] Waiting for FEIDE button to be clickable...");
-                    wait.Until(ExpectedConditions.ElementToBeClickable(feideButton));
+                    wait.Until(d => {
+                        try {
+                            return feideButton.Enabled && feideButton.Displayed;
+                        } catch {
+                            return false;
+                        }
+                    });
                     
                     Debug.WriteLine("[SELENIUM] Clicking FEIDE button...");
                     feideButton.Click();
@@ -308,7 +313,14 @@ namespace AkademiTrack.Services
                     
                     // CLICK THE INPUT FIELD TO ACTIVATE THE SCHOOL LIST (same method as username/password)
                     Debug.WriteLine("[SELENIUM] Clicking search input to activate school list");
-                    var searchInput = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("org_selector_filter")));
+                    var searchInput = wait.Until(d => {
+                        try {
+                            var element = d.FindElement(By.Id("org_selector_filter"));
+                            return element.Enabled && element.Displayed ? element : null;
+                        } catch {
+                            return null;
+                        }
+                    });
                     searchInput.Click();
                     Debug.WriteLine("[SELENIUM] ✅ Clicked search input");
                     await Task.Delay(300); // Reduced from 1000ms to 300ms
@@ -355,7 +367,13 @@ namespace AkademiTrack.Services
                                 await Task.Delay(100); // Reduced from 300ms to 100ms
                                 
                                 // Wait for element to be clickable
-                                wait.Until(ExpectedConditions.ElementToBeClickable(element));
+                                wait.Until(d => {
+                                    try {
+                                        return element.Enabled && element.Displayed;
+                                    } catch {
+                                        return false;
+                                    }
+                                });
                                 element.Click();
                                 schoolFound = true;
                                 break;
@@ -380,7 +398,13 @@ namespace AkademiTrack.Services
                             
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", schoolByText);
                             await Task.Delay(100); // Reduced from 300ms to 100ms
-                            wait.Until(ExpectedConditions.ElementToBeClickable(schoolByText));
+                            wait.Until(d => {
+                                try {
+                                    return schoolByText.Enabled && schoolByText.Displayed;
+                                } catch {
+                                    return false;
+                                }
+                            });
                             schoolByText.Click();
                             schoolFound = true;
                         }
@@ -393,7 +417,14 @@ namespace AkademiTrack.Services
                             searchBox.SendKeys(_schoolName);
                             await Task.Delay(200); // Reduced from 500ms to 200ms
                             
-                            var matchingSchool = wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("li.orglist_item.match")));
+                            var matchingSchool = wait.Until(d => {
+                                try {
+                                    var element = d.FindElement(By.CssSelector("li.orglist_item.match"));
+                                    return element.Enabled && element.Displayed ? element : null;
+                                } catch {
+                                    return null;
+                                }
+                            });
                             matchingSchool.Click();
                             schoolFound = true;
                         }
@@ -404,19 +435,54 @@ namespace AkademiTrack.Services
                         // Small delay to ensure school selection is registered
                         await Task.Delay(200); // Reduced from 500ms to 200ms
                         Debug.WriteLine("➡️ [SELENIUM] Clicking Continue button to proceed with selected school");
-                        var continueButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("selectorg_button")));
+                        var continueButton = wait.Until(d => {
+                            try {
+                                var element = d.FindElement(By.Id("selectorg_button"));
+                                return element.Enabled && element.Displayed ? element : null;
+                            } catch {
+                                return null;
+                            }
+                        });
                         continueButton.Click();
                     }
                     
                     // Wait for navigation to login form
-                    wait.Until(ExpectedConditions.ElementIsVisible(By.Id("username")));
+                    wait.Until(d => {
+                        try {
+                            var element = d.FindElement(By.Id("username"));
+                            return element.Displayed;
+                        } catch {
+                            return false;
+                        }
+                    });
                     await Task.Delay(300); // Reduced from 1000ms to 300ms
 
                     // Fill login form
                     Debug.WriteLine("[SELENIUM] Filling login form");
-                    var usernameField = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("username")));
-                    var passwordField = wait.Until(ExpectedConditions.ElementToBeClickable(By.Id("password")));
-                    var submitButton = wait.Until(ExpectedConditions.ElementToBeClickable(By.CssSelector("button[type='submit']")));
+                    var usernameField = wait.Until(d => {
+                        try {
+                            var element = d.FindElement(By.Id("username"));
+                            return element.Enabled && element.Displayed ? element : null;
+                        } catch {
+                            return null;
+                        }
+                    });
+                    var passwordField = wait.Until(d => {
+                        try {
+                            var element = d.FindElement(By.Id("password"));
+                            return element.Enabled && element.Displayed ? element : null;
+                        } catch {
+                            return null;
+                        }
+                    });
+                    var submitButton = wait.Until(d => {
+                        try {
+                            var element = d.FindElement(By.CssSelector("button[type='submit']"));
+                            return element.Enabled && element.Displayed ? element : null;
+                        } catch {
+                            return null;
+                        }
+                    });
                     
                     // Clear and fill username
                     usernameField.Clear();
