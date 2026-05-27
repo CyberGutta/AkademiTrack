@@ -219,7 +219,6 @@ namespace AkademiTrack.Services
                     driver.Navigate().GoToUrl("https://iskole.net/elev/?ojr=login");
                     Debug.WriteLine($"[SELENIUM] Current URL after navigation: {driver.Url}");
                     Debug.WriteLine($"[SELENIUM] Page title: {driver.Title}");
-                    await Task.Delay(800); // Wait for page to load
 
                     // Click FEIDE button
                     Debug.WriteLine("[SELENIUM] Clicking FEIDE button");
@@ -282,13 +281,8 @@ namespace AkademiTrack.Services
                     // Scroll to element and ensure it's visible
                     Debug.WriteLine("[SELENIUM] Scrolling to FEIDE button...");
                     ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", feideButton);
-                    await Task.Delay(500); // Wait for scroll to complete
                     
-                    // Check if element is displayed and enabled
-                    Debug.WriteLine($"[SELENIUM] FEIDE button - Displayed: {feideButton.Displayed}, Enabled: {feideButton.Enabled}");
-                    
-                    // Wait for element to be clickable
-                    Debug.WriteLine("[SELENIUM] Waiting for FEIDE button to be clickable...");
+                    // Wait for element to be clickable (replaces arbitrary delay)
                     wait.Until(d => {
                         try {
                             return feideButton.Enabled && feideButton.Displayed;
@@ -296,6 +290,9 @@ namespace AkademiTrack.Services
                             return false;
                         }
                     });
+                    
+                    // Check if element is displayed and enabled
+                    Debug.WriteLine($"[SELENIUM] FEIDE button - Displayed: {feideButton.Displayed}, Enabled: {feideButton.Enabled}");
                     
                     Debug.WriteLine("[SELENIUM] Clicking FEIDE button...");
                     feideButton.Click();
@@ -309,7 +306,6 @@ namespace AkademiTrack.Services
                     
                     // Wait for the organization page to be fully loaded
                     wait.Until(d => d.FindElements(By.Id("org_selector_filter")).Count > 0);
-                    await Task.Delay(500); // Reduced from 2000ms to 500ms
                     
                     // CLICK THE INPUT FIELD TO ACTIVATE THE SCHOOL LIST (same method as username/password)
                     Debug.WriteLine("[SELENIUM] Clicking search input to activate school list");
@@ -323,7 +319,9 @@ namespace AkademiTrack.Services
                     });
                     searchInput.Click();
                     Debug.WriteLine("[SELENIUM] ✅ Clicked search input");
-                    await Task.Delay(300); // Reduced from 1000ms to 300ms
+                    
+                    // Wait for school list to populate (explicit wait instead of arbitrary delay)
+                    wait.Until(d => d.FindElements(By.CssSelector("li.orglist_item[org_name]")).Count > 0);
                     
                     // Find and click the school by matching org_name attribute (case-insensitive)
                     var schoolNameLower = _schoolName.ToLowerInvariant();
@@ -364,9 +362,8 @@ namespace AkademiTrack.Services
                                 
                                 // Scroll to element and ensure it's visible
                                 ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", element);
-                                await Task.Delay(100); // Reduced from 300ms to 100ms
                                 
-                                // Wait for element to be clickable
+                                // Wait for element to be clickable (replaces arbitrary delay)
                                 wait.Until(d => {
                                     try {
                                         return element.Enabled && element.Displayed;
@@ -397,7 +394,6 @@ namespace AkademiTrack.Services
                             Debug.WriteLine($"✅ [SELENIUM] Found school by text content - clicking it");
                             
                             ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", schoolByText);
-                            await Task.Delay(100); // Reduced from 300ms to 100ms
                             wait.Until(d => {
                                 try {
                                     return schoolByText.Enabled && schoolByText.Displayed;
@@ -415,8 +411,8 @@ namespace AkademiTrack.Services
                             var searchBox = driver.FindElement(By.Id("org_selector_filter"));
                             searchBox.Clear();
                             searchBox.SendKeys(_schoolName);
-                            await Task.Delay(200); // Reduced from 500ms to 200ms
                             
+                            // Wait for search results to appear
                             var matchingSchool = wait.Until(d => {
                                 try {
                                     var element = d.FindElement(By.CssSelector("li.orglist_item.match"));
@@ -432,8 +428,6 @@ namespace AkademiTrack.Services
                     
                     if (schoolFound)
                     {
-                        // Small delay to ensure school selection is registered
-                        await Task.Delay(200); // Reduced from 500ms to 200ms
                         Debug.WriteLine("➡️ [SELENIUM] Clicking Continue button to proceed with selected school");
                         var continueButton = wait.Until(d => {
                             try {
@@ -455,7 +449,6 @@ namespace AkademiTrack.Services
                             return false;
                         }
                     });
-                    await Task.Delay(300); // Reduced from 1000ms to 300ms
 
                     // Fill login form
                     Debug.WriteLine("[SELENIUM] Filling login form");
@@ -487,12 +480,10 @@ namespace AkademiTrack.Services
                     // Clear and fill username
                     usernameField.Clear();
                     usernameField.SendKeys(_loginEmail);
-                    await Task.Delay(100); // Reduced from 200ms to 100ms
                     
                     // Clear and fill password
                     passwordField.Clear();
                     passwordField.SendKeys(SecureStringToString(_loginPasswordSecure));
-                    await Task.Delay(100); // Reduced from 200ms to 100ms
                     
                     // Submit the form
                     submitButton.Click();
@@ -524,8 +515,8 @@ namespace AkademiTrack.Services
                     {
                         Debug.WriteLine("[SELENIUM] Login successful");
                         
-                        // Wait a bit for the page to fully load
-                        await Task.Delay(500); // Reduced from 2000ms to 500ms
+                        // Wait for page to fully load after successful login
+                        wait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState")?.Equals("complete") == true);
                         
                         // Extract cookies and parameters
                         var cookies = ExtractCookies(driver);

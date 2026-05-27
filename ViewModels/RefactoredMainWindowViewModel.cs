@@ -1482,6 +1482,27 @@ namespace AkademiTrack.ViewModels
 
             try
             {
+                // Unsubscribe from all event handlers to prevent memory leaks
+                _loggingService.LogEntryAdded -= OnLogEntryAdded;
+                _notificationService.NotificationAdded -= OnNotificationAdded;
+                _notificationService.NotificationDismissed -= OnNotificationDismissed;
+                _settingsService.SettingsChanged -= OnSettingsChanged;
+                _automationService.StatusChanged -= OnAutomationStatusChanged;
+                _automationService.ProgressUpdated -= OnAutomationProgressUpdated;
+                _automationService.SessionRegistered -= OnSessionRegistered;
+                
+                // Unsubscribe from ViewModel events
+                if (SettingsViewModel != null)
+                {
+                    SettingsViewModel.CloseRequested -= OnSettingsCloseRequested;
+                    SettingsViewModel.CredentialsSaved -= OnCredentialsSaved;
+                }
+                
+                if (FeideViewModel != null)
+                {
+                    FeideViewModel.SetupCompleted -= OnFeideSetupCompleted;
+                }
+
                 // Dispose timers
                 _dataRefreshTimer?.Dispose();
                 _dataRefreshTimer = null;
@@ -1491,6 +1512,7 @@ namespace AkademiTrack.ViewModels
 
                 _midnightResetTimer?.Dispose();
                 _midnightResetTimer = null;
+                
                 // Dispose semaphores
                 _refreshSemaphore?.Dispose();
                 _initializationSemaphore?.Dispose();
@@ -1508,8 +1530,10 @@ namespace AkademiTrack.ViewModels
                     authDisposable.Dispose();
                 }
 
-                // Dispose FeideViewModel
+                // Dispose ViewModels
                 FeideViewModel?.Dispose();
+                Dashboard?.Dispose();
+                SettingsViewModel?.Dispose();
 
                 _disposed = true;
             }

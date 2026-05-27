@@ -14,7 +14,7 @@ using System.Text.Json;
 
 namespace AkademiTrack.ViewModels
 {
-    public class DashboardViewModel : INotifyPropertyChanged
+    public class DashboardViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly AttendanceDataService _attendanceService;
         private readonly ILoggingService? _loggingService;
@@ -24,6 +24,9 @@ namespace AkademiTrack.ViewModels
         private TodayScheduleData? _cachedTodaySchedule;
         private DateTime _cacheDate = DateTime.MinValue;
         private bool _isRefreshing = false; // Concurrency guard
+        
+        // HTTP request throttling to prevent connection exhaustion
+        private static readonly System.Threading.SemaphoreSlim _httpThrottle = new(2, 2); // Max 2 concurrent requests
 
 
         // Today's STU sessions
@@ -376,11 +379,31 @@ namespace AkademiTrack.ViewModels
                 _isRefreshing = true;
                 _loggingService?.LogDebug("[DASHBOARD] Starting data refresh...");
 
-                // Load all data in parallel for faster loading
-                var summaryTask = _attendanceService.GetAttendanceSummaryAsync();
-                var todayTask = _attendanceService.GetTodayScheduleAsync();
-                var monthlyTask = _attendanceService.GetMonthlyAttendanceAsync();
-                var weeklyTask = _attendanceService.GetWeeklyAttendanceAsync();
+                // Load all data in parallel with HTTP throttling to prevent connection exhaustion
+                // Wrap each HTTP call with semaphore to limit concurrent requests
+                var summaryTask = Task.Run(async () => {
+                    await _httpThrottle.WaitAsync();
+                    try { return await _attendanceService.GetAttendanceSummaryAsync(); }
+                    finally { _httpThrottle.Release(); }
+                });
+                
+                var todayTask = Task.Run(async () => {
+                    await _httpThrottle.WaitAsync();
+                    try { return await _attendanceService.GetTodayScheduleAsync(); }
+                    finally { _httpThrottle.Release(); }
+                });
+                
+                var monthlyTask = Task.Run(async () => {
+                    await _httpThrottle.WaitAsync();
+                    try { return await _attendanceService.GetMonthlyAttendanceAsync(); }
+                    finally { _httpThrottle.Release(); }
+                });
+                
+                var weeklyTask = Task.Run(async () => {
+                    await _httpThrottle.WaitAsync();
+                    try { return await _attendanceService.GetWeeklyAttendanceAsync(); }
+                    finally { _httpThrottle.Release(); }
+                });
 
                 // Wait for all tasks with individual timeouts
                 var allTasks = new[]
