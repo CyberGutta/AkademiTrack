@@ -96,6 +96,6 @@
 		</PackageReference>
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="ReactiveUI" Version="23.2.27" />
-		<PackageReference Include="Velopack" Version="0.0.1298" />
+		<PackageReference Include="Velopack" Version="1.1.1" />
 	</ItemGroup>
 </Project>
