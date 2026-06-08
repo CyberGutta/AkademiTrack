@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using AkademiTrack.Services;
+﻿﻿using AkademiTrack.Services;
 using AkademiTrack.Services.Configuration;
 using AkademiTrack.Views;
 using Avalonia.Controls.ApplicationLifetimes;
