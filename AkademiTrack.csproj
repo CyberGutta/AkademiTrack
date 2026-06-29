@@ -74,10 +74,10 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="Avalonia" Version="12.0.4" />
-		<PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
-		<PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
+		<PackageReference Include="Avalonia" Version="12.0.5" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.0.5" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
+		<PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.5" />
 		<PackageReference Include="Material.Icons.Avalonia" Version="3.0.2" />
 		<PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
@@ -90,7 +90,7 @@
 		<PackageReference Include="WebDriverManager" Version="2.17.7" />
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.9" />
 		<PackageReference Include="System.Text.Json" Version="10.0.9" />
-		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.17">
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.18">
 			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
 		</PackageReference>
