@@ -80,16 +80,16 @@
 		<PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
 		<PackageReference Include="Material.Icons.Avalonia" Version="3.0.2" />
 		<PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
-		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
 		<PackageReference Include="OsNotifications" Version="1.1.3" />
 		<PackageReference Include="Selenium.WebDriver" Version="4.46.0" />
 		<PackageReference Include="Selenium.Support" Version="4.46.0" />
 	<PackageReference Include="Tmds.DBus.Protocol" Version="0.94.2" />
 		<PackageReference Include="WebDriverManager" Version="2.17.7" />
-		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.9" />
-		<PackageReference Include="System.Text.Json" Version="10.0.9" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
+		<PackageReference Include="System.Text.Json" Version="10.0.10" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.18">
 			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
