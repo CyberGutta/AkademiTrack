@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Solution created for Akademiet by Akademiet students</h1>
-   <p style="color: #ff4d4f;">Development has been discontinued.</p>
+   <p>Development has been discontinued.</p>
 </div>
 
 <br>
