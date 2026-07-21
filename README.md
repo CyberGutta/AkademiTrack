@@ -1,4 +1,7 @@
-</h1> Solution created for Akademiet by Akademiet students </h1>
+<div align="center">
+  <h1>Solution created for Akademiet by Akademiet students</h1>
+   <p style="color: red;">Development has been discontinued.</p>
+</div>
 
 <div align="center">
 <img width="124" height="124" alt="AT-1024" src="https://github.com/user-attachments/assets/5dba8bdc-b59f-4431-84c5-e797f3352295" />
